@@ -1,0 +1,1545 @@
+<?php
+
+
+    function createConnection() {
+
+        global $db,$sum;
+
+        //$uri = "mongodb://ratUser:electr!cMongo3$@127.0.0.1:27017";
+        $uri = "mongodb://127.0.0.1:27017";
+
+        if($db){
+            return $db;
+        }
+
+        try {
+            $mongo = new MongoDB\Client($uri);
+
+            $db = $mongo->codigo_db;
+            //$db->setLogLevel(5);
+
+
+            return $db;
+        }
+        catch (MongoCursorException $e) {
+            echo "mensaje de error: ".$e->getMessage()."\n";
+            echo "código del error: ".$e->getCode()."\n";
+        }
+
+    }
+
+
+
+    function mandaBot($manda){
+
+        // Inicializar variables para evitar warnings
+        $error = array();
+        $_ERRORS = array();
+
+        $errno   = isset($error["type"]) ? $error["type"] : 0;
+        $errfile = isset($error["file"]) ? $error["file"] : '';
+        $errline = isset($error["line"]) ? $error["line"] : 0;
+        $errstr  = isset($error["message"]) ? $error["message"] : '';
+
+        $manda.= "CODIGOAMIGO*\n";
+
+        if (is_array($_ERRORS)) {
+            foreach($_ERRORS as $a => $line){
+                $manda.= "***".$line."*****\n";
+            }
+        }
+
+        if($errno == 1 || $errno == 4){ //SOLO FATALES
+
+            $manda.= $errno."\n".$errfile."\n".$errline."\n".$errstr;
+
+
+
+            if($archivos_incluidos){
+                $limit = 0;
+                foreach ($archivos_incluidos as $nombre_archivo) {
+                    if($limit<=5){
+                        $last_file.= "\n::".$nombre_archivo;
+                    }
+                    $limit++;
+                }
+                $manda.= "\n\nEncontrado en: ".$last_file."...";
+            }
+
+            $botToken = "1208948207:AAF0O45V1zcsp7wjRgbwOrLQ7tNRUHlfnME";
+            //$chatId="-1001249170942";
+            $chatId="-563343505";
+
+            $url = "https://api.telegram.org/bot".$botToken. "/sendMessage?chat_id=" . $chatId;
+
+            $post = [
+                'chat_id'=>$chatId,
+                'text' => $manda
+            ];
+
+            $curl = curl_init();
+            curl_setopt($curl, CURLOPT_URL, $url);
+            curl_setopt($curl, CURLOPT_POSTFIELDS, $post);
+            curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+
+            $data = curl_exec($curl);
+
+            curl_close($curl);
+
+            //decoding request
+            $result = json_decode($data, true);
+
+        }
+    }
+
+    /**********************************************************
+     *  CONEXION CON BD - USUARIO
+     *********************************************************/
+
+    function getObjectUser ($parameter, $value) {
+
+        $collection_usuarios = getCollectionUsuarios();
+
+
+        $usuario = $collection_usuarios->findOne([$parameter => $value]);
+        
+        // Log para verificar qué imagen se obtiene de la base de datos
+        // Comentado para evitar spam en logs
+        // if ($usuario && isset($usuario["img"])) {
+        //     error_log("getObjectUser - Imagen obtenida de BD: " . $usuario["img"]);
+        // }
+        
+        // Respeta la URL original de la imagen sin modificaciones
+        // Las URLs de imágenes deben mantenerse exactamente como están almacenadas
+        
+        //$usuario["img"] = "aaa";
+        
+        return $usuario;
+    }
+
+    /**********************************************************
+     *  PROPIAS DE USUARIO
+     *********************************************************/
+
+    function more_codes($datos) {
+
+        $marca["nombre_clave"] = $datos["nombre_clave"];
+        $skip_patrocinados = $datos["skip"];
+
+        $array_skip = array("limit"=>13);
+        $array_skip = array_merge($array_skip, array("skip"=>$skip_patrocinados));
+        $array_skip = array_merge($array_skip, array("sort"=>array('destacado' => -1)));
+
+        /* Listado NORMAL */
+        $array_filtro = array("marca"=>$marca["nombre_clave"]);
+        $array_filtro = array_merge($array_filtro, array("estado"=>0));
+        $array_filtro = array_merge($array_filtro, array("destacado"=>0));
+
+        //TOMO LOS CODIGOS
+        $lista_codigos_pre = get_all_listado_codigos_array($array_filtro, $array_skip);
+
+        $lista_codigos = $lista_codigos_pre["results"];
+        $numero_codigos = $lista_codigos_pre["total_number"];
+
+
+
+        block_listado_codigos($lista_codigos, $a_printar);
+
+
+    }
+
+
+
+    function show_estatistics($datos){
+
+        session_start();
+
+
+        $share_url = $datos["data_codigo_url"];
+        $codigo_to_show["codigo"] = $datos["data_codigo_url"];
+
+
+        ?>
+
+                <div class="modal-dialog modal-md">
+                <div class="modal-content">
+
+                    <div class="modal-header" style="background: #3466FF; color: white; padding: 20px; font-size: 20px;">
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                        <span class="modal-title" style="font-size:20px;">Visitas en tu código!</span>
+                    </div>
+
+                    <div class="text-center" style="font-size: 16px; padding: 30px; overflow:auto;max-height:800px;">
+
+                   		 <?php muestra_visitas($datos["data_codigo_id"]); ?>
+
+                    </div>
+
+                </div>
+                </div>
+
+		<?
+
+    }
+
+    function last_codigo($datos,$marca='') {
+
+        session_start();
+
+
+        $share_url = $datos["data_codigo_url"];
+        $codigo_to_show["codigo"] = $datos["data_codigo_url"];
+
+
+
+        ?>
+
+        <div class="modal-dialog modal-md">
+        <div class="modal-content">
+
+            <div class="modal-header" style="background: #3466FF; color: white; padding: 20px; font-size: 20px;">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <span class="modal-title" style="font-size:20px;">Comparte tu código en redes!</span>
+            </div>
+
+            <div class="text-center" style="font-size: 16px; padding: 10px;">
+
+                        	<p><?php
+
+
+                        	if((!$_SESSION["user_id"])) { ?>
+
+                    	    		<div class="text-center block_codigo_no_sesion"><p>Por favor, inicia sesión para poder ver este código</p>
+                    	    			<button class="btn btn_codigo_amigo btn-custom btn-mini login open_modal_login"><i class="fa fa-user"></i> Iniciar sesión</button>
+                    	    		</div>
+
+                        	 <?php }else{
+
+                        	if(strpos($codigo_to_show["codigo"], "http") !==false){
+                        	    ?><a target="_blank" href="<? echo $codigo_to_show["codigo"]; ?>"><? echo $codigo_to_show["codigo"]; ?></a><?
+                        	}else{
+                        	    echo $codigo_to_show["codigo"];
+                        	}
+
+                        	}
+
+
+
+                        	?>
+
+                        	</p>
+
+                        	<?php echo "<br><i class='fa fa-clipboard' aria-hidden='true'></i> <a onclick='executeCopy(\"".$codigo_to_show["codigo"]."\",$(this));'>Copiar al portapapeles</a>"; ?>
+                       		<hr>
+                    		<div class="text-center">
+						<?php
+
+
+                		 // Get current page URL
+                		 $crunchifyURL = urlencode($share_url);
+
+                		 $title = "Ahorra";
+
+                		 if($datos["descuento"]){
+                		     $title.= " ".$datos["descuento"];
+                		 }
+
+                		 if($datos["marca"]){
+                		     $title.= " de ".$datos["marca"];
+                		 }
+
+                		 $title.= " con mi código amigo";
+
+                		 // Get current page title
+                		 $crunchifyTitle = htmlspecialchars(urlencode(html_entity_decode($title)));
+
+                		 // $crunchifyTitle = str_replace( ' ', '%20', get_the_title());
+
+                		 // Get Post Thumbnail for pinterest
+                		 $crunchifyThumbnail = $imagen_social;
+
+                		                 		 // Construct sharing URL without using any script
+                		 $twitterURL = 'https://twitter.com/intent/tweet?text='.$crunchifyTitle.'&amp;url='.$crunchifyURL.'&amp;via=codigoamigoweb&amp;hashtags=codigoamigo,descuentos,codigopromocional'.optimizeUrlPath($datos["marca"]).','.optimizeUrlPath($datos["marca"]);
+                		 $facebookURL = 'https://www.facebook.com/sharer/sharer.php?u='.$crunchifyURL;
+                		 $googleURL = 'https://plus.google.com/share?url='.$crunchifyURL;
+                		 $bufferURL = 'https://bufferapp.com/add?url='.$crunchifyURL.'&amp;text='.$crunchifyTitle;
+                		 $whatsappURL = 'whatsapp://send?text='.$crunchifyTitle.' '.$crunchifyURL;
+                		 $telegramURL = 'https://telegram.me/share/url?url='.$crunchifyURL.'&text='.$crunchifyTitle;
+                		 $linkedInURL = 'https://www.linkedin.com/shareArticle?mini=true&url='.$crunchifyURL.'&amp;title='.$crunchifyTitle;
+
+                		 // Based on popular demand added Pinterest too
+                		 $pinterestURL = 'https://pinterest.com/pin/create/button/?url='.$crunchifyURL.'&amp;media='.$crunchifyThumbnail[0].'&amp;description='.$crunchifyTitle;
+
+                		 // Add sharing button at the end of page/page content
+                		 //$content .= '<!-- Implement your own superfast social sharing buttons without any JavaScript loading. No plugin required. Detailed steps here: http://crunchify.me/1VIxAsz -->';
+
+
+
+                		 $content2 .= '<div class="crunchify-social">';
+                		 $content2 .= '<h5>Comparte</h5>';
+                		 $content2 .= '<a class="crunchify-link crunchify-whatsapp" href="'.$whatsappURL.'" target="_blank">Whatsapp</a>';$content2 .= '<a class="crunchify-link crunchify-linkedin" href="'.$linkedInURL.'" target="_blank">LinkedIn</a>';
+                		 $content2 .= '<a class="crunchify-link crunchify-telegram" href="'.$telegramURL.'" target="_blank">Telegram</a>';
+
+                		 $content2 .=' <a class="crunchify-link crunchify-twitter" href="'. $twitterURL .'" target="_blank">Twitter</a>';
+                		$content2 .= '<a class="crunchify-link crunchify-facebook" href="'.$facebookURL.'" target="_blank">Facebook</a>';
+                		 $content2 .= '<a class="crunchify-link crunchify-pinterest" href="'.$pinterestURL.'" data-pin-custom="true" target="_blank">Pin It</a>';
+                		 $content2 .= '</div>';
+
+                		 echo $content2;
+
+                		 ?>
+                            </div>
+                        </div>
+
+            </div>
+        </div>
+
+
+        <?
+
+    }
+
+
+
+    /**********************************************************
+     *  CONEXION CON BD - MARCA
+     *********************************************************/
+
+    function getObjectMarca ($parameter, $value) {
+
+        $collection_marcas = getCollectionMarcas();
+        $marca = $collection_marcas->findOne([$parameter => $value]);
+        
+        // Verificar si se encontró la marca
+        if (!$marca) {
+            return null;
+        }
+        
+        // Verificar si existe la clave "nombre" antes de procesarla
+        if (isset($marca["nombre"])) {
+            $marca["nombre"] = ucwords(strtolower($marca["nombre"]));
+        }
+
+
+
+
+
+        // Verificar si existe la clave "imagen" antes de procesarla
+        if (isset($marca["imagen"]) && is_string($marca["imagen"])) {
+            if(strpos($marca["imagen"],'http://') !==false){
+                $marca["imagen"] = str_replace("http://", "https://", $marca["imagen"]);
+            }
+
+            if(strpos($marca["imagen"],'https://www.codigoamigo.com/img/') !==false ){
+                // Solo convertir a CloudFront si está en la carpeta /img/ (no /img/panel_marcas/)
+                if(strpos($marca["imagen"],'https://www.codigoamigo.com/img/panel_marcas/') === false) {
+                    $marca["imagen"] = str_replace("https://www.codigoamigo.com/img/","https://d3hcf0nbuqjt3g.cloudfront.net/",$marca["imagen"]);
+                }
+            }else if(strpos($marca["imagen"],'https://cdn-codigoamigo.s3-eu-west-1.amazonaws.com/') !==false ){
+                $marca["imagen"] = str_replace("https://cdn-codigoamigo.s3-eu-west-1.amazonaws.com/","https://d3hcf0nbuqjt3g.cloudfront.net/",$marca["imagen"]);
+            }
+
+            if($marca["imagen"] == 'Sin imagen'){
+                $marca["imagen"] = "";
+            }
+        } else {
+            // Si no existe la clave "imagen", establecer un valor por defecto
+            $marca["imagen"] = "";
+        }
+
+        return $marca;
+    }
+
+    /**********************************************************
+     *  CONEXION CON BD - CÓDIGO
+     *********************************************************/
+
+    function añadir_vista_codigo ($codigo) {
+
+        $rand = rand(1, 3);
+        $num_vistas = $codigo["totalclicks"] + $rand;
+
+        try {
+            $collection_codigos = getCollectionCodigos();
+            $updateResult = $collection_codigos->updateOne(
+                ['_id' => new \MongoDB\BSON\ObjectId($codigo["_id"]) ],
+                ['$set' => ['totalclicks' => $num_vistas]]
+            );
+        } catch(MongoDB\Driver\Exception\WriteException $e) {
+            $writeResult = $e->getWriteResult();
+            echo "Errores en MongoDB\n";
+        }
+
+    }
+
+
+     function añadir_historial_codigo ($codigo) {
+         $rand = rand(1, 3);
+         $num_vistas = $codigo["totalclicks"] + $rand;
+
+         try {
+             $collection_historial = getCollectionHistorial();
+
+             $data = [
+                 "id_codigo" => new \MongoDB\BSON\ObjectId($codigo["_id"]),
+                 "user_id" => $_SESSION["user_id"],
+                 "fecha_visita" => date('d-m-Y  H:i:s'),
+             ];
+
+             $collection_historial->insertOne($data);
+
+         } catch(MongoDB\Driver\Exception\WriteException $e) {
+             $writeResult = $e->getWriteResult();
+             echo "Errores en MongoDB\n";
+         }
+     }
+
+     function añadir_destacado_codigo_usuario ($usuario,$codigo_operacion='BCV') {
+
+
+
+
+
+
+
+         //DESTACA TODOS LOS CODIGOS DE UN USUARIO
+
+         //añadir_destacado_codigo
+
+             try {
+                 $collection_codigos = getCollectionCodigos();
+                 //print_r($collection_codigos);
+                 $updateResult = $collection_codigos->updateMany(
+                    ['id_usuario' => $usuario["_id"] ],
+                    ['$set' => ['destacado' => strtotime('now')]]
+                 );
+             } catch(MongoDB\Driver\Exception\WriteException $e) {
+                 $writeResult = $e->getWriteResult();
+                 echo "Errores en MongoDB\n";
+             }
+
+
+
+             /* EMAIL */
+
+             $usuario = getObjectUser('_id', $usuario["_id"] );
+             $usuario_original = get_array_de_usuario($usuario);
+
+
+             /* SACO TODOS LOS CODIGOS DE LA MARCA QUE ESTAN PATROCINADOS */
+             $array_filtro = array("id_usuario"=>$usuario["_id"]);
+             $array_filtro = array_merge($array_filtro, array("estado"=>0));
+             $array_filtro = array_merge($array_filtro, array("destacado"=>array('$ne' => 0)));
+
+             $array_skip = array("limit"=>13);
+             $array_skip = array_merge($array_skip, array("sort"=>array('destacado' => -1)));
+
+             //TOMO LOS CODIGOS
+             $lista_codigos_pre = get_all_listado_codigos_array($array_filtro, $array_skip);
+             $lista_codigos_patrocinados = $lista_codigos_pre["results"];
+
+             foreach($lista_codigos_patrocinados as $listado){
+
+                 $usuario = getObjectUser('_id', new \MongoDB\BSON\ObjectId($listado["id_usuario"]));
+                 $datos_usuario = get_array_de_usuario($usuario);
+
+                 if($usuario_original["mail"] != $datos_usuario["mail"]){
+
+                     $codigo_to_show = $collection_codigos->findOne(['_id' => $codigo["_id"]]);
+                     $m = getObjectMarca("nombre_clave", $listado["marca"]);
+                     $u = getObjectUser('_id', $codigo_to_show["id_usuario"]);
+                     $actual_link = "https://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+                     enviar_mail_codigo_no_destacado($listado,  $datos_usuario["mail"], $datos_usuario["username"], $actual_link, $m["nombre"], $m["imagen"], $usuario_original);
+
+                 }
+
+             }
+
+     }
+
+
+    // Nueva función para el sistema de destacar moderno
+    function destacar_codigo_moderno($codigo_id, $tipo_destacado = 'normal') {
+        try {
+            $collection_codigos = getCollectionCodigos();
+            $obj_id_codigo = new \MongoDB\BSON\ObjectId($codigo_id);
+            
+            $update_data = [
+                'destacado' => strtotime('now'),
+                'fecha_destacado' => date('Y-m-d H:i:s'),
+                'tipo_destacado' => $tipo_destacado
+            ];
+            
+            // Para destacado super, agregar campo adicional
+            if($tipo_destacado == 'super') {
+                $update_data['destacado_super'] = strtotime('now');
+            }
+            
+            $updateResult = $collection_codigos->updateOne(
+                ['_id' => $obj_id_codigo],
+                ['$set' => $update_data]
+            );
+            
+            if($updateResult->getModifiedCount() > 0) {
+                // Enviar notificación por email al usuario
+                enviar_notificacion_destacado($codigo_id, $tipo_destacado);
+                return true;
+            }
+            
+            return false;
+            
+        } catch(MongoDB\Driver\Exception\WriteException $e) {
+            error_log("Error al destacar código: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    // Función para enviar notificación de destacado
+    function enviar_notificacion_destacado($codigo_id, $tipo_destacado) {
+        try {
+            $codigo = getCodeByID(new \MongoDB\BSON\ObjectId($codigo_id));
+            if(!$codigo) return false;
+            
+            $usuario = getObjectUser('_id', $codigo['id_usuario']);
+            if(!$usuario) return false;
+            
+            $marca = getObjectMarca('nombre_clave', $codigo['marca']);
+            $marca_nombre = $marca['nombre'] ?? $codigo['marca'];
+            
+            $tipo_texto = $tipo_destacado == 'super' ? 'Super Destacado' : 'Destacado Normal';
+            $duracion = $tipo_destacado == 'super' ? '60 días' : '30 días';
+            
+            $asunto = "¡Tu código ha sido destacado exitosamente!";
+            $mensaje = "
+                <h2>¡Felicidades! Tu código ha sido destacado</h2>
+                <p>Tu código para <strong>{$marca_nombre}</strong> ha sido destacado como <strong>{$tipo_texto}</strong>.</p>
+                <p><strong>Detalles:</strong></p>
+                <ul>
+                    <li>Marca: {$marca_nombre}</li>
+                    <li>Código: {$codigo['codigo']}</li>
+                    <li>Tipo: {$tipo_texto}</li>
+                    <li>Duración: {$duracion}</li>
+                    <li>Fecha: " . date('d/m/Y H:i') . "</li>
+                </ul>
+                <p>Tu código ahora aparecerá en primera posición y tendrá mayor visibilidad.</p>
+                <p><a href='{$GLOBALS['website']}de-" . strtolower($codigo['marca']) . "' style='background: #ff6b35; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>Ver código destacado</a></p>
+            ";
+            
+            // Enviar email usando mail() de PHP
+            $headers = "MIME-Version: 1.0" . "\r\n";
+            $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
+            $headers .= "From: info@codigoamigo.com" . "\r\n";
+            
+            return mail($usuario['mail'], $asunto, $mensaje, $headers);
+            
+        } catch(Exception $e) {
+            error_log("Error enviando notificación de destacado: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    function añadir_destacado_codigo ($codigo,$codigo_operacion='BCV') {
+
+        //BCV == destacado normal
+        //BCS == destacado social
+
+        //añadir_destacado_codigo
+
+        
+
+        if($codigo_operacion=='BCV'){ //BCV == destacado normal
+
+            try {
+                $collection_codigos = getCollectionCodigos();
+                //print_r($collection_codigos);
+                $updateResult = $collection_codigos->updateOne(
+                    ['_id' => new \MongoDB\BSON\ObjectId($codigo["_id"]) ],
+                    ['$set' => ['destacado' => strtotime('now')]]
+                    );
+            } catch(MongoDB\Driver\Exception\WriteException $e) {
+                $writeResult = $e->getWriteResult();
+                echo "Errores en MongoDB\n";
+            }
+
+            // echo "doble o nada";
+            // print_r($codigo);
+            // echo $codigo_operacion;
+            // die;
+
+            /* EMAIL */
+
+            $usuario = getObjectUser('_id', new \MongoDB\BSON\ObjectId($codigo["id_usuario"]));
+            $usuario_original = get_array_de_usuario($usuario);
+
+
+            /* SACO TODOS LOS CODIGOS DE LA MARCA QUE ESTAN PATROCINADOS */
+
+            $array_filtro = array("marca"=>$codigo["marca"]);
+            $array_filtro = array_merge($array_filtro, array("estado"=>0));
+            $array_filtro = array_merge($array_filtro, array("destacado"=>array('$ne' => 0)));
+
+            $array_skip = array("limit"=>13);
+            $array_skip = array_merge($array_skip, array("sort"=>array('destacado' => -1)));
+
+            //TOMO LOS CODIGOS
+            $lista_codigos_pre = get_all_listado_codigos_array($array_filtro, $array_skip);
+            $lista_codigos_patrocinados = $lista_codigos_pre["results"];
+
+            foreach($lista_codigos_patrocinados as $listado){
+
+                $usuario = getObjectUser('_id', new \MongoDB\BSON\ObjectId($listado["id_usuario"]));
+                $datos_usuario = get_array_de_usuario($usuario);
+
+                if($usuario_original["mail"] != $datos_usuario["mail"]){
+
+                    $codigo_to_show = $collection_codigos->findOne(['_id' => $codigo["_id"]]);
+                    $m = getObjectMarca("nombre_clave", $listado["marca"]);
+                    $u = getObjectUser('_id', $codigo_to_show["id_usuario"]);
+                    $actual_link = "https://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+                    enviar_mail_codigo_no_destacado($listado,  $datos_usuario["mail"], $datos_usuario["username"], $actual_link, $m["nombre"], $m["imagen"], $usuario_original);
+
+                }
+
+            }
+
+        }elseif($codigo_operacion=='BCS'){
+
+            try {
+                $collection_codigos = getCollectionCodigos();
+                
+
+                $updateResult = $collection_codigos->updateOne(
+                    ['_id' => new \MongoDB\BSON\ObjectId($codigo["_id"]) ],
+                    ['$set' => ['destacado' => strtotime('now'), 'destacado_social' => strtotime('now')]]
+                    );
+
+
+            } catch(MongoDB\Driver\Exception\WriteException $e) {
+                $writeResult = $e->getWriteResult();
+                echo "Errores en MongoDB\n";
+            }
+
+            /* ENVIO CORREOS */
+
+            $usuario = getObjectUser('_id', new \MongoDB\BSON\ObjectId($codigo["id_usuario"]));
+            $usuario_original = get_array_de_usuario($usuario);
+
+            /* SACO TODOS LOS CODIGOS DE LA MARCA QUE ESTAN PATROCINADOS */
+
+            $array_filtro = array("marca"=>$codigo["marca"]);
+            $array_filtro = array_merge($array_filtro, array("estado"=>0));
+            $array_filtro = array_merge($array_filtro, array("destacado_social"=>array('$exists' => true)));
+            $array_filtro = array_merge($array_filtro, array("destacado"=>array('$ne' => 0)));
+
+            $array_skip = array("limit"=>13);
+            $array_skip = array_merge($array_skip, array("sort"=>array('destacado_social' => -1)));
+
+            //TOMO LOS CODIGOS
+            $lista_codigos_pre = get_all_listado_codigos_array($array_filtro, $array_skip);
+            $lista_codigos_patrocinados = $lista_codigos_pre["results"];
+
+            foreach($lista_codigos_patrocinados as $listado){
+
+                $usuario = getObjectUser('_id', new \MongoDB\BSON\ObjectId($listado["id_usuario"]));
+                $datos_usuario = get_array_de_usuario($usuario);
+
+
+
+                if($usuario_original["mail"] != $datos_usuario["mail"]){
+                    $codigo_to_show = $collection_codigos->findOne(['_id' => $codigo["_id"]]);
+                    $m = getObjectMarca("nombre_clave", $listado["marca"]);
+                    $u = getObjectUser('_id', $codigo_to_show["id_usuario"]);
+                    $actual_link = "https://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+                    enviar_mail_codigo_no_destacado_home($listado,  $datos_usuario["mail"], $datos_usuario["username"], $actual_link, $m["nombre"], $m["imagen"], $usuario_original);
+                }
+
+            }
+
+
+        }
+
+    }
+
+function send_mail_elastic($data) {
+
+
+
+        $url = "https://api.elasticemail.com/v2/email/send";
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        $respuesta = curl_exec($ch);
+        curl_close ($ch);
+
+        $info_res = json_decode($respuesta);
+        return $info_res;
+
+
+}
+
+
+function sendToTelegram($anuncio){
+
+    global $arrProv,$arrSubCats,$arrMicro,$arrCatsT;
+
+
+
+
+    if(isset($GLOBALS["SYSTEM_CONF"]) && isset($GLOBALS["SYSTEM_CONF"]['WEBSITE'])){
+        if($GLOBALS["SYSTEM_CONF"]['WEBSITE']=="AR"){
+            $icono_pais = "";
+        }elseif($GLOBALS["SYSTEM_CONF"]['WEBSITE']=="CU"){
+            $icono_pais = "";
+        }elseif($GLOBALS["SYSTEM_CONF"]['WEBSITE']=="CO"){
+            $icono_pais = "";
+        }elseif($GLOBALS["SYSTEM_CONF"]['WEBSITE']=="UY"){
+            $icono_pais = "🇺🇾";
+        }elseif($GLOBALS["SYSTEM_CONF"]['WEBSITE']=="CA"){
+            $icono_pais = "🇪🇸";
+            $publica = 1;
+        }
+    } else {
+        $icono_pais = "";
+    }
+
+
+    if(isset($anuncio['id_subcategoria']) && $anuncio['id_subcategoria']==371 && isset($anuncio['id_usuario']) && $anuncio['id_usuario']==1732){ //STOCKS SERGI
+        $stocks = 1;
+        $icono = "📱";
+        //$chat_id = "-1001075210999";
+        $chat_id = "@casinuevo_stock";
+    }elseif(isset($anuncio['id_categoria']) && $anuncio['id_categoria']==1){ //COCHES
+        $icono = "🚗";
+        //$chat_id = "-1001075210999";
+        $chat_id = "@casinuevo_motor";
+    }elseif(isset($anuncio['id_categoria']) && $anuncio['id_categoria']==2){ //VIVIENDAS
+        $icono = "🏪";
+        $chat_id = "@casinuevo_pisos";
+    }elseif(isset($anuncio['id_categoria']) && $anuncio['id_categoria']==3){ //ELECTRONICA
+        $icono = "📱";
+        $chat_id = "@moviles_segunda_mano";
+    }elseif(isset($anuncio['id_categoria']) && ($anuncio['id_categoria']==7 || $anuncio['id_categoria']==5 || $anuncio['id_categoria']==4)){ //CASINUEVO
+        $icono = "📲💵";
+        $chat_id = "@casinuevo";
+    }elseif(isset($anuncio['id_categoria']) && ($anuncio['id_categoria']==6 || $anuncio['id_categoria']==8)){ //EMPLEO
+        $icono = "⛓";
+        //$chat_id = "-1001077892633";
+        $chat_id = "@casinuevo_servicios_empleo";
+
+    }elseif(isset($anuncio['id_categoria']) && $anuncio['id_categoria']==321){ //CONTACTOS
+        $icono = "💑";
+        //$chat_id = "-1001099207555";
+        $chat_id = "@casinovios";
+
+    }
+
+    $publica = 1;
+    $chat_id = "@codigoamigocom";
+    
+    // Inicializar variables
+    $icono = isset($icono) ? $icono : "📱";
+    $icono_pais = isset($icono_pais) ? $icono_pais : "";
+
+    $optimize_name_marca = optimizeUrlPath($anuncio["marca"]);
+    $optimize_name_marca = str_replace("-", "", $optimize_name_marca);
+
+
+
+    if($chat_id && $publica){
+
+        $caract = "\n♦️ ".$anuncio["numerobeneficio"]." ".$anuncio["descuentos"]." en ".$anuncio["marca"]."\n";
+
+        $tags = isset($tags) ? $tags : "";
+        $datos = isset($datos) ? $datos : array("localidad" => "", "provincia" => "");
+        $tags.= "\n".$icono_pais." #".($datos["localidad"])." - ".($datos["provincia"]);
+
+
+        $href_prod = "🔗  https://www.codigoamigo.com/de-".$optimize_name_marca;
+
+        $mensaje= "\n\n".$icono.$icono."\n\n<pre>".recorta_texto_pos($anuncio["descripcion"],160,"..")."</pre>\n".$caract.$tags;
+
+
+        $mensaje.=$href_prod."\n\n";
+
+        $mensaje.="Más códigos de amigo en <a href='https://telegram.me/".$chat_id."'>".$chat_id."</a>";
+
+
+
+
+
+        $token = "822797607:AAE-3fPaZsUc1LKKgFaWgqmfLRCPgu1sDdw";
+
+
+
+        $bot_url    = "https://api.telegram.org/bot$token/";
+        $url = $bot_url."sendMessage?chat_id=".$chat_id."&text=".urlencode($mensaje)."&parse_mode=HTML&disable_notification=true";
+        $ret = file_get_contents($url);
+
+    }
+
+}
+
+function formatDateAgo($value)
+{
+    $time = strtotime($value);
+    $d = new \DateTime($value);
+
+    $weekDays = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    $months = ['Janvier', 'Février', 'Mars', 'Avril',' Mai', 'Juin', 'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+
+
+    if ($time > strtotime('-2 minutes'))
+    {
+        return 'Hace unos segundos';
+    }
+    elseif ($time > strtotime('-30 minutes'))
+    {
+        return 'Hoy, hace ' . floor((strtotime('now') - $time)/60) . ' min';
+    }
+    elseif ($time > strtotime('today'))
+    {
+        return $d->format('G:i');
+    }
+    elseif ($time > strtotime('yesterday'))
+    {
+        return 'Ayer, ' . $d->format('G:i');
+    }
+    elseif ($time > strtotime('Esta semana'))
+    {
+        return $weekDays[$d->format('N') - 1] . ', ' . $d->format('G:i');
+    }
+    else
+    {
+        return $d->format('j') . ' ' . $months[$d->format('n') - 1] . ', ' . $d->format('G:i');
+    }
+}
+
+function formatDateAgoLarge($value)
+{
+    $time = strtotime($value);
+    $d = new \DateTime($value);
+
+    $weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    $months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+    if ($time > strtotime('-2 minutes'))
+    {
+        return 'Hace unos segundos';
+    }
+    elseif ($time > strtotime('-30 minutes'))
+    {
+        return 'Hoy, hace ' . floor((strtotime('now') - $time)/60) . ' min';
+    }
+    elseif ($time > strtotime('today'))
+    {
+        return 'Hoy, ' . $d->format('d/m/Y H:i');
+    }
+    elseif ($time > strtotime('yesterday'))
+    {
+        return 'Ayer, ' . $d->format('d/m/Y H:i');
+    }
+    elseif ($time > strtotime('-7 days'))
+    {
+        return $weekDays[$d->format('N') - 1] . ', ' . $d->format('d') . ' ' . $months[$d->format('n') - 1] . ' ' . $d->format('Y');
+    }
+    else
+    {
+        return $d->format('d') . ' ' . $months[$d->format('n') - 1] . ' ' . $d->format('Y');
+    }
+}
+
+
+
+    /**********************************************************
+     *  PROPIAS DE CÓDIGO
+     *********************************************************/
+
+    function get_all_codigos() {
+
+        $collection_codigos = getCollectionCodigos();
+        /* Comprobamos num de codigos antes de jugar */
+
+        $count = $collection_codigos->count(['estado' => 0]);
+
+        if($count > 0) {
+            $lista_codigos = $collection_codigos->find(['estado' => 0], ['sort' => ['_id' => -1]]);
+            $array_codigos = iterator_to_array($lista_codigos);
+            return $array_codigos;
+        }
+
+    }
+
+    function get_all_listado_codigos($parameter, $value) {
+
+        $collection_codigos = getCollectionCodigos();
+        /* Comprobamos num de codigos antes de jugar */
+        $count = $collection_codigos->count(['estado' => 0, $parameter => $value]);
+        if($count > 0) {
+
+            $lista_codigos = $collection_codigos->find(['estado' => 0,
+                $parameter => $value],
+                ['sort' => ['_id' => -1]]);
+
+            $array_codigos = iterator_to_array($lista_codigos);
+            return $array_codigos;
+        }
+
+    }
+
+
+    function get_all_listado_codigos_by_user($parameter, $value,$id_user) {
+
+        $collection_codigos = getCollectionCodigos();
+        /* Comprobamos num de codigos antes de jugar */
+        $count = $collection_codigos->count(['estado' => 0, $parameter => $value]);
+        if($count > 0) {
+
+            $lista_codigos = $collection_codigos->find([
+                'id_usuario' => $id_user,
+                $parameter => $value],
+                ['sort' => ['_id' => -1]]);
+
+            $array_codigos = iterator_to_array($lista_codigos);
+            return $array_codigos;
+        }
+
+    }
+
+
+    function getCodeByID_prelista($id_codigo) {
+        $collection_codigos = getCollectionCodigos();
+        
+        // Una sola consulta usando findOne() ya que buscamos por ID
+        $codigo = $collection_codigos->findOne(['_id' => $id_codigo]);
+        
+        if ($codigo) {
+            // Retornamos el resultado en un array para mantener compatibilidad
+            return [$codigo];
+        }
+        
+        return null;
+    }
+
+
+    function get_all_listado_codigos_filtro($parameter, $value, $limit='', $skip='') {
+
+
+        $collection_codigos = getCollectionCodigos();
+        $count = $collection_codigos->count(['estado' => 0, $parameter => $value]);
+        if($count > 0) {
+            $lista_codigos = $collection_codigos->find(
+                [
+                    'estado' => 0,
+                    $parameter => $value,
+                ],
+                [
+                    'limit' => $limit,
+                    'skip' => $skip,
+                    'sort' => ['_id' => -1]
+                ]
+            );
+
+            $array_codigos = iterator_to_array($lista_codigos);
+            return $array_codigos;
+        }
+
+    }
+
+
+    function count_all_listado_codigos_array($array_filtro, $array_skip='',$array_group='',$results=1) {
+
+
+        $collection_codigos = getCollectionCodigos();
+
+        if(!$array_skip){
+            $array_skip = array();
+        }
+
+
+        if($array_filtro){
+
+            $count = $collection_codigos->count($array_filtro);
+            $array_codigos["total_number"] = $count;
+
+
+
+            return $array_codigos["total_number"];
+
+        }
+
+    }
+
+
+    function get_all_listado_codigos_array($array_filtro, $array_skip='',$array_group='',$results=1) {
+
+
+        $collection_codigos = getCollectionCodigos();
+
+
+        if(!$array_skip){
+            $array_skip = array();
+        }
+
+
+        if($array_filtro){
+
+            
+
+            $count = $collection_codigos->count($array_filtro);
+
+
+
+            $array_codigos["total_number"] = $count;
+
+            if($count > 0 && $results==1) {
+
+                $lista_codigos = $collection_codigos->find($array_filtro,$array_skip);
+                $array_codigos["results"] = iterator_to_array($lista_codigos);
+            }
+
+
+
+            return $array_codigos;
+
+        }
+
+    }
+
+    function get_all_listado_codigos_destacados($parameter, $value, $limit='', $skip='') {
+
+
+        $collection_codigos = getCollectionCodigos();
+
+
+        if($limit){
+        if($parameter && $value){
+
+
+
+            $count = $collection_codigos->count(['estado' => 0, 'destacado' => ['$ne' => 0], $parameter => $value]);
+
+
+            if($count > 0) {
+                $lista_codigos = $collection_codigos->find(
+                    [
+                        'estado' => 0,
+                        'destacado' => ['$ne' => 0],
+                        $parameter => $value
+                    ],
+                    [
+                        'limit' => $limit,
+                        'skip' => $skip,
+                        'sort' => ['destacado' => -1, '_id' => -1],
+                    ]
+                    );
+                $array_codigos = iterator_to_array($lista_codigos);
+                return $array_codigos;
+            }
+
+        }else{
+
+            $count = $collection_codigos->count(['estado' => 0]);
+
+            if($count > 0) {
+                $lista_codigos = $collection_codigos->find(
+                    [
+                        'estado' => 0,
+                        'destacado' => ['$ne' => 0],
+                    ],
+                    [
+                        'limit' => $limit,
+                        'skip' => $skip,
+                        'sort' => ['destacado' => -1, '_id' => -1],
+                    ]
+                    );
+                $array_codigos = iterator_to_array($lista_codigos);
+                return $array_codigos;
+            }
+
+        }
+        }
+
+    }
+
+
+
+
+
+    function guardar_token_compra_lead_sin_validar($datos) {
+
+        session_start();
+
+        $_SESSION["compra_lead_sin_validar"]["token_id"] = $datos["token_id"];
+        $_SESSION["compra_lead_sin_validar"]["cantidad"] = $datos["cantidad"];
+        $_SESSION["compra_lead_sin_validar"]["codigo"] = $datos["codigo"];
+        $_SESSION["compra_lead_sin_validar"]["lead_id"] = $datos["lead_id"];
+
+    }
+
+    function guardar_token_compra_lead_validado($datos) {
+
+        session_start();
+
+        $_SESSION["compra_lead_validado"]["token_id"] = $datos["token_id"];
+        $_SESSION["compra_lead_validado"]["cantidad"] = $datos["cantidad"];
+        $_SESSION["compra_lead_validado"]["codigo"] = $datos["codigo"];
+        $_SESSION["compra_lead_validado"]["lead_id"] = $datos["lead_id"];
+
+        //print_x($_SESSION);
+
+    }
+
+
+
+
+
+
+    function get_listado_codigos ($parameter, $value, $limit='', $skip='') {
+
+	    $collection_codigos = getCollectionCodigos();
+	    $count = $collection_codigos->count(
+	        [
+	            'estado' => 0,
+	            $parameter => $value,
+	        ]);
+	    if($count > 0) {
+	        $lista_codigos = $collection_codigos->find(
+	            [
+	                'estado' => 0,
+	                $parameter => $value,
+	            ],
+	            [
+	                'limit' => $limit,
+	                'skip' => $skip,
+	                'sort' => ['_id' => -1],
+	            ]
+	            );
+	        $lista_codigos->num = $count;
+	        return $lista_codigos;
+	    }
+
+	}
+
+	function order_listado_codigos_localizacion($marca) {
+
+	    global $array_mes2;
+
+	    $array_ordenada = array();
+	    $lista = get_all_listado_codigos('marca', $marca["nombre_clave"]);
+
+	    foreach ($lista as $index=>$item) {
+
+	        $item_c = optimizeUrlPath($item["provincia"]);
+
+
+	        $array_ordenada[$item_c][$item_c][] = $item;
+
+	    }
+
+	    return $array_ordenada;
+
+	}
+
+	function order_listado_codigos($marca) {
+
+	    global $array_mes2;
+
+	    $array_ordenada = array();
+	    $lista = get_all_listado_codigos('marca', $marca["nombre_clave"]);
+
+	    foreach ($lista as $index=>$item) {
+
+	        $fec = $item["fecha_publicacion"];
+	        if (strpos($fec, "-18") !== false) { $fec = str_replace("-18", "-2018", $fec); }
+	        if (strpos($fec, "-17") !== false) { $fec = str_replace("-17", "-2017", $fec); }
+	        $fecha = date("d-m-Y", strtotime($fec));
+
+	        $mes = date("m", strtotime($fecha));
+	        $año = date("Y", strtotime($fecha));
+
+	        $array_ordenada[$año][$array_mes2[$mes]][] = $item;
+
+	    }
+
+	    return $array_ordenada;
+
+	}
+
+
+	function get_prev_and_next($num_codigos, $codigos_restantes) {
+
+	    //Boton siguiente
+	    if($_GET["page"] == "" || $_GET["page"] == 1) { $page = 2; $page_prev = ''; }
+	    else { $page = $_GET["page"] + 1; $page_prev = $_GET["page"] - 1;}
+
+	    if($page_prev){
+	        if($page_prev>1){
+    	        $url_prev = strtok($GLOBALS["actual_url"], '?')."?page=".$page_prev;
+	        }else{
+	            $url_prev = str_replace("?page=2","",($GLOBALS["actual_url"]));
+	        }
+    	    $links["prev"] = $url_prev;
+	    }
+
+	    $url_next = strtok($GLOBALS["actual_url"], '?')."?page=".$page;
+
+
+	    $links["next"] = $url_next;
+
+	    return $links;
+
+	}
+
+	function show_buttons_paginate($num_codigos, $codigos_restantes,$marca='') {
+
+
+
+        $html = '<div class="row text-center  col-xs-12" style="margin-bottom: 20px;">';
+
+
+
+// 	    $html .= ' <button id="show_more">dsa</button>';
+
+
+// 	    $html .= '</div>';
+
+	    //Boton anterior
+	    if(isset($_GET["page"]) && $_GET["page"] > 1) {
+	        $page_atras = $_GET["page"] - 1;
+	        if($page_atras != 1) { $url_atras = strtok($GLOBALS["actual_url"], '?')."?page=".$page_atras; }
+	        else { $url_atras = strtok($GLOBALS["actual_url"], '?'); }
+	        $html .= '<a href="'.$url_atras.'" class="btn btn-primary btn-custom"> <i class="fas fa-angle-left"></i> Códigos anteriores</a>';
+	    }
+
+	    //Boton siguiente
+	    if(!isset($_GET["page"]) || $_GET["page"] < 15){
+    	    if((!isset($_GET["page"]) || $_GET["page"] == "" || $_GET["page"] == 1)) { $page = 2; }
+    	    else { $page = $_GET["page"] + 1; }
+    	    // Inicializar variable global si no está definida
+    	    if (!isset($GLOBALS["actual_url"])) {
+    	        $GLOBALS["actual_url"] = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+    	    }
+    	    $url = strtok($GLOBALS["actual_url"], '?')."?page=".$page;
+    	    if($num_codigos > 10 && $codigos_restantes >= 1) {
+    	        $html .= ' <a href="'.$url.'" class="text-center btn btn-primary btn-custom">Ver más códigos descuento de '.$marca["nombre"].'  <i class="fas fa-angle-right"></i></a>';
+    	    }
+
+    	    $html .= '</div>';
+	    }
+
+        echo $html;
+
+	}
+
+
+
+
+
+
+
+	function rich_snippet_page () { ?>
+
+	    <?php
+	        global $rating_count_rs, $rating_value_rs, $url_logo_rs, $url_marca_rs, $title_marca_rs;
+
+
+	        $url_logo_rs = str_replace("https://www.codigoamigo.comhttps","https",$url_logo_rs);
+	    ?>
+
+	    <script type="application/ld+json">
+            {
+                "@context": "http://schema.org",
+                "@type": "WebPage",
+                "name": "<?php echo $title_marca_rs; ?>",
+                "url": "<?php echo $url_marca_rs; ?>",
+                "image": "<?php echo $url_logo_rs; ?>",
+                "aggregateRating": {
+                    "@type": "AggregateRating",
+                    "ratingValue": "<?php echo $rating_value_rs; ?>",
+                    "ratingCount": "<?php echo $rating_count_rs; ?>"
+ 	            }
+            }
+        </script>
+
+	<?php }
+
+
+
+
+
+
+
+
+
+
+/********************************************************************
+ * AYUDA
+ *******************************************************************/
+
+
+function get_skip_patrocinados_in_pagination() {
+
+    if(isset($_GET["page"]) && $_GET["page"] > 1) { $skip = ($_GET["page"] - 1) * 3; }
+    else { $skip = 0; }
+    return $skip;
+
+}
+
+
+function get_skip_in_pagination() {
+
+    if(isset($_GET["page"]) && $_GET["page"] > 1) { $skip = ($_GET["page"] - 1) * 10; }
+    else { $skip = 0; }
+    return $skip;
+
+}
+
+function print_x($array) {
+
+    echo "<pre>";
+    print_r($array);
+
+}
+
+function get_date_today() {
+
+    date_default_timezone_set('Europe/London');
+    $hoy = getdate();
+
+    $dia = $hoy["mday"];
+    $mes = $hoy["mon"];
+    if($mes < 10) { $mes = "0".$mes; }
+    $año = $hoy["year"];
+    $hora = $hoy["hours"];
+    $min = $hoy["minutes"];
+
+    $fecha = $dia."/".$mes."/".$año." ".$hora.":".$min;
+    return $fecha;
+
+}
+
+/* Funciones encriptación */
+function encriptar($cadena){
+    $key = 'codigoamigo';
+    $iv = openssl_random_pseudo_bytes(16);
+    $encrypted = openssl_encrypt($cadena, 'AES-256-CBC', $key, 0, $iv);
+    return base64_encode($iv . $encrypted);
+}
+
+function desencriptar($cadena){
+    $key = 'codigoamigo';
+    
+    // Si es un hash MD5 (32 caracteres hexadecimales), es un código antiguo
+    if (preg_match('/^[a-f0-9]{32}$/', $cadena)) {
+        // Para códigos antiguos, intentar buscar en la base de datos
+        // o devolver un valor que indique que es un código antiguo
+        return false; // Código antiguo no válido
+    }
+    
+    try {
+        $data = base64_decode($cadena);
+        if (strlen($data) < 16) {
+            return false; // Datos insuficientes
+        }
+        
+        $iv = substr($data, 0, 16);
+        $encrypted = substr($data, 16);
+        $decrypted = openssl_decrypt($encrypted, 'AES-256-CBC', $key, 0, $iv);
+        return $decrypted;
+    } catch (Exception $e) {
+        return false; // Error en desencriptación
+    }
+}
+
+function get_posicion_codigo_en_marca($codigo_id, $marca_clave) {
+    // Obtener códigos destacados de la marca (igual que en la página de marca)
+    $array_filtro_destacados = array("marca" => $marca_clave, "estado" => 0, "destacado" => array('$ne' => 0));
+    $array_opciones_destacados = array(
+        'limit' => 10,
+        'sort' => array('destacado' => -1, '_id' => -1)
+    );
+    
+    $lista_codigos_destacados = get_all_listado_codigos_array($array_filtro_destacados, $array_opciones_destacados);
+    $codigos_destacados = isset($lista_codigos_destacados["results"]) ? $lista_codigos_destacados["results"] : [];
+    
+    // Obtener códigos normales (excluyendo los destacados)
+    $array_filtro_normales = array("marca" => $marca_clave, "estado" => 0, "destacado" => 0);
+    $array_opciones_normales = array(
+        'limit' => 20,
+        'sort' => array('_id' => -1)
+    );
+
+    $lista_codigos_normales = get_all_listado_codigos_array($array_filtro_normales, $array_opciones_normales);
+    $codigos_normales = isset($lista_codigos_normales["results"]) ? $lista_codigos_normales["results"] : [];
+    
+    // Combinar códigos destacados primero, luego normales (igual que en la página de marca)
+    $codigos = array_merge($codigos_destacados, $codigos_normales);
+    
+    // Buscar la posición del código específico
+    $posicion = 1;
+    foreach($codigos as $codigo) {
+        if((string)$codigo['_id'] === (string)$codigo_id) {
+            return $posicion;
+        }
+        $posicion++;
+    }
+    
+    // Si no se encuentra en los primeros 30 (10 destacados + 20 normales), devolver una posición alta
+    return 999;
+}
+
+// Función para obtener un código por ID
+function getObjectCodigo($codigo_id) {
+    $db = createConnection();
+    
+    try {
+        $collection = $db->selectCollection('codigos');
+        $codigo = $collection->findOne(['_id' => new MongoDB\BSON\ObjectId($codigo_id)]);
+        
+        if ($codigo) {
+            return iterator_to_array($codigo);
+        }
+    } catch (Exception $e) {
+        error_log("Error al obtener código: " . $e->getMessage());
+    }
+    
+    return false;
+}
+
+// Función para actualizar un código
+function updateCodigo($codigo_id, $update_data) {
+    $db = createConnection();
+    
+    try {
+        $collection = $db->selectCollection('codigos');
+        
+        // Obtener el código original para preservar campos importantes
+        $codigo_original = $collection->findOne(['_id' => new MongoDB\BSON\ObjectId($codigo_id)]);
+        
+        if (!$codigo_original) {
+            return false;
+        }
+        
+        // Preservar campos importantes que no deben perderse
+        $preserved_fields = [
+            'destacado' => $codigo_original['destacado'] ?? 0,
+            'destacado_social' => $codigo_original['destacado_social'] ?? 0,
+            'id_usuario' => $codigo_original['id_usuario'],
+            'estado' => $codigo_original['estado'] ?? 0,
+            'totalclicks' => $codigo_original['totalclicks'] ?? 0,
+            'fecha_publicacion' => $codigo_original['fecha_publicacion']
+        ];
+        
+        // Si se está actualizando la marca, buscar o crear marca existente
+        if (isset($update_data['marca']) && !empty($update_data['marca'])) {
+            $marca_normalizada = normalizeMarcaName($update_data['marca']);
+            $marca_existente = findOrCreateMarca($update_data['marca'], $marca_normalizada);
+            $update_data['marca'] = $marca_existente['nombre_clave'];
+        }
+        
+        // Combinar datos preservados con datos de actualización
+        $final_update_data = array_merge($preserved_fields, $update_data);
+        
+        // Añadir campos de auditoría
+        $final_update_data['fecha_modificacion'] = date('Y-m-d H:i:s');
+        $final_update_data['updated_at'] = new \MongoDB\BSON\UTCDateTime();
+        
+        $result = $collection->updateOne(
+            ['_id' => new MongoDB\BSON\ObjectId($codigo_id)],
+            ['$set' => $final_update_data]
+        );
+        
+        return $result->getModifiedCount() > 0;
+    } catch (Exception $e) {
+        error_log("Error al actualizar código: " . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Obtiene datos del usuario priorizando la sesión sobre la base de datos
+ */
+function getObjectUserWithSession($parameter, $value) {
+    $usuario = getObjectUser($parameter, $value);
+    
+    // Si la sesión tiene datos más recientes, usarlos
+    if (isset($_SESSION["img"]) && !empty($_SESSION["img"])) {
+        $usuario["img"] = $_SESSION["img"];
+    }
+    if (isset($_SESSION["username"]) && !empty($_SESSION["username"])) {
+        $usuario["username"] = $_SESSION["username"];
+    }
+    
+    return $usuario;
+}
+
+// Función auxiliar para normalizar nombres de marcas
+function normalizeMarcaName($marca_name) {
+    // Convertir a minúsculas y limpiar caracteres especiales
+    $normalized = strtolower(trim($marca_name));
+    
+    // Reemplazar caracteres especiales comunes
+    $normalized = str_replace(['.', ',', ' ', '-', '_'], '', $normalized);
+    
+    // Casos especiales conocidos
+    $special_cases = [
+        'make.com' => 'makecom',
+        'make.com' => 'makecom',
+        'social car' => 'socialcar',
+        'social-car' => 'socialcar',
+        'social_car' => 'socialcar'
+    ];
+    
+    if (isset($special_cases[strtolower($marca_name)])) {
+        return $special_cases[strtolower($marca_name)];
+    }
+    
+    return $normalized;
+}
+
+// Función auxiliar para buscar o crear marca
+function findOrCreateMarca($marca_name, $marca_normalizada) {
+    $db = createConnection();
+    $collection_marcas = $db->selectCollection('marcas');
+    
+    // Buscar marca existente por nombre_clave normalizado
+    $marca_existente = $collection_marcas->findOne(['nombre_clave' => $marca_normalizada]);
+    
+    if ($marca_existente) {
+        return iterator_to_array($marca_existente);
+    }
+    
+    // Si no existe, buscar por nombre exacto (sin normalizar)
+    $marca_exacta = $collection_marcas->findOne(['nombre' => $marca_name]);
+    
+    if ($marca_exacta) {
+        return iterator_to_array($marca_exacta);
+    }
+    
+    // Si no existe ninguna, crear nueva marca
+    $nueva_marca = [
+        'estado' => 1,
+        'nombre' => $marca_name,
+        'nombre_clave' => $marca_normalizada,
+        'categoria' => 'General',
+        'categoria_clave' => 'general',
+        'imagen' => '/img/no_image.png',
+        'descripción' => '',
+        'descripción_larga' => '',
+        'fecha_publicacion' => date('d-m-Y H:i', strtotime('now')),
+        'usuario_creador' => $_SESSION["user_id"] ?? 'system',
+        'url' => '',
+        'url_register' => '',
+        'aviso' => 'Marca creada al modificar código'
+    ];
+    
+    $result = $collection_marcas->insertOne($nueva_marca);
+    
+    // Retornar la marca recién creada
+    $marca_creada = $collection_marcas->findOne(['_id' => $result->getInsertedId()]);
+    return iterator_to_array($marca_creada);
+}
+
+?>

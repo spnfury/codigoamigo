@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Mobile Responsive - CodigoAmigo</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/mobile-optimization.css">
+    <style>
+        body {
+            background: #f8f9fa;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .test-container {
+            max-width: 100vw;
+            overflow-x: hidden;
+        }
+        
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .test-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <!-- Test Header -->
+        <div class="test-section">
+            <h1 class="test-title">Test Mobile Responsive</h1>
+            
+            <!-- Test Header Moderno -->
+            <div class="header-modern">
+                <div class="logo-text">CodigoAmigo</div>
+                <div class="logo-tagline">Códigos de Descuento</div>
+                <div class="nav-modern">
+                    <a href="#" class="nav-link">Inicio</a>
+                    <a href="#" class="nav-link">Códigos</a>
+                    <a href="#" class="nav-link">Marcas</a>
+                    <a href="#" class="nav-link">Contacto</a>
+                </div>
+                <div class="search-header">
+                    <input type="text" class="search-input-header" placeholder="Busca códigos de...">
+                    <button class="btn-buscar">Buscar</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Test Filtros -->
+        <div class="test-section">
+            <h2 class="test-title">Filtros Móviles</h2>
+            <div class="filter-section">
+                <div class="filter-options">
+                    <div class="filter-radio-group">
+                        <div class="filter-radio">
+                            <input type="radio" id="hoy" name="fecha" value="hoy">
+                            <label for="hoy">Publicados hoy</label>
+                        </div>
+                        <div class="filter-radio">
+                            <input type="radio" id="semana" name="fecha" value="semana">
+                            <label for="semana">Publicados esta semana</label>
+                        </div>
+                        <div class="filter-radio">
+                            <input type="radio" id="mes" name="fecha" value="mes">
+                            <label for="mes">Publicados este mes</label>
+                        </div>
+                    </div>
+                    <div class="filter-buttons">
+                        <button class="btn-filter btn-primary">Aplicar</button>
+                        <button class="btn-filter btn-secondary">Limpiar filtros</button>
+                        <button class="btn-filter btn-publish">Publicar Código</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Test Tarjetas de Códigos -->
+        <div class="test-section">
+            <h2 class="test-title">Tarjetas de Códigos</h2>
+            <div class="codes-grid">
+                <div class="code-card">
+                    <div class="code-brand-image">
+                        <div class="brand-placeholder">
+                            <i class="fas fa-tag"></i>
+                        </div>
+                    </div>
+                    <div class="code-card-header">
+                        <div class="code-brand">Test Marca</div>
+                        <div class="code-user-info">
+                            <div class="code-user-avatar">
+                                <div class="code-user-placeholder">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                            </div>
+                            <div class="code-user-details">
+                                <span class="code-user-name">Usuario Test</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="code-description">Descripción del código de prueba para verificar la responsividad móvil</div>
+                    
+                    <!-- Beneficio destacado -->
+                    <div class="beneficio-destacado">
+                        <div class="beneficio-icono">💰</div>
+                        <div class="beneficio-contenido">
+                            <div class="beneficio-cantidad">50€</div>
+                            <div class="beneficio-tipo">Beneficio</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Fecha de publicación -->
+                    <div class="fecha-publicacion-large">
+                        <i class="far fa-clock"></i>
+                        <span class="fecha-texto">Hace 2 horas</span>
+                    </div>
+                    
+                    <button class="code-button">
+                        <i class="fas fa-eye"></i> Ver Código
+                    </button>
+                </div>
+                
+                <div class="code-card">
+                    <div class="code-brand-image">
+                        <div class="brand-placeholder">
+                            <i class="fas fa-tag"></i>
+                        </div>
+                    </div>
+                    <div class="code-card-header">
+                        <div class="code-brand">Otra Marca</div>
+                        <div class="code-user-info">
+                            <div class="code-user-avatar">
+                                <div class="code-user-placeholder">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                            </div>
+                            <div class="code-user-details">
+                                <span class="code-user-name">Otro Usuario</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="code-description">Segunda tarjeta de prueba para verificar el layout en móviles</div>
+                    
+                    <!-- Beneficio destacado -->
+                    <div class="beneficio-destacado">
+                        <div class="beneficio-icono">💰</div>
+                        <div class="beneficio-contenido">
+                            <div class="beneficio-cantidad">25€</div>
+                            <div class="beneficio-tipo">Descuento</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Fecha de publicación -->
+                    <div class="fecha-publicacion-large">
+                        <i class="far fa-clock"></i>
+                        <span class="fecha-texto">Ayer, 14:30</span>
+                    </div>
+                    
+                    <button class="code-button">
+                        <i class="fas fa-eye"></i> Ver Código
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Test Secciones de Marcas -->
+        <div class="test-section">
+            <h2 class="test-title">Marcas Relacionadas</h2>
+            <div class="related-brands">
+                <h3>Otras marcas relacionadas</h3>
+                <div class="brands-horizontal">
+                    <div class="brand-card">
+                        <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjRkY2QjM1Ii8+Cjx0ZXh0IHg9IjMwIiB5PSIzNSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QnJhbmQ8L3RleHQ+Cjwvc3ZnPg==" alt="Brand Logo" class="brand-logo">
+                        <div class="brand-info">
+                            <div class="brand-name">Marca Test</div>
+                            <div class="brand-offers">3 ofertas disponibles</div>
+                        </div>
+                        <button class="btn-ver-ofertas">Ver ofertas</button>
+                    </div>
+                    
+                    <div class="brand-card">
+                        <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjNEZBRjUwIi8+Cjx0ZXh0IHg9IjMwIiB5PSIzNSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QnJhbmQ8L3RleHQ+Cjwvc3ZnPg==" alt="Brand Logo" class="brand-logo">
+                        <div class="brand-info">
+                            <div class="brand-name">Otra Marca</div>
+                            <div class="brand-offers">5 ofertas disponibles</div>
+                        </div>
+                        <button class="btn-ver-ofertas">Ver ofertas</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Test Grid de Ofertas -->
+        <div class="test-section">
+            <h2 class="test-title">No te pierdas ninguna oferta</h2>
+            <div class="offers-grid">
+                <div class="offer-card">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIHZpZXdCb3g9IjAgMCA1MCA1MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjRkY2QjM1Ii8+Cjx0ZXh0IHg9IjI1IiB5PSIzMCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QnJhbmQ8L3RleHQ+Cjwvc3ZnPg==" alt="Brand" class="offer-logo">
+                    <div class="offer-name">Marca 1</div>
+                    <div class="offer-count">2x códigos</div>
+                </div>
+                
+                <div class="offer-card">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIHZpZXdCb3g9IjAgMCA1MCA1MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjNEZBRjUwIi8+Cjx0ZXh0IHg9IjI1IiB5PSIzMCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QnJhbmQ8L3RleHQ+Cjwvc3ZnPg==" alt="Brand" class="offer-logo">
+                    <div class="offer-name">Marca 2</div>
+                    <div class="offer-count">1x código</div>
+                </div>
+                
+                <div class="offer-card">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIHZpZXdCb3g9IjAgMCA1MCA1MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjMjE5NkYzIi8+Cjx0ZXh0IHg9IjI1IiB5PSIzMCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QnJhbmQ8L3RleHQ+Cjwvc3ZnPg==" alt="Brand" class="offer-logo">
+                    <div class="offer-name">Marca 3</div>
+                    <div class="offer-count">4x códigos</div>
+                </div>
+                
+                <div class="offer-card">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAiIGhlaWdodD0iNTAiIHZpZXdCb3g9IjAgMCA1MCA1MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjRkY5ODAwIi8+Cjx0ZXh0IHg9IjI1IiB5PSIzMCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEyIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+QnJhbmQ8L3RleHQ+Cjwvc3ZnPg==" alt="Brand" class="offer-logo">
+                    <div class="offer-name">Marca 4</div>
+                    <div class="offer-count">3x códigos</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Test Tags -->
+        <div class="test-section">
+            <h2 class="test-title">Categorías</h2>
+            <div class="tags-section">
+                <div class="tags-container">
+                    <button class="tag-button active">Ver más</button>
+                    <button class="tag-button">Compras</button>
+                    <button class="tag-button">Cursos</button>
+                    <button class="tag-button">Marketing de afiliados</button>
+                    <button class="tag-button">Cajas de regalo</button>
+                    <button class="tag-button">Finanzas</button>
+                    <button class="tag-button">Tecnología</button>
+                    <button class="tag-button">Viajes</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Test Footer -->
+        <div class="test-section">
+            <h2 class="test-title">Footer</h2>
+            <div class="footer-modern">
+                <div class="activity-feed">
+                    <div class="activity-text">Última actividad: Usuario publicó un código hace 5 minutos</div>
+                </div>
+                <div class="rewards-link">Ver recompensas</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Test de funcionalidad móvil
+        console.log('Test Mobile Responsive iniciado');
+        
+        // Verificar que no hay scroll horizontal
+        function checkHorizontalScroll() {
+            if (document.documentElement.scrollWidth > window.innerWidth) {
+                console.warn('⚠️ Scroll horizontal detectado!');
+            } else {
+                console.log('✅ No hay scroll horizontal');
+            }
+        }
+        
+        // Verificar touch targets
+        function checkTouchTargets() {
+            const buttons = document.querySelectorAll('button, .btn, .nav-link, .tag-button');
+            let smallTargets = 0;
+            
+            buttons.forEach(button => {
+                const rect = button.getBoundingClientRect();
+                if (rect.width < 44 || rect.height < 44) {
+                    smallTargets++;
+                    console.warn('⚠️ Touch target pequeño:', button.textContent, rect.width + 'x' + rect.height);
+                }
+            });
+            
+            if (smallTargets === 0) {
+                console.log('✅ Todos los touch targets son adecuados (≥44px)');
+            } else {
+                console.warn(`⚠️ ${smallTargets} touch targets son demasiado pequeños`);
+            }
+        }
+        
+        // Ejecutar tests
+        window.addEventListener('load', () => {
+            checkHorizontalScroll();
+            checkTouchTargets();
+        });
+        
+        window.addEventListener('resize', checkHorizontalScroll);
+    </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /usuario_*
+Disallow: /*?codigo=*
+Disallow: /*?continua_viendo=1
+Disallow: /*-del-2018
+Disallow: /*-del-2019
+Disallow: /*-del-2020
+Disallow: /*-del-2021
+Disallow: /*-del-2022
+Disallow: /*-del-2023
+Sitemap: https://www.codigoamigo.com/sitemap.xml

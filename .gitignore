@@ -1,0 +1,49 @@
+# Archivos de configuración sensibles
+config/app.php
+config/email_config.php
+inc/conexion.php
+
+# Logs y archivos de debug
+*.log
+logs/
+debug.log*
+php_errors.log*
+
+# Archivos de cache
+cache/
+cached-*.html
+
+# Archivos de backup
+*_backup_*
+*.backup.*
+
+# Archivos temporales
+*.tmp
+*.temp
+
+# Archivos de uploads (mantener estructura pero no contenido)
+uploads/*
+!uploads/.gitkeep
+
+# Archivos de vendor (se instalan con composer)
+vendor/
+
+# Archivos de composer
+composer.phar
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Archivos de configuración local
+.env
+.env.local
+
+# Archivos de documentación temporal
+documentacion_rediseno/

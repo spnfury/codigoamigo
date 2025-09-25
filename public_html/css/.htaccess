@@ -1,0 +1,5 @@
+# Permitir archivos CSS estáticos
+<Files "*.css">
+    SetHandler default-handler
+    Header set Content-Type "text/css"
+</Files>

@@ -1,0 +1,637 @@
+<?php
+
+
+
+	function recorta_texto_pos($texto,$caracteres,$puntos_suspensivos) {
+        //esta funcion recorta un texto donde encuentre el primer espacio despues del tamaño para no cortar carácteres UTF8 y salgan simbolos raros
+        $corte = strpos($texto," ",$caracteres);
+        if (!$corte) { return $texto; }
+        else { return substr($texto,0,$corte).$puntos_suspensivos; }
+    }
+
+    function transformafecha($date,$long='',$morelong='',$FixaNew = false) {
+
+        global $month_arr,$month_arr_long,$weekdays_arr,$amZona,$debugAdmin;
+
+        /*if($GLOBALS["SYSTEM_CONF"]["timezone"]){
+         date_default_timezone_set($GLOBALS["SYSTEM_CONF"]["timezone"]);
+         }*/
+
+
+        //no puede mostrar fechas en el futuro
+        $opening_date = date('Y-m-d G:i:s',strtotime('now'));
+        $current_date = date('Y-m-d G:i:s',strtotime($date));
+
+        if ($opening_date < $current_date){
+            $date = $opening_date;
+            $date = date('Y-m-d',strtotime('now'));
+        }
+        if(date('Ymd') == date('Ymd', strtotime($date))){
+            //echo date('Ymd')."--".date('Ymd', strtotime($date));
+            $es_hoy = 1;
+        }
+        if(date("d-m-y")==date("d-m-y",strtotime($date))){
+            if(!$morelong){
+                $str_week = " ";
+            } else {
+                $str_week = $weekdays_arr[date("w",strtotime($date))+1];
+            }
+        } else {
+            $str_week = $weekdays_arr[date("w",strtotime($date))+1];
+        }
+        $day = date("d",strtotime($date));
+
+        $month = $month_arr[date("n",strtotime($date))];
+        $month_l = $month_arr_long[date("n",strtotime($date))];
+
+        $year = date("y",strtotime($date));
+        $yearF = date("Y",strtotime($date));
+        $hora = date("H:i",strtotime($date));
+
+        $nuevahora = strtotime('now')-strtotime($date);
+        $nuevahora_horas = (int)($nuevahora/(60*60));
+        $nuevahora_minutos = date("i",$nuevahora);
+
+        if(!$long){
+            if($str_week==' '){
+                //$form_date = "<b>".$str_week."</b><br>".$hora." ".$zona;
+                //RESTO el numero de tiempo que hace a partir de hoy
+                if($hora=='00:00'){
+                    $form_date = "Hoy";
+
+                } else {
+                    $form_date = "Hoy, ".$hora;
+                }
+            } else {
+                if($morelong){
+                    $form_date = $str_week.", ".$day." de ".$month_l;
+                } else {
+                    $form_date = $day." ".ucfirst($month_l);
+                }
+            }
+        } else {
+            if($es_hoy==1){
+                if ($opening_date < $current_date){
+                    $form_date = "hace menos de un día";
+                } else {
+                    $form_date = "Hoy a las ".$hora." ".$zona;
+                }
+            } else {
+                $form_date = $str_week."  ".$day." ".$month_l/*." a las ".$hora." ".$zona*/;
+            }
+        }
+        if($FixaNew == true){
+            $form_date = $day." de ".$month_l;
+        }
+        return $form_date;
+    }
+
+
+    function uploadFotoUsuario ($file) {
+
+        include_once($_SERVER["DOCUMENT_ROOT"]."/inc/resize_class.php");
+        $img = new img($add);
+
+
+        $msg = "";
+        $uploadedfileload = "true";
+        if (($file["uploadedfile"]['size']) > 2000000) {
+            $uploadedfile_size = $file['uploadedfile']['size'];
+            $msg = "Solo es posible subir fotos menores de 2MB";
+            $uploadedfileload = "false";
+        }
+        if (!($file["uploadedfile"]['type'] =="image/jpeg" OR $file["uploadedfile"]['type'] =="image/gif" OR $file["uploadedfile"]['type'] =="image/png")) {
+            $msg = "Solo es posible subir archivos que sean imágenes.";
+            $uploadedfileload = "false";
+        }
+        $file_name = $file["uploadedfile"]['name'];
+        $add = $_SERVER['DOCUMENT_ROOT']."/uploads/$file_name";
+
+        if($uploadedfileload == "true") {
+            if(move_uploaded_file ($file["uploadedfile"]['tmp_name'], $add)) {
+
+                $img = new img($add);
+                $img->resize(302,404,true);
+                $img->store($add,50);
+
+                $msg = "Foto de perfil cambiada correctamente";
+                //echo " Ha sido subido satisfactoriamente";
+                $nueva_url_foto = $GLOBALS["website"]."/uploads/$file_name";
+                cambiarFotoUsuario($_SESSION["mail"], $nueva_url_foto);
+            } else { $msg = "Error al subir el archivo"; }
+        }
+        return $msg;
+    }
+
+    /****************** MAILS *******************************/
+
+    function enviarMailVerOferta ($datos) {
+
+        $nombre = $datos["username"];
+        $email = $datos['mail'];
+
+        $codigo = $datos["codigo"];
+
+        $email_encriptado = encriptar($email);
+
+        $url = 'https://www.codigoamigo.com/bienvenido_de_nuevo?codigo='. $email_encriptado;
+
+        $mensaje = '
+	        <html>
+                <head>
+                  <title>Bienvenido a código amigo</title><br>
+                </head>
+                <body>
+                    <img src="http://www.codigoamigo.com/img/logo_codigoamigo.jpg"><br><br>
+                    <span>Enhorabuena <b>' . $nombre . '</b>! </span><br><br>
+                    <span>El usuario '.$_SESSION["username"].' ha abierto tu código amigo de '.$codigo["marca"].' es muy probable que lo use y te beneficies de '.$codigo["num_beneficio"].' '.$codigo["tipo_descuento"].'!</span><br><br>Comparte tu código para que llegue aún más personas:<br><a href="'.$url.'">'.$url.'</a><br><br>Un Saludo, Tamara de CodigoAmigo.com
+
+                </body>
+                </html>
+	        ';
+
+
+        $dest = $email;
+        $headers = "From: $nombre <$email>\r\n";
+        $headers = "cc: $nombre <$email>\r\n";
+        $headers .= "X-Mailer: PHP5\n";
+        $headers .= 'MIME-Version: 1.0' . "\n";
+        $headers .= 'Content-type: text/html; charset=utf-8' . "\r\n";
+        $asunto = $datos["username"].", alguien ha abierto tu código amigo!";
+        $cuerpo .= $mensaje;
+
+
+        if($nombre != '' && $email != '' && $mensaje != ''){
+            mail($dest,$asunto,$cuerpo,$headers);
+        }
+    }
+
+    function enviarMailActivacion ($datos) {
+
+        $nombre = $datos["username"];
+        $email = $datos['mail'];
+        $email_encriptado = encriptar($email);
+        $mensaje = '
+	        <html>
+                <head>
+                  <title>Activar tu cuenta de código amigo</title><br>
+                </head>
+                <body>
+                    <img src="http://www.codigoamigo.com/img/240xNxlogo_codigoamigo.png.pagespeed.ic.eZ0wzfOUuO.webp"><br><br>
+                    <span>Estimado usuario <b>' . $nombre . '</b>: </span><br><br>
+                    <span>Gracias por registrarse en nuestra web <a href="'.$GLOBALS["website"].'">Código Amigo.</a></span>
+                    <p>Para validar su cuenta, por favor, acceda al siguiente enlace. Si el enlace no estuviera activo,
+	                   por favor, copie y pegue en el navegador.</p><br>
+                    <a href="https://www.codigoamigo.com/bienvenido_de_nuevo?codigo='. $email_encriptado . '">
+	                   https://www.codigoamigo.com/bienvenido_de_nuevo?codigo='. $email_encriptado . '
+                    </a>
+                </body>
+                </html>
+	        ';
+        $dest = $email;
+        $headers = "From: $nombre <$email>\r\n";
+        $headers = "cc: $nombre <$email>\r\n";
+        $headers .= "X-Mailer: PHP5\n";
+        $headers .= 'MIME-Version: 1.0' . "\n";
+        $headers .= 'Content-type: text/html; charset=iso-8859-1' . "\r\n";
+        $asunto = "Activar tu cuenta de Código Amigo";
+        $cuerpo .= $mensaje;
+
+        $data = array("apikey" => "05575e45-958d-470a-ae00-0ddfa9366845",
+            "to" => $email,
+            "body" => $mensaje,
+            "subject" => $asunto,
+            "from" => $direccion,
+            "fromName" => $nombre_m,
+            "merge_name" => $datos["nombre"],
+            "merge_username" => $datos["correo"],
+            "merge_password" => $datos["password"],
+            "merge_enlace_panel_control" => $datos["enlace"],
+            "merge_texto_olpd" => $mensaje_olpd,
+            "bodyText" => "Email",
+            "charsetBodyHtml" => "utf-8",
+            "charset" => "utf-8",
+            'isTransactional' => false,
+        );
+
+
+        send_mail_elastic($data);
+    }
+
+    function enviarMailRecuerdoPass ($datos) {
+
+
+        $nombre = $datos["username"];
+        $email_dire = $datos['mail'];
+        $email_encriptado = encriptar($email_dire);
+
+        $email_encode = urlencode($email_encriptado);
+
+
+
+
+        $body = '
+	        <html>
+                <head>
+                  <title>Hola de nuevo a código amigo</title><br>
+                </head>
+                <body>
+                    <img src="https://www.codigoamigo.com/img/logo_codigoamigo.png"><br><br>
+                    <span>Estimado usuario <b>' . $nombre . '</b>: </span><br><br>
+                    <span>Te agradecemos que te pongas en contacto con nosotros. Hemos recuperado tu cuenta de usuario de <a href="'.$GLOBALS["website"].'">Código Amigo.</a></span>
+                    <p>Para cambiar tu contraseña, por favor, acceda al siguiente enlace. Si el enlace no estuviera activo,
+	                   por favor, copie y pegue en el navegador.</p><br>
+                    <a href="http://www.codigoamigo.com/nuevo_password?codigo='. $email_encode . '">
+	                   http://www.codigoamigo.com/nuevo_password?codigo='. $email_encode . '
+                    </a>
+                </body>
+                </html>
+	        ';
+        $dest = $email_dire;
+        $direccion = "noreply@codigoamigo.com";
+        $nombre_m = "Tamara de Código Amigo";
+
+        $asunto = "Recuperación de contraseña de Código Amigo";
+
+//         $headers= "From: \"".$nombre_m."\" <".$direccion."> \r\n";
+//         //$headers = "From: $nombre_final <$email>\r\n";
+//         //$headers = "cc: $nombre <$email>\r\n";
+//         $headers .= "X-Mailer: PHP5\n";
+//         $headers .= 'MIME-Version: 1.0' . "\n";
+//         $headers .= 'Content-type: text/html; charset=utf-8' . "\r\n";
+//         $asunto = "Recuperación de contraseña de Código Amigo";
+//         $cuerpo .= $mensaje;
+
+
+//         $data = array("apikey" => "05575e45-958d-470a-ae00-0ddfa9366845",
+//             "to" => $email,
+//             "body" => $mensaje,
+//             "subject" => $asunto,
+//             "from" => $direccion,
+//             "fromName" => $nombre_m,
+//             "merge_name" => $datos["nombre"],
+//             "merge_username" => $datos["correo"],
+//             "merge_password" => $datos["password"],
+//             "merge_enlace_panel_control" => $datos["enlace"],
+//             "merge_texto_olpd" => $mensaje_olpd,
+//             "bodyText" => "Email",
+//             "charsetBodyHtml" => "utf-8",
+//             "charset" => "utf-8",
+//             'isTransactional' => false,
+//         );
+
+        $email = new \SendGrid\Mail\Mail();
+
+        $email->setFrom($direccion, $nombre_m);
+
+
+        //$email->setReplyTo($datos["correo"], $datos["nombre"]);
+        $email->setSubject($asunto);
+        $email->addTo($email_dire, $nombre);
+        $email->addContent("text/plain", "Codigoamigo, recuperar contraseña");
+        $email->addContent(
+            "text/html", $body
+            );
+
+
+
+        $sendgrid = new \SendGrid('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');
+
+        try {
+            $response = $sendgrid->send($email);
+
+            if($response->statusCode()!=200){
+                mandaBot("eee");
+            }
+
+        } catch (Exception $e) {
+            echo 'Caught exception: '. $e->getMessage() ."\n";
+            mandaBot($e->getMessage());
+        }
+
+
+
+        //send_mail_elastic($data);
+
+
+        /*if($nombre != '' && $email != '' && $mensaje != ''){
+            mail($dest,$asunto,$cuerpo,$headers,"-f".$direccion);
+        }*/
+    }
+
+
+// Product field functions
+function optimizeUrlPath($texto , $space=false,$espacios='',$junto=''){
+
+    global $debugAdmin;
+    $texto = (string)$texto;
+    if(is_string($texto)){
+        $texto = strtolower($texto);
+        $texto = trim($texto);
+        $arCharReplace["\¿"] = "";
+        $arCharReplace["\?"] = "";
+        $arCharReplace["'"] = "";
+        $arCharReplace["´"] = "";
+        $arCharReplace["á"] = "a";
+        $arCharReplace["à"] = "a";
+        $arCharReplace["ä"] = "a";
+        $arCharReplace["â"] = "a";
+        $arCharReplace["è"] = "e";
+        $arCharReplace["é"] = "e";
+        $arCharReplace["ë"] = "e";
+        $arCharReplace["ê"] = "e";
+        $arCharReplace["í"] = "i";
+        $arCharReplace["ì"] = "i";
+        $arCharReplace["î"] = "i";
+        $arCharReplace["ï"] = "i";
+        $arCharReplace["ô"] = "o";
+        $arCharReplace["ö"] = "o";
+        $arCharReplace["ó"] = "o";
+        $arCharReplace["ò"] = "o";
+        $arCharReplace["î"] = "i";
+        $arCharReplace["ï"] = "i";
+        $arCharReplace["ì"] = "i";
+        $arCharReplace["ú"] = "u";
+        $arCharReplace["ù"] = "u";
+        $arCharReplace["ü"] = "u";
+        $arCharReplace["û"] = "u";
+        $arCharReplace["ñ"] = "n";
+        $arCharReplace["ç"] = "c";
+        $arCharReplace["l`"] = "l";
+        $arCharReplace["l'"] = "l";
+        $arCharReplace["d'"] = "d";
+        $arCharReplace["€"] = "";
+        $arCharReplace["\”"] = "";
+        //$arCharReplace["-"] = "";
+        $arCharReplace["¡"] = "";
+        $arCharReplace["!"] = "";
+        $arCharReplace["“"] = "";
+        $arCharReplace["&"] = "-";
+        $arCharReplace["”"] = "";
+        $arCharReplace["Nº"] = "n";
+
+        $arCharReplace["Á"] = "a";
+        $arCharReplace["À"] = "a";
+        $arCharReplace["Ä"] = "a";
+        $arCharReplace["Â"] = "a";
+        $arCharReplace["È"] = "e";
+        $arCharReplace["É"] = "e";
+        $arCharReplace["Ë"] = "e";
+        $arCharReplace["Ê"] = "e";
+        $arCharReplace["Í"] = "i";
+        $arCharReplace["Ì"] = "i";
+        $arCharReplace["Î"] = "i";
+        $arCharReplace["Ï"] = "i";
+        $arCharReplace["Ô"] = "o";
+        $arCharReplace["Ö"] = "o";
+        $arCharReplace["Ó"] = "o";
+        $arCharReplace["Ò"] = "o";
+        $arCharReplace["Ú"] = "u";
+        $arCharReplace["Ù"] = "u";
+        $arCharReplace["Ü"] = "u";
+        $arCharReplace["Û"] = "u";
+        $arCharReplace["Ç"] = "c";
+        $arCharReplace["Ñ"] = "n";
+        $arCharReplace["L`"] = "l";
+        $arCharReplace["L'"] = "l";
+        $arCharReplace["D'"] = "d";
+
+        foreach($arCharReplace AS $kChar=>$vChar){
+            $texto = preg_replace('#'.$kChar.'#i',$vChar,$texto);
+        }
+
+        $texto = strtolower( trim($texto, '-') );
+
+        //if($texto !== mb_convert_encoding( mb_convert_encoding($texto, 'UTF-32', 'UTF-8'), 'UTF-8', 'UTF-32') )
+        //$str_actual_enc = mb_detect_encoding($texto);
+        /*if(isset($str_actual_enc) && $str_actual_enc!=''){
+         $texto = mb_convert_encoding($texto, 'UTF-8', $str_actual_enc);
+         }else{
+         $texto = mb_convert_encoding($texto, 'UTF-8');
+        }*/
+
+        $texto = preg_replace('`&([a-z]{1,2})(acute|eacute|uml|circ|grave|ring|cedil|slash|tilde|caron|lig);`i', '\1', $texto);
+        $texto = preg_replace("/[^A-Za-z0-9?! ]/","",$texto);
+       	$texto = str_replace(' ', '-', $texto);
+        $texto = str_replace("amp-amp", "amp", $texto);
+
+        if($junto){
+            $texto = str_replace("-","",$texto);
+        }
+        $url = $texto;
+        if($espacios){ //aado espacios a las barras
+            $url = str_replace('-', ' ', $url);
+        }
+        return $url;
+    }
+}
+
+getObjectCode() {
+    
+    // Obtener la lista de marcas revisadas
+    $lista_marcas = getMarcasRevisadas(10);
+    $array_marcas = array();
+    
+    if (empty($lista_marcas)) {
+        return []; // Devuelve un array vacío si no hay marcas
+    }
+    
+    // Procesar cada marca
+    foreach ($lista_marcas as $marca) {
+        // Simplificar el proceso de limpieza de la URL de la imagen
+        $url_remover = ['http://www.codigoamigo.com', 'https://www.codigoamigo.com', 'https://codigoamigo.com'];
+        $marca["imagen"] = str_replace($url_remover, '', $marca["imagen"]);
+        
+        // Obtener el número de códigos asociados a la marca
+        $num_codes = getNumCodes('marca', $marca["nombre_clave"], null);
+        
+        // Verificar que $num_codes sea un valor válido
+        if ($num_codes === null) {
+            $num_codes = 0; // Asignar un valor por defecto si no se obtiene el número de códigos
+        }
+        
+        // Crear el array de la marca
+        $elemento = array(
+            'nombre' => $marca["nombre"],
+            'codes' => $num_codes,
+            'nombre_clave' => $marca["nombre_clave"],
+            'imagen' => $marca["imagen"]
+        );
+        
+        // Añadir al array de marcas
+        $array_marcas[] = $elemento;
+    }
+    
+    // Ordenar el array por el número de códigos de forma descendente
+    //array_sort_by($array_marcas, 'codes', SORT_DESC);
+    
+    
+    // Dividir el array según el tipo de dispositivo
+    if ($GLOBALS["detect"]->isMobile()) {
+        $array_chunk = array_chunk($array_marcas, 12); // Dividir en bloques de 12 para móviles
+    } else {
+        $array_chunk = array_chunk($array_marcas, 20); // Dividir en bloques de 20 para escritorio
+    }
+    
+    // Devolver el primer bloque si existe, o el array completo si no hay bloques
+    return !empty($array_chunk) ? $array_chunk[0] : $array_marcas;
+}
+
+
+function array_sort_by(&$arrIni, $col, $order = SORT_ASC)
+{
+    $arrAux = array();
+    foreach ($arrIni as $key=> $row)
+    {
+        $arrAux[$key] = is_object($row) ? $arrAux[$key] = $row->$col : $row[$col];
+        $arrAux[$key] = strtolower($arrAux[$key]);
+    }
+    array_multisort($arrAux, $order, $arrIni);
+}
+
+
+function printCuadroCodigo ($tipo, $list_codigos) {
+
+    /* 4 tipos: 'miscodigos', 'listado', 'ficha', 'codigo' */
+
+	   $code = "";
+	   $css = "cbp-item col-md-4 col-xs-12 ";
+
+    	if($tipo == "ficha" || $tipo == "codigo") {
+
+    	    $code = $list_codigos;
+    	    $list_codigos = array();
+    	    array_push($list_codigos, $code);
+    	    $css = "cbp-item ";
+    }
+
+    foreach ($list_codigos as $codigo) {
+
+        $usuario = getObjectUser('_id', $codigo["id_usuario"]);
+        $marca = getObjectMarca ('nombre_clave', $codigo["marca"]);
+
+        $marca["imagen"] = str_replace("http://","https://",$marca["imagen"]);
+
+        ?>
+
+		<div class="<?php echo $css.$codigo["marca"]?>">
+            <div class="cbp-caption-defaultWrap">
+                <div class="cbp-caption">
+                	<?php if($tipo == 'miscodigos') { ?>
+                		<a class="eliminar_codigo" data-id="<?php echo $codigo["_id"] ?>" title="Eliminar código">
+    						<span class="glyphicon glyphicon-remove"></span>
+                		</a>
+                	<?php } ?>
+                    <div  style="position:relative;">
+                    	<?php if($marca["imagen"] == "No se encontro logo para la imagen") { ?>
+                    		<p style="font-size: 20px;">Código Amigo de<br><a class="enlace" href="<?php echo link_codigo($codigo["_id"],$codigo["marca"]); ?>"><strong><?php echo $marca["nombre"]?></strong></a></p>
+                    	<?php } else { ?>
+                    		<a href="<?php echo link_codigo($codigo["_id"],$codigo["marca"]); ?>">
+                				<img class="div_marca"  alt="Código amigo de <?php echo $codigo["marca"]; ?>" src="<?php echo $marca["imagen"]; ?>">
+            				</a>
+                    	<?php } ?>
+                    	<div class="usuario">
+                    		<a title="Publicado por <?php echo $usuario["username"]; ?>" href="<?php echo link_usuario($usuario["username"], $usuario["_id"]); ?>">
+                    			<?php if($usuario["img"]) { ?>
+                    				<img src="<?php echo $usuario["img"];?>">
+                				<?php } else { ?><img src="../img/po.png"><?php } ?>
+                    		</a>
+                		</div>
+                    </div>
+                </div>
+                <div class="cbp-1-title-bg listadocodigos">
+                    <div class="cbp-l-grid-projects-title"><?php echo $codigo["descripcion"] ?></div>
+                    <div class="cbp-l-grid-projects-desc descuento">
+                        <i class="fa fa-trophy" aria-hidden="true"></i> <b><?php echo $codigo["num_beneficio"] ?></b> <?php echo $codigo["tipo_descuento"] ?>
+                    </div>
+                 	<?php if(!empty($_SESSION["user_id"])) {
+                 	          if($tipo == "ficha" || $tipo == "codigo") { ?>
+                 					<div class="cbp-l-grid-projects-desc">
+                                		<button class="btn btn-success mostrar_code btn_mostrar_code" data-id="<?php echo $codigo["_id"]; ?>">Ver código</button>
+                                    </div>
+                                    <div class="cbp-l-grid-projects-desc hide thecode<?php echo $codigo["_id"]; ?>">
+                                    	<div class="rev">
+                                    		<span style="font-size: 15px !important;"><?php
+                                    		if(strstr($codigo["codigo"], "http") || strstr($codigo["codigo"], "www")){
+                                    		    echo "<a href='".$codigo["codigo"]."' target='_blank'>".$codigo["codigo"]."</a>";
+                                    		}else{
+                                    		    echo $codigo["codigo"];
+                                    		}
+                                    		?></span>
+                                    	</div><br>
+                                        <?php if (!empty($marca["url_register"])) { ?>
+                                        	<span style="font-size: 15px;">No esperes más y <a class="enlace" target="_blank" href="<?php echo $marca["url_register"]?>"><strong>regístrate ya en <?php echo $marca["nombre"]?></strong></a></span><br>
+                                        <?php } else { ?>
+                                        	<span style="font-size: 15px;">No esperes más y <a class="enlace" target="_blank" href="<?php echo $marca["url"]?>"><strong>visita ya la web de <?php echo $marca["nombre"]?></strong></a></span><br>
+                                        <?php } ?>
+                                    </div>
+                 				<?php } else { ?>
+                 					<div class="cbp-l-grid-projects-desc">
+                                		<a href="<?php echo link_codigo($codigo["_id"],$codigo["marca"]); ?>">
+                                			<button class="btn btn-success btn_mostrar_code">Ir al código</button>
+                            			</a>
+                                    </div>
+                 				<?php } ?>
+					<?php } else { ?>
+    					<div class="cbp-l-grid-projects-desc">
+                    		<button class="btn btn-success mostrar_code_nosession btn_mostrar_code">Ir al código</button>
+                        </div>
+					<?php } ?>
+                    <div class="cbp-l-grid-projects-desc">
+                		<span class="glyphicon glyphicon-eye-open"></span>
+                    	<?php if ($codigo["totalclicks"] == 1) { echo $codigo["totalclicks"] . " vez"; }
+                    	       else { echo $codigo["totalclicks"] . " veces";} ?>
+                	</div>
+                	<div class="cbp-l-grid-projects-desc">
+                		<?php if($tipo == 'miscodigos' || $tipo == 'ficha' || $tipo = 'miscodigos_usuario_externo') { ?>
+                        	<?php if (!empty($codigo["fecha_validez"])) { ?>
+                				<i class="fa fa-newspaper-o" aria-hidden="true"></i> <?php echo $codigo["fecha_publicacion"] ?> -
+                				<i class="fa fa-times" aria-hidden="true"></i> <?php echo $codigo["fecha_validez"] ?>
+            				<?php } else { ?>
+            					<i class="fa fa-newspaper-o" aria-hidden="true"></i> <?php echo $codigo["fecha_publicacion"] ?>
+            				<?php }} ?>
+    				</div>
+                	<?php if ($tipo == 'ficha' || $tipo == 'miscodigos_usuario_externo') { ?>
+                		<div class="cbp-l-grid-projects-desc"><i class="fa fa-location-arrow" aria-hidden="true"></i> <?php echo $codigo["provincia"] ?>-<?php echo $codigo["localidad"] ?></div>
+                	<?php } ?>
+<!--                 	<div class="sharethis-inline-share-buttons"></div> -->
+					<div class="text-center">
+						<?php if ($tipo == 'ficha') {
+						    shareBySocialBlade("ficha");
+						} ?>
+					</div>
+                </div>
+        	</div>
+    	</div>
+    	<?php } publicaCodigo();
+
+}
+
+function printPanel_($tipo, $object, $lista_codigos) { ?>
+<?php /*?>
+	<section class="main-contain">
+    	<div class="container">
+        	<div class="cd-home-title">
+                <?php if($tipo == "usuario") { ?>
+                	<h2 style="padding: 20px;">Otros <a href="<?php echo link_usuario($object["username"], $object["_id"]); ?>">códigos amigo de <?php echo $object["username"]; ?></a></h2>
+            	<?php } elseif ($tipo == "marca") {
+            	       $marca = getObjectMarca('nombre_clave', $object["marca"]);?>
+            		<h2>Otros <a href="<?php echo link_marca($object["marca"]) ?>">códigos amigo de <?php echo $marca["nombre"]; ?></a></h2>
+            	<?php } elseif ($tipo == "categoria") {
+            	    $categoria = getObjectCategoria('nombre_clave', $object["clave_categoria"]);?>
+            		<h2>Otros <a href="<?php echo link_categoria($categoria["nombre_clave"]); ?>">códigos amigo de <?php echo $categoria["nombre"]; ?></a></h2>
+            	<?php } elseif ($tipo == "provincia"){ ?>
+            		<h2>Otros <a>códigos amigo de <?php echo $object["provincia"]; ?></a></h2>
+            	<?php } ?>
+            </div>
+           <div class="row">
+             	<?php //printCuadroCodigo('listado', $lista_codigos);
+            	    printaNuevoCuadroCodigo($lista_codigos); ?>
+        	</div>
+        </div>
+    </section>
+    <? */ ?>
+<?php }
+
+
+?>

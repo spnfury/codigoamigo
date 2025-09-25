@@ -1,0 +1,15 @@
+{
+    "require": {
+        "slim/slim": "^3.0",
+	"bryanjhv/slim-session": "~3.0",
+        "mongodb/mongodb": "^2.1",
+	"sendgrid/sendgrid": "^7.3",
+        "stripe/stripe-php": "^10.0",
+        "spatie/image-optimizer": "^1.1",
+        "castlepointanime/brancher": "@dev",
+        "aws/aws-sdk-php": "^3.158",
+        "google/apiclient": "^2.12",
+        "getbrevo/brevo-php": "^2.0",
+        "phpmailer/phpmailer": "^6.10"
+    }
+}

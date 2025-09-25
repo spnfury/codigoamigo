@@ -1,0 +1,813 @@
+/* ========================================
+   OPTIMIZACIÓN MÓVIL - CODIGOAMIGO.COM
+   Elimina scroll horizontal y mejora UX
+   ======================================== */
+
+/* Reset general para móviles */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    overflow-x: hidden;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    max-width: 100vw;
+}
+
+/* ========================================
+   HEADER MÓVIL
+   ======================================== */
+@media (max-width: 768px) {
+    .header-modern {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1rem;
+        min-height: auto;
+        width: 100%;
+        max-width: 100vw;
+    }
+    
+    .nav-modern {
+        gap: 0.5rem;
+        margin: 0;
+        flex-wrap: wrap;
+        justify-content: center;
+        width: 100%;
+    }
+    
+    .search-header {
+        width: 100%;
+        justify-content: center;
+        height: auto;
+        max-width: 100%;
+    }
+    
+    .search-input-header {
+        width: 100%;
+        max-width: 100%;
+        font-size: 1.2rem;
+        padding: 12px 16px;
+        border-radius: 25px;
+    }
+    
+    .logo-text {
+        font-size: 2.5rem;
+        text-align: center;
+    }
+    
+    .logo-tagline {
+        font-size: 1.1rem;
+        text-align: center;
+    }
+    
+    .nav-link {
+        font-size: 1.2rem;
+        padding: 8px 12px;
+        min-height: 44px; /* Touch target mínimo */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .dropdown-toggle {
+        font-size: 1.2rem;
+        padding: 8px 12px;
+        min-height: 44px;
+    }
+}
+
+/* ========================================
+   FILTROS MÓVILES - ESTILO CHOLLOMETRO
+   ======================================== */
+
+/* Ocultar filtros en desktop */
+.chollometro-filter-container {
+    display: none;
+}
+
+/* Mejoras específicas para móvil */
+@media (max-width: 768px) {
+    /* Botón de registro a tamaño completo */
+    .form-btn {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+    }
+    
+    /* Más espacio entre foto y h1 en páginas de marca */
+    .brand-header-content {
+        gap: 2rem !important;
+        margin-top: 1rem !important;
+    }
+    
+    .brand-header-content .brand-logo {
+        margin-bottom: 1rem !important;
+    }
+    
+    .brand-header-content h1 {
+        margin-top: 1.5rem !important;
+    }
+    
+    /* Mejorar espaciado general en móvil */
+    .brand-header {
+        padding: 2rem 1rem !important;
+    }
+}
+
+/* Mostrar filtros solo en móviles */
+@media (max-width: 768px) {
+    .chollometro-filter-container {
+        display: block;
+    }
+    .chollometro-filter-container {
+        width: 100%;
+        max-width: 100vw;
+        background: white;
+        border-bottom: 1px solid #e9ecef;
+        position: relative;
+    }
+    
+    .filter-bar {
+        display: flex;
+        align-items: center;
+        padding: 10px 15px;
+        gap: 10px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .filter-more-btn {
+        background: #FF6B35;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        min-height: 40px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .filter-more-btn:hover {
+        background: #E55A2B;
+        transform: translateY(-1px);
+    }
+    
+    .filter-more-btn i {
+        font-size: 1rem;
+    }
+    
+    .filter-buttons {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        flex: 1;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .filter-type-btn {
+        background: white;
+        color: #666;
+        border: 1px solid #ddd;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        min-height: 32px;
+    }
+    
+    .filter-type-btn.active {
+        background: #FF6B35;
+        color: white;
+        border-color: #FF6B35;
+    }
+    
+    .filter-type-btn:hover {
+        background: #f8f9fa;
+        border-color: #FF6B35;
+    }
+    
+    .filter-type-btn.active:hover {
+        background: #E55A2B;
+    }
+    
+    .filter-search-btn {
+        background: #28a745;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .filter-search-btn:hover {
+        background: #218838;
+        transform: translateY(-1px);
+    }
+    
+    /* Panel de filtros desplegable */
+    .filter-panel {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-top: none;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        z-index: 1000;
+        display: none;
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+    
+    .filter-panel.show {
+        display: block;
+    }
+    
+    .filter-panel-content {
+        padding: 20px;
+    }
+    
+    .filter-panel-content h4 {
+        margin: 0 0 15px 0;
+        color: #333;
+        font-size: 1.2rem;
+        font-weight: 600;
+    }
+    
+    .filter-group {
+        margin-bottom: 20px;
+    }
+    
+    .filter-group h5 {
+        margin: 0 0 10px 0;
+        color: #666;
+        font-size: 1rem;
+        font-weight: 500;
+    }
+    
+    .filter-option {
+        display: flex;
+        align-items: center;
+        padding: 10px 0;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .filter-option:last-child {
+        border-bottom: none;
+    }
+    
+    .filter-option input[type="radio"] {
+        margin-right: 12px;
+        transform: scale(1.2);
+    }
+    
+    .filter-option span {
+        font-size: 0.95rem;
+        color: #333;
+    }
+    
+    .filter-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 20px;
+    }
+    
+    .btn-apply, .btn-clear {
+        width: 100%;
+        padding: 12px 20px;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        min-height: 44px;
+    }
+    
+    .btn-apply {
+        background: #FF6B35;
+        color: white;
+    }
+    
+    .btn-apply:hover {
+        background: #E55A2B;
+        transform: translateY(-1px);
+    }
+    
+    .btn-clear {
+        background: #6c757d;
+        color: white;
+    }
+    
+    .btn-clear:hover {
+        background: #5a6268;
+        transform: translateY(-1px);
+    }
+    
+    /* Panel de búsqueda desplegable */
+    .search-panel {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-top: none;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        z-index: 1000;
+        display: none;
+    }
+    
+    .search-panel.show {
+        display: block;
+    }
+    
+    .search-panel-content {
+        padding: 15px;
+    }
+    
+    .search-form {
+        display: flex;
+        gap: 10px;
+    }
+    
+    .search-input {
+        flex: 1;
+        padding: 10px 15px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 1rem;
+    }
+    
+    .search-submit {
+        background: #FF6B35;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .search-submit:hover {
+        background: #E55A2B;
+    }
+}
+
+/* ========================================
+   GRID DE CÓDIGOS MÓVIL
+   ======================================== */
+@media (max-width: 768px) {
+    .codes-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        padding: 15px;
+        width: 100%;
+        max-width: 100vw;
+    }
+    
+    .code-card {
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .listado_codigos {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        padding: 15px;
+        width: 100%;
+        max-width: 100vw;
+    }
+    
+    .pre_card {
+        width: 100%;
+        max-width: 100%;
+        margin: 0 0 15px 0;
+        padding: 0;
+    }
+    
+    .card_real {
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+}
+
+/* ========================================
+   TARJETAS DE CÓDIGO MÓVIL
+   ======================================== */
+@media (max-width: 768px) {
+    .code-brand-image {
+        width: 100%;
+        height: 120px;
+        margin-bottom: 15px;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    .code-card-header {
+        margin-bottom: 15px;
+    }
+    
+    .code-brand {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #333;
+        margin-bottom: 8px;
+    }
+    
+    .code-description {
+        font-size: 0.95rem;
+        line-height: 1.4;
+        color: #666;
+        margin-bottom: 15px;
+    }
+    
+    /* Beneficio destacado móvil */
+    .beneficio-destacado {
+        margin: 15px 0;
+        padding: 12px 15px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .beneficio-icono {
+        font-size: 2rem;
+    }
+    
+    .beneficio-cantidad {
+        font-size: 1.8rem;
+        font-weight: 800;
+    }
+    
+    .beneficio-tipo {
+        font-size: 0.9rem;
+    }
+    
+    /* Fecha de publicación móvil */
+    .fecha-publicacion-large {
+        margin: 10px 0;
+        padding: 8px 12px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+    }
+    
+    .fecha-texto {
+        font-size: 0.9rem;
+    }
+    
+    /* Botones de acción móvil */
+    .code-button {
+        width: 100%;
+        padding: 14px 20px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border-radius: 8px;
+        min-height: 48px;
+        margin-top: 15px;
+    }
+    
+    .btn_interno {
+        width: 100%;
+        padding: 12px 16px;
+        font-size: 1rem;
+        font-weight: 600;
+        border-radius: 8px;
+        min-height: 44px;
+        margin: 5px 0;
+    }
+}
+
+/* ========================================
+   SECCIONES DE MARCAS MÓVIL
+   ======================================== */
+@media (max-width: 768px) {
+    .related-brands {
+        padding: 15px;
+        width: 100%;
+        max-width: 100vw;
+        overflow: hidden;
+    }
+    
+    .related-brands h3 {
+        font-size: 1.4rem;
+        margin-bottom: 15px;
+        text-align: center;
+    }
+    
+    .brands-horizontal {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        width: 100%;
+    }
+    
+    .brand-card {
+        width: 100%;
+        max-width: 100%;
+        padding: 15px;
+        border-radius: 12px;
+        background: white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+    
+    .brand-logo {
+        width: 60px;
+        height: 60px;
+        border-radius: 8px;
+        object-fit: contain;
+        flex-shrink: 0;
+    }
+    
+    .brand-info {
+        flex: 1;
+    }
+    
+    .brand-name {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 5px;
+    }
+    
+    .brand-offers {
+        font-size: 0.9rem;
+        color: #666;
+    }
+    
+    .btn-ver-ofertas {
+        padding: 8px 16px;
+        font-size: 0.9rem;
+        border-radius: 6px;
+        min-height: 36px;
+        white-space: nowrap;
+    }
+}
+
+/* ========================================
+   GRID DE OFERTAS MÓVIL
+   ======================================== */
+@media (max-width: 768px) {
+    .offers-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+        padding: 15px;
+        width: 100%;
+        max-width: 100vw;
+    }
+    
+    .offer-card {
+        width: 100%;
+        max-width: 100%;
+        padding: 15px;
+        border-radius: 12px;
+        background: white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    
+    .offer-logo {
+        width: 50px;
+        height: 50px;
+        margin: 0 auto 10px;
+        border-radius: 8px;
+        object-fit: contain;
+    }
+    
+    .offer-name {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 5px;
+    }
+    
+    .offer-count {
+        font-size: 0.8rem;
+        color: #666;
+    }
+}
+
+/* ========================================
+   TAGS/CATEGORÍAS MÓVIL
+   ======================================== */
+@media (max-width: 768px) {
+    .tags-section {
+        padding: 15px;
+        width: 100%;
+        max-width: 100vw;
+    }
+    
+    .tags-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        width: 100%;
+    }
+    
+    .tag-button {
+        padding: 8px 16px;
+        font-size: 0.9rem;
+        border-radius: 20px;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        color: #495057;
+        min-height: 36px;
+        white-space: nowrap;
+    }
+    
+    .tag-button.active {
+        background: #FF6B35;
+        color: white;
+        border-color: #FF6B35;
+    }
+}
+
+/* ========================================
+   FOOTER MÓVIL
+   ======================================== */
+@media (max-width: 768px) {
+    .footer-modern {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+        padding: 20px 15px;
+        width: 100%;
+        max-width: 100vw;
+    }
+    
+    .activity-feed {
+        flex-direction: column;
+        gap: 0.5rem;
+        text-align: center;
+    }
+    
+    .activity-text {
+        font-size: 0.9rem;
+    }
+}
+
+/* ========================================
+   BOTONES TOUCH OPTIMIZADOS
+   ======================================== */
+@media (max-width: 768px) {
+    /* Tamaño mínimo para touch targets */
+    button, .btn, .nav-link, .dropdown-toggle, 
+    .tag-button, .filter-radio, .code-button {
+        min-height: 44px;
+        min-width: 44px;
+        touch-action: manipulation;
+    }
+    
+    /* Espaciado entre elementos táctiles */
+    .nav-modern .nav-link {
+        margin: 2px;
+    }
+    
+    .filter-buttons .btn {
+        margin: 2px 0;
+    }
+    
+    /* Efectos táctiles */
+    button:active, .btn:active, .nav-link:active {
+        transform: scale(0.98);
+        transition: transform 0.1s ease;
+    }
+}
+
+/* ========================================
+   SCROLL SUAVE Y OVERFLOW
+   ======================================== */
+@media (max-width: 768px) {
+    html {
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    body {
+        -webkit-overflow-scrolling: touch;
+        overflow-x: hidden;
+    }
+    
+    .container, .container-fluid {
+        max-width: 100vw;
+        overflow-x: hidden;
+    }
+    
+    /* Prevenir scroll horizontal en todas las secciones */
+    .main-content, .codes-section, .related-brands, 
+    .offers-grid, .tags-section, .filter-section {
+        max-width: 100vw;
+        overflow-x: hidden;
+    }
+}
+
+/* ========================================
+   PANTALLAS MUY PEQUEÑAS (320px-480px)
+   ======================================== */
+@media (max-width: 480px) {
+    .hero-title {
+        font-size: 2.5rem;
+    }
+    
+    .logo-text {
+        font-size: 2rem;
+    }
+    
+    .nav-modern {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.25rem;
+    }
+    
+    .nav-link {
+        font-size: 1rem;
+        padding: 6px 10px;
+    }
+    
+    .offers-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .brand-card {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .brand-logo {
+        width: 80px;
+        height: 80px;
+    }
+}
+
+/* ========================================
+   UTILIDADES MÓVILES
+   ======================================== */
+@media (max-width: 768px) {
+    .mobile-hidden {
+        display: none !important;
+    }
+    
+    .mobile-only {
+        display: block !important;
+    }
+    
+    .mobile-full-width {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    
+    .mobile-center {
+        text-align: center !important;
+    }
+    
+    .mobile-padding {
+        padding: 15px !important;
+    }
+    
+    .mobile-margin {
+        margin: 15px 0 !important;
+    }
+}
+
+/* ========================================
+   DESKTOP - OCULTAR ELEMENTOS MÓVILES
+   ======================================== */
+@media (min-width: 769px) {
+    .mobile-only {
+        display: none !important;
+    }
+}

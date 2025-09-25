@@ -1,0 +1,1168 @@
+<?php
+session_start();
+
+// Incluir archivos necesarios
+include_once __DIR__ . '/../inc/includes.php';
+include_once __DIR__ . '/../myphp/funciones.php';
+include_once __DIR__ . '/../inc/funciones.php';
+include_once __DIR__ . '/../myphp/funciones_usuario.php';
+
+// Verificar permisos de administrador
+$array_codigos_acceso[] = "58bd851da54e295b8b52f702"; //thevega82@gmail.com
+$array_codigos_acceso[] = "5e78170e6b68e6519b7c5df2"; //edna
+$array_codigos_acceso[] = "639899bc6321ee0d0e4010d2"; //aron
+$array_codigos_acceso[] = "5c8a10ce2f55c86d6e707d82"; //jose
+
+if (!in_array($_SESSION["user_id"], $array_codigos_acceso)) {
+    header('Location: https://www.codigoamigo.com');
+    die();
+}
+
+$collection_codigos = getCollectionCodigos();
+$collection_usuarios = getCollectionUsuarios();
+$collection_marcas = getCollectionMarcas();
+
+// Procesar acciones
+if ($_POST) {
+    $action = $_POST['action'] ?? '';
+    
+    switch ($action) {
+        case 'update_codigo':
+            $codigo_id = $_POST['codigo_id'];
+            $nuevo_codigo = trim($_POST['codigo']);
+            $descripcion = trim($_POST['descripcion']);
+            $marca = trim($_POST['marca']);
+            $estado = (int)$_POST['estado'];
+            $destacado = (int)$_POST['destacado'];
+            $destacado_social = (int)$_POST['destacado_social'];
+            
+            $update_data = [
+                'codigo' => $nuevo_codigo,
+                'descripcion' => $descripcion,
+                'marca' => strtolower($marca),
+                'estado' => $estado,
+                'destacado' => $destacado,
+                'destacado_social' => $destacado_social,
+                'updated_at' => new MongoDB\BSON\UTCDateTime()
+            ];
+            
+            $result = $collection_codigos->updateOne(
+                ['_id' => new MongoDB\BSON\ObjectId($codigo_id)],
+                ['$set' => $update_data]
+            );
+            
+            if ($result->getModifiedCount() > 0) {
+                $_SESSION['success_message'] = "Código actualizado correctamente";
+            } else {
+                $_SESSION['error_message'] = "No se realizaron cambios en el código";
+            }
+            break;
+            
+        case 'toggle_estado':
+            $codigo_id = $_POST['codigo_id'];
+            $nuevo_estado = $_POST['nuevo_estado'];
+            
+            $collection_codigos->updateOne(
+                ['_id' => new MongoDB\BSON\ObjectId($codigo_id)],
+                ['$set' => [
+                    'estado' => (int)$nuevo_estado,
+                    'updated_at' => new MongoDB\BSON\UTCDateTime()
+                ]]
+            );
+            
+            $_SESSION['success_message'] = "Estado del código actualizado";
+            break;
+            
+        case 'toggle_destacado':
+            $codigo_id = $_POST['codigo_id'];
+            $nuevo_destacado = $_POST['nuevo_destacado'];
+            
+            $collection_codigos->updateOne(
+                ['_id' => new MongoDB\BSON\ObjectId($codigo_id)],
+                ['$set' => [
+                    'destacado' => (int)$nuevo_destacado,
+                    'updated_at' => new MongoDB\BSON\UTCDateTime()
+                ]]
+            );
+            
+            $_SESSION['success_message'] = "Estado destacado actualizado";
+            break;
+            
+        case 'toggle_destacado_premium':
+            $codigo_id = $_POST['codigo_id'];
+            $nuevo_destacado_premium = $_POST['nuevo_destacado_premium'];
+            
+            $collection_codigos->updateOne(
+                ['_id' => new MongoDB\BSON\ObjectId($codigo_id)],
+                ['$set' => [
+                    'destacado_social' => (int)$nuevo_destacado_premium,
+                    'updated_at' => new MongoDB\BSON\UTCDateTime()
+                ]]
+            );
+            
+            $_SESSION['success_message'] = "Estado destacado premium actualizado";
+            break;
+            
+        case 'delete_codigo':
+            $codigo_id = $_POST['codigo_id'];
+            
+            $result = $collection_codigos->deleteOne(['_id' => new MongoDB\BSON\ObjectId($codigo_id)]);
+            if ($result->getDeletedCount() > 0) {
+                $_SESSION['success_message'] = "Código eliminado correctamente";
+            } else {
+                $_SESSION['error_message'] = "Error al eliminar el código";
+            }
+            break;
+            
+        case 'bulk_action':
+            $codigo_ids = $_POST['codigo_ids'] ?? [];
+            $bulk_action = $_POST['bulk_action'];
+            
+            if (empty($codigo_ids)) {
+                $_SESSION['error_message'] = "No se seleccionaron códigos";
+            } else {
+                $object_ids = array_map(function($id) {
+                    return new MongoDB\BSON\ObjectId($id);
+                }, $codigo_ids);
+                
+                switch ($bulk_action) {
+                    case 'activate':
+                        $result = $collection_codigos->updateMany(
+                            ['_id' => ['$in' => $object_ids]],
+                            ['$set' => [
+                                'estado' => 0,
+                                'updated_at' => new MongoDB\BSON\UTCDateTime()
+                            ]]
+                        );
+                        $_SESSION['success_message'] = "Se activaron {$result->getModifiedCount()} códigos";
+                        break;
+                        
+                    case 'deactivate':
+                        $result = $collection_codigos->updateMany(
+                            ['_id' => ['$in' => $object_ids]],
+                            ['$set' => [
+                                'estado' => -1,
+                                'updated_at' => new MongoDB\BSON\UTCDateTime()
+                            ]]
+                        );
+                        $_SESSION['success_message'] = "Se desactivaron {$result->getModifiedCount()} códigos";
+                        break;
+                        
+                    case 'highlight':
+                        $result = $collection_codigos->updateMany(
+                            ['_id' => ['$in' => $object_ids]],
+                            ['$set' => [
+                                'destacado' => 1,
+                                'updated_at' => new MongoDB\BSON\UTCDateTime()
+                            ]]
+                        );
+                        $_SESSION['success_message'] = "Se destacaron {$result->getModifiedCount()} códigos";
+                        break;
+                        
+                    case 'unhighlight':
+                        $result = $collection_codigos->updateMany(
+                            ['_id' => ['$in' => $object_ids]],
+                            ['$set' => [
+                                'destacado' => 0,
+                                'updated_at' => new MongoDB\BSON\UTCDateTime()
+                            ]]
+                        );
+                        $_SESSION['success_message'] = "Se quitaron de destacados {$result->getModifiedCount()} códigos";
+                        break;
+                        
+                    case 'highlight_premium':
+                        $result = $collection_codigos->updateMany(
+                            ['_id' => ['$in' => $object_ids]],
+                            ['$set' => [
+                                'destacado_social' => 1,
+                                'updated_at' => new MongoDB\BSON\UTCDateTime()
+                            ]]
+                        );
+                        $_SESSION['success_message'] = "Se destacaron premium {$result->getModifiedCount()} códigos";
+                        break;
+                        
+                    case 'unhighlight_premium':
+                        $result = $collection_codigos->updateMany(
+                            ['_id' => ['$in' => $object_ids]],
+                            ['$set' => [
+                                'destacado_social' => 0,
+                                'updated_at' => new MongoDB\BSON\UTCDateTime()
+                            ]]
+                        );
+                        $_SESSION['success_message'] = "Se quitaron de destacados premium {$result->getModifiedCount()} códigos";
+                        break;
+                        
+                    case 'delete':
+                        $result = $collection_codigos->deleteMany(['_id' => ['$in' => $object_ids]]);
+                        $_SESSION['success_message'] = "Se eliminaron {$result->getDeletedCount()} códigos";
+                        break;
+                }
+            }
+            break;
+    }
+    
+    header('Location: admin_codigos.php');
+    exit;
+}
+
+// Obtener filtros
+$filtro_estado = $_GET['estado'] ?? '';
+$filtro_destacado = $_GET['destacado'] ?? '';
+$filtro_marca = $_GET['marca'] ?? '';
+$filtro_usuario = $_GET['usuario'] ?? '';
+$filtro_busqueda = $_GET['busqueda'] ?? '';
+$filtro_id_codigo = $_GET['id_codigo'] ?? '';
+
+// Obtener parámetros de ordenamiento
+$sort_field = $_GET['sort'] ?? 'fecha_publicacion';
+$sort_direction = $_GET['dir'] ?? 'desc';
+
+// Construir filtros para la consulta
+$filtros = [];
+if ($filtro_estado !== '') {
+    $filtros['estado'] = (int)$filtro_estado;
+}
+if ($filtro_destacado !== '') {
+    $filtros['destacado'] = (int)$filtro_destacado;
+}
+if ($filtro_marca) {
+    $filtros['marca'] = ['$regex' => $filtro_marca, '$options' => 'i'];
+}
+if ($filtro_usuario) {
+    $filtros['id_usuario'] = $filtro_usuario;
+}
+if ($filtro_busqueda) {
+    $filtros['$or'] = [
+        ['codigo' => ['$regex' => $filtro_busqueda, '$options' => 'i']],
+        ['descripcion' => ['$regex' => $filtro_busqueda, '$options' => 'i']]
+    ];
+}
+if ($filtro_id_codigo) {
+    // Buscar por ID completo o parcial
+    try {
+        // Si es un ObjectId válido, buscar por ID exacto
+        $objectId = new MongoDB\BSON\ObjectId($filtro_id_codigo);
+        $filtros['_id'] = $objectId;
+    } catch (Exception $e) {
+        // Si no es un ObjectId válido, buscar por ID parcial como string
+        $filtros['_id'] = ['$regex' => $filtro_id_codigo, '$options' => 'i'];
+    }
+}
+
+// Obtener códigos con paginación
+$page = (int)($_GET['page'] ?? 1);
+$limit = (int)($_GET['limit'] ?? 20);
+$skip = ($page - 1) * $limit;
+
+// Validar límite para evitar valores extremos
+$opciones_limit = [10, 20, 50, 100, 200, 500, 1000, 'todos'];
+if (!in_array($limit, $opciones_limit) && $limit !== 'todos') {
+    $limit = 20;
+}
+
+// Si se selecciona "todos", obtener todos los resultados
+if ($limit === 'todos') {
+    $limit = 999999; // Número muy grande para obtener todos
+}
+
+// Construir ordenamiento
+$sort_options = [];
+$sort_direction_value = ($sort_direction === 'asc') ? 1 : -1;
+
+switch ($sort_field) {
+    case 'fecha_publicacion':
+        // Ordenar directamente por fecha_publicacion (campo string)
+        $sort_options['fecha_publicacion'] = $sort_direction_value;
+        break;
+    case 'updated_at':
+        $sort_options['updated_at'] = $sort_direction_value;
+        break;
+    case 'codigo':
+        $sort_options['codigo'] = $sort_direction_value;
+        break;
+    case 'marca':
+        $sort_options['marca'] = $sort_direction_value;
+        break;
+    case 'estado':
+        $sort_options['estado'] = $sort_direction_value;
+        break;
+    case 'destacado':
+        $sort_options['destacado'] = $sort_direction_value;
+        break;
+    case 'destacado_social':
+        $sort_options['destacado_social'] = $sort_direction_value;
+        break;
+    case 'vistas':
+        $sort_options['totalclicks'] = $sort_direction_value;
+        break;
+    default:
+        $sort_options['_id'] = -1;
+        break;
+}
+
+// Ordenamiento optimizado: usar índices de MongoDB directamente
+$codigos = $collection_codigos->find($filtros, [
+    'sort' => $sort_options,
+    'skip' => $skip,
+    'limit' => $limit
+])->toArray();
+
+$total_codigos = $collection_codigos->countDocuments($filtros);
+$total_pages = ceil($total_codigos / $limit);
+
+// Obtener marcas para el filtro
+$marcas = $collection_marcas->find([], ['sort' => ['nombre' => 1]])->toArray();
+
+// Obtener estadísticas
+$estadisticas = [
+    'total' => $collection_codigos->countDocuments([]),
+    'activos' => $collection_codigos->countDocuments(['estado' => 0]),
+    'inactivos' => $collection_codigos->countDocuments(['estado' => -1]),
+    'destacados' => $collection_codigos->countDocuments(['destacado' => 1]),
+    'nuevos_hoy' => $collection_codigos->countDocuments([
+        'fecha_creacion' => ['$gte' => new MongoDB\BSON\UTCDateTime(strtotime('today') * 1000)]
+    ])
+];
+
+$title = "Gestión de Códigos - Panel de Administración";
+?>
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?php echo $title; ?></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <style>
+        .sidebar {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .sidebar .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin: 2px 0;
+            transition: all 0.3s;
+        }
+        .sidebar .nav-link:hover, .sidebar .nav-link.active {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        .main-content {
+            background-color: #f8f9fa;
+            min-height: 100vh;
+        }
+        .navbar-admin {
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .card-stat {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .codigo-text {
+            font-family: 'Courier New', monospace;
+            background-color: #f8f9fa;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        .descripcion-text {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        /* Estilos para encabezados ordenables */
+        .sortable-header {
+            color: #333 !important;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+        }
+        
+        .sortable-header:hover {
+            color: #667eea !important;
+            text-decoration: none !important;
+        }
+        
+        .sortable-header i {
+            font-size: 0.8em;
+        }
+        
+        .sortable-header:hover i {
+            color: #667eea !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2 sidebar p-0">
+                <div class="p-3">
+                    <h4 class="text-white mb-4">
+                        <i class="fas fa-cogs me-2"></i>Admin Panel
+                    </h4>
+                    <nav class="nav flex-column">
+                        <a class="nav-link" href="admin_dashboard.php">
+                            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                        </a>
+                        <a class="nav-link" href="admin_usuarios.php">
+                            <i class="fas fa-users me-2"></i>Usuarios
+                        </a>
+                        <a class="nav-link" href="admin_marcas.php">
+                            <i class="fas fa-tags me-2"></i>Marcas
+                        </a>
+                        <a class="nav-link active" href="admin_codigos.php">
+                            <i class="fas fa-code me-2"></i>Códigos
+                        </a>
+                        <a class="nav-link" href="admin_transacciones.php">
+                            <i class="fas fa-credit-card me-2"></i>Transacciones
+                        </a>
+                        <a class="nav-link" href="admin_reportes.php">
+                            <i class="fas fa-chart-bar me-2"></i>Reportes
+                        </a>
+                        <a class="nav-link" href="admin_configuracion.php">
+                            <i class="fas fa-cog me-2"></i>Configuración
+                        </a>
+                        <a class="nav-link" href="admin_logs.php">
+                            <i class="fas fa-file-alt me-2"></i>Logs
+                        </a>
+                        <hr class="text-white">
+                        <a class="nav-link" href="https://www.codigoamigo.com">
+                            <i class="fas fa-home me-2"></i>Volver al sitioo
+                        </a>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="col-md-9 col-lg-10 main-content">
+                <!-- Navbar -->
+                <nav class="navbar navbar-expand-lg navbar-admin">
+                    <div class="container-fluid">
+                        <h5 class="mb-0">Gestión de Códigos</h5>
+                        <div class="d-flex align-items-center">
+                            <span class="text-muted me-3">Bienvenido, <?php echo $_SESSION["username"] ?? 'Admin'; ?></span>
+                            <a href="https://www.codigoamigo.com/logout" class="btn btn-outline-danger btn-sm">
+                                <i class="fas fa-sign-out-alt me-1"></i>Salir
+                            </a>
+                        </div>
+                    </div>
+                </nav>
+
+                <div class="p-4">
+                    <!-- Mensajes -->
+                    <?php if (isset($_SESSION['success_message'])): ?>
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            <?php echo $_SESSION['success_message']; unset($_SESSION['success_message']); ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <?php if (isset($_SESSION['error_message'])): ?>
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <?php echo $_SESSION['error_message']; unset($_SESSION['error_message']); ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    <?php endif; ?>
+
+                    <!-- Estadísticas -->
+                    <div class="row mb-4">
+                        <div class="col-md-2 mb-3">
+                            <div class="card card-stat">
+                                <div class="card-body text-center">
+                                    <h3 class="text-primary"><?php echo number_format($estadisticas['total']); ?></h3>
+                                    <p class="text-muted mb-0">Total</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card card-stat">
+                                <div class="card-body text-center">
+                                    <h3 class="text-success"><?php echo number_format($estadisticas['activos']); ?></h3>
+                                    <p class="text-muted mb-0">Activos</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card card-stat">
+                                <div class="card-body text-center">
+                                    <h3 class="text-danger"><?php echo number_format($estadisticas['inactivos']); ?></h3>
+                                    <p class="text-muted mb-0">Inactivos</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card card-stat">
+                                <div class="card-body text-center">
+                                    <h3 class="text-warning"><?php echo number_format($estadisticas['destacados']); ?></h3>
+                                    <p class="text-muted mb-0">Destacados</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card card-stat">
+                                <div class="card-body text-center">
+                                    <h3 class="text-info"><?php echo number_format($estadisticas['nuevos_hoy']); ?></h3>
+                                    <p class="text-muted mb-0">Hoy</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="card card-stat">
+                                <div class="card-body text-center">
+                                    <h3 class="text-secondary"><?php echo number_format($total_codigos); ?></h3>
+                                    <p class="text-muted mb-0">Filtrados</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filtros -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Filtros de Búsqueda</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="GET" class="row g-3">
+                                <div class="col-md-2">
+                                    <label class="form-label">Estado</label>
+                                    <select name="estado" class="form-select">
+                                        <option value="">Todos</option>
+                                        <option value="0" <?php echo $filtro_estado === '0' ? 'selected' : ''; ?>>Activo</option>
+                                        <option value="-1" <?php echo $filtro_estado === '-1' ? 'selected' : ''; ?>>Inactivo</option>
+                                        <option value="-2" <?php echo $filtro_estado === '-2' ? 'selected' : ''; ?>>Desactivado por usuario</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Destacado</label>
+                                    <select name="destacado" class="form-select">
+                                        <option value="">Todos</option>
+                                        <option value="1" <?php echo $filtro_destacado === '1' ? 'selected' : ''; ?>>Sí</option>
+                                        <option value="0" <?php echo $filtro_destacado === '0' ? 'selected' : ''; ?>>No</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Marca</label>
+                                    <select name="marca" class="form-select">
+                                        <option value="">Todas</option>
+                                        <?php foreach ($marcas as $marca): ?>
+                                        <option value="<?php echo htmlspecialchars($marca['nombre_clave']); ?>" 
+                                                <?php echo $filtro_marca === $marca['nombre_clave'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($marca['nombre']); ?>
+                                        </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Buscar</label>
+                                    <input type="text" name="busqueda" class="form-control" 
+                                           placeholder="Código o descripción" value="<?php echo htmlspecialchars($filtro_busqueda); ?>">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">ID Código</label>
+                                    <input type="text" name="id_codigo" class="form-control" 
+                                           placeholder="67a43ea6a241517ce506ef23" value="<?php echo htmlspecialchars($filtro_id_codigo); ?>">
+                                </div>
+                                <div class="col-md-1">
+                                    <label class="form-label">Usuario ID</label>
+                                    <input type="text" name="usuario" class="form-control" 
+                                           placeholder="ID Usuario" value="<?php echo htmlspecialchars($filtro_usuario); ?>">
+                                </div>
+                                <div class="col-md-1">
+                                    <label class="form-label">Mostrar</label>
+                                    <select name="limit" class="form-select">
+                                        <option value="10" <?php echo $limit === 10 ? 'selected' : ''; ?>>10</option>
+                                        <option value="20" <?php echo $limit === 20 ? 'selected' : ''; ?>>20</option>
+                                        <option value="50" <?php echo $limit === 50 ? 'selected' : ''; ?>>50</option>
+                                        <option value="100" <?php echo $limit === 100 ? 'selected' : ''; ?>>100</option>
+                                        <option value="200" <?php echo $limit === 200 ? 'selected' : ''; ?>>200</option>
+                                        <option value="500" <?php echo $limit === 500 ? 'selected' : ''; ?>>500</option>
+                                        <option value="1000" <?php echo $limit === 1000 ? 'selected' : ''; ?>>1000</option>
+                                        <option value="todos" <?php echo $limit === 'todos' || $limit >= 999999 ? 'selected' : ''; ?>>Todos</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-1">
+                                    <label class="form-label">&nbsp;</label>
+                                    <div class="d-grid">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-search"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Acciones masivas -->
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <form method="POST" id="bulkForm">
+                                <input type="hidden" name="action" value="bulk_action">
+                                <div class="row align-items-center">
+                                    <div class="col-md-3">
+                                        <label class="form-label">Acción masiva:</label>
+                                        <select name="bulk_action" class="form-select" id="bulkAction">
+                                            <option value="">Seleccionar acción</option>
+                                            <option value="activate">Activar seleccionados</option>
+                                            <option value="deactivate">Desactivar seleccionados</option>
+                                            <option value="highlight">Destacar seleccionados</option>
+                                            <option value="unhighlight">Quitar destacado</option>
+                                            <option value="highlight_premium">Destacar premium</option>
+                                            <option value="unhighlight_premium">Quitar destacado premium</option>
+                                            <option value="delete">Eliminar seleccionados</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <button type="button" class="btn btn-outline-primary" onclick="selectAll()">
+                                            <i class="fas fa-check-square me-1"></i>Seleccionar todos
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary" onclick="deselectAll()">
+                                            <i class="fas fa-square me-1"></i>Deseleccionar
+                                        </button>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <button type="submit" class="btn btn-warning" id="bulkSubmit" disabled>
+                                            <i class="fas fa-cogs me-1"></i>Ejecutar acción
+                                        </button>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <span class="text-muted" id="selectedCount">0 seleccionados</span>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de códigos -->
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title mb-0">Lista de Códigos</h5>
+                                <?php if ($sort_field && $sort_field !== 'fecha_publicacion'): ?>
+                                    <small class="text-muted">
+                                        Ordenado por: <strong><?php echo ucfirst($sort_field); ?></strong> 
+                                        (<?php echo $sort_direction === 'asc' ? 'Ascendente' : 'Descendente'; ?>)
+                                    </small>
+                                <?php endif; ?>
+                            </div>
+                            <span class="badge bg-primary"><?php echo number_format($total_codigos); ?> códigos</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th width="30">
+                                                <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()">
+                                            </th>
+                                            <th>
+                                                <a href="?<?php echo http_build_query(array_merge($_GET, ['sort' => 'fecha_publicacion', 'dir' => ($sort_field === 'fecha_publicacion' && $sort_direction === 'asc') ? 'desc' : 'asc'])); ?>" 
+                                                   class="sortable-header text-decoration-none">
+                                                    Fecha
+                                                    <?php if ($sort_field === 'fecha_publicacion'): ?>
+                                                        <i class="fas fa-sort-<?php echo $sort_direction === 'asc' ? 'up' : 'down'; ?> ms-1"></i>
+                                                    <?php else: ?>
+                                                        <i class="fas fa-sort ms-1 text-muted"></i>
+                                                    <?php endif; ?>
+                                                </a>
+                                            </th>
+                                            <th>
+                                                <a href="?<?php echo http_build_query(array_merge($_GET, ['sort' => 'updated_at', 'dir' => ($sort_field === 'updated_at' && $sort_direction === 'asc') ? 'desc' : 'asc'])); ?>" 
+                                                   class="sortable-header text-decoration-none">
+                                                    Actualizado
+                                                    <?php if ($sort_field === 'updated_at'): ?>
+                                                        <i class="fas fa-sort-<?php echo $sort_direction === 'asc' ? 'up' : 'down'; ?> ms-1"></i>
+                                                    <?php else: ?>
+                                                        <i class="fas fa-sort ms-1 text-muted"></i>
+                                                    <?php endif; ?>
+                                                </a>
+                                            </th>
+                                            <th>ID</th>
+                                            <th>Usuario</th>
+                                            <th>
+                                                <a href="?<?php echo http_build_query(array_merge($_GET, ['sort' => 'marca', 'dir' => ($sort_field === 'marca' && $sort_direction === 'asc') ? 'desc' : 'asc'])); ?>" 
+                                                   class="sortable-header text-decoration-none">
+                                                    Marca
+                                                    <?php if ($sort_field === 'marca'): ?>
+                                                        <i class="fas fa-sort-<?php echo $sort_direction === 'asc' ? 'up' : 'down'; ?> ms-1"></i>
+                                                    <?php else: ?>
+                                                        <i class="fas fa-sort ms-1 text-muted"></i>
+                                                    <?php endif; ?>
+                                                </a>
+                                            </th>
+                                            <th>
+                                                <a href="?<?php echo http_build_query(array_merge($_GET, ['sort' => 'codigo', 'dir' => ($sort_field === 'codigo' && $sort_direction === 'asc') ? 'desc' : 'asc'])); ?>" 
+                                                   class="sortable-header text-decoration-none">
+                                                    Código
+                                                    <?php if ($sort_field === 'codigo'): ?>
+                                                        <i class="fas fa-sort-<?php echo $sort_direction === 'asc' ? 'up' : 'down'; ?> ms-1"></i>
+                                                    <?php else: ?>
+                                                        <i class="fas fa-sort ms-1 text-muted"></i>
+                                                    <?php endif; ?>
+                                                </a>
+                                            </th>
+                                            <th>Descripción</th>
+                                            <th>
+                                                <a href="?<?php echo http_build_query(array_merge($_GET, ['sort' => 'estado', 'dir' => ($sort_field === 'estado' && $sort_direction === 'asc') ? 'desc' : 'asc'])); ?>" 
+                                                   class="sortable-header text-decoration-none">
+                                                    Estado
+                                                    <?php if ($sort_field === 'estado'): ?>
+                                                        <i class="fas fa-sort-<?php echo $sort_direction === 'asc' ? 'up' : 'down'; ?> ms-1"></i>
+                                                    <?php else: ?>
+                                                        <i class="fas fa-sort ms-1 text-muted"></i>
+                                                    <?php endif; ?>
+                                                </a>
+                                            </th>
+                                            <th>
+                                                <a href="?<?php echo http_build_query(array_merge($_GET, ['sort' => 'destacado', 'dir' => ($sort_field === 'destacado' && $sort_direction === 'asc') ? 'desc' : 'asc'])); ?>" 
+                                                   class="sortable-header text-decoration-none">
+                                                    Destacado
+                                                    <?php if ($sort_field === 'destacado'): ?>
+                                                        <i class="fas fa-sort-<?php echo $sort_direction === 'asc' ? 'up' : 'down'; ?> ms-1"></i>
+                                                    <?php else: ?>
+                                                        <i class="fas fa-sort ms-1 text-muted"></i>
+                                                    <?php endif; ?>
+                                                </a>
+                                            </th>
+                                            <th>
+                                                <a href="?<?php echo http_build_query(array_merge($_GET, ['sort' => 'destacado_social', 'dir' => ($sort_field === 'destacado_social' && $sort_direction === 'asc') ? 'desc' : 'asc'])); ?>" 
+                                                   class="sortable-header text-decoration-none">
+                                                    Premium
+                                                    <?php if ($sort_field === 'destacado_social'): ?>
+                                                        <i class="fas fa-sort-<?php echo $sort_direction === 'asc' ? 'up' : 'down'; ?> ms-1"></i>
+                                                    <?php else: ?>
+                                                        <i class="fas fa-sort ms-1 text-muted"></i>
+                                                    <?php endif; ?>
+                                                </a>
+                                            </th>
+                                            <th>
+                                                <a href="?<?php echo http_build_query(array_merge($_GET, ['sort' => 'vistas', 'dir' => ($sort_field === 'vistas' && $sort_direction === 'asc') ? 'desc' : 'asc'])); ?>" 
+                                                   class="sortable-header text-decoration-none">
+                                                    Vistas
+                                                    <?php if ($sort_field === 'vistas'): ?>
+                                                        <i class="fas fa-sort-<?php echo $sort_direction === 'asc' ? 'up' : 'down'; ?> ms-1"></i>
+                                                    <?php else: ?>
+                                                        <i class="fas fa-sort ms-1 text-muted"></i>
+                                                    <?php endif; ?>
+                                                </a>
+                                            </th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($codigos as $codigo): 
+                                            // Obtener información del usuario (verificar que existe id_usuario)
+                                            $usuario = null;
+                                            if (isset($codigo['id_usuario']) && $codigo['id_usuario']) {
+                                                $usuario = $collection_usuarios->findOne(['_id' => new MongoDB\BSON\ObjectId($codigo['id_usuario'])]);
+                                            }
+                                        ?>
+                                        <tr>
+                                            <td>
+                                                <input type="checkbox" class="codigo-checkbox" value="<?php echo $codigo['_id']; ?>" 
+                                                       onchange="updateSelectedCount()">
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    <?php 
+                                                    $fecha_mostrar = 'N/A';
+                                                    
+                                                    // Intentar obtener fecha de fecha_publicacion
+                                                    if (isset($codigo['fecha_publicacion'])) {
+                                                        if ($codigo['fecha_publicacion'] instanceof MongoDB\BSON\UTCDateTime) {
+                                                            $fecha_mostrar = date('d/m/Y H:i', $codigo['fecha_publicacion']->toDateTime()->getTimestamp());
+                                                        } elseif (is_string($codigo['fecha_publicacion'])) {
+                                                            $fecha_mostrar = date('d/m/Y H:i', strtotime($codigo['fecha_publicacion']));
+                                                        }
+                                                    }
+                                                    
+                                                    // Si no hay fecha_creacion, usar el timestamp del ObjectId
+                                                    if ($fecha_mostrar === 'N/A' && isset($codigo['_id'])) {
+                                                        $objectId = $codigo['_id'];
+                                                        if ($objectId instanceof MongoDB\BSON\ObjectId) {
+                                                            $timestamp = $objectId->getTimestamp();
+                                                            $fecha_mostrar = date('d/m/Y H:i', $timestamp);
+                                                        }
+                                                    }
+                                                    
+                                                    echo $fecha_mostrar;
+                                                    ?>
+                                                </small>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    <?php 
+                                                    $fecha_actualizado = 'N/A';
+                                                    
+                                                    // Intentar obtener fecha de updated_at
+                                                    if (isset($codigo['updated_at'])) {
+                                                        if ($codigo['updated_at'] instanceof MongoDB\BSON\UTCDateTime) {
+                                                            $fecha_actualizado = date('d/m/Y H:i', $codigo['updated_at']->toDateTime()->getTimestamp());
+                                                        } elseif (is_string($codigo['updated_at'])) {
+                                                            $fecha_actualizado = date('d/m/Y H:i', strtotime($codigo['updated_at']));
+                                                        }
+                                                    }
+                                                    
+                                                    echo $fecha_actualizado;
+                                                    ?>
+                                                </small>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted"><?php echo substr($codigo['_id'], 0, 8) . '...'; ?></small>
+                                            </td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <?php if ($usuario && isset($usuario['img']) && $usuario['img']): ?>
+                                                        <img src="<?php echo htmlspecialchars($usuario['img']); ?>" 
+                                                             class="rounded-circle me-2" width="24" height="24" 
+                                                             onerror="this.src='https://via.placeholder.com/24'">
+                                                    <?php else: ?>
+                                                        <div class="bg-secondary rounded-circle me-2 d-flex align-items-center justify-content-center" 
+                                                             style="width: 24px; height: 24px;">
+                                                            <i class="fas fa-user text-white" style="font-size: 10px;"></i>
+                                                        </div>
+                                                    <?php endif; ?>
+                                                    <div>
+                                                        <small><?php echo htmlspecialchars($usuario['username'] ?? 'Usuario no encontrado'); ?></small>
+                                                        <br><small class="text-muted"><?php echo isset($codigo['id_usuario']) ? substr($codigo['id_usuario'], 0, 8) . '...' : 'Sin usuario'; ?></small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <?php 
+                                                $marca_nombre = $codigo['marca'] ?? '';
+                                                if (!empty($marca_nombre)) {
+                                                    $marca_url = '/de-' . strtolower($marca_nombre);
+                                                    echo '<a href="' . $marca_url . '" target="_blank" class="badge bg-info text-decoration-none" title="Ver página de marca">';
+                                                    echo ucfirst($marca_nombre);
+                                                    echo '</a>';
+                                                } else {
+                                                    echo '<span class="badge bg-secondary">Sin marca</span>';
+                                                }
+                                                ?>
+                                            </td>
+                                            <td>
+                                                <span class="codigo-text"><?php echo htmlspecialchars($codigo['codigo'] ?? ''); ?></span>
+                                            </td>
+                                            <td>
+                                                <div class="descripcion-text" title="<?php echo htmlspecialchars($codigo['descripcion'] ?? ''); ?>">
+                                                    <?php echo htmlspecialchars(substr($codigo['descripcion'] ?? '', 0, 50)) . '...'; ?>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <?php 
+                                                $estado = $codigo['estado'] ?? 0;
+                                                $estado_class = $estado == 0 ? 'success' : ($estado == -1 ? 'danger' : 'warning');
+                                                $estado_text = $estado == 0 ? 'Activo' : ($estado == -1 ? 'Inactivo' : 'Desactivado');
+                                                ?>
+                                                <span class="badge bg-<?php echo $estado_class; ?>"><?php echo $estado_text; ?></span>
+                                            </td>
+                                            <td>
+                                                <?php if (($codigo['destacado'] ?? 0) == 1): ?>
+                                                    <span class="badge bg-warning">
+                                                        <i class="fas fa-star me-1"></i>Destacado
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="text-muted">No</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?php if (($codigo['destacado_social'] ?? 0) == 1): ?>
+                                                    <span class="badge bg-success">
+                                                        <i class="fas fa-crown me-1"></i>Premium
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="text-muted">No</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-secondary"><?php echo $codigo['totalclicks'] ?? 0; ?></span>
+                                            </td>
+                                            <td>
+                                                <div class="btn-group" role="group">
+                                                    <button type="button" class="btn btn-sm btn-outline-primary" 
+                                                            data-bs-toggle="modal" data-bs-target="#modalEditarCodigo" 
+                                                            data-codigo-id="<?php echo $codigo['_id']; ?>"
+                                                            data-codigo-codigo="<?php echo htmlspecialchars($codigo['codigo'] ?? ''); ?>"
+                                                            data-codigo-descripcion="<?php echo htmlspecialchars($codigo['descripcion'] ?? ''); ?>"
+                                                            data-codigo-marca="<?php echo htmlspecialchars($codigo['marca'] ?? ''); ?>"
+                                                            data-codigo-estado="<?php echo $codigo['estado'] ?? 0; ?>"
+                                                            data-codigo-destacado="<?php echo $codigo['destacado'] ?? 0; ?>"
+                                                            data-codigo-destacado-social="<?php echo $codigo['destacado_social'] ?? 0; ?>">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-outline-warning" 
+                                                            onclick="toggleEstado('<?php echo $codigo['_id']; ?>', <?php echo $codigo['estado'] ?? 0; ?>)">
+                                                        <i class="fas fa-toggle-<?php echo ($codigo['estado'] ?? 0) == 0 ? 'on' : 'off'; ?>"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-outline-info" 
+                                                            onclick="toggleDestacado('<?php echo $codigo['_id']; ?>', <?php echo $codigo['destacado'] ?? 0; ?>)"
+                                                            title="Destacado Normal">
+                                                        <i class="fas fa-star"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-outline-success" 
+                                                            onclick="toggleDestacadoPremium('<?php echo $codigo['_id']; ?>', <?php echo $codigo['destacado_social'] ?? 0; ?>)"
+                                                            title="Destacado Premium (Home)">
+                                                        <i class="fas fa-crown"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                            onclick="eliminarCodigo('<?php echo $codigo['_id']; ?>')">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Paginación -->
+                            <?php if ($total_pages > 1): ?>
+                            <nav aria-label="Paginación de códigos">
+                                <ul class="pagination justify-content-center">
+                                    <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                                    <li class="page-item <?php echo $i == $page ? 'active' : ''; ?>">
+                                        <a class="page-link" href="?page=<?php echo $i; ?>&estado=<?php echo $filtro_estado; ?>&destacado=<?php echo $filtro_destacado; ?>&marca=<?php echo urlencode($filtro_marca); ?>&usuario=<?php echo urlencode($filtro_usuario); ?>&busqueda=<?php echo urlencode($filtro_busqueda); ?>&id_codigo=<?php echo urlencode($filtro_id_codigo); ?>&sort=<?php echo $sort_field; ?>&dir=<?php echo $sort_direction; ?>">
+                                            <?php echo $i; ?>
+                                        </a>
+                                    </li>
+                                    <?php endfor; ?>
+                                </ul>
+                            </nav>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para editar código -->
+    <div class="modal fade" id="modalEditarCodigo" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Editar Código</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="update_codigo">
+                        <input type="hidden" name="codigo_id" id="edit_codigo_id">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Código *</label>
+                                <input type="text" class="form-control" name="codigo" id="edit_codigo" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Marca *</label>
+                                <input type="text" class="form-control" name="marca" id="edit_marca" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Estado</label>
+                                <select name="estado" class="form-select" id="edit_estado">
+                                    <option value="0">Activo</option>
+                                    <option value="-1">Inactivo</option>
+                                    <option value="-2">Desactivado por usuario</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Destacado</label>
+                                <select name="destacado" class="form-select" id="edit_destacado">
+                                    <option value="0">No</option>
+                                    <option value="1">Sí</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Destacado Premium (Home)</label>
+                                <select name="destacado_social" class="form-select" id="edit_destacado_social">
+                                    <option value="0">No</option>
+                                    <option value="1">Sí (Aparece en Home)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Descripción</label>
+                            <textarea class="form-control" name="descripcion" id="edit_descripcion" rows="4"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Actualizar Código</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        // Modal de editar código
+        document.getElementById('modalEditarCodigo').addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            document.getElementById('edit_codigo_id').value = button.getAttribute('data-codigo-id');
+            document.getElementById('edit_codigo').value = button.getAttribute('data-codigo-codigo');
+            document.getElementById('edit_descripcion').value = button.getAttribute('data-codigo-descripcion');
+            document.getElementById('edit_marca').value = button.getAttribute('data-codigo-marca');
+            document.getElementById('edit_estado').value = button.getAttribute('data-codigo-estado');
+            document.getElementById('edit_destacado').value = button.getAttribute('data-codigo-destacado');
+            document.getElementById('edit_destacado_social').value = button.getAttribute('data-codigo-destacado-social') || '0';
+        });
+
+        // Selección masiva
+        function toggleSelectAll() {
+            var selectAll = document.getElementById('selectAllCheckbox');
+            var checkboxes = document.querySelectorAll('.codigo-checkbox');
+            checkboxes.forEach(function(checkbox) {
+                checkbox.checked = selectAll.checked;
+            });
+            updateSelectedCount();
+        }
+
+        function selectAll() {
+            var checkboxes = document.querySelectorAll('.codigo-checkbox');
+            checkboxes.forEach(function(checkbox) {
+                checkbox.checked = true;
+            });
+            document.getElementById('selectAllCheckbox').checked = true;
+            updateSelectedCount();
+        }
+
+        function deselectAll() {
+            var checkboxes = document.querySelectorAll('.codigo-checkbox');
+            checkboxes.forEach(function(checkbox) {
+                checkbox.checked = false;
+            });
+            document.getElementById('selectAllCheckbox').checked = false;
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            var checkboxes = document.querySelectorAll('.codigo-checkbox:checked');
+            var count = checkboxes.length;
+            document.getElementById('selectedCount').textContent = count + ' seleccionados';
+            
+            // Actualizar botón de acción masiva
+            var bulkSubmit = document.getElementById('bulkSubmit');
+            var bulkAction = document.getElementById('bulkAction');
+            bulkSubmit.disabled = count === 0 || bulkAction.value === '';
+        }
+
+        // Actualizar formulario de acciones masivas
+        document.getElementById('bulkAction').addEventListener('change', function() {
+            updateSelectedCount();
+        });
+
+        // Formulario de acciones masivas
+        document.getElementById('bulkForm').addEventListener('submit', function(e) {
+            var checkboxes = document.querySelectorAll('.codigo-checkbox:checked');
+            if (checkboxes.length === 0) {
+                e.preventDefault();
+                alert('Por favor selecciona al menos un código');
+                return;
+            }
+            
+            var action = document.getElementById('bulkAction').value;
+            if (!action) {
+                e.preventDefault();
+                alert('Por favor selecciona una acción');
+                return;
+            }
+            
+            if (action === 'delete') {
+                if (!confirm('¿Estás seguro de eliminar los códigos seleccionados? Esta acción no se puede deshacer.')) {
+                    e.preventDefault();
+                    return;
+                }
+            }
+            
+            // Añadir IDs seleccionados al formulario
+            checkboxes.forEach(function(checkbox) {
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'codigo_ids[]';
+                input.value = checkbox.value;
+                this.appendChild(input);
+            }, this);
+        });
+
+        // Toggle estado
+        function toggleEstado(codigoId, currentEstado) {
+            if (confirm('¿Estás seguro de cambiar el estado de este código?')) {
+                var form = document.createElement('form');
+                form.method = 'POST';
+                form.innerHTML = `
+                    <input type="hidden" name="action" value="toggle_estado">
+                    <input type="hidden" name="codigo_id" value="${codigoId}">
+                    <input type="hidden" name="nuevo_estado" value="${currentEstado == 0 ? -1 : 0}">
+                `;
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+
+        // Toggle destacado
+        function toggleDestacado(codigoId, currentDestacado) {
+            if (confirm('¿Estás seguro de cambiar el estado destacado de este código?')) {
+                var form = document.createElement('form');
+                form.method = 'POST';
+                form.innerHTML = `
+                    <input type="hidden" name="action" value="toggle_destacado">
+                    <input type="hidden" name="codigo_id" value="${codigoId}">
+                    <input type="hidden" name="nuevo_destacado" value="${currentDestacado == 1 ? 0 : 1}">
+                `;
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+
+        // Toggle destacado premium
+        function toggleDestacadoPremium(codigoId, currentDestacadoPremium) {
+            if (confirm('¿Estás seguro de cambiar el estado destacado premium de este código? (Esto afecta la visibilidad en la home)')) {
+                var form = document.createElement('form');
+                form.method = 'POST';
+                form.innerHTML = `
+                    <input type="hidden" name="action" value="toggle_destacado_premium">
+                    <input type="hidden" name="codigo_id" value="${codigoId}">
+                    <input type="hidden" name="nuevo_destacado_premium" value="${currentDestacadoPremium == 1 ? 0 : 1}">
+                `;
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+
+        // Eliminar código
+        function eliminarCodigo(codigoId) {
+            if (confirm('¿Estás seguro de eliminar este código? Esta acción no se puede deshacer.')) {
+                var form = document.createElement('form');
+                form.method = 'POST';
+                form.innerHTML = `
+                    <input type="hidden" name="action" value="delete_codigo">
+                    <input type="hidden" name="codigo_id" value="${codigoId}">
+                `;
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+    </script>
+    
+<?php get_footer(); ?>
+</body>
+</html>
+
+

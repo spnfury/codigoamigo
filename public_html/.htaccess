@@ -1,0 +1,10 @@
+# Rewrite rules para Slim
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/myphp/
+RewriteCond %{REQUEST_URI} !^/api/
+RewriteCond %{REQUEST_URI} !^/static/
+RewriteCond %{REQUEST_URI} !^/test_ajax\.php$
+RewriteCond %{REQUEST_URI} !^/login_ajax\.php$
+RewriteRule ^ index.php [QSA,L]

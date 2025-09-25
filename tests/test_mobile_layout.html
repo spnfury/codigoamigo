@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Layout Móvil - CodigoAmigo</title>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- CSS Móvil -->
+    <link rel="stylesheet" href="/css/mobile-compact-header.css">
+    <link rel="stylesheet" href="/css/mobile-exhaustive-optimization.css">
+    
+    <style>
+        /* Estilos de prueba */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        /* Simular variables CSS */
+        :root {
+            --dark-gray: #2C2C2C;
+            --primary-orange: #FF6B35;
+            --text-white: #FFFFFF;
+            --text-gray: #CCCCCC;
+        }
+        
+        /* Indicador de tamaño de pantalla */
+        .screen-indicator {
+            position: fixed;
+            top: 0;
+            right: 0;
+            background: rgba(255, 107, 53, 0.9);
+            color: white;
+            padding: 4px 8px;
+            font-size: 0.8rem;
+            z-index: 9999;
+            border-radius: 0 0 0 8px;
+        }
+        
+        /* Botones de prueba */
+        .test-buttons {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 9999;
+        }
+        
+        .test-btn {
+            background: #FF6B35;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+        
+        .test-btn:hover {
+            background: #E55A2B;
+        }
+    </style>
+</head>
+<body>
+    <!-- Indicador de tamaño de pantalla -->
+    <div class="screen-indicator" id="screen-indicator">
+        <span id="screen-size"></span>
+    </div>
+    
+    <!-- Botones de prueba -->
+    <div class="test-buttons">
+        <button class="test-btn" onclick="toggleMenu()">Toggle Menú</button>
+        <button class="test-btn" onclick="toggleFilters()">Toggle Filtros</button>
+        <button class="test-btn" onclick="addTestContent()">Agregar Contenido</button>
+    </div>
+    
+    <!-- HEADER COMPACTO MÓVIL -->
+    <header class="header-modern">
+        <div class="header-container">
+            <!-- LOGO COMPACTO -->
+            <a href="/" class="logo-section">
+                <div class="logo-text">
+                    <span class="logo-codigo">codigo</span><span class="logo-amigo">amigo</span>
+                </div>
+                <div class="logo-tagline">códigos verificados, gente real</div>
+            </a>
+            
+            <!-- BÚSQUEDA COMPACTA -->
+            <div class="search-header">
+                <div style="position: relative; width: 100%;">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" 
+                           class="search-input-header" 
+                           placeholder="Buscar códigos..." 
+                           id="mobile-search-input">
+                    <button class="search-submit" type="button">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- PERFIL DE USUARIO COMPACTO -->
+            <div class="user-profile-mobile" id="user-profile-mobile">
+                <i class="fas fa-user"></i>
+            </div>
+            
+            <!-- BOTÓN DE MENÚ HAMBURGUESA -->
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+        
+        <!-- MENÚ DESPLEGABLE MÓVIL -->
+        <div class="mobile-menu" id="mobile-menu">
+            <div class="mobile-menu-content">
+                <nav class="mobile-nav-links">
+                    <a href="/destacados" class="mobile-nav-link">Destacados</a>
+                    <a href="/nuevos" class="mobile-nav-link">Nuevos</a>
+                    <a href="/populares" class="mobile-nav-link">Populares</a>
+                    <a href="/categorias" class="mobile-nav-link">Categorías</a>
+                    <a href="/login" class="mobile-nav-link">Iniciar Sesión</a>
+                    <a href="/registro" class="mobile-nav-link">Registrarse</a>
+                </nav>
+            </div>
+        </div>
+        
+        <!-- OVERLAY PARA MENÚ -->
+        <div class="mobile-menu-overlay" id="mobile-menu-overlay"></div>
+    </header>
+    
+    <!-- SECCIÓN DE FILTROS MÓVIL -->
+    <section class="filters-section-mobile">
+        <div class="filters-bar">
+            <h3 class="filters-title">Filtros</h3>
+            <button class="filters-toggle" id="filters-toggle">
+                <i class="fas fa-chevron-down"></i>
+            </button>
+        </div>
+        
+        <div class="filters-panel" id="filters-panel">
+            <div class="filter-group">
+                <h4 class="filter-group-title">Categorías</h4>
+                <div class="filter-options">
+                    <div class="filter-option active">Todas</div>
+                    <div class="filter-option">Moda</div>
+                    <div class="filter-option">Tecnología</div>
+                    <div class="filter-option">Hogar</div>
+                    <div class="filter-option">Deportes</div>
+                    <div class="filter-option">Belleza</div>
+                </div>
+            </div>
+            
+            <div class="filter-group">
+                <h4 class="filter-group-title">Tipo de Descuento</h4>
+                <div class="filter-options">
+                    <div class="filter-option active">Todos</div>
+                    <div class="filter-option">Porcentaje</div>
+                    <div class="filter-option">Cantidad Fija</div>
+                    <div class="filter-option">Envío Gratis</div>
+                </div>
+            </div>
+            
+            <div class="filter-group">
+                <h4 class="filter-group-title">Estado</h4>
+                <div class="filter-options">
+                    <div class="filter-option active">Todos</div>
+                    <div class="filter-option">Verificados</div>
+                    <div class="filter-option">Nuevos</div>
+                    <div class="filter-option">Destacados</div>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <!-- CONTENIDO PRINCIPAL MÓVIL -->
+    <main class="main-container">
+        <!-- SECCIÓN DE CÓDIGOS -->
+        <section class="codes-section">
+            <div class="codes-grid" id="codes-grid">
+                <!-- Códigos de prueba -->
+                <div class="code-card">
+                    <div class="code-card-header">
+                        <div class="code-brand-logo" style="background: #e0e0e0; display: flex; align-items: center; justify-content: center; color: #666;">
+                            <i class="fas fa-store" style="font-size: 1.5rem;"></i>
+                        </div>
+                        <div class="code-brand-info">
+                            <h3 class="code-brand-name">Nike</h3>
+                            <p class="code-description">20% de descuento en calzado deportivo para toda la temporada</p>
+                        </div>
+                    </div>
+                    <div class="code-benefit">20% OFF</div>
+                    <div class="code-actions">
+                        <button class="code-button">Ver Código</button>
+                        <button class="code-button secondary">Compartir</button>
+                    </div>
+                </div>
+                
+                <div class="code-card">
+                    <div class="code-card-header">
+                        <div class="code-brand-logo" style="background: #e0e0e0; display: flex; align-items: center; justify-content: center; color: #666;">
+                            <i class="fas fa-shopping-cart" style="font-size: 1.5rem;"></i>
+                        </div>
+                        <div class="code-brand-info">
+                            <h3 class="code-brand-name">Amazon</h3>
+                            <p class="code-description">Envío gratis en pedidos superiores a 25€</p>
+                        </div>
+                    </div>
+                    <div class="code-benefit">ENVÍO GRATIS</div>
+                    <div class="code-actions">
+                        <button class="code-button">Ver Código</button>
+                        <button class="code-button secondary">Compartir</button>
+                    </div>
+                </div>
+                
+                <div class="code-card">
+                    <div class="code-card-header">
+                        <div class="code-brand-logo" style="background: #e0e0e0; display: flex; align-items: center; justify-content: center; color: #666;">
+                            <i class="fas fa-tshirt" style="font-size: 1.5rem;"></i>
+                        </div>
+                        <div class="code-brand-info">
+                            <h3 class="code-brand-name">Zara</h3>
+                            <p class="code-description">15% de descuento en toda la colección de primavera</p>
+                        </div>
+                    </div>
+                    <div class="code-benefit">15% OFF</div>
+                    <div class="code-actions">
+                        <button class="code-button">Ver Código</button>
+                        <button class="code-button secondary">Compartir</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- SECCIÓN DE MARCAS RELACIONADAS -->
+        <section class="related-brands-section">
+            <h2 class="related-brands-title">Marcas Relacionadas</h2>
+            <div class="brands-grid" id="brands-grid">
+                <div class="brand-card">
+                    <div class="brand-logo" style="background: #e0e0e0; display: flex; align-items: center; justify-content: center; color: #666;">
+                        <i class="fas fa-running" style="font-size: 1.5rem;"></i>
+                    </div>
+                    <h4 class="brand-name">Adidas</h4>
+                    <p class="brand-offers-count">12 códigos</p>
+                </div>
+                
+                <div class="brand-card">
+                    <div class="brand-logo" style="background: #e0e0e0; display: flex; align-items: center; justify-content: center; color: #666;">
+                        <i class="fas fa-shopping-bag" style="font-size: 1.5rem;"></i>
+                    </div>
+                    <h4 class="brand-name">H&M</h4>
+                    <p class="brand-offers-count">8 códigos</p>
+                </div>
+                
+                <div class="brand-card">
+                    <div class="brand-logo" style="background: #e0e0e0; display: flex; align-items: center; justify-content: center; color: #666;">
+                        <i class="fas fa-dumbbell" style="font-size: 1.5rem;"></i>
+                    </div>
+                    <h4 class="brand-name">Decathlon</h4>
+                    <p class="brand-offers-count">15 códigos</p>
+                </div>
+                
+                <div class="brand-card">
+                    <div class="brand-logo" style="background: #e0e0e0; display: flex; align-items: center; justify-content: center; color: #666;">
+                        <i class="fas fa-laptop" style="font-size: 1.5rem;"></i>
+                    </div>
+                    <h4 class="brand-name">MediaMarkt</h4>
+                    <p class="brand-offers-count">6 códigos</p>
+                </div>
+            </div>
+        </section>
+        
+        <!-- SECCIÓN DE CATEGORÍAS -->
+        <section class="categories-section">
+            <h2 class="categories-title">Categorías Populares</h2>
+            <div class="categories-grid" id="categories-grid">
+                <div class="category-card">
+                    <div class="category-icon">
+                        <i class="fas fa-tshirt"></i>
+                    </div>
+                    <h4 class="category-name">Moda</h4>
+                </div>
+                
+                <div class="category-card">
+                    <div class="category-icon">
+                        <i class="fas fa-laptop"></i>
+                    </div>
+                    <h4 class="category-name">Tecnología</h4>
+                </div>
+                
+                <div class="category-card">
+                    <div class="category-icon">
+                        <i class="fas fa-home"></i>
+                    </div>
+                    <h4 class="category-name">Hogar</h4>
+                </div>
+                
+                <div class="category-card">
+                    <div class="category-icon">
+                        <i class="fas fa-dumbbell"></i>
+                    </div>
+                    <h4 class="category-name">Deportes</h4>
+                </div>
+                
+                <div class="category-card">
+                    <div class="category-icon">
+                        <i class="fas fa-palette"></i>
+                    </div>
+                    <h4 class="category-name">Belleza</h4>
+                </div>
+                
+                <div class="category-card">
+                    <div class="category-icon">
+                        <i class="fas fa-plane"></i>
+                    </div>
+                    <h4 class="category-name">Viajes</h4>
+                </div>
+            </div>
+        </section>
+    </main>
+    
+    <!-- FOOTER MÓVIL -->
+    <footer class="footer-section">
+        <div class="footer-content">
+            <h3 class="footer-logo">CodigoAmigo</h3>
+            <p class="footer-tagline">Códigos verificados, gente real</p>
+            
+            <div class="footer-links">
+                <a href="/sobre-nosotros" class="footer-link">Sobre Nosotros</a>
+                <a href="/contacto" class="footer-link">Contacto</a>
+                <a href="/ayuda" class="footer-link">Ayuda</a>
+                <a href="/terminos" class="footer-link">Términos</a>
+                <a href="/privacidad" class="footer-link">Privacidad</a>
+            </div>
+            
+            <p class="footer-copyright">
+                © 2024 CodigoAmigo.com - Todos los derechos reservados
+            </p>
+        </div>
+    </footer>
+    
+    <script>
+        // Actualizar indicador de tamaño de pantalla
+        function updateScreenIndicator() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            const indicator = document.getElementById('screen-indicator');
+            const sizeText = document.getElementById('screen-size');
+            
+            let sizeCategory = '';
+            if (width <= 360) {
+                sizeCategory = 'XS (≤360px)';
+            } else if (width <= 480) {
+                sizeCategory = 'SM (≤480px)';
+            } else if (width <= 768) {
+                sizeCategory = 'MD (≤768px)';
+            } else {
+                sizeCategory = 'LG (>768px)';
+            }
+            
+            sizeText.textContent = `${width}x${height} - ${sizeCategory}`;
+        }
+        
+        // Funciones de prueba
+        function toggleMenu() {
+            const menuToggle = document.getElementById('mobile-menu-toggle');
+            const mobileMenu = document.getElementById('mobile-menu');
+            const overlay = document.getElementById('mobile-menu-overlay');
+            
+            menuToggle.classList.toggle('active');
+            mobileMenu.classList.toggle('show');
+            overlay.classList.toggle('show');
+            document.body.style.overflow = mobileMenu.classList.contains('show') ? 'hidden' : '';
+        }
+        
+        function toggleFilters() {
+            const filtersToggle = document.getElementById('filters-toggle');
+            const filtersPanel = document.getElementById('filters-panel');
+            
+            filtersPanel.classList.toggle('show');
+            filtersToggle.classList.toggle('active');
+        }
+        
+        function addTestContent() {
+            const codesGrid = document.getElementById('codes-grid');
+            const newCard = document.createElement('div');
+            newCard.className = 'code-card';
+            newCard.innerHTML = `
+                <div class="code-card-header">
+                    <div class="code-brand-logo" style="background: #e0e0e0; display: flex; align-items: center; justify-content: center; color: #666;">
+                        <i class="fas fa-plus" style="font-size: 1.5rem;"></i>
+                    </div>
+                    <div class="code-brand-info">
+                        <h3 class="code-brand-name">Nueva Marca</h3>
+                        <p class="code-description">Código de prueba agregado dinámicamente</p>
+                    </div>
+                </div>
+                <div class="code-benefit">TEST</div>
+                <div class="code-actions">
+                    <button class="code-button">Ver Código</button>
+                    <button class="code-button secondary">Compartir</button>
+                </div>
+            `;
+            codesGrid.appendChild(newCard);
+        }
+        
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            updateScreenIndicator();
+            
+            // Toggle del menú móvil
+            const menuToggle = document.getElementById('mobile-menu-toggle');
+            const mobileMenu = document.getElementById('mobile-menu');
+            const overlay = document.getElementById('mobile-menu-overlay');
+            
+            if (menuToggle) {
+                menuToggle.addEventListener('click', toggleMenu);
+            }
+            
+            if (overlay) {
+                overlay.addEventListener('click', function() {
+                    menuToggle.classList.remove('active');
+                    mobileMenu.classList.remove('show');
+                    overlay.classList.remove('show');
+                    document.body.style.overflow = '';
+                });
+            }
+            
+            // Cerrar menú al hacer clic en enlaces
+            document.querySelectorAll('.mobile-nav-link').forEach(link => {
+                link.addEventListener('click', function() {
+                    menuToggle.classList.remove('active');
+                    mobileMenu.classList.remove('show');
+                    overlay.classList.remove('show');
+                    document.body.style.overflow = '';
+                });
+            });
+            
+            // Toggle de filtros
+            const filtersToggle = document.getElementById('filters-toggle');
+            const filtersPanel = document.getElementById('filters-panel');
+            
+            if (filtersToggle) {
+                filtersToggle.addEventListener('click', toggleFilters);
+            }
+            
+            // Funcionalidad de filtros
+            document.querySelectorAll('.filter-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    // Remover active de otros elementos del mismo grupo
+                    const group = this.closest('.filter-group');
+                    group.querySelectorAll('.filter-option').forEach(opt => {
+                        opt.classList.remove('active');
+                    });
+                    
+                    // Activar el elemento clickeado
+                    this.classList.add('active');
+                });
+            });
+            
+            // Búsqueda móvil
+            const searchSubmit = document.querySelector('.search-submit');
+            const searchInput = document.getElementById('mobile-search-input');
+            
+            if (searchSubmit) {
+                searchSubmit.addEventListener('click', function() {
+                    const query = searchInput.value.trim();
+                    if (query) {
+                        alert('Búsqueda: ' + query);
+                    }
+                });
+            }
+            
+            // Búsqueda con Enter
+            if (searchInput) {
+                searchInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        const query = searchInput.value.trim();
+                        if (query) {
+                            alert('Búsqueda: ' + query);
+                        }
+                    }
+                });
+            }
+            
+            // Funcionalidad del perfil de usuario
+            const userProfile = document.getElementById('user-profile-mobile');
+            if (userProfile) {
+                userProfile.addEventListener('click', function() {
+                    alert('Perfil de usuario');
+                });
+            }
+        });
+        
+        // Actualizar indicador al redimensionar
+        window.addEventListener('resize', updateScreenIndicator);
+        
+        // Cerrar menú al redimensionar pantalla
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 768) {
+                const menuToggle = document.getElementById('mobile-menu-toggle');
+                const mobileMenu = document.getElementById('mobile-menu');
+                const overlay = document.getElementById('mobile-menu-overlay');
+                
+                menuToggle.classList.remove('active');
+                mobileMenu.classList.remove('show');
+                overlay.classList.remove('show');
+                document.body.style.overflow = '';
+            }
+        });
+    </script>
+</body>
+</html>

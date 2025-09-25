@@ -1,0 +1,250 @@
+/* Estilos para filtros estilo Chollometro */
+.chollometro-filter-container {
+    margin: 20px 0;
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.filter-btn {
+    background: #fff;
+    border: 2px solid #e9ecef;
+    border-radius: 25px;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #495057;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.filter-btn:hover {
+    border-color: #ff6b35;
+    color: #ff6b35;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(255, 107, 53, 0.2);
+}
+
+.filter-btn.active {
+    background: #ff6b35;
+    border-color: #ff6b35;
+    color: white;
+}
+
+.filter-btn.active:hover {
+    background: #e55a2b;
+    border-color: #e55a2b;
+    color: white;
+}
+
+.filter-more-btn {
+    background: #6c757d;
+    border-color: #6c757d;
+    color: white;
+}
+
+.filter-more-btn:hover {
+    background: #5a6268;
+    border-color: #5a6268;
+    color: white;
+}
+
+.filter-search-btn {
+    background: #28a745;
+    border-color: #28a745;
+    color: white;
+}
+
+.filter-search-btn:hover {
+    background: #218838;
+    border-color: #218838;
+    color: white;
+}
+
+.filter-buttons {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.filter-panel, .search-panel {
+    display: none;
+    margin-top: 15px;
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.filter-panel.show, .search-panel.show {
+    display: block;
+}
+
+.filter-panel-content h4 {
+    color: #333;
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+.filter-group {
+    margin-bottom: 20px;
+}
+
+.filter-group h5 {
+    color: #555;
+    margin-bottom: 10px;
+    font-weight: 500;
+}
+
+.filter-option {
+    display: block;
+    margin-bottom: 10px;
+    cursor: pointer;
+    padding: 8px 0;
+}
+
+.filter-option input[type="radio"] {
+    margin-right: 10px;
+}
+
+.filter-option span {
+    color: #666;
+    font-size: 14px;
+}
+
+.filter-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.btn-apply, .btn-clear {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-apply {
+    background: #ff6b35;
+    color: white;
+}
+
+.btn-apply:hover {
+    background: #e55a2b;
+    transform: translateY(-2px);
+}
+
+.btn-clear {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-clear:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+}
+
+.search-form {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.search-input {
+    flex: 1;
+    padding: 10px 15px;
+    border: 2px solid #e9ecef;
+    border-radius: 25px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.3s ease;
+}
+
+.search-input:focus {
+    border-color: #ff6b35;
+}
+
+.search-submit {
+    background: #ff6b35;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.search-submit:hover {
+    background: #e55a2b;
+    transform: scale(1.1);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-buttons {
+        justify-content: center;
+    }
+    
+    .filter-btn {
+        flex: 1;
+        justify-content: center;
+        min-width: 100px;
+    }
+    
+    .filter-actions {
+        flex-direction: column;
+    }
+    
+    .search-form {
+        flex-direction: column;
+    }
+    
+    .search-submit {
+        width: 100%;
+        border-radius: 25px;
+    }
+}
+
+@media (max-width: 480px) {
+    .chollometro-filter-container {
+        padding: 10px;
+        margin: 10px 0;
+    }
+    
+    .filter-panel, .search-panel {
+        padding: 15px;
+    }
+    
+    .filter-btn {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+    
+    .btn-apply, .btn-clear {
+        padding: 8px 16px;
+        font-size: 14px;
+    }
+}
