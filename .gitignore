@@ -47,3 +47,6 @@ Thumbs.db
 
 # Archivos de documentación temporal
 documentacion_rediseno/
+
+# Repositorios Git anidados
+public_html/v2/startbootstrap-sb-admin-2/
