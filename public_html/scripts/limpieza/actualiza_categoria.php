@@ -7,7 +7,7 @@ error_reporting(1);
 include_once("../../inc/includes.php");
 
 $db = createConnection();
-$collection = $db->selectCollection('codigos')
+$collection = $db->selectCollection('codigos');
 
 
 $cursor = $collection->find(

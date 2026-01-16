@@ -1,0 +1,265 @@
+/* Estilos para la página de favoritos */
+
+.favoritos-container {
+    min-height: 60vh;
+    padding: 2rem 0;
+    background: #f8f9fa;
+}
+
+.favoritos-header {
+    text-align: center;
+    margin-bottom: 3rem;
+    padding: 2rem;
+    background: linear-gradient(135deg, #E30613 0%, #C40510 100%);
+    color: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(227, 6, 19, 0.3);
+}
+
+.favoritos-header h1 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: bold;
+}
+
+.favoritos-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+}
+
+.tab-item {
+    padding: 12px 25px;
+    background: white;
+    color: #666;
+    border-radius: 50px;
+    text-decoration: none;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+    border: 1px solid transparent;
+}
+
+.tab-item:hover {
+    color: #E30613;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.tab-item.active {
+    background: #E30613;
+    color: white;
+    box-shadow: 0 4px 15px rgba(227, 6, 19, 0.3);
+}
+
+.favoritos-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.95;
+    margin: 0;
+}
+
+/* Grids */
+.favoritos-grid,
+.chollos-grid-3 {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-bottom: 3rem;
+}
+
+/* Estilos específicos para tarjetas de chollos en favoritos */
+.chollo-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.chollo-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.chollo-image {
+    position: relative;
+    padding-top: 75%;
+    /* Aspect ratio 4:3 */
+    overflow: hidden;
+    background: #f0f0f0;
+}
+
+.chollo-image img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    /* Cambiado a contain para ver toda la imagen sin recortes */
+    padding: 10px;
+    background: white;
+    transition: transform 0.3s ease;
+}
+
+.chollo-card:hover .chollo-image img {
+    transform: scale(1.05);
+}
+
+.chollo-content {
+    padding: 15px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.chollo-title {
+    font-size: 1.1em;
+    font-weight: 700;
+    margin-bottom: 10px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    color: #333;
+}
+
+.chollo-price-container {
+    margin-top: auto;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+.chollo-price {
+    font-size: 1.4em;
+    font-weight: 800;
+    color: #E30613;
+}
+
+.chollo-original-price {
+    font-size: 0.9em;
+    text-decoration: line-through;
+    color: #999;
+    margin-bottom: 4px;
+}
+
+/* Badge de descuento */
+.chollo-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #E30613;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.9em;
+    z-index: 2;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* Mensajes de vacío */
+.no-favoritos-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 400px;
+}
+
+.no-favoritos-message {
+    text-align: center;
+    padding: 3rem;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.no-favoritos-message i {
+    font-size: 4rem;
+    color: #E30613;
+    margin-bottom: 1rem;
+}
+
+.no-favoritos-message h2 {
+    color: #333;
+    margin-bottom: 1rem;
+}
+
+.no-favoritos-message p {
+    color: #666;
+    margin-bottom: 2rem;
+}
+
+.btn-explorar {
+    display: inline-block;
+    padding: 12px 30px;
+    background: #E30613;
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-explorar:hover {
+    background: #C40510;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(227, 6, 19, 0.3);
+}
+
+/* Paginación */
+.favoritos-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 3rem;
+    padding: 2rem;
+}
+
+.pagination-btn {
+    padding: 10px 20px;
+    background: white;
+    color: #E30613;
+    text-decoration: none;
+    border-radius: 8px;
+    border: 2px solid #E30613;
+    transition: all 0.3s ease;
+    font-weight: 600;
+}
+
+.pagination-btn:hover {
+    background: #E30613;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(227, 6, 19, 0.3);
+}
+
+.pagination-info {
+    padding: 10px 20px;
+    color: #666;
+    font-weight: 600;
+}
+
+@media (max-width: 768px) {
+    .favoritos-header h1 {
+        font-size: 2rem;
+    }
+
+    .favoritos-grid,
+    .chollos-grid-3 {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+
+    .favoritos-pagination {
+        flex-direction: column;
+    }
+}

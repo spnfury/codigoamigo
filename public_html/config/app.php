@@ -4,6 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+
 // HABILITAR VISUALIZACIÓN DE ERRORES PHP (solo en desarrollo)
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -52,6 +53,10 @@ if (!function_exists("fatal_handler")) {
 
         if ($error !== NULL) {
 
+            if (function_exists('codigoamigo_sentry_capture_last_error')) {
+                codigoamigo_sentry_capture_last_error();
+            }
+
             $errno = $error["type"];
             $errfile = $error["file"];
             $errline = $error["line"];
@@ -82,9 +87,13 @@ if (!function_exists("fatal_handler")) {
                     $manda .= "\n\nEncontrado en: " . $last_file . "...";
                 }
 
-                $botToken = "1208948207:AAF0O45V1zcsp7wjRgbwOrLQ7tNRUHlfnME";
-                //$chatId="-1001249170942";
-                $chatId = "-563343505";
+                // Ensure configuration is loaded
+                if (!defined('TELEGRAM_BOT_TOKEN')) {
+                    @include_once __DIR__ . '/ai_config.php';
+                }
+
+                $botToken = defined('TELEGRAM_BOT_TOKEN') ? TELEGRAM_BOT_TOKEN : "1208948207:AAF0O45V1zcsp7wjRgbwOrLQ7tNRUHlfnME";
+                $chatId = defined('TELEGRAM_ADMIN_CHAT_ID') ? TELEGRAM_ADMIN_CHAT_ID : "-563343505";
 
                 $url = "https://api.telegram.org/bot" . $botToken . "/sendMessage?chat_id=" . $chatId;
 
@@ -129,14 +138,15 @@ if ($_SESSION['user_id']) {
 
 
 
-$lifetime = 60000000;
-session_set_cookie_params($lifetime);
-// Configuración de sesiones
+// Configuración de sesiones - Sesión infinita (10 años)
+$lifetime = 315360000; // 10 años en segundos (60*60*24*365*10)
+ini_set('session.gc_maxlifetime', $lifetime); // Tiempo de vida de los archivos de sesión en el servidor
 ini_set('session.cookie_httponly', 1);
 ini_set('session.cookie_secure', isset($_SERVER['HTTPS']) ? 1 : 0);
 ini_set('session.use_strict_mode', 1);
 ini_set('session.cookie_samesite', 'Lax');
-session_set_cookie_params(0, '/', ".codigoamigo.com");
+// Configurar cookie de sesión con lifetime muy alto
+session_set_cookie_params($lifetime, '/', ".codigoamigo.com");
 
 
 if ((strstr($_SERVER['HTTP_USER_AGENT'], 'casinuevo_debug'))) {
@@ -195,6 +205,9 @@ if ($DEBUG_MODE) {
 
 // Incluir sistema de logging organizado
 require_once __DIR__ . '/../inc/logger.php';
+
+// Incluir variables globales
+require_once __DIR__ . '/../myphp/herramientas/var_globals.php';
 
 // Mejorar la función de debug (mantener compatibilidad)
 function debug_log($message, $data = null)
@@ -258,6 +271,8 @@ set_exception_handler(function ($e) {
 require dirname(__DIR__) . '/vendor/autoload.php';
 use Spatie\ImageOptimizer\OptimizerChainFactory;
 
+require_once __DIR__ . '/../inc/sentry_bootstrap.php';
+codigoamigo_init_sentry();
 
 
 $app = new \Slim\App([
@@ -268,6 +283,18 @@ $app = new \Slim\App([
         'determineRouteBeforeAppMiddleware' => true
     ]
 ]);
+
+$app->add(function ($request, $response, $next) {
+    try {
+        return $next($request, $response);
+    } catch (\Throwable $exception) {
+        if (function_exists('codigoamigo_sentry_capture_exception')) {
+            codigoamigo_sentry_capture_exception($exception);
+        }
+
+        throw $exception;
+    }
+});
 
 $actual_url = "https://" . $_SERVER["HTTP_HOST"] . (rawurldecode($_SERVER["REQUEST_URI"]));
 
@@ -291,6 +318,9 @@ include_once dirname(__DIR__) . '/myphp/_header.php';
 $container = $app->getContainer();
 $container['errorHandler'] = function($c) {
     return function($request, $response, $exception) use ($c) {
+        if (function_exists('codigoamigo_sentry_capture_exception')) {
+            codigoamigo_sentry_capture_exception($exception);
+        }
         error_log('[EXCEPTION] '.get_class($exception).': '.$exception->getMessage().' in '.$exception->getFile().':'.$exception->getLine()."\n".$exception->getTraceAsString());
         return $c['response']->withStatus(500)->write('Internal Server Error');
     };
@@ -498,7 +528,7 @@ $app->get('/test2', function ($request, $respon) {
 
 });
 
-$app->get('/buscar/{termino}', function ($request, $respon, $args) {
+$app->get('/ofertas/{termino}', function ($request, $respon, $args) {
     global $author_web, $name_page;
 
     $termino = $args['termino'];
@@ -508,6 +538,11 @@ $app->get('/buscar/{termino}', function ($request, $respon, $args) {
 
     // Incluir funciones de búsqueda mejorada
     include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_busqueda.php';
+    
+    // Incluir funciones de chollos
+    if (!function_exists('obtenerChollos')) {
+        include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_chollos.php';
+    }
 
     // Procesar el término de búsqueda para manejar espacios y múltiples palabras
     $terminos_busqueda = procesar_termino_busqueda($termino);
@@ -515,20 +550,105 @@ $app->get('/buscar/{termino}', function ($request, $respon, $args) {
     // Buscar en marcas con filtro mejorado
     $array_filtro_marcas = crear_filtro_marcas_mejorado($terminos_busqueda);
     $lista_marcas = buscar_marcas_mejorado($array_filtro_marcas);
+    
+    // Buscar en chollos
+    $lista_chollos = [];
+    if (function_exists('obtenerChollos')) {
+        $filtros_chollos = [
+            'estado' => 1,
+            'busqueda' => $termino,
+            'limite' => 20
+        ];
+        $lista_chollos = obtenerChollos($filtros_chollos);
+    }
 
     // Buscar en códigos con términos mejorados
     $array_filtro_codigos = crear_filtro_codigos_mejorado($terminos_busqueda);
 
-    $array_opciones = array(
-        'limit' => 20,
+    // Primero obtener códigos DESTACADOS que coincidan con la búsqueda
+    // Combinar el filtro de búsqueda con el filtro de destacados usando $and
+    $array_filtro_destacados = array();
+    
+    // Copiar todos los filtros excepto $or
+    foreach ($array_filtro_codigos as $key => $value) {
+        if ($key !== '$or') {
+            $array_filtro_destacados[$key] = $value;
+        }
+    }
+    
+    // Combinar condiciones de búsqueda y destacados con $and
+    $and_conditions = array();
+    
+    // Añadir condición de búsqueda si existe
+    if (isset($array_filtro_codigos['$or'])) {
+        $and_conditions[] = array('$or' => $array_filtro_codigos['$or']);
+    }
+    
+    // Añadir condición de destacados (destacado o destacado_social)
+    $and_conditions[] = array(
+        '$or' => array(
+            array('destacado' => array('$ne' => 0)),
+            array('destacado_social' => array('$ne' => 0))
+        )
+    );
+    
+    if (!empty($and_conditions)) {
+        $array_filtro_destacados['$and'] = $and_conditions;
+    }
+    
+    $array_opciones_destacados = array(
+        'limit' => 50,  // Aumentar límite para obtener más destacados
+        'sort' => array('destacado_social' => -1, 'destacado' => -1, '_id' => -1)
+    );
+    
+    $lista_codigos_destacados = get_all_listado_codigos_array($array_filtro_destacados, $array_opciones_destacados);
+    $codigos_destacados = isset($lista_codigos_destacados["results"]) ? $lista_codigos_destacados["results"] : [];
+    
+    // Luego obtener códigos NO DESTACADOS que coincidan con la búsqueda
+    // Excluir tanto destacado como destacado_social
+    $array_filtro_normales = array();
+    
+    // Copiar todos los filtros excepto $or
+    foreach ($array_filtro_codigos as $key => $value) {
+        if ($key !== '$or') {
+            $array_filtro_normales[$key] = $value;
+        }
+    }
+    
+    // Añadir condición de búsqueda si existe
+    if (isset($array_filtro_codigos['$or'])) {
+        $array_filtro_normales['$or'] = $array_filtro_codigos['$or'];
+    }
+    
+    // Excluir destacados: destacado = 0 Y destacado_social = 0 (o no existe)
+    $array_filtro_normales['$and'] = array(
+        array('destacado' => 0),
+        array('$or' => array(
+            array('destacado_social' => array('$exists' => false)),
+            array('destacado_social' => 0)
+        ))
+    );
+    
+    $array_opciones_normales = array(
+        'limit' => 50,  // Aumentar límite
         'sort' => array('_id' => -1)
     );
-
-    $lista_codigos = get_all_listado_codigos_array($array_filtro_codigos, $array_opciones);
+    
+    $lista_codigos_normales = get_all_listado_codigos_array($array_filtro_normales, $array_opciones_normales);
+    $codigos_normales = isset($lista_codigos_normales["results"]) ? $lista_codigos_normales["results"] : [];
+    
+    // Combinar: primero destacados, luego normales
+    $lista_codigos_combinada = array_merge($codigos_destacados, $codigos_normales);
+    
+    // Recrear la estructura esperada con los resultados combinados
+    $lista_codigos = array(
+        'results' => $lista_codigos_combinada,
+        'total_number' => count($lista_codigos_combinada)
+    );
 
     // Configurar variables para la vista
-    $title = "Resultados de búsqueda para: " . htmlspecialchars($termino);
-    $description = "Búsqueda de códigos y marcas relacionados con " . htmlspecialchars($termino) . " en " . $author_web;
+    $title = htmlspecialchars($termino) . " ofertas y chollos";
+    $description = "Búsqueda de códigos, marcas y chollos relacionados con " . htmlspecialchars($termino) . " en " . $author_web;
     $name_page = "busqueda";
 
 
@@ -552,7 +672,11 @@ $app->get('/buscar/{termino}', function ($request, $respon, $args) {
 
 $app->get('/', function ($request, $respon) {
     global $author_web, $detect, $num_inicio, $name_page;
-    
+
+    // Definir variables que pueden no estar definidas
+    if (!isset($num_inicio)) $num_inicio = 1;
+    if (!isset($name_page)) $name_page = "home";
+
     // Asegurar que $detect esté inicializado
     if (!isset($detect)) {
         $detect = new Mobile_Detect();
@@ -682,13 +806,28 @@ $app->get('/', function ($request, $respon) {
 
 $app->post('/google_sign', function ($request, $respon) {
 
-    $respon->withHeader('Content-Type', 'application/json');
+    $respon = $respon->withHeader('Content-Type', 'application/json');
 
     global $author_web, $detect, $num_inicio;
 
+    ob_start();
     include_once $_SERVER['DOCUMENT_ROOT'] . '/public/google-sign-in.php';
+    $payload = ob_get_clean();
+    $trimmedPayload = trim($payload);
 
+    if ($trimmedPayload === '') {
+        $trimmedPayload = json_encode([
+            'success' => false,
+            'error' => 'Respuesta vacía del servicio de autenticación'
+        ]);
+        error_log('[google_sign route] Respuesta vacía después de incluir google-sign-in.php');
+    } elseif ($trimmedPayload[0] !== '{' && $trimmedPayload[0] !== '[') {
+        error_log('[google_sign route] Respuesta inesperada: ' . substr($trimmedPayload, 0, 400));
+    }
 
+    $respon->getBody()->write($trimmedPayload);
+
+    return $respon;
 
 });
 
@@ -747,6 +886,22 @@ $app->any('/bienvenido', function ($request, $respon) {
     $description = "La única web donde puedes compartir tus códigos - " . $author_web;
 
     include_once $_SERVER['DOCUMENT_ROOT'] . '/public/bienvenido.php';
+
+});
+
+
+$app->get('/bienvenida-login', function ($request, $respon) {
+
+    global $author_web;
+
+    if (empty($_SESSION["user_id"])) {
+        return $respon->withRedirect('/', 302);
+    }
+
+    $title = "¡Bienvenido a Código Amigo!";
+    $description = "Descubre las mejores oportunidades para compartir y ahorrar en nuestra comunidad - " . $author_web;
+
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/bienvenida-login.php';
 
 });
 
@@ -867,6 +1022,13 @@ $app->get('/estadisticas', function ($request, $respon, $args) {
 
 
 $app->any('/mis_codigos', function ($request, $respon) {
+    // Verificar que el usuario esté logueado
+    session_start();
+    if (!isset($_SESSION["user_id"]) || !isset($_SESSION["username"]) || empty($_SESSION["user_id"]) || empty($_SESSION["username"])) {
+        $_SESSION['msg_error'] = "Debes iniciar sesión para ver tus códigos";
+        return $respon->withRedirect($GLOBALS["website"] . "login");
+    }
+
     global $author_web;
 
     $newURL = "https://www.codigoamigo.com/usuario_" . strtolower($_SESSION["username"]) . "_" . $_SESSION["user_id"];
@@ -952,7 +1114,25 @@ $app->group('/usuario', function () use ($app) {
         $offset = ($page - 1) * $per_page;
 
         // 3. Obtener códigos con límite
-        $estado = ($_REQUEST["borrados"] == 1) ? -2 : 0;
+        $estado_param = filter_input(INPUT_GET, 'estado', FILTER_SANITIZE_STRING);
+        
+        if ($estado_param === 'activos') {
+            $estado = 0; // Solo activos
+        } elseif ($estado_param === 'inactivos') {
+            $estado = array('$in' => [-1, 1]); // Solo inactivos
+        } elseif ($estado_param === 'borrados') {
+            $estado = -2; // Solo borrados
+        } elseif ($estado_param === 'all') {
+            $estado = array('$in' => [0, -1, 1, -2]); // Todos los estados
+        } else {
+            // Por defecto: mostrar todos excepto borrados (comportamiento original)
+            // pero permitir ver borrados con ?borrados=1
+            if ($_REQUEST["borrados"] == 1) {
+                $estado = array('$in' => [0, -1, 1, -2]); // Todos incluyendo borrados
+            } else {
+                $estado = array('$in' => [0, -1, 1]); // Activos + inactivos
+            }
+        }
 
         // Consulta optimizada con límite y skip
         $filter = [
@@ -1187,6 +1367,7 @@ $app->get('/de-', function ($request, $respon, $args) {
 $app->get('/de-{marca}', function ($request, $respon, $args) {
 
 
+
     global $author_web;
     global $ubicacion_actual;
     global $rating_count_rs, $rating_value_rs, $url_logo_rs, $url_marca_rs, $title_marca_rs, $codigo_existente;
@@ -1312,6 +1493,9 @@ $app->get('/de-{marca}', function ($request, $respon, $args) {
             $lista_codigos = getCodeByID_prelista($obj_id_codigo);
             $codigo_to_show = getCodeByID($obj_id_codigo);
             if (is_object($codigo_to_show)) { $codigo_to_show = (array)$codigo_to_show; }
+            
+            // Incrementar contador de vistas
+            añadir_vista_codigo($codigo_to_show);
 
             $u = getObjectUser('_id', $codigo_to_show["id_usuario"] ?? null);
             //     if($u && $u != "") { $info_user = get_array_de_usuario($u); }
@@ -1493,8 +1677,7 @@ $app->get('/de-{marca}', function ($request, $respon, $args) {
         $description_social = $description;
 
         $name_page = "marca";
-
-        include_once $_SERVER['DOCUMENT_ROOT'] . '/public/marca_moderna.php';
+        include_once $_SERVER['DOCUMENT_ROOT'] . '/public/marca.php';
 
 
     } elseif (!$marca["nombre_clave"]) {
@@ -1604,6 +1787,37 @@ $app->any('/contacto_empresa', function ($request, $respon) {
  * RGPD
  *******************************************************************/
 
+// Rutas de páginas informativas
+$app->get('/preguntas-frecuentes', function ($request, $respon) {
+    global $noindex;
+    
+    $noindex = 0; // Permitir indexación
+    
+    include_once __DIR__ . '/../public/preguntas_frecuentes.php';
+    
+    return $respon;
+});
+
+$app->get('/sobre-nosotros', function ($request, $respon) {
+    global $noindex;
+    
+    $noindex = 0; // Permitir indexación
+    
+    include_once __DIR__ . '/../public/sobre_nosotros.php';
+    
+    return $respon;
+});
+
+$app->get('/blog', function ($request, $respon) {
+    global $noindex;
+    
+    $noindex = 0; // Permitir indexación
+    
+    include_once __DIR__ . '/../public/blog.php';
+    
+    return $respon;
+});
+
 $app->get('/politica-de-privacidad', function ($request, $respon) {
 
     global $author_web, $noindex;
@@ -1626,6 +1840,18 @@ $app->get('/politica-de-cookies', function ($request, $respon) {
     $description = "Política de cookies de " . $author_web;
     include_once $_SERVER['DOCUMENT_ROOT'] . '/public/politica_de_cookies.php';
 
+});
+
+// Endpoint para suscripción al newsletter
+$app->post('/api/newsletter-subscribe', function ($request, $respon) {
+    $respon = $respon->withHeader('Content-Type', 'application/json');
+    
+    ob_start();
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/api/newsletter-subscribe.php';
+    $payload = ob_get_clean();
+    
+    $respon->getBody()->write($payload);
+    return $respon;
 });
 
 $app->get('/aviso-legal', function ($request, $respon) {
@@ -1722,6 +1948,11 @@ $app->get('/modificar_codigo/{codigo_id}', function ($request, $response, $args)
         return $response->withRedirect($GLOBALS["website"]);
     }
 
+    // Verificar si el código está borrado y mostrar alerta
+    if (isset($codigo_to_show["estado"]) && $codigo_to_show["estado"] == -2) {
+        $_SESSION['msg_warning'] = "⚠️ Este código está marcado como borrado. Al guardar los cambios, se restaurará automáticamente.";
+    }
+
     // El usuario está autorizado, cargar datos para edición
     $codigo_data = getCodeByID_prelista($obj_id_codigo);
     if (is_array($codigo_data) && count($codigo_data) > 0) {
@@ -1790,6 +2021,33 @@ $app->post('/modificar_codigo/{codigo_id}', function ($request, $response, $args
             }
         }
 
+        // Verificar si el código está borrado y restaurarlo automáticamente
+        $codigo_id_obj = new \MongoDB\BSON\ObjectId($args['codigo_id']);
+        $codigo_actual = getCodeByID($codigo_id_obj);
+        
+        if ($codigo_actual && isset($codigo_actual["estado"]) && $codigo_actual["estado"] == -2) {
+            // El código está borrado, restaurarlo primero
+            $db = createConnection();
+            $collection = $db->selectCollection('codigos');
+            
+            $collection->updateOne(
+                ['_id' => $codigo_id_obj],
+                ['$set' => [
+                    'estado' => 0,
+                    'fecha_modificacion' => new \MongoDB\BSON\UTCDateTime(),
+                    'updated_at' => new \MongoDB\BSON\UTCDateTime()
+                ]]
+            );
+            
+            // Recalcular visibilidad
+            $codigo_id_string = (string)$codigo_id_obj;
+            $marca_clave = $codigo_actual['marca'] ?? '';
+            if ($marca_clave) {
+                updateCodeVisibilityByPosition($codigo_id_string, $marca_clave);
+                updateAllCodesVisibilityInBrand($marca_clave);
+            }
+        }
+
         // Intentar actualizar el código
         $update_result = updateExistingCode($_POST, $_SESSION["user_id"]);
         
@@ -1822,6 +2080,12 @@ $app->post('/modificar_codigo/{codigo_id}', function ($request, $response, $args
 });
 
 $app->post('/codigo_insertado', function ($request, $respon) {
+    // Verificar que el usuario esté logueado
+    session_start();
+    if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
+        $_SESSION['msg_error'] = "Debes iniciar sesión para publicar códigos";
+        return $respon->withRedirect($GLOBALS["website"] . "login");
+    }
 
     global $author_web;
 
@@ -1849,6 +2113,124 @@ $app->get('/categoria', function ($request, $respon, $args) {
     $description = $categoria["descripcion"] . " - " . $GLOBALS["author"];
     include __DIR__ . '/../public/categoria.php';
 
+});
+
+/* ------------------------- PROMOCIONES (ANTES DE RUTAS CON PATRONES) ----------------------- */
+// IMPORTANTE: Estas rutas deben estar ANTES de las rutas con patrones variables para evitar conflictos
+
+$app->get('/crear-promocion', function ($request, $respon) {
+    global $author_web, $noindex;
+
+    $noindex = 1;
+
+    // Verificar que el usuario esté logueado
+    if (empty($_SESSION["user_id"])) {
+        $_SESSION['msg_error'] = "Debes iniciar sesión para crear promociones";
+        return $respon->withRedirect($GLOBALS["website"] . "login", 302);
+    }
+
+    $codigo_id = filter_input(INPUT_GET, 'codigo_id', FILTER_SANITIZE_STRING);
+    
+    if (empty($codigo_id)) {
+        $_SESSION['msg_error'] = "Debes seleccionar un código";
+        return $respon->withRedirect($GLOBALS["website"] . "mis-promociones", 302);
+    }
+    
+    // Verificar que el código existe y pertenece al usuario
+    if (!function_exists('getCodeByID')) {
+        include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones.php';
+    }
+
+    $codigo = getCodeByID(new \MongoDB\BSON\ObjectId($codigo_id));
+    
+    if (!$codigo) {
+        $_SESSION['msg_error'] = "Código no encontrado";
+        return $respon->withRedirect($GLOBALS["website"], 302);
+    }
+
+    $codigo_user_id = is_object($codigo['id_usuario']) ? (string)$codigo['id_usuario'] : $codigo['id_usuario'];
+    if ($codigo_user_id !== $_SESSION["user_id"]) {
+        $_SESSION['msg_error'] = "No tienes permiso para crear promociones en este código";
+        return $respon->withRedirect($GLOBALS["website"], 302);
+    }
+
+    $title = "Crear Promoción - " . $author_web;
+    $description = "Crea una promoción temporal para tu código";
+
+    $codigo_data = $codigo;
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/crear_promocion.php';
+});
+
+$app->post('/crear-promocion', function ($request, $respon) {
+    // Verificar que el usuario esté logueado
+    if (empty($_SESSION["user_id"])) {
+        $_SESSION['msg_error'] = "Debes iniciar sesión para crear promociones";
+        return $respon->withRedirect($GLOBALS["website"] . "login", 302);
+    }
+
+    $codigo_id = filter_input(INPUT_POST, 'codigo_id', FILTER_SANITIZE_STRING);
+    $precio_promocional = filter_input(INPUT_POST, 'precio_promocional', FILTER_VALIDATE_FLOAT);
+    $fecha_fin = filter_input(INPUT_POST, 'fecha_fin', FILTER_SANITIZE_STRING);
+
+    if (empty($codigo_id) || empty($precio_promocional) || empty($fecha_fin)) {
+        $_SESSION['msg_error'] = "Todos los campos son requeridos";
+        return $respon->withRedirect($GLOBALS["website"] . "crear-promocion?codigo_id=" . $codigo_id, 302);
+    }
+
+    if (!function_exists('crearPromocionCodigo')) {
+        include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_premium.php';
+    }
+
+    $resultado = crearPromocionCodigo($codigo_id, $precio_promocional, $fecha_fin, $_SESSION["user_id"]);
+
+    if ($resultado['success']) {
+        $_SESSION['msg'] = "Promoción creada exitosamente";
+        return $respon->withRedirect($GLOBALS["website"] . "mis-promociones", 302);
+    } else {
+        $_SESSION['msg_error'] = $resultado['error'] ?? "Error al crear la promoción";
+        return $respon->withRedirect($GLOBALS["website"] . "crear-promocion?codigo_id=" . $codigo_id, 302);
+    }
+});
+
+$app->get('/mis-promociones', function ($request, $respon) {
+    global $author_web, $noindex;
+
+    $noindex = 1;
+
+    // Verificar que el usuario esté logueado
+    if (empty($_SESSION["user_id"])) {
+        $_SESSION['msg_error'] = "Debes iniciar sesión para ver tus promociones";
+        return $respon->withRedirect($GLOBALS["website"] . "login", 302);
+    }
+
+    $title = "Mis Promociones - " . $author_web;
+    $description = "Gestiona tus promociones activas y expiradas";
+
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/mis_promociones.php';
+});
+
+$app->post('/eliminar-promocion/{promocion_id}', function ($request, $respon, $args) {
+    // Verificar que el usuario esté logueado
+    if (empty($_SESSION["user_id"])) {
+        $_SESSION['msg_error'] = "Debes iniciar sesión para eliminar promociones";
+        return $respon->withRedirect($GLOBALS["website"] . "login", 302);
+    }
+
+    $promocion_id = $args['promocion_id'];
+
+    if (!function_exists('eliminarPromocion')) {
+        include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_premium.php';
+    }
+
+    $resultado = eliminarPromocion($promocion_id, $_SESSION["user_id"]);
+
+    if ($resultado) {
+        $_SESSION['msg'] = "Promoción eliminada exitosamente";
+    } else {
+        $_SESSION['msg_error'] = "Error al eliminar la promoción o no tienes permiso";
+    }
+
+    return $respon->withRedirect($GLOBALS["website"] . "mis-promociones", 302);
 });
 
 $app->get('/{categoria}-comparte-y-gana', function ($request, $respon, $args) {
@@ -2009,15 +2391,15 @@ $app->get('/cambiar_password', function ($request, $respon) {
     include __DIR__ . '/../public/cambiar_password.php';
 });
 
-$app->post('/cambio_password', function ($request, $respon) {
+$app->post('/cambio_password', function ($request, $response) {
 
     global $noindex;
 
     $noindex = 1;
 
-    $mail_ = filter_input(INPUT_POST, "mail_login", FILTER_SANITIZE_STRING);
-    $pass_ = filter_input(INPUT_POST, "pass_login", FILTER_SANITIZE_STRING);
-    include __DIR__ . '/../php/cambio_password.php';
+    $mail_ = filter_input(INPUT_POST, "mail", FILTER_SANITIZE_EMAIL);
+    $pass_ = filter_input(INPUT_POST, "pass_login", FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    return include __DIR__ . '/../php/cambio_password.php';
 });
 
 $app->get('/nuevo_password', function ($request, $respon) {
@@ -2042,7 +2424,13 @@ $app->get('/nuevo_password', function ($request, $respon) {
     include __DIR__ . '/../public/nuevo_password.php';
 });
 
-$app->post('/actualizar_usuario', function ($request, $respon) {
+$app->post('/actualizar_usuario', function ($request, $response) {
+    // Verificar que el usuario esté logueado
+    session_start();
+    if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
+        $_SESSION['msg_error'] = "Debes iniciar sesión para actualizar tu perfil";
+        return $respon->withRedirect($GLOBALS["website"] . "login");
+    }
 
     $new_password = filter_input(INPUT_POST, "nueva_password", FILTER_SANITIZE_STRING);
     $new_confirm_password = filter_input(INPUT_POST, "nueva_confirm_password", FILTER_SANITIZE_STRING);
@@ -2051,12 +2439,23 @@ $app->post('/actualizar_usuario', function ($request, $respon) {
 });
 
 $app->post('/remove_photo_user', function ($request, $respon) {
+    // Verificar que el usuario esté logueado
+    session_start();
+    if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
+        $_SESSION['msg_error'] = "Debes iniciar sesión para gestionar tu foto de perfil";
+        return $respon->withRedirect($GLOBALS["website"] . "login");
+    }
+
     include __DIR__ . '/../php/remove_photo_user.php';
 });
 
 $app->post('/cambiar_foto_usuario', function ($request, $respon) {
-
-
+    // Verificar que el usuario esté logueado
+    session_start();
+    if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
+        $_SESSION['msg_error'] = "Debes iniciar sesión para cambiar tu foto de perfil";
+        return $respon->withRedirect($GLOBALS["website"] . "login");
+    }
 
     include __DIR__ . '/../php/cambiar_foto_usuario.php';
 });

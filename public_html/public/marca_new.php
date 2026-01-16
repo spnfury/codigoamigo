@@ -75,7 +75,13 @@ $numero_codigos_format = number_format($numero_codigos, 0, ',', '.');
                             </div>
                             
                             <div class="benefit-display">
-                                <div class="benefit-amount"><?php echo $item["num_beneficio"]; ?>€</div>
+                                <?php 
+                                // Incluir funciones premium
+                                if (!function_exists('generarHTMLPrecioConPromocion')) {
+                                    include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_premium.php';
+                                }
+                                echo generarHTMLPrecioConPromocion($item["_id"], $item["num_beneficio"] ?? 0, $item["tipo_descuento"] ?? 'euros', true);
+                                ?>
                                 <div class="benefit-type"><?php echo $item["tipo_descuento"]; ?></div>
                             </div>
                             
@@ -240,11 +246,3 @@ $numero_codigos_format = number_format($numero_codigos, 0, ',', '.');
 
 <!-- Incluir JavaScript externo -->
 <script src="/assets/js/brand-page.js"></script>
-
-<?php
-// Incluir el footer
-if (!function_exists('get_footer')) {
-    include_once __DIR__ . '/../myphp/_footer.php';
-}
-get_footer();
-?>

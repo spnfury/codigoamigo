@@ -2,12 +2,12 @@
 /* Esquema de colores: Gris oscuro y naranja */
 
 :root {
-    --primary-orange: #FF6B35;
+    --primary-orange: #E30613;
     --dark-gray: #2C2C2C;
     --light-gray: #404040;
     --text-white: #FFFFFF;
     --text-gray: #CCCCCC;
-    --gradient-bg: linear-gradient(135deg, #2C2C2C 0%, #404040 50%, #FF6B35 100%);
+    --gradient-bg: linear-gradient(135deg, #2C2C2C 0%, #404040 50%, #E30613 100%);
 }
 
 * {
@@ -63,7 +63,7 @@ body {
 
 .nav-modern {
     display: flex;
-    gap: 2rem;
+    gap: 0rem;
     align-items: center;
 }
 
@@ -131,7 +131,7 @@ body {
 }
 
 .btn-acceder:hover {
-    background-color: #E55A2B;
+    background-color: #C40510;
 }
 
 /* HERO SECTION */
@@ -202,7 +202,7 @@ body {
 }
 
 .btn-buscar:hover {
-    background-color: #E55A2B;
+    background-color: #C40510;
     transform: translateY(-2px);
 }
 
@@ -210,7 +210,8 @@ body {
 .main-content {
     background-color: var(--dark-gray);
     padding: 2rem;
-    min-height: 50vh;
+    min-height: 100vh;
+    height: 100%;
 }
 
 .codes-section {
@@ -272,7 +273,7 @@ body {
 }
 
 .code-button:hover {
-    background-color: #E55A2B;
+    background-color: #C40510;
 }
 
 /* FOOTER */
@@ -312,7 +313,7 @@ body {
 }
 
 .rewards-link:hover {
-    color: #E55A2B;
+    color: #C40510;
 }
 
 /* RESPONSIVE */
@@ -324,7 +325,7 @@ body {
     }
     
     .nav-modern {
-        gap: 1rem;
+        gap: 0rem;
     }
     
     .search-header {

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Botones</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
+        .btn-edit, .btn-delete, .btn-stats, .btn-my-codes {
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: none;
+            text-align: left;
+            margin: 5px;
+        }
+        .btn-edit {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+        }
+        .btn-delete {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+        }
+        .btn-stats {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+        .btn-my-codes {
+            background: linear-gradient(135deg, #6f42c1, #5a2d91);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test de Botones de Gestión de Código</h1>
+    
+    <div class="test-section">
+        <h2>Botones de Gestión</h2>
+        <p>Estos botones deberían funcionar correctamente:</p>
+        
+        <button class="btn-edit" onclick="editCode('507f1f77bcf86cd799439011')">
+            <i>✏️</i> Editar código
+        </button>
+        
+        <button class="btn-delete" onclick="deleteCode('507f1f77bcf86cd799439011')">
+            <i>🗑️</i> Eliminar código
+        </button>
+        
+        <button class="btn-stats" onclick="viewStatsModal('507f1f77bcf86cd799439011')">
+            <i>📊</i> Ver estadísticas
+        </button>
+        
+        <button class="btn-my-codes" onclick="viewMyCodes()">
+            <i>📋</i> Ver mis códigos
+        </button>
+    </div>
+
+    <div class="test-section">
+        <h2>Resultados de Prueba</h2>
+        <div id="test-results">
+            <p>Haz clic en los botones para probar su funcionalidad:</p>
+            <ul>
+                <li><strong>Editar:</strong> Debería redirigir a /modificar_codigo/507f1f77bcf86cd799439011</li>
+                <li><strong>Eliminar:</strong> Debería mostrar confirmación y hacer petición AJAX</li>
+                <li><strong>Estadísticas:</strong> Debería mostrar modal con estadísticas</li>
+                <li><strong>Mis códigos:</strong> Debería redirigir a /mis_codigos</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function editCode(codeId) {
+            console.log('editCode llamado con ID:', codeId);
+            alert('Editar código: ' + codeId + '\nRedirigiendo a: /modificar_codigo/' + codeId);
+            // window.location.href = "/modificar_codigo/" + codeId;
+        }
+
+        function deleteCode(codeId) {
+            console.log('deleteCode llamado con ID:', codeId);
+            if (confirm("¿Estás seguro de que quieres eliminar este código? Esta acción no se puede deshacer.")) {
+                alert('Eliminando código: ' + codeId + '\nHaciendo petición AJAX a: /api/codes.php');
+                // Aquí iría la petición AJAX real
+            }
+        }
+
+        function viewStatsModal(codeId) {
+            console.log('viewStatsModal llamado con ID:', codeId);
+            alert('Mostrando estadísticas para código: ' + codeId + '\nCargando modal desde: /estadisticas?codigo=' + codeId);
+        }
+
+        function viewMyCodes() {
+            console.log('viewMyCodes llamado');
+            alert('Redirigiendo a: /mis_codigos');
+            // window.location.href = "/mis_codigos";
+        }
+
+        // Log de inicialización
+        console.log('Test de botones cargado correctamente');
+    </script>
+</body>
+</html>

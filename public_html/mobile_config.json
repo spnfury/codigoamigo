@@ -1,0 +1,124 @@
+{
+  "app": {
+    "name": "CodigoAmigo Mobile",
+    "version": "1.0.0",
+    "description": "Aplicación móvil para gestionar códigos de descuento",
+    "author": "CodigoAmigo.com",
+    "package": "com.codigoamigo.mobile"
+  },
+  "api": {
+    "base_url": "https://www.codigoamigo.com/api/mobile_api.php",
+    "timeout": 30000,
+    "endpoints": {
+      "login": "?path=user/login",
+      "codes": "?path=codes",
+      "brands": "?path=brands",
+      "user": "?path=user",
+      "statistics": "?path=statistics",
+      "search": "?path=search"
+    }
+  },
+  "features": {
+    "authentication": {
+      "google_login": true,
+      "email_login": true,
+      "biometric_auth": true,
+      "session_timeout": 86400000
+    },
+    "codes": {
+      "create": true,
+      "edit": true,
+      "delete": true,
+      "categories": ["cupones", "descuentos", "ofertas", "promociones"],
+      "types": ["cupon", "codigo", "enlace"],
+      "max_codes_per_user": 100
+    },
+    "brands": {
+      "create": true,
+      "manage": true,
+      "categories": ["tecnologia", "ropa", "comida", "hogar", "entretenimiento"]
+    },
+    "notifications": {
+      "push_notifications": true,
+      "email_notifications": true,
+      "types": ["new_codes", "code_expiring", "statistics_update"]
+    },
+    "analytics": {
+      "track_views": true,
+      "track_clicks": true,
+      "track_shares": true
+    }
+  },
+  "ui": {
+    "theme": {
+      "primary_color": "#E30613",
+      "secondary_color": "#2C2C2C",
+      "background_color": "#1a1a1a",
+      "text_color": "#ffffff",
+      "dark_mode": true,
+      "animations": true
+    },
+    "layout": {
+      "bottom_navigation": true,
+      "sidebar_navigation": false,
+      "tab_bar": true
+    },
+    "components": {
+      "search_bar": true,
+      "filter_options": true,
+      "pull_to_refresh": true,
+      "infinite_scroll": true
+    }
+  },
+  "platforms": {
+    "ios": {
+      "bundle_id": "com.codigoamigo.mobile.ios",
+      "min_version": "12.0",
+      "permissions": ["camera", "photo_library", "notifications", "location"]
+    },
+    "android": {
+      "package": "com.codigoamigo.mobile",
+      "min_version": "21",
+      "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE", "ACCESS_NOTIFICATION_POLICY", "ACCESS_FINE_LOCATION"]
+    }
+  },
+  "monetization": {
+    "ads": {
+      "enabled": false,
+      "admob": {
+        "app_id": "",
+        "banner_ad_unit": "",
+        "interstitial_ad_unit": "",
+        "rewarded_ad_unit": ""
+      }
+    },
+    "in_app_purchase": {
+      "enabled": true,
+      "products": [
+        {
+          "id": "premium_monthly",
+          "title": "Premium Mensual",
+          "description": "Acceso premium por un mes",
+          "price": "4.99"
+        },
+        {
+          "id": "premium_yearly",
+          "title": "Premium Anual",
+          "description": "Acceso premium por un año",
+          "price": "49.99"
+        }
+      ]
+    },
+    "referrals": {
+      "enabled": true,
+      "reward_per_referral": 1.00,
+      "min_payout": 10.00
+    }
+  },
+  "development": {
+    "debug_mode": true,
+    "log_level": "debug",
+    "crash_reporting": true,
+    "performance_monitoring": true
+  }
+}

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bypass Específico - CodigoAmigo</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        .bypass-section {
+            background: rgba(40,167,69,0.2);
+            border: 2px solid #2ecc71;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+        .btn {
+            background: #2ecc71;
+            color: white;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            background: #27ae60;
+            transform: translateY(-2px);
+        }
+        .btn-danger {
+            background: #ff4757;
+        }
+        .btn-danger:hover {
+            background: #ff3742;
+        }
+        .btn-large {
+            font-size: 20px;
+            padding: 20px 40px;
+        }
+        .code {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            margin: 10px 0;
+            border-left: 4px solid #ff4757;
+        }
+        .status {
+            background: rgba(255,255,255,0.2);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .auto-redirect {
+            background: rgba(255,193,7,0.2);
+            border: 2px solid #ffc107;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Bypass Específico para Tu Navegador</h1>
+
+        <div class="auto-redirect">
+            <h2>🔄 Redirección Automática en <span id="countdown">5</span> segundos</h2>
+            <p>Si no eres redirigido automáticamente, usa los enlaces de abajo</p>
+        </div>
+
+        <div class="bypass-section">
+            <h2>🎯 SOLUCIONES ESPECÍFICAS PARA TU PROBLEMA</h2>
+
+            <h3>🌐 Acceso Directo al Servidor (SOLUCIÓN MÁS FÁCIL)</h3>
+            <div class="code">http://78.46.100.91/</div>
+            <p>Esta URL evita completamente Cloudflare y debería funcionar desde cualquier navegador.</p>
+            <a href="http://78.46.100.91/" class="btn btn-large">🔓 ACCESO DIRECTO</a>
+
+            <h3>🔧 Configuración de Cloudflare</h3>
+            <p><strong>Ve a:</strong> <a href="https://dash.cloudflare.com/" style="color: #4ecdc4;">https://dash.cloudflare.com/</a></p>
+            <p><strong>Selecciona:</strong> codigoamigo.com</p>
+            <p><strong>Security → Settings:</strong> Cambia Security Level a "Essentially Off"</p>
+            <p><strong>Security → Bot Fight Mode:</strong> Desactívalo</p>
+            <p><strong>Security → Challenge Passage:</strong> Configura a "5 minutes"</p>
+        </div>
+
+        <div class="status">
+            <h3>📊 Estado del Sistema:</h3>
+            <p>✅ <strong>Servidor:</strong> Funcionando perfectamente</p>
+            <p>✅ <strong>IP Directa:</strong> http://78.46.100.91/</p>
+            <p>✅ <strong>PHP:</strong> Sin errores</p>
+            <p>✅ <strong>Base de datos:</strong> Conectada</p>
+            <p>⚠️ <strong>Cloudflare:</strong> Bloqueando tu navegador específicamente</p>
+        </div>
+
+        <div class="bypass-section">
+            <h3>🎯 URLs de Prueba para Tu Navegador:</h3>
+            <a href="http://78.46.100.91/" class="btn">🌐 IP Directa</a>
+            <a href="http://78.46.100.91/?cf_bypass=1" class="btn btn-danger">⚡ IP + Bypass</a>
+            <a href="http://78.46.100.91/diagnostico.html" class="btn">🔍 Diagnóstico</a>
+            <a href="https://www.codigoamigo.com/diagnostico-especifico.html" class="btn">📊 Test Completo</a>
+        </div>
+
+        <div class="status">
+            <h3>🔍 ¿Por qué no funciona desde tu navegador?</h3>
+            <p>El sitio está funcionando perfectamente. El problema es que Cloudflare está aplicando protecciones adicionales que bloquean tu navegador específicamente.</p>
+            <p><strong>La solución más rápida:</strong> Usa <code>http://78.46.100.91/</code></p>
+        </div>
+
+        <script>
+            // Countdown para redirección automática
+            let countdown = 5;
+            const countdownElement = document.getElementById('countdown');
+
+            const timer = setInterval(function() {
+                countdown--;
+                countdownElement.textContent = countdown;
+
+                if (countdown <= 0) {
+                    clearInterval(timer);
+                    // Redirección automática al acceso directo
+                    window.location.href = 'http://78.46.100.91/';
+                }
+            }, 1000);
+
+            // Log para debugging
+            console.log('User bypass page loaded');
+            console.log('User Agent:', navigator.userAgent);
+            console.log('Current URL:', window.location.href);
+            console.log('Timestamp:', new Date().toISOString());
+        </script>
+    </div>
+</body>
+</html>

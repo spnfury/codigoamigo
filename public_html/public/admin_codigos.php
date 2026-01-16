@@ -6,6 +6,7 @@ include_once __DIR__ . '/../inc/includes.php';
 include_once __DIR__ . '/../myphp/funciones.php';
 include_once __DIR__ . '/../inc/funciones.php';
 include_once __DIR__ . '/../myphp/funciones_usuario.php';
+include_once __DIR__ . '/admin_sidebar_menu.php';
 
 // Verificar permisos de administrador
 $array_codigos_acceso[] = "58bd851da54e295b8b52f702"; //thevega82@gmail.com
@@ -13,7 +14,8 @@ $array_codigos_acceso[] = "5e78170e6b68e6519b7c5df2"; //edna
 $array_codigos_acceso[] = "639899bc6321ee0d0e4010d2"; //aron
 $array_codigos_acceso[] = "5c8a10ce2f55c86d6e707d82"; //jose
 
-if (!in_array($_SESSION["user_id"], $array_codigos_acceso)) {
+// Verificar que el usuario esté logueado y tenga permisos
+if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"]) || !in_array($_SESSION["user_id"], $array_codigos_acceso)) {
     header('Location: https://www.codigoamigo.com');
     die();
 }
@@ -77,30 +79,83 @@ if ($_POST) {
             $codigo_id = $_POST['codigo_id'];
             $nuevo_destacado = $_POST['nuevo_destacado'];
             
-            $collection_codigos->updateOne(
+            // Si se está activando el destacado, usar timestamp, si no, 0
+            $valor_destacado = $nuevo_destacado == 1 ? strtotime('now') : 0;
+            
+            $result = $collection_codigos->updateOne(
                 ['_id' => new MongoDB\BSON\ObjectId($codigo_id)],
                 ['$set' => [
-                    'destacado' => (int)$nuevo_destacado,
+                    'destacado' => $valor_destacado,
                     'updated_at' => new MongoDB\BSON\UTCDateTime()
                 ]]
             );
             
-            $_SESSION['success_message'] = "Estado destacado actualizado";
+            if ($result->getModifiedCount() > 0) {
+                $_SESSION['success_message'] = "Estado destacado actualizado correctamente";
+            } else {
+                $_SESSION['error_message'] = "No se pudo actualizar el estado destacado";
+            }
             break;
             
         case 'toggle_destacado_premium':
             $codigo_id = $_POST['codigo_id'];
             $nuevo_destacado_premium = $_POST['nuevo_destacado_premium'];
             
-            $collection_codigos->updateOne(
+            // Si se está activando el destacado, usar timestamp, si no, 0
+            $valor_destacado_social = $nuevo_destacado_premium == 1 ? strtotime('now') : 0;
+            
+            $result = $collection_codigos->updateOne(
                 ['_id' => new MongoDB\BSON\ObjectId($codigo_id)],
                 ['$set' => [
-                    'destacado_social' => (int)$nuevo_destacado_premium,
+                    'destacado_social' => $valor_destacado_social,
                     'updated_at' => new MongoDB\BSON\UTCDateTime()
                 ]]
             );
             
-            $_SESSION['success_message'] = "Estado destacado premium actualizado";
+            if ($result->getModifiedCount() > 0) {
+                $_SESSION['success_message'] = "Estado destacado premium actualizado correctamente";
+            } else {
+                $_SESSION['error_message'] = "No se pudo actualizar el estado destacado premium";
+            }
+            break;
+            
+        case 'editar_fecha_destacado':
+            $codigo_id = $_POST['codigo_id'];
+            $tipo_destacado = $_POST['tipo_destacado'];
+            $nueva_fecha = $_POST['nueva_fecha'];
+            
+            // Convertir fecha a timestamp
+            $timestamp = strtotime($nueva_fecha);
+            
+            if ($timestamp === false) {
+                $_SESSION['error_message'] = "Fecha inválida";
+                break;
+            }
+            
+            // Actualizar según el tipo de destacado
+            $update_data = [
+                'updated_at' => new MongoDB\BSON\UTCDateTime()
+            ];
+            
+            if ($tipo_destacado == 'normal') {
+                $update_data['destacado'] = $timestamp;
+            } elseif ($tipo_destacado == 'premium') {
+                $update_data['destacado_social'] = $timestamp;
+            } elseif ($tipo_destacado == 'ambos') {
+                $update_data['destacado'] = $timestamp;
+                $update_data['destacado_social'] = $timestamp;
+            }
+            
+            $result = $collection_codigos->updateOne(
+                ['_id' => new MongoDB\BSON\ObjectId($codigo_id)],
+                ['$set' => $update_data]
+            );
+            
+            if ($result->getModifiedCount() > 0) {
+                $_SESSION['success_message'] = "Fecha de destacado actualizada correctamente";
+            } else {
+                $_SESSION['error_message'] = "No se pudo actualizar la fecha de destacado";
+            }
             break;
             
         case 'delete_codigo':
@@ -201,7 +256,10 @@ if ($_POST) {
             break;
     }
     
-    header('Location: admin_codigos.php');
+    // Mantener los parámetros de filtro en la redirección
+    $redirect_params = $_GET;
+    $redirect_url = 'admin_codigos.php?' . http_build_query($redirect_params);
+    header('Location: ' . $redirect_url);
     exit;
 }
 
@@ -212,30 +270,70 @@ $filtro_marca = $_GET['marca'] ?? '';
 $filtro_usuario = $_GET['usuario'] ?? '';
 $filtro_busqueda = $_GET['busqueda'] ?? '';
 $filtro_id_codigo = $_GET['id_codigo'] ?? '';
+$filtro_nuevos_hoy = $_GET['filtro_nuevos_hoy'] ?? '';
 
 // Obtener parámetros de ordenamiento
-$sort_field = $_GET['sort'] ?? 'fecha_publicacion';
+$sort_field = $_GET['sort'] ?? '_id';
 $sort_direction = $_GET['dir'] ?? 'desc';
 
 // Construir filtros para la consulta
 $filtros = [];
+$filtros_and = [];
+
 if ($filtro_estado !== '') {
     $filtros['estado'] = (int)$filtro_estado;
 }
 if ($filtro_destacado !== '') {
-    $filtros['destacado'] = (int)$filtro_destacado;
+    $valor_destacado = (int)$filtro_destacado;
+    if ($valor_destacado == 1) {
+        // Para destacados, incluir tanto destacado > 0 como destacado_social > 0 (premium)
+        $filtros_and[] = [
+            '$or' => [
+                ['destacado' => ['$gt' => 0]],
+                ['destacado_social' => ['$gt' => 0]]
+            ]
+        ];
+    } else {
+        // Para no destacados, excluir tanto destacado como premium
+        // Un código no está destacado si destacado <= 0 Y destacado_social <= 0
+        $filtros_and[] = [
+            '$and' => [
+                ['$or' => [
+                    ['destacado' => ['$exists' => false]],
+                    ['destacado' => ['$lte' => 0]]
+                ]],
+                ['$or' => [
+                    ['destacado_social' => ['$exists' => false]],
+                    ['destacado_social' => ['$lte' => 0]]
+                ]]
+            ]
+        ];
+    }
 }
 if ($filtro_marca) {
-    $filtros['marca'] = ['$regex' => $filtro_marca, '$options' => 'i'];
+    // Convertir a minúsculas para hacer búsqueda exacta
+    $filtro_marca_lower = strtolower($filtro_marca);
+    $filtros['marca'] = $filtro_marca_lower;
 }
 if ($filtro_usuario) {
-    $filtros['id_usuario'] = $filtro_usuario;
+    try {
+        $filtros['id_usuario'] = new MongoDB\BSON\ObjectId($filtro_usuario);
+    } catch (Exception $e) {
+        $filtros['id_usuario'] = $filtro_usuario;
+    }
 }
 if ($filtro_busqueda) {
-    $filtros['$or'] = [
-        ['codigo' => ['$regex' => $filtro_busqueda, '$options' => 'i']],
-        ['descripcion' => ['$regex' => $filtro_busqueda, '$options' => 'i']]
+    $filtros_and[] = [
+        '$or' => [
+            ['codigo' => ['$regex' => $filtro_busqueda, '$options' => 'i']],
+            ['descripcion' => ['$regex' => $filtro_busqueda, '$options' => 'i']]
+        ]
     ];
+}
+
+// Combinar filtros AND si existen
+if (!empty($filtros_and)) {
+    $filtros['$and'] = $filtros_and;
 }
 if ($filtro_id_codigo) {
     // Buscar por ID completo o parcial
@@ -248,16 +346,32 @@ if ($filtro_id_codigo) {
         $filtros['_id'] = ['$regex' => $filtro_id_codigo, '$options' => 'i'];
     }
 }
+// Filtro para códigos nuevos de hoy (desde el dashboard)
+if ($filtro_nuevos_hoy) {
+    $timestamp_hoy_filtro = strtotime('today');
+    $objectId_hoy_filtro = new MongoDB\BSON\ObjectId(sprintf('%08x%s', $timestamp_hoy_filtro, str_repeat('0', 16)));
+    if (isset($filtros['_id'])) {
+        // Si ya hay un filtro de _id, combinarlo
+        if (is_array($filtros['_id']) && isset($filtros['_id']['$gte'])) {
+            // Mantener el más restrictivo
+            $filtros['_id']['$gte'] = $objectId_hoy_filtro;
+        } else {
+            $filtros['_id'] = ['$gte' => $objectId_hoy_filtro];
+        }
+    } else {
+        $filtros['_id'] = ['$gte' => $objectId_hoy_filtro];
+    }
+}
 
 // Obtener códigos con paginación
 $page = (int)($_GET['page'] ?? 1);
-$limit = (int)($_GET['limit'] ?? 20);
+$limit = (int)($_GET['limit'] ?? 100);
 $skip = ($page - 1) * $limit;
 
 // Validar límite para evitar valores extremos
 $opciones_limit = [10, 20, 50, 100, 200, 500, 1000, 'todos'];
 if (!in_array($limit, $opciones_limit) && $limit !== 'todos') {
-    $limit = 20;
+    $limit = 100;
 }
 
 // Si se selecciona "todos", obtener todos los resultados
@@ -313,16 +427,162 @@ $total_pages = ceil($total_codigos / $limit);
 // Obtener marcas para el filtro
 $marcas = $collection_marcas->find([], ['sort' => ['nombre' => 1]])->toArray();
 
-// Obtener estadísticas
+// Obtener estadísticas basadas en los filtros aplicados
+// Crear filtros para cada tipo de estadística
+$filtros_total = $filtros;
+$filtros_activos = array_merge($filtros, ['estado' => 0]);
+$filtros_inactivos = array_merge($filtros, ['estado' => -1]);
+
+// Para destacados, incluir tanto destacado como premium
+// Un código está destacado si tiene destacado > 0 O destacado_social > 0 (timestamp válido)
+$filtros_destacados = $filtros;
+// Si ya hay filtros $and, agregar el filtro de destacados
+if (isset($filtros_destacados['$and'])) {
+    $filtros_destacados['$and'][] = [
+        '$or' => [
+            ['destacado' => ['$gt' => 0]],
+            ['destacado_social' => ['$gt' => 0]]
+        ]
+    ];
+} else {
+    // Si no hay $and, crear uno nuevo
+    $filtros_destacados['$and'] = [
+        [
+            '$or' => [
+                ['destacado' => ['$gt' => 0]],
+                ['destacado_social' => ['$gt' => 0]]
+            ]
+        ]
+    ];
+}
+
+// Para códigos nuevos hoy, usar timestamp del ObjectId
+$timestamp_hoy = strtotime('today');
+$objectId_hoy = new MongoDB\BSON\ObjectId(sprintf('%08x%s', $timestamp_hoy, str_repeat('0', 16)));
+$filtros_hoy = array_merge($filtros, ['_id' => ['$gte' => $objectId_hoy]]);
+
 $estadisticas = [
-    'total' => $collection_codigos->countDocuments([]),
-    'activos' => $collection_codigos->countDocuments(['estado' => 0]),
-    'inactivos' => $collection_codigos->countDocuments(['estado' => -1]),
-    'destacados' => $collection_codigos->countDocuments(['destacado' => 1]),
-    'nuevos_hoy' => $collection_codigos->countDocuments([
-        'fecha_creacion' => ['$gte' => new MongoDB\BSON\UTCDateTime(strtotime('today') * 1000)]
-    ])
+    'total' => $collection_codigos->countDocuments($filtros_total),
+    'activos' => $collection_codigos->countDocuments($filtros_activos),
+    'inactivos' => $collection_codigos->countDocuments($filtros_inactivos),
+    'destacados' => $collection_codigos->countDocuments($filtros_destacados),
+    'nuevos_hoy' => $collection_codigos->countDocuments($filtros_hoy),
+    'filtrados' => $total_codigos // Este ya está calculado correctamente arriba
 ];
+
+// Datos para gráfica de códigos publicados por fecha
+// Obtener período seleccionado
+$periodo_grafica = $_GET['periodo_grafica'] ?? '30dias';
+$fecha_inicio_grafica = $_GET['fecha_inicio_grafica'] ?? '';
+$fecha_fin_grafica = $_GET['fecha_fin_grafica'] ?? '';
+
+// Calcular fecha límite según el período seleccionado
+$objectId_limite = null;
+$agrupar_por = 'day'; // Por defecto agrupar por día
+
+try {
+    $timestamp_limite = null;
+    
+    switch ($periodo_grafica) {
+        case 'semana':
+            $timestamp_limite = time() - (7 * 24 * 60 * 60);
+            break;
+        case '30dias':
+            $timestamp_limite = time() - (30 * 24 * 60 * 60);
+            break;
+        case '3meses':
+            $timestamp_limite = time() - (90 * 24 * 60 * 60);
+            $agrupar_por = 'day'; // Mantener por día para 3 meses
+            break;
+        case 'inicio':
+            $timestamp_limite = 0; // Desde el inicio
+            $agrupar_por = 'month'; // Agrupar por mes si es desde el inicio
+            break;
+        case 'personalizado':
+            if (!empty($fecha_inicio_grafica) && !empty($fecha_fin_grafica)) {
+                $timestamp_limite = strtotime($fecha_inicio_grafica);
+                $timestamp_fin = strtotime($fecha_fin_grafica);
+                // Determinar agrupación según el rango
+                $dias_diferencia = ($timestamp_fin - $timestamp_limite) / (24 * 60 * 60);
+                if ($dias_diferencia > 365) {
+                    $agrupar_por = 'month';
+                } elseif ($dias_diferencia > 90) {
+                    $agrupar_por = 'week';
+                } else {
+                    $agrupar_por = 'day';
+                }
+            } else {
+                $timestamp_limite = time() - (30 * 24 * 60 * 60); // Por defecto 30 días
+            }
+            break;
+        default:
+            $timestamp_limite = time() - (30 * 24 * 60 * 60);
+    }
+    
+    // Crear ObjectId límite si hay límite de tiempo
+    if ($timestamp_limite > 0) {
+        $objectId_limite = new MongoDB\BSON\ObjectId(sprintf('%08x%s', $timestamp_limite, str_repeat('0', 16)));
+    }
+    
+    // Construir pipeline de agregación
+    $pipeline_codigos_fecha = [];
+    
+    // Agregar filtro de fecha si hay límite
+    if ($objectId_limite) {
+        $pipeline_codigos_fecha[] = ['$match' => [
+            '_id' => ['$gte' => $objectId_limite]
+        ]];
+    }
+    
+    // Si es personalizado y hay fecha fin, agregar filtro de fecha fin
+    if ($periodo_grafica === 'personalizado' && !empty($fecha_fin_grafica)) {
+        $timestamp_fin = strtotime($fecha_fin_grafica . ' 23:59:59');
+        $objectId_fin = new MongoDB\BSON\ObjectId(sprintf('%08x%s', $timestamp_fin, str_repeat('f', 16)));
+        if (isset($pipeline_codigos_fecha[0]['$match'])) {
+            $pipeline_codigos_fecha[0]['$match']['_id']['$lte'] = $objectId_fin;
+        } else {
+            $pipeline_codigos_fecha[] = ['$match' => [
+                '_id' => ['$lte' => $objectId_fin]
+            ]];
+        }
+    }
+    
+    // Construir agrupación según el tipo
+    $group_id = [];
+    if ($agrupar_por === 'month') {
+        $group_id = [
+            'year' => ['$year' => '$_id'],
+            'month' => ['$month' => '$_id']
+        ];
+    } elseif ($agrupar_por === 'week') {
+        $group_id = [
+            'year' => ['$year' => '$_id'],
+            'week' => ['$isoWeek' => '$_id']
+        ];
+    } else {
+        // Por día (default)
+        $group_id = [
+            'year' => ['$year' => '$_id'],
+            'month' => ['$month' => '$_id'],
+            'day' => ['$dayOfMonth' => '$_id']
+        ];
+    }
+    
+    $pipeline_codigos_fecha[] = ['$group' => [
+        '_id' => $group_id,
+        'total_codigos' => ['$sum' => 1],
+        'codigos_activos' => ['$sum' => ['$cond' => [['$eq' => ['$estado', 0]], 1, 0]]],
+        'codigos_inactivos' => ['$sum' => ['$cond' => [['$ne' => ['$estado', 0]], 1, 0]]]
+    ]];
+    
+    $pipeline_codigos_fecha[] = ['$sort' => ['_id' => 1]];
+    
+    $datos_grafica_codigos = $collection_codigos->aggregate($pipeline_codigos_fecha)->toArray();
+} catch (Exception $e) {
+    error_log("Error en agregación de códigos por fecha: " . $e->getMessage());
+    $datos_grafica_codigos = [];
+    $agrupar_por = 'day';
+}
 
 $title = "Gestión de Códigos - Panel de Administración";
 ?>
@@ -335,7 +595,6 @@ $title = "Gestión de Códigos - Panel de Administración";
     <title><?php echo $title; ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <style>
         .sidebar {
             min-height: 100vh;
@@ -373,10 +632,84 @@ $title = "Gestión de Códigos - Panel de Administración";
             font-size: 0.9em;
         }
         .descripcion-text {
-            max-width: 300px;
+            max-width: 150px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+        
+        .codigo-text {
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        /* Optimizar columnas de la tabla */
+        .table th:nth-child(5), .table td:nth-child(5) { /* Columna Usuario */
+            max-width: 100px;
+            min-width: 100px;
+        }
+        
+        .table th:nth-child(6), .table td:nth-child(6) { /* Columna Marca */
+            max-width: 80px;
+            min-width: 80px;
+        }
+        
+        .table th:nth-child(7), .table td:nth-child(7) { /* Columna Código */
+            max-width: 120px;
+            min-width: 120px;
+        }
+        
+        .table th:nth-child(8), .table td:nth-child(8) { /* Columna Descripción */
+            max-width: 150px;
+            min-width: 150px;
+        }
+        
+        .table th:nth-child(9), .table td:nth-child(9) { /* Columna Estado */
+            max-width: 70px;
+            min-width: 70px;
+        }
+        
+        .table th:nth-child(10), .table td:nth-child(10) { /* Columna Destacado */
+            max-width: 80px;
+            min-width: 80px;
+        }
+        
+        .table th:nth-child(11), .table td:nth-child(11) { /* Columna Premium */
+            max-width: 80px;
+            min-width: 80px;
+        }
+        
+        .table th:nth-child(12), .table td:nth-child(12) { /* Columna Impresiones */
+            max-width: 70px;
+            min-width: 70px;
+        }
+        
+        .table th:nth-child(13), .table td:nth-child(13) { /* Columna Clicks */
+            max-width: 70px;
+            min-width: 70px;
+        }
+        
+        .table th:nth-child(14), .table td:nth-child(14) { /* Columna % Conv */
+            max-width: 70px;
+            min-width: 70px;
+        }
+        
+        .table th:nth-child(15), .table td:nth-child(15) { /* Columna Acciones */
+            min-width: 120px;
+            white-space: nowrap;
+        }
+        
+        /* Hacer la tabla más compacta */
+        .table td {
+            padding: 0.5rem;
+            vertical-align: middle;
+        }
+        
+        .table th {
+            padding: 0.5rem;
+            font-size: 0.9rem;
         }
         
         /* Estilos para encabezados ordenables */
@@ -405,43 +738,7 @@ $title = "Gestión de Códigos - Panel de Administración";
     <div class="container-fluid">
         <div class="row">
             <!-- Sidebar -->
-            <div class="col-md-3 col-lg-2 sidebar p-0">
-                <div class="p-3">
-                    <h4 class="text-white mb-4">
-                        <i class="fas fa-cogs me-2"></i>Admin Panel
-                    </h4>
-                    <nav class="nav flex-column">
-                        <a class="nav-link" href="admin_dashboard.php">
-                            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
-                        </a>
-                        <a class="nav-link" href="admin_usuarios.php">
-                            <i class="fas fa-users me-2"></i>Usuarios
-                        </a>
-                        <a class="nav-link" href="admin_marcas.php">
-                            <i class="fas fa-tags me-2"></i>Marcas
-                        </a>
-                        <a class="nav-link active" href="admin_codigos.php">
-                            <i class="fas fa-code me-2"></i>Códigos
-                        </a>
-                        <a class="nav-link" href="admin_transacciones.php">
-                            <i class="fas fa-credit-card me-2"></i>Transacciones
-                        </a>
-                        <a class="nav-link" href="admin_reportes.php">
-                            <i class="fas fa-chart-bar me-2"></i>Reportes
-                        </a>
-                        <a class="nav-link" href="admin_configuracion.php">
-                            <i class="fas fa-cog me-2"></i>Configuración
-                        </a>
-                        <a class="nav-link" href="admin_logs.php">
-                            <i class="fas fa-file-alt me-2"></i>Logs
-                        </a>
-                        <hr class="text-white">
-                        <a class="nav-link" href="https://www.codigoamigo.com">
-                            <i class="fas fa-home me-2"></i>Volver al sitioo
-                        </a>
-                    </nav>
-                </div>
-            </div>
+            <?php echo get_admin_sidebar_menu('admin_codigos.php'); ?>
 
             <!-- Main Content -->
             <div class="col-md-9 col-lg-10 main-content">
@@ -523,6 +820,74 @@ $title = "Gestión de Códigos - Panel de Administración";
                                     <p class="text-muted mb-0">Filtrados</p>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Gráfica de códigos publicados por fecha -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap">
+                                <div>
+                                    <h5 class="card-title mb-0">
+                                        <i class="fas fa-chart-line me-2"></i>Gráfica de Códigos Publicados por Fecha
+                                    </h5>
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Muestra códigos agrupados por fecha de publicación. 
+                                        "Inactivos" son códigos publicados en esa fecha que actualmente están desactivados.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Filtros de período -->
+                            <form method="GET" id="formFiltroGrafica" class="mb-3">
+                                <!-- Mantener otros filtros existentes -->
+                                <?php 
+                                foreach ($_GET as $key => $value): 
+                                    if ($key !== 'periodo_grafica' && $key !== 'fecha_inicio_grafica' && $key !== 'fecha_fin_grafica'):
+                                ?>
+                                    <input type="hidden" name="<?php echo htmlspecialchars($key); ?>" value="<?php echo htmlspecialchars($value); ?>">
+                                <?php 
+                                    endif;
+                                endforeach; 
+                                ?>
+                                
+                                <div class="row g-3 align-items-end">
+                                    <div class="col-md-3">
+                                        <label class="form-label">Período</label>
+                                        <select name="periodo_grafica" id="periodo_grafica" class="form-select" onchange="toggleFechaPersonalizada()">
+                                            <option value="semana" <?php echo $periodo_grafica === 'semana' ? 'selected' : ''; ?>>Última semana</option>
+                                            <option value="30dias" <?php echo $periodo_grafica === '30dias' ? 'selected' : ''; ?>>Últimos 30 días</option>
+                                            <option value="3meses" <?php echo $periodo_grafica === '3meses' ? 'selected' : ''; ?>>Últimos 3 meses</option>
+                                            <option value="inicio" <?php echo $periodo_grafica === 'inicio' ? 'selected' : ''; ?>>Desde el inicio</option>
+                                            <option value="personalizado" <?php echo $periodo_grafica === 'personalizado' ? 'selected' : ''; ?>>Personalizado</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3" id="fecha_inicio_container" style="display: <?php echo $periodo_grafica === 'personalizado' ? 'block' : 'none'; ?>;">
+                                        <label class="form-label">Fecha Inicio</label>
+                                        <input type="date" name="fecha_inicio_grafica" id="fecha_inicio_grafica" 
+                                               class="form-control" 
+                                               value="<?php echo htmlspecialchars($fecha_inicio_grafica); ?>">
+                                    </div>
+                                    <div class="col-md-3" id="fecha_fin_container" style="display: <?php echo $periodo_grafica === 'personalizado' ? 'block' : 'none'; ?>;">
+                                        <label class="form-label">Fecha Fin</label>
+                                        <input type="date" name="fecha_fin_grafica" id="fecha_fin_grafica" 
+                                               class="form-control" 
+                                               value="<?php echo htmlspecialchars($fecha_fin_grafica); ?>">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-filter me-1"></i>Filtrar
+                                        </button>
+                                        <a href="admin_codigos.php" class="btn btn-outline-secondary">
+                                            <i class="fas fa-redo me-1"></i>Resetear
+                                        </a>
+                                    </div>
+                                </div>
+                            </form>
+                            
+                            <canvas id="graficaCodigosFecha" width="400" height="150"></canvas>
                         </div>
                     </div>
 
@@ -647,9 +1012,14 @@ $title = "Gestión de Códigos - Panel de Administración";
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <div>
                                 <h5 class="card-title mb-0">Lista de Códigos</h5>
-                                <?php if ($sort_field && $sort_field !== 'fecha_publicacion'): ?>
+                                <?php if ($sort_field && $sort_field !== '_id'): ?>
                                     <small class="text-muted">
                                         Ordenado por: <strong><?php echo ucfirst($sort_field); ?></strong> 
+                                        (<?php echo $sort_direction === 'asc' ? 'Ascendente' : 'Descendente'; ?>)
+                                    </small>
+                                <?php else: ?>
+                                    <small class="text-muted">
+                                        Ordenado por: <strong>Fecha de creación</strong> 
                                         (<?php echo $sort_direction === 'asc' ? 'Ascendente' : 'Descendente'; ?>)
                                     </small>
                                 <?php endif; ?>
@@ -745,9 +1115,20 @@ $title = "Gestión de Códigos - Panel de Administración";
                                                 </a>
                                             </th>
                                             <th>
+                                                <a href="?<?php echo http_build_query(array_merge($_GET, ['sort' => 'impressions', 'dir' => ($sort_field === 'impressions' && $sort_direction === 'asc') ? 'desc' : 'asc'])); ?>" 
+                                                   class="sortable-header text-decoration-none">
+                                                    Impr.
+                                                    <?php if ($sort_field === 'impressions'): ?>
+                                                        <i class="fas fa-sort-<?php echo $sort_direction === 'asc' ? 'up' : 'down'; ?> ms-1"></i>
+                                                    <?php else: ?>
+                                                        <i class="fas fa-sort ms-1 text-muted"></i>
+                                                    <?php endif; ?>
+                                                </a>
+                                            </th>
+                                            <th>
                                                 <a href="?<?php echo http_build_query(array_merge($_GET, ['sort' => 'vistas', 'dir' => ($sort_field === 'vistas' && $sort_direction === 'asc') ? 'desc' : 'asc'])); ?>" 
                                                    class="sortable-header text-decoration-none">
-                                                    Vistas
+                                                    Clicks
                                                     <?php if ($sort_field === 'vistas'): ?>
                                                         <i class="fas fa-sort-<?php echo $sort_direction === 'asc' ? 'up' : 'down'; ?> ms-1"></i>
                                                     <?php else: ?>
@@ -755,6 +1136,7 @@ $title = "Gestión de Códigos - Panel de Administración";
                                                     <?php endif; ?>
                                                 </a>
                                             </th>
+                                            <th>% Conv</th>
                                             <th>Acciones</th>
                                         </tr>
                                     </thead>
@@ -817,23 +1199,49 @@ $title = "Gestión de Códigos - Panel de Administración";
                                                 </small>
                                             </td>
                                             <td>
-                                                <small class="text-muted"><?php echo substr($codigo['_id'], 0, 8) . '...'; ?></small>
+                                                <?php if (!empty($codigo['codigo']) && !empty($codigo['marca'])): ?>
+                                                    <a href="/de-<?php echo htmlspecialchars(strtolower($codigo['marca'])); ?>?codigo=<?php echo $codigo['_id']; ?>"
+                                                       target="_blank" title="Ver código público" class="text-decoration-none">
+                                                        <small class="text-primary codigo-id-elipsis-css" title="<?php echo $codigo['_id']; ?>">
+                                                            <?php echo $codigo['_id']; ?>
+                                                        </small>
+                                                    </a>
+                                                    <style>
+                                                        .codigo-id-elipsis-css {
+                                                            display: inline-block;
+                                                            max-width: 50px !important;
+                                                            white-space: nowrap;
+                                                            overflow: hidden;
+                                                            text-overflow: ellipsis;
+                                                            vertical-align: bottom;
+                                                        }
+                                                    </style>
+                                                <?php else: ?>
+                                                    <small class="text-muted"><?php echo substr($codigo['_id'], 0, 8) . '...'; ?></small>
+                                                <?php endif; ?>
                                             </td>
                                             <td>
                                                 <div class="d-flex align-items-center">
                                                     <?php if ($usuario && isset($usuario['img']) && $usuario['img']): ?>
                                                         <img src="<?php echo htmlspecialchars($usuario['img']); ?>" 
-                                                             class="rounded-circle me-2" width="24" height="24" 
-                                                             onerror="this.src='https://via.placeholder.com/24'">
+                                                             class="rounded-circle me-1" width="20" height="20" 
+                                                             onerror="this.src='https://via.placeholder.com/20'">
                                                     <?php else: ?>
-                                                        <div class="bg-secondary rounded-circle me-2 d-flex align-items-center justify-content-center" 
-                                                             style="width: 24px; height: 24px;">
-                                                            <i class="fas fa-user text-white" style="font-size: 10px;"></i>
+                                                        <div class="bg-secondary rounded-circle me-1 d-flex align-items-center justify-content-center" 
+                                                             style="width: 20px; height: 20px;">
+                                                            <i class="fas fa-user text-white" style="font-size: 8px;"></i>
                                                         </div>
                                                     <?php endif; ?>
                                                     <div>
-                                                        <small><?php echo htmlspecialchars($usuario['username'] ?? 'Usuario no encontrado'); ?></small>
-                                                        <br><small class="text-muted"><?php echo isset($codigo['id_usuario']) ? substr($codigo['id_usuario'], 0, 8) . '...' : 'Sin usuario'; ?></small>
+                                                        <?php if (isset($codigo['id_usuario']) && $codigo['id_usuario']): ?>
+                                                            <a href="admin_usuario_detalle.php?id=<?php echo htmlspecialchars($codigo['id_usuario']); ?>" 
+                                                               class="text-decoration-none" title="Ver usuario: <?php echo htmlspecialchars($usuario['username'] ?? 'Usuario'); ?>">
+                                                                <small class="text-primary"><?php echo htmlspecialchars(substr($usuario['username'] ?? 'Usuario no encontrado', 0, 10)) . '...'; ?></small>
+                                                            </a>
+                                                        <?php else: ?>
+                                                            <small><?php echo htmlspecialchars(substr($usuario['username'] ?? 'Usuario no encontrado', 0, 10)) . '...'; ?></small>
+                                                        <?php endif; ?>
+                                                        <br><small class="text-muted"><?php echo isset($codigo['id_usuario']) ? substr($codigo['id_usuario'], 0, 6) . '...' : 'Sin usuario'; ?></small>
                                                     </div>
                                                 </div>
                                             </td>
@@ -851,11 +1259,13 @@ $title = "Gestión de Códigos - Panel de Administración";
                                                 ?>
                                             </td>
                                             <td>
-                                                <span class="codigo-text"><?php echo htmlspecialchars($codigo['codigo'] ?? ''); ?></span>
+                                                <div class="codigo-text" title="<?php echo htmlspecialchars($codigo['codigo'] ?? ''); ?>">
+                                                    <?php echo htmlspecialchars(substr($codigo['codigo'] ?? '', 0, 15)) . '...'; ?>
+                                                </div>
                                             </td>
                                             <td>
                                                 <div class="descripcion-text" title="<?php echo htmlspecialchars($codigo['descripcion'] ?? ''); ?>">
-                                                    <?php echo htmlspecialchars(substr($codigo['descripcion'] ?? '', 0, 50)) . '...'; ?>
+                                                    <?php echo htmlspecialchars(substr($codigo['descripcion'] ?? '', 0, 30)) . '...'; ?>
                                                 </div>
                                             </td>
                                             <td>
@@ -867,29 +1277,51 @@ $title = "Gestión de Códigos - Panel de Administración";
                                                 <span class="badge bg-<?php echo $estado_class; ?>"><?php echo $estado_text; ?></span>
                                             </td>
                                             <td>
-                                                <?php if (($codigo['destacado'] ?? 0) == 1): ?>
-                                                    <span class="badge bg-warning">
-                                                        <i class="fas fa-star me-1"></i>Destacado
+                                                <?php 
+                                                $destacado = $codigo['destacado'] ?? 0;
+                                                if ($destacado > 0): 
+                                                    $fecha_destacado = date('d/m/Y H:i', $destacado);
+                                                ?>
+                                                    <span class="badge bg-warning" title="Fecha: <?php echo $fecha_destacado; ?>">
+                                                        <i class="fas fa-star me-1"></i>
+                                                        <?php echo date('d/m/Y', $destacado); ?>
                                                     </span>
                                                 <?php else: ?>
                                                     <span class="text-muted">No</span>
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <?php if (($codigo['destacado_social'] ?? 0) == 1): ?>
-                                                    <span class="badge bg-success">
-                                                        <i class="fas fa-crown me-1"></i>Premium
+                                                <?php 
+                                                $destacado_social = $codigo['destacado_social'] ?? 0;
+                                                if ($destacado_social > 0): 
+                                                    $fecha_premium = date('d/m/Y H:i', $destacado_social);
+                                                ?>
+                                                    <span class="badge bg-success" title="Fecha: <?php echo $fecha_premium; ?>">
+                                                        <i class="fas fa-crown me-1"></i>
+                                                        <?php echo date('d/m/Y', $destacado_social); ?>
                                                     </span>
                                                 <?php else: ?>
                                                     <span class="text-muted">No</span>
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <span class="badge bg-secondary"><?php echo $codigo['totalclicks'] ?? 0; ?></span>
+                                                <span class="badge bg-info" title="Impresiones"><?php echo number_format($codigo['total_impressions'] ?? 0); ?></span>
                                             </td>
                                             <td>
-                                                <div class="btn-group" role="group">
-                                                    <button type="button" class="btn btn-sm btn-outline-primary" 
+                                                <span class="badge bg-success" title="Clicks"><?php echo number_format($codigo['totalclicks'] ?? 0); ?></span>
+                                            </td>
+                                            <td>
+                                                <?php 
+                                                $impressions = $codigo['total_impressions'] ?? 0;
+                                                $clicks = $codigo['totalclicks'] ?? 0;
+                                                $conversion = $impressions > 0 ? round(($clicks / $impressions) * 100, 1) : 0;
+                                                $conversion_color = $conversion > 10 ? 'success' : ($conversion > 5 ? 'warning' : 'danger');
+                                                ?>
+                                                <span class="badge bg-<?php echo $conversion_color; ?>" title="Tasa de conversión"><?php echo $conversion; ?>%</span>
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <button type="button" class="btn btn-outline-primary btn-sm p-1" 
                                                             data-bs-toggle="modal" data-bs-target="#modalEditarCodigo" 
                                                             data-codigo-id="<?php echo $codigo['_id']; ?>"
                                                             data-codigo-codigo="<?php echo htmlspecialchars($codigo['codigo'] ?? ''); ?>"
@@ -897,26 +1329,36 @@ $title = "Gestión de Códigos - Panel de Administración";
                                                             data-codigo-marca="<?php echo htmlspecialchars($codigo['marca'] ?? ''); ?>"
                                                             data-codigo-estado="<?php echo $codigo['estado'] ?? 0; ?>"
                                                             data-codigo-destacado="<?php echo $codigo['destacado'] ?? 0; ?>"
-                                                            data-codigo-destacado-social="<?php echo $codigo['destacado_social'] ?? 0; ?>">
-                                                        <i class="fas fa-edit"></i>
+                                                            data-codigo-destacado-social="<?php echo $codigo['destacado_social'] ?? 0; ?>"
+                                                            title="Editar">
+                                                        <i class="fas fa-edit" style="font-size: 0.8rem;"></i>
                                                     </button>
-                                                    <button type="button" class="btn btn-sm btn-outline-warning" 
-                                                            onclick="toggleEstado('<?php echo $codigo['_id']; ?>', <?php echo $codigo['estado'] ?? 0; ?>)">
-                                                        <i class="fas fa-toggle-<?php echo ($codigo['estado'] ?? 0) == 0 ? 'on' : 'off'; ?>"></i>
+                                                    <button type="button" class="btn btn-outline-warning btn-sm p-1" 
+                                                            onclick="toggleEstado('<?php echo $codigo['_id']; ?>', <?php echo $codigo['estado'] ?? 0; ?>)"
+                                                            title="Toggle Estado">
+                                                        <i class="fas fa-toggle-<?php echo ($codigo['estado'] ?? 0) == 0 ? 'on' : 'off'; ?>" style="font-size: 0.8rem;"></i>
                                                     </button>
-                                                    <button type="button" class="btn btn-sm btn-outline-info" 
+                                                    <button type="button" class="btn btn-outline-info btn-sm p-1" 
                                                             onclick="toggleDestacado('<?php echo $codigo['_id']; ?>', <?php echo $codigo['destacado'] ?? 0; ?>)"
-                                                            title="Destacado Normal">
-                                                        <i class="fas fa-star"></i>
+                                                            title="Toggle Destacado Normal">
+                                                        <i class="fas fa-star" style="font-size: 0.8rem;"></i>
                                                     </button>
-                                                    <button type="button" class="btn btn-sm btn-outline-success" 
+                                                    <button type="button" class="btn btn-outline-success btn-sm p-1" 
                                                             onclick="toggleDestacadoPremium('<?php echo $codigo['_id']; ?>', <?php echo $codigo['destacado_social'] ?? 0; ?>)"
-                                                            title="Destacado Premium (Home)">
-                                                        <i class="fas fa-crown"></i>
+                                                            title="Toggle Destacado Premium (Home)">
+                                                        <i class="fas fa-crown" style="font-size: 0.8rem;"></i>
                                                     </button>
-                                                    <button type="button" class="btn btn-sm btn-outline-danger" 
-                                                            onclick="eliminarCodigo('<?php echo $codigo['_id']; ?>')">
-                                                        <i class="fas fa-trash"></i>
+                                                    <?php if (($codigo['destacado'] ?? 0) > 0 || ($codigo['destacado_social'] ?? 0) > 0): ?>
+                                                    <button type="button" class="btn btn-outline-warning btn-sm p-1" 
+                                                            onclick="editarFechaDestacado('<?php echo $codigo['_id']; ?>', <?php echo $codigo['destacado'] ?? 0; ?>, <?php echo $codigo['destacado_social'] ?? 0; ?>)"
+                                                            title="Editar fecha de destacado">
+                                                        <i class="fas fa-calendar" style="font-size: 0.8rem;"></i>
+                                                    </button>
+                                                    <?php endif; ?>
+                                                    <button type="button" class="btn btn-outline-danger btn-sm p-1" 
+                                                            onclick="eliminarCodigo('<?php echo $codigo['_id']; ?>')"
+                                                            title="Eliminar">
+                                                        <i class="fas fa-trash" style="font-size: 0.8rem;"></i>
                                                     </button>
                                                 </div>
                                             </td>
@@ -1009,8 +1451,43 @@ $title = "Gestión de Códigos - Panel de Administración";
         </div>
     </div>
 
+    <!-- Modal para editar fecha de destacado -->
+    <div class="modal fade" id="modalEditarFechaDestacado" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Editar Fecha de Destacado</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" id="formEditarFecha">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="editar_fecha_destacado">
+                        <input type="hidden" name="codigo_id" id="fecha_codigo_id">
+                        <input type="hidden" name="tipo_destacado" id="fecha_tipo_destacado">
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Tipo de Destacado</label>
+                            <div id="fecha_tipo_info" class="alert alert-info"></div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Nueva Fecha y Hora</label>
+                            <input type="datetime-local" class="form-control" name="nueva_fecha" id="fecha_input" required>
+                            <small class="form-text text-muted">Esta fecha determiná el orden en el home (más reciente aparece primero)</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Actualizar Fecha</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         // Modal de editar código
         document.getElementById('modalEditarCodigo').addEventListener('show.bs.modal', function (event) {
@@ -1159,6 +1636,201 @@ $title = "Gestión de Códigos - Panel de Administración";
                 form.submit();
             }
         }
+
+        // Editar fecha de destacado
+        function editarFechaDestacado(codigoId, destacado, destacadoSocial) {
+            // Determinar qué tipo de destacado editar
+            var tipo = '';
+            var tipoInfo = '';
+            var fechaActual = '';
+            
+            if (destacadoSocial > 0 && destacado > 0) {
+                // Tiene ambos, permitir elegir
+                tipo = 'ambos';
+                tipoInfo = 'Ambos (Premium y Normal)';
+                // Usar el más reciente
+                fechaActual = new Date(Math.max(destacadoSocial, destacado) * 1000);
+            } else if (destacadoSocial > 0) {
+                tipo = 'premium';
+                tipoInfo = '<i class="fas fa-crown"></i> Destacado Premium (Home)';
+                fechaActual = new Date(destacadoSocial * 1000);
+            } else if (destacado > 0) {
+                tipo = 'normal';
+                tipoInfo = '<i class="fas fa-star"></i> Destacado Normal';
+                fechaActual = new Date(destacado * 1000);
+            }
+            
+            // Configurar el modal
+            document.getElementById('fecha_codigo_id').value = codigoId;
+            document.getElementById('fecha_tipo_destacado').value = tipo;
+            document.getElementById('fecha_tipo_info').innerHTML = tipoInfo;
+            
+            // Convertir fecha a formato datetime-local
+            var year = fechaActual.getFullYear();
+            var month = String(fechaActual.getMonth() + 1).padStart(2, '0');
+            var day = String(fechaActual.getDate()).padStart(2, '0');
+            var hours = String(fechaActual.getHours()).padStart(2, '0');
+            var minutes = String(fechaActual.getMinutes()).padStart(2, '0');
+            var fechaFormato = year + '-' + month + '-' + day + 'T' + hours + ':' + minutes;
+            
+            document.getElementById('fecha_input').value = fechaFormato;
+            
+            // Mostrar el modal
+            var modal = new bootstrap.Modal(document.getElementById('modalEditarFechaDestacado'));
+            modal.show();
+        }
+
+        // Gráfica de códigos publicados por fecha
+        document.addEventListener('DOMContentLoaded', function() {
+            <?php
+            // Preparar datos para la gráfica
+            $labels = [];
+            $datos_total = [];
+            $datos_activos = [];
+            $datos_inactivos = [];
+
+            if (!empty($datos_grafica_codigos)) {
+                foreach ($datos_grafica_codigos as $dato) {
+                    $fecha = '';
+                    // Formatear fecha según el tipo de agrupación
+                    if (isset($dato['_id']['day']) && isset($dato['_id']['month']) && isset($dato['_id']['year'])) {
+                        // Agrupación por día
+                        $fecha = sprintf('%02d/%02d/%d', $dato['_id']['day'], $dato['_id']['month'], $dato['_id']['year']);
+                    } elseif (isset($dato['_id']['week']) && isset($dato['_id']['year'])) {
+                        // Agrupación por semana
+                        $fecha = 'Semana ' . $dato['_id']['week'] . '/' . $dato['_id']['year'];
+                    } elseif (isset($dato['_id']['month']) && isset($dato['_id']['year'])) {
+                        // Agrupación por mes
+                        $meses = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+                        $fecha = $meses[$dato['_id']['month']] . ' ' . $dato['_id']['year'];
+                    }
+                    
+                    if (!empty($fecha)) {
+                        $labels[] = $fecha;
+                        $datos_total[] = $dato['total_codigos'] ?? 0;
+                        $datos_activos[] = $dato['codigos_activos'] ?? 0;
+                        $datos_inactivos[] = $dato['codigos_inactivos'] ?? 0;
+                    }
+                }
+            }
+
+            // Si no hay datos, crear datos de ejemplo para mostrar la gráfica
+            if (empty($labels)) {
+                $labels = ['No hay datos'];
+                $datos_total = [0];
+                $datos_activos = [0];
+                $datos_inactivos = [0];
+            }
+            ?>
+
+            const ctxCodigos = document.getElementById('graficaCodigosFecha').getContext('2d');
+            const graficaCodigosFecha = new Chart(ctxCodigos, {
+                type: 'line',
+                data: {
+                    labels: <?php echo json_encode($labels); ?>,
+                    datasets: [{
+                        label: 'Total Códigos',
+                        data: <?php echo json_encode($datos_total); ?>,
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        tension: 0.1,
+                        fill: true
+                    }, {
+                        label: 'Códigos Activos',
+                        data: <?php echo json_encode($datos_activos); ?>,
+                        borderColor: 'rgb(40, 167, 69)',
+                        backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                        tension: 0.1,
+                        fill: true
+                    }, {
+                        label: 'Códigos Inactivos',
+                        data: <?php echo json_encode($datos_inactivos); ?>,
+                        borderColor: 'rgb(220, 53, 69)',
+                        backgroundColor: 'rgba(220, 53, 69, 0.2)',
+                        tension: 0.1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Códigos Publicados por Fecha<?php 
+                                $titulo_periodo = '';
+                                switch($periodo_grafica) {
+                                    case 'semana': $titulo_periodo = ' (Última semana)'; break;
+                                    case '30dias': $titulo_periodo = ' (Últimos 30 días)'; break;
+                                    case '3meses': $titulo_periodo = ' (Últimos 3 meses)'; break;
+                                    case 'inicio': $titulo_periodo = ' (Desde el inicio)'; break;
+                                    case 'personalizado': 
+                                        if (!empty($fecha_inicio_grafica) && !empty($fecha_fin_grafica)) {
+                                            $titulo_periodo = ' (' . date('d/m/Y', strtotime($fecha_inicio_grafica)) . ' - ' . date('d/m/Y', strtotime($fecha_fin_grafica)) . ')';
+                                        }
+                                        break;
+                                }
+                                echo $titulo_periodo;
+                            ?>'
+                        },
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Número de Códigos'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Fecha'
+                            }
+                        }
+                    }
+                }
+            });
+        });
+
+        // Función para mostrar/ocultar campos de fecha personalizada
+        function toggleFechaPersonalizada() {
+            const periodo = document.getElementById('periodo_grafica').value;
+            const fechaInicioContainer = document.getElementById('fecha_inicio_container');
+            const fechaFinContainer = document.getElementById('fecha_fin_container');
+            
+            if (periodo === 'personalizado') {
+                fechaInicioContainer.style.display = 'block';
+                fechaFinContainer.style.display = 'block';
+            } else {
+                fechaInicioContainer.style.display = 'none';
+                fechaFinContainer.style.display = 'none';
+            }
+        }
+
+        // Validar fechas personalizadas al enviar el formulario
+        document.getElementById('formFiltroGrafica').addEventListener('submit', function(e) {
+            const periodo = document.getElementById('periodo_grafica').value;
+            if (periodo === 'personalizado') {
+                const fechaInicio = document.getElementById('fecha_inicio_grafica').value;
+                const fechaFin = document.getElementById('fecha_fin_grafica').value;
+                
+                if (!fechaInicio || !fechaFin) {
+                    e.preventDefault();
+                    alert('Por favor, selecciona ambas fechas (inicio y fin) para el período personalizado.');
+                    return false;
+                }
+                
+                if (new Date(fechaInicio) > new Date(fechaFin)) {
+                    e.preventDefault();
+                    alert('La fecha de inicio debe ser anterior a la fecha de fin.');
+                    return false;
+                }
+            }
+        });
     </script>
     
 <?php get_footer(); ?>

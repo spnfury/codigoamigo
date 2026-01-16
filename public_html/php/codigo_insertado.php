@@ -2,6 +2,7 @@
 // Incluir archivos necesarios
 include_once $_SERVER['DOCUMENT_ROOT'] . '/inc/includes.php';
 include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones.php';
+include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_pdf.php';
 
 // Verificar que el usuario esté logueado
 if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
@@ -17,7 +18,7 @@ if (empty($_POST)) {
 }
 
 // Obtener datos del formulario
-$marca = $_POST['marca'] ?? '';
+$marca = $_POST['marca_valor'] ?? $_POST['marca'] ?? '';
 $num_beneficio = $_POST['num_beneficio'] ?? '';
 $tipo_beneficio = $_POST['tipo_beneficio'] ?? 'euros';
 $codigo = $_POST['codigo'] ?? '';
@@ -52,7 +53,8 @@ if (!empty($errores)) {
     
     // Preservar datos del formulario en la sesión
     $_SESSION['form_data'] = [
-        'marca' => $marca,
+        'marca' => $_POST['marca'] ?? '',
+        'marca_valor' => $marca,
         'num_beneficio' => $num_beneficio,
         'tipo_beneficio' => $tipo_beneficio,
         'codigo' => $codigo,
@@ -79,25 +81,92 @@ try {
         'provincia' => $provincia,
         'localidad' => $localidad,
         'fecha_caducidad' => $fecha_caducidad,
-        'visibilidad' => 'media'
+        'visibilidad' => 'baja', // Los códigos nuevos empiezan con baja visibilidad
+        'url_imagen' => $_POST['url_imagen'] ?? null,
+        'categoria_valor' => $_POST['categoria_valor'] ?? null,
+        'categoria_clave' => $_POST['categoria_clave'] ?? null
     ];
     
     // Usar función unificada para crear el código
+    
+    // Si se solicitó reemplazar código existente
+    if (isset($_POST['replace_existing']) && $_POST['replace_existing'] == '1') {
+        try {
+            $marca_normalizada = normalizeMarcaName($marca);
+            $collection = getCollectionCodigos();
+            // Borrar código anterior de esta marca para este usuario
+            $collection->deleteOne([
+                'marca' => $marca_normalizada,
+                'id_usuario' => new MongoDB\BSON\ObjectId($_SESSION["user_id"])
+            ]);
+        } catch (Exception $e) {
+            error_log("Error al borrar código para reemplazo: " . $e->getMessage());
+            // Continuamos intentando crear el nuevo aunque falle el borrado (MongoDB manejará unicidad si hay índice, sino se creará duplicado que luego se detectará)
+        }
+    }
+
     $resultado = createNewCode($datos_codigo, $_SESSION["user_id"]);
     unset($_SESSION['msg_error']);
     if ($resultado) {
+        /* 
+        // Procesamiento de PDF temporalmente deshabilitado - pendiente de arreglar
+        // Procesar PDF si se subió uno
+        if (isset($_FILES['pdf_retencion']) && $_FILES['pdf_retencion']['error'] === UPLOAD_ERR_OK) {
+            $pdf_file = $_FILES['pdf_retencion'];
+            $codigo_id = (string)$resultado['_id'];
+            
+            // Validar que sea PDF
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime_type = finfo_file($finfo, $pdf_file['tmp_name']);
+            finfo_close($finfo);
+            
+            if ($mime_type === 'application/pdf') {
+                // Directorio para guardar las imágenes del PDF
+                $uploads_dir = $_SERVER['DOCUMENT_ROOT'] . '/uploads/pdfs';
+                
+                // Mover el PDF a un directorio temporal
+                $pdf_temp_path = $uploads_dir . '/temp_' . $codigo_id . '.pdf';
+                if (!is_dir($uploads_dir)) {
+                    mkdir($uploads_dir, 0755, true);
+                }
+                
+                if (move_uploaded_file($pdf_file['tmp_name'], $pdf_temp_path)) {
+                    // Directorio para las imágenes
+                    $imagenes_dir = $uploads_dir . '/' . $codigo_id;
+                    
+                    // Procesar PDF y convertir a imágenes
+                    $paginas = procesarPDF($pdf_temp_path, $imagenes_dir, $codigo_id);
+                    
+                    if ($paginas && is_array($paginas) && count($paginas) > 0) {
+                        // Guardar las páginas en MongoDB
+                        guardarPaginasPDF($codigo_id, $paginas);
+                    }
+                    
+                    // Eliminar PDF temporal
+                    if (file_exists($pdf_temp_path)) {
+                        @unlink($pdf_temp_path);
+                    }
+                }
+            }
+        }
+        */
         // Limpiar datos del formulario de la sesión
         unset($_SESSION['form_data']);
         
         // Obtener el ID del código insertado
         $codigo_id = (string)$resultado['_id'];
         
-        // Mensaje de éxito
-        $_SESSION['msg_success'] = '¡Código publicado exitosamente! 🎉';
-        
-        // Redirigir a la página del código
-        $url = "/de-" . strtolower($marca) . "?codigo=" . $codigo_id;
-        header("Location: " . $url);
+        // Guardar información del código publicado en la sesión
+        $_SESSION['codigo_publicado'] = [
+            'id' => $codigo_id,
+            'marca' => $marca,
+            'codigo' => $codigo,
+            'beneficio' => $num_beneficio . ' ' . $tipo_beneficio,
+            'descripcion' => $descripcion
+        ];
+
+        // Redirigir a la página de felicitaciones
+        header("Location: /codigo-publicado");
         exit;
     } else {
         // Determinar el tipo de error específico
@@ -113,7 +182,15 @@ try {
                 'marca' => $marca_normalizada,
                 'id_usuario' => new MongoDB\BSON\ObjectId($_SESSION["user_id"])
             ]);
-           
+
+            // Verificar si es problema de código duplicado
+            $codigo_existente_codigo = null;
+            if (!empty($codigo)) {
+                $codigo_existente_codigo = $collection->findOne([
+                    'codigo' => $codigo,
+                    'id_usuario' => new MongoDB\BSON\ObjectId($_SESSION["user_id"])
+                ]);
+            }
 
             if ($codigo_existente_marca) {
                 $codigo_id_existente = (string)$codigo_existente_marca['_id'];
@@ -133,7 +210,8 @@ try {
         
         // Preservar datos del formulario en la sesión para el error
         $_SESSION['form_data'] = [
-            'marca' => $marca,
+            'marca' => $_POST['marca'] ?? '',
+            'marca_valor' => $marca,
             'num_beneficio' => $num_beneficio,
             'tipo_beneficio' => $tipo_beneficio,
             'codigo' => $codigo,
@@ -154,7 +232,8 @@ try {
     
     // Preservar datos del formulario en la sesión para el error
     $_SESSION['form_data'] = [
-        'marca' => $marca,
+        'marca' => $_POST['marca'] ?? '',
+        'marca_valor' => $marca,
         'num_beneficio' => $num_beneficio,
         'tipo_beneficio' => $tipo_beneficio,
         'codigo' => $codigo,

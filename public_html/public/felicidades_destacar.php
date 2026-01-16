@@ -41,34 +41,163 @@ if ($metodo === 'tarjeta' && !empty($session_id)) {
     try {
         require_once __DIR__ . '/../vendor/stripe/stripe-php/init.php';
         
-        $stripe_secret_key = "sk_test_ML0vGPIQHfl4iQYVHeflQTZt";
+        // Determinar qué clave usar según el session_id
+        // Los session IDs de test empiezan con cs_test_, los de live con cs_live_
+        $is_test = strpos($session_id, 'cs_test_') === 0;
+        
+        if ($is_test) {
+            $stripe_secret_key = "sk_test_ML0vGPIQHfl4iQYVHeflQTZt";
+        } else {
+            $stripe_secret_key = "sk_live_dfMwJTC7REoMy76Bp2PzVoZV00U5KaNCcv";
+        }
+        
+        error_log("Verificando sesión Stripe: $session_id (modo: " . ($is_test ? 'TEST' : 'LIVE') . ")");
+        
         $stripe = new \Stripe\StripeClient($stripe_secret_key);
         
         $session = $stripe->checkout->sessions->retrieve($session_id);
         
-        if ($session->payment_status == 'paid' && $session->client_reference_id == $codigo_id) {
-            $pago_exitoso = true;
-            
-            // Actualizar el código para destacarlo
-            $collection_codigos = getCollectionCodigos();
-            $duracion_dias = $tipo === 'normal' ? 30 : 60;
-            $fecha_fin = new DateTime();
-            $fecha_fin->add(new DateInterval('P' . $duracion_dias . 'D'));
-            
-            $collection_codigos->updateOne(
-                ['_id' => new MongoDB\BSON\ObjectId($codigo_id)],
-                [
-                    '$set' => [
-                        'destacado' => true,
-                        'tipo_destacado' => $tipo,
-                        'fecha_destacado' => new MongoDB\BSON\UTCDateTime(),
-                        'fecha_fin_destacado' => new MongoDB\BSON\UTCDateTime($fecha_fin->getTimestamp() * 1000)
-                    ]
-                ]
-            );
+        // Verificar que el pago fue exitoso
+        if ($session->payment_status !== 'paid') {
+            error_log("ERROR: Sesión Stripe no pagada - Session: $session_id, Status: " . $session->payment_status);
+            throw new Exception("El pago no fue completado. Estado: " . $session->payment_status);
         }
+        
+        // Verificar que el código coincide (usando client_reference_id o metadata)
+        $codigo_coincide = false;
+        if (isset($session->client_reference_id) && $session->client_reference_id == $codigo_id) {
+            $codigo_coincide = true;
+        } elseif (isset($session->metadata) && isset($session->metadata->codigo_id) && $session->metadata->codigo_id == $codigo_id) {
+            $codigo_coincide = true;
+        }
+        
+        if (!$codigo_coincide) {
+            error_log("ERROR: Código no coincide - Session: $session_id, Código esperado: $codigo_id, Client ref: " . ($session->client_reference_id ?? 'N/A'));
+            throw new Exception("El código de la sesión no coincide");
+        }
+        
+        $pago_exitoso = true;
+        
+        // Actualizar el código para destacarlo
+        $collection_codigos = getCollectionCodigos();
+        $duracion_dias = $tipo === 'normal' ? 30 : 60;
+        $fecha_fin = new DateTime();
+        $fecha_fin->add(new DateInterval('P' . $duracion_dias . 'D'));
+        
+        // Preparar datos de actualización
+        $update_data = [
+            'destacado' => time(), // Usar timestamp en lugar de true para consistencia
+            'tipo_destacado' => $tipo,
+            'fecha_destacado' => new MongoDB\BSON\UTCDateTime(),
+            'fecha_fin_destacado' => new MongoDB\BSON\UTCDateTime($fecha_fin->getTimestamp() * 1000),
+            'prioridad_pago' => time() // Nueva prioridad para que "quien paga manda"
+        ];
+        
+        // Para destacado "super", establecer también destacado_social (aparece en home y tiene prioridad)
+        if ($tipo === 'super') {
+            $update_data['destacado_social'] = time();
+            error_log("Destacado SUPER: Estableciendo destacado_social para código $codigo_id");
+        }
+        
+        $resultado_destacado = $collection_codigos->updateOne(
+            ['_id' => new MongoDB\BSON\ObjectId($codigo_id)],
+            ['$set' => $update_data]
+        );
+        
+        if ($resultado_destacado->getModifiedCount() > 0) {
+            error_log("SUCCESS: Código destacado correctamente - Código ID: $codigo_id, Tipo: $tipo, Destacado: " . $update_data['destacado']);
+            
+            // Si es destacado super, notificar a todos los usuarios con códigos en el home
+            if ($tipo === 'super') {
+                if (function_exists('notificar_competencia_home_destacado_super')) {
+                    $codigo_actualizado = $collection_codigos->findOne(['_id' => new MongoDB\BSON\ObjectId($codigo_id)]);
+                    $emails_enviados = notificar_competencia_home_destacado_super(
+                        $codigo_id,
+                        $_SESSION["user_id"],
+                        $codigo_actualizado
+                    );
+                    error_log("Notificaciones de competencia home enviadas: $emails_enviados");
+                }
+            }
+            
+            // Verificar que se actualizó correctamente
+            $codigo_verificado = $collection_codigos->findOne(['_id' => new MongoDB\BSON\ObjectId($codigo_id)]);
+            if ($codigo_verificado) {
+                $destacado_verificado = isset($codigo_verificado['destacado']) ? $codigo_verificado['destacado'] : 'NO';
+                error_log("VERIFICACIÓN: Código $codigo_id tiene destacado = $destacado_verificado");
+            }
+        } else {
+            if ($resultado_destacado->getMatchedCount() == 0) {
+                error_log("ERROR: Código no encontrado para destacar - Código ID: $codigo_id");
+            } else {
+                error_log("WARNING: Código encontrado pero no se modificó - Código ID: $codigo_id (puede que ya esté destacado con los mismos valores)");
+            }
+        }
+        
+        // Registrar transacción (si no existe ya por webhook)
+        $collection_transacciones = getCollectionTransacciones();
+        $existe = $collection_transacciones->findOne(['stripe_session_id' => $session_id]);
+        
+        if (!$existe) {
+            // Obtener cantidad real de la sesión o usar precio por defecto
+            $precio = isset($session->amount_total) ? ($session->amount_total / 100) : ($tipo === 'normal' ? 0.99 : 3.99);
+            $marca_nombre = $codigo['marca'] ?? '';
+            
+            // Extraer metadata si está disponible
+            $metadata = [];
+            if (isset($session->metadata)) {
+                if (is_object($session->metadata)) {
+                    foreach (['usuario_id', 'codigo_id', 'marca', 'tipo_destacado'] as $key) {
+                        if (isset($session->metadata->$key)) {
+                            $metadata[$key] = $session->metadata->$key;
+                        }
+                    }
+                } else {
+                    $metadata = (array)$session->metadata;
+                }
+            }
+            
+            $transaccion = [
+                'usuario_id' => $metadata['usuario_id'] ?? $_SESSION["user_id"],
+                'tipo' => 'destacado',
+                'subtipo' => $tipo,
+                'cantidad' => $precio,
+                'descripcion' => "Destacado de código - Marca: {$marca_nombre} - Tipo: {$tipo}",
+                'fecha' => new MongoDB\BSON\UTCDateTime(),
+                'estado' => 'completada',
+                'codigo_id' => $codigo_id,
+                'marca' => $marca_nombre,
+                'tipo_destacado' => $tipo,
+                'stripe_session_id' => $session_id,
+                'stripe_payment_intent' => $session->payment_intent ?? null,
+                'stripe_customer_email' => isset($session->customer_details) && isset($session->customer_details->email) 
+                    ? $session->customer_details->email 
+                    : null,
+                'stripe_payment_status' => $session->payment_status ?? 'paid',
+                'metodo_pago' => 'tarjeta',
+                'registrado_desde' => 'felicidades_destacar' // Marca que fue registrado desde backup
+            ];
+            
+            try {
+                $resultado_insert = $collection_transacciones->insertOne($transaccion);
+                if ($resultado_insert->getInsertedCount() > 0) {
+                    error_log("✓ Transacción registrada desde felicidades_destacar.php (backup): " . $session_id);
+                } else {
+                    error_log("WARNING: InsertOne no devolvió insertedCount > 0 para sesión: " . $session_id);
+                }
+            } catch (Exception $e) {
+                error_log("ERROR al insertar transacción desde felicidades_destacar.php: " . $e->getMessage());
+                // No lanzar excepción aquí para no bloquear el flujo
+            }
+        } else {
+            error_log("INFO: Transacción ya existe en MongoDB (probablemente registrada por webhook): " . $session_id);
+        }
+    } catch (\Stripe\Exception\InvalidRequestException $e) {
+        error_log("ERROR Stripe: Sesión no encontrada o inválida - Session: $session_id, Error: " . $e->getMessage());
+        // Si la sesión no existe, podría ser un problema de timing o de clave incorrecta
     } catch (Exception $e) {
-        error_log("Error verificando pago Stripe: " . $e->getMessage());
+        error_log("ERROR verificando pago Stripe: " . $e->getMessage() . " | Session: $session_id");
+        // No establecer $pago_exitoso = false aquí, dejar que el flujo continúe
     }
 } elseif ($metodo === 'saldo') {
     // Si es pago con saldo, verificar que el código esté realmente destacado
@@ -120,7 +249,7 @@ $description = "Tu código de " . $marca_nombre . " ha sido destacado correctame
 <style>
 /* Estilos para la página de felicidades destacar */
 body {
-    background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+    background: linear-gradient(135deg, #E30613 0%, #f7931e 100%);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -196,7 +325,7 @@ p {
 
 .btn-custom {
     background: #fff;
-    color: #ff6b35;
+    color: #E30613;
     border: none;
     padding: 12px 25px;
     border-radius: 50px;
@@ -211,7 +340,7 @@ p {
     background: #e0e0e0;
     transform: translateY(-3px);
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-    color: #ff6b35;
+    color: #E30613;
     text-decoration: none;
 }
 
@@ -280,6 +409,5 @@ p {
     </div>
 </div>
 
-<?php get_footer(); ?>
 </body>
 </html>

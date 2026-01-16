@@ -54,7 +54,7 @@ $GLOBALS['detect'] = $detect;
     }
     
     .demo-title {
-        background: #ff6b35;
+        background: #E30613;
         color: white;
         padding: 10px 20px;
         margin: 0;
@@ -77,11 +77,11 @@ $GLOBALS['detect'] = $detect;
         background: #2a2a2a;
         padding: 20px;
         border-radius: 8px;
-        border-left: 4px solid #ff6b35;
+        border-left: 4px solid #E30613;
     }
     
     .feature-card h4 {
-        color: #ff6b35;
+        color: #E30613;
         margin-top: 0;
     }
     
@@ -124,7 +124,7 @@ $GLOBALS['detect'] = $detect;
         display: inline-block;
         padding: 15px 30px;
         margin: 0 10px;
-        background: #ff6b35;
+        background: #E30613;
         color: white;
         text-decoration: none;
         border-radius: 25px;
@@ -133,7 +133,7 @@ $GLOBALS['detect'] = $detect;
     }
     
     .test-btn:hover {
-        background: #e55a2b;
+        background: #C40510;
         transform: translateY(-2px);
         color: white;
         text-decoration: none;
@@ -150,7 +150,7 @@ $GLOBALS['detect'] = $detect;
 </head>
 <body>
     <div class="comparison-container">
-        <h1 style="text-align: center; color: #ff6b35; margin-bottom: 30px;">
+        <h1 style="text-align: center; color: #E30613; margin-bottom: 30px;">
             🔄 Comparación de Headers - CodigoAmigo.com
         </h1>
         
@@ -224,7 +224,7 @@ $GLOBALS['detect'] = $detect;
         </div>
         
         <div style="background: #2a2a2a; padding: 20px; border-radius: 8px; margin: 30px 0;">
-            <h3 style="color: #ff6b35; margin-top: 0;">📊 Comparación Técnica</h3>
+            <h3 style="color: #E30613; margin-top: 0;">📊 Comparación Técnica</h3>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                 <div>
                     <h4 style="color: #00ff00;">Header Nuevo</h4>
@@ -251,7 +251,7 @@ $GLOBALS['detect'] = $detect;
             </div>
         </div>
         
-        <div style="background: linear-gradient(45deg, #ff6b35, #ff8c42); padding: 30px; border-radius: 8px; text-align: center; color: white; margin: 30px 0;">
+        <div style="background: linear-gradient(45deg, #E30613, #FF4D4D); padding: 30px; border-radius: 8px; text-align: center; color: white; margin: 30px 0;">
             <h2 style="margin-top: 0;">🎯 Recomendación</h2>
             <p style="font-size: 1.2rem; margin-bottom: 20px;">
                 <strong>Implementar el Header Nuevo es la mejor opción</strong>

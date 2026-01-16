@@ -53,7 +53,7 @@ if (!in_array($_SESSION["user_id"], $array_codigos_acceso)) {
                 margin-bottom: 2rem;
             }
             .btn {
-                background: #FF6B35;
+                background: #E30613;
                 color: white;
                 padding: 10px 20px;
                 text-decoration: none;
@@ -61,7 +61,7 @@ if (!in_array($_SESSION["user_id"], $array_codigos_acceso)) {
                 display: inline-block;
             }
             .btn:hover {
-                background: #E55A2B;
+                background: #C40510;
             }
         </style>
     </head>

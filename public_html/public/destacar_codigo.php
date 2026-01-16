@@ -1,4 +1,5 @@
 <?php
+file_put_contents(__DIR__ . '/debug_entry.log', "File loaded at " . date('Y-m-d H:i:s') . "\n", FILE_APPEND);
 // Al inicio del archivo, antes de cargar el header
 $anula_adsense = true; // Esta variable será leída por el header para no mostrar Adsense
 
@@ -71,6 +72,40 @@ if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58
     $sku_destacado_normal = 'sku_H6K4Pf8TXO6w58'; // Normal 0.99€ - Mismo que el sistema anterior
     $sku_destacado_super = 'sku_H6K69kuQGeL0pV'; // Super 3.99€ - Mismo que el sistema anterior
 }
+
+// Check if this brand has a Super Landing
+$has_super_landing = false;
+$super_landing_title = '';
+$path_functions = realpath(__DIR__ . '/../myphp/funciones.php');
+$path_sl = realpath(__DIR__ . '/../myphp/_super_landing_functions.php');
+file_put_contents(__DIR__ . '/debug_destacar_logic.log', "Path functions: $path_functions\nPath SL: $path_sl\n", FILE_APPEND);
+
+if ($path_sl && file_exists($path_sl)) {
+    // Use include_once to prevent redeclaration errors if functions.php was already loaded by header
+    include_once $path_functions;
+    include_once $path_sl;
+} else {
+    file_put_contents(__DIR__ . '/debug_destacar_logic.log', "ERROR: File not found: " . __DIR__ . '/../myphp/_super_landing_functions.php' . "\n", FILE_APPEND);
+}
+if (function_exists('get_active_super_landings')) {
+    $all_sl = get_active_super_landings(50);
+    file_put_contents(__DIR__ . '/debug_destacar_logic.log', "Found " . count($all_sl) . " landings. Code brand: " . $codigo['marca'] . "\n");
+    foreach ($all_sl as $sl) {
+        if (isset($sl['linked_brand_slugs'])) {
+            $brand_slugs = is_object($sl['linked_brand_slugs']) ? iterator_to_array($sl['linked_brand_slugs']) : $sl['linked_brand_slugs'];
+            $match = in_array($codigo['marca'], $brand_slugs);
+            file_put_contents(__DIR__ . '/debug_destacar_logic.log', "Checking " . $sl['title'] . ": " . json_encode($brand_slugs) . " Match: " . ($match ? 'YES' : 'NO') . "\n", FILE_APPEND);
+            if ($match) {
+                $has_super_landing = true;
+                $super_landing_title = $sl['title'] ?? 'Guía Oficial';
+                $super_landing_slug = $sl['slug'] ?? '';
+                break;
+            }
+        }
+    }
+} else {
+    file_put_contents(__DIR__ . '/debug_destacar_logic.log', "Function get_active_super_landings not found!\n", FILE_APPEND);
+}
 ?>
 
 <style>
@@ -87,7 +122,7 @@ if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58
     text-align: center;
     margin-bottom: 40px;
     padding: 40px 20px;
-    background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+    background: linear-gradient(135deg, #E30613 0%, #f7931e 100%);
     border-radius: 20px;
     color: white;
 }
@@ -122,7 +157,7 @@ if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58
     height: 60px;
     border-radius: 10px;
     margin-right: 20px;
-    background: #ff6b35;
+    background: #E30613;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -185,12 +220,12 @@ if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58
 }
 
 .pricing-card:hover {
-    border-color: #ff6b35;
+    border-color: #E30613;
     transform: translateY(-5px);
 }
 
 .pricing-card.featured {
-    border-color: #ff6b35;
+    border-color: #E30613;
     background: linear-gradient(135deg, #2c2c2c 0%, #3a3a3a 100%);
 }
 
@@ -200,7 +235,7 @@ if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58
     top: -10px;
     left: 50%;
     transform: translateX(-50%);
-    background: #ff6b35;
+    background: #E30613;
     color: white;
     padding: 5px 20px;
     border-radius: 20px;
@@ -217,7 +252,7 @@ if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58
 .pricing-price {
     font-size: 3rem;
     font-weight: 700;
-    color: #ff6b35;
+    color: #E30613;
     margin-bottom: 20px;
 }
 
@@ -238,12 +273,12 @@ if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58
 }
 
 .pricing-features li i {
-    color: #ff6b35;
+    color: #E30613;
     margin-right: 10px;
 }
 
 .destacar-btn {
-    background: #ff6b35;
+    background: #E30613;
     color: white;
     border: none;
     padding: 15px 30px;
@@ -256,7 +291,7 @@ if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58
 }
 
 .destacar-btn:hover {
-    background: #e55a2b;
+    background: #C40510;
     transform: translateY(-2px);
 }
 
@@ -299,7 +334,7 @@ if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58
 
 .benefit-item i {
     font-size: 3rem;
-    color: #ff6b35;
+    color: #E30613;
     margin-bottom: 15px;
 }
 
@@ -353,46 +388,10 @@ if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58
 </style>
 
 <div class="destacar-container">
-    <a href="/mis-anuncios" class="back-btn">
-        <i class="fas fa-arrow-left"></i>
-        Volver a mis anuncios
-    </a>
 
     <div class="destacar-header">
-        <h1><i class="fas fa-star"></i> Destacar tu código</h1>
-        <p>Obtén mayor visibilidad para tu código de descuento</p>
-    </div>
-
-    <!-- Vista previa del código -->
-    <div class="code-preview">
-        <div class="code-preview-header">
-            <div class="code-preview-logo">
-                <i class="fas fa-tag"></i>
-            </div>
-            <div class="code-preview-info">
-                <h3><?php echo htmlspecialchars($marca_nombre); ?></h3>
-                <p><?php echo htmlspecialchars($codigo['descripcion'] ?? 'Código de descuento'); ?></p>
-            </div>
-        </div>
-        
-        <div class="code-preview-details">
-            <div class="code-detail-item">
-                <div class="label">Código</div>
-                <div class="value"><?php echo htmlspecialchars($codigo['codigo'] ?? 'N/A'); ?></div>
-            </div>
-            <div class="code-detail-item">
-                <div class="label">Beneficio</div>
-                <div class="value"><?php echo ($codigo['num_beneficio'] ?? 0); ?>€</div>
-            </div>
-            <div class="code-detail-item">
-                <div class="label">Posición actual</div>
-                <div class="value">#<?php echo get_posicion_codigo_en_marca($codigo['_id'], $codigo['marca']); ?></div>
-            </div>
-            <div class="code-detail-item">
-                <div class="label">Clicks</div>
-                <div class="value"><?php echo $codigo['totalclicks'] ?? 0; ?></div>
-            </div>
-        </div>
+        <h1><i class="fas fa-star"></i> Destacar tu código de <?php echo htmlspecialchars($marca_nombre); ?></h1>
+        <p>¡Aumenta tus ganancias y haz que tu código sea el primero que vean los usuarios!</p>
     </div>
 
     <!-- Opciones de destacar -->
@@ -406,7 +405,7 @@ if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58
                 <li><i class="fas fa-check"></i> Aparece en primera posición</li>
                 <li><i class="fas fa-check"></i> Badge "Destacado" visible</li>
                 <li><i class="fas fa-check"></i> Mayor visibilidad en la marca</li>
-                <li><i class="fas fa-check"></i> Duración: 30 días</li>
+                <li><i class="fas fa-check"></i> Sin fecha límite: mantienes el #1 hasta que otro te supere</li>
             </ul>
             <button class="destacar-btn" id="destacar-normal" data-price="99" data-sku="<?php echo $sku_destacado_normal; ?>" data-tipo="normal">
                 <i class="fas fa-star"></i> Destacar Normal
@@ -423,12 +422,35 @@ if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58
                 <li><i class="fas fa-check"></i> Badge "Destacado" dorado</li>
                 <li><i class="fas fa-check"></i> Aparece en página principal</li>
                 <li><i class="fas fa-check"></i> Mayor visibilidad en la marca</li>
-                <li><i class="fas fa-check"></i> Duración: 60 días</li>
+                <li><i class="fas fa-check"></i> Sin fecha límite: mantienes el #1 hasta que otro te supere</li>
             </ul>
             <button class="destacar-btn" id="destacar-super" data-price="399" data-sku="<?php echo $sku_destacado_super; ?>" data-tipo="super">
                 <i class="fas fa-crown"></i> Destacar Super
             </button>
         </div>
+        
+        <?php if ($has_super_landing): ?>
+        <div class="pricing-card super-landing-card" style="border-color: #FFD700;">
+            <div class="super-landing-badge" style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #FFD700, #FFA500); color: #333; padding: 5px 20px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; box-shadow: 0 4px 10px rgba(255, 215, 0, 0.4);">
+                ★ GUÍA OFICIAL ★
+            </div>
+            <div class="pricing-header">
+                <h3>Super Destacado en Guías</h3>
+                <p style="color: #ccc; font-size: 0.9rem; margin: 10px 0;">Aparece en: <a href="/guias/<?php echo $super_landing_slug; ?>" target="_blank" style="color: #FFD700; text-decoration: underline; font-weight: bold;"><?php echo htmlspecialchars($super_landing_title); ?></a></p>
+            </div>
+            <div class="pricing-price" style="color: #FFD700;">9,99€</div>
+            <ul class="pricing-features">
+                <li><i class="fas fa-check"></i> Posición #1 en la Guía Oficial</li>
+                <li><i class="fas fa-check"></i> Sección "Recomendados por Editores"</li>
+                <li><i class="fas fa-check"></i> Miles de visitas mensuales</li>
+                <li><i class="fas fa-check"></i> Carrusel si hay varios (visibilidad rotativa)</li>
+                <li><i class="fas fa-check"></i> Duración: 30 días garantizados</li>
+            </ul>
+            <button class="destacar-btn" id="destacar-guia" data-price="999" data-sku="super_landing_999" data-tipo="super_landing" style="background: linear-gradient(135deg, #FFD700, #FFA500); color: #333;">
+                <i class="fas fa-trophy"></i> Destacar en Guía
+            </button>
+        </div>
+        <?php endif; ?>
     </div>
 
     <!-- Beneficios -->
@@ -452,87 +474,99 @@ if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58
             </div>
             <div class="benefit-item">
                 <i class="fas fa-clock"></i>
-                <h3>Duración Garantizada</h3>
-                <p>Tu código permanecerá destacado durante el tiempo que hayas pagado.</p>
+                <h3>Prioridad sin fecha fin</h3>
+                <p>Tu código mantiene la primera posición hasta que otro usuario decida destacar la misma marca.</p>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal de pago -->
-<div class="modal fade" id="modalPago" tabindex="-1" role="dialog" aria-labelledby="modalPagoLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content" style="background: #2c2c2c; border: 1px solid #404040; border-radius: 15px;">
-            <div class="modal-header" style="border-bottom: 1px solid #404040; padding: 20px 30px;">
-                <h5 class="modal-title" id="modalPagoLabel" style="color: white; font-size: 1.5rem; font-weight: 600;">
-                    <i class="fas fa-credit-card"></i> Elegir método de pago
-                </h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close" style="color: white; opacity: 0.7;">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+</div>
+
+<!-- Modal de pago - Sistema Overlay Custom (igual que login) -->
+<div class="login-modal-overlay" id="modalPago" style="z-index: 99999;">
+    <div class="login-modal-content" style="max-width: 600px; background: #2c2c2c; border: 1px solid #404040; color: white;">
+        <div class="login-modal-header" style="background: transparent; border-bottom: 1px solid #404040;">
+            <h3 style="color: white;"><i class="fas fa-credit-card"></i> Elegir método de pago</h3>
+            <button class="login-modal-close" style="color: white; opacity: 0.7;">&times;</button>
+        </div>
+        
+        <div class="login-modal-body" style="padding: 30px;">
+            <!-- Información del destacado -->
+            <div class="destacado-info" style="background: #404040; padding: 25px; border-radius: 10px; margin-bottom: 25px; border-left: 4px solid #E30613;">
+                <h6 style="color: white; margin-bottom: 15px; font-weight: 600; font-size: 1.3rem;" id="destacadoTitulo">Destacado Normal</h6>
+                <ul id="destacadoCaracteristicas" style="list-style: none; padding: 0; margin: 0;">
+                    <li style="color: #ccc; padding: 8px 0; border-bottom: 1px solid #555; display: flex; align-items: center;">
+                        <i class="fas fa-check" style="color: #E30613; margin-right: 10px; font-size: 1rem;"></i>
+                        <span>Aparece en primera posición</span>
+                    </li>
+                    <li style="color: #ccc; padding: 8px 0; border-bottom: 1px solid #555; display: flex; align-items: center;">
+                        <i class="fas fa-check" style="color: #E30613; margin-right: 10px; font-size: 1rem;"></i>
+                        <span id="badgeInfo">Badge "Destacado" visible</span>
+                    </li>
+                    <li style="color: #ccc; padding: 8px 0; border-bottom: 1px solid #555; display: flex; align-items: center;">
+                        <i class="fas fa-check" style="color: #E30613; margin-right: 10px; font-size: 1rem;"></i>
+                        <span>Mayor visibilidad en la marca</span>
+                    </li>
+                    <li style="color: #ccc; padding: 8px 0; border-bottom: 1px solid #555; display: none; align-items: center;" id="extraFeature">
+                        <i class="fas fa-check" style="color: #E30613; margin-right: 10px; font-size: 1rem;"></i>
+                        <span>Aparece en página principal</span>
+                    </li>
+                    <li style="color: #ccc; padding: 8px 0; display: flex; align-items: center;">
+                        <i class="fas fa-check" style="color: #E30613; margin-right: 10px; font-size: 1rem;"></i>
+                        <span>Sin fecha límite: mantienes el #1 hasta que otro te supere</span>
+                    </li>
+                </ul>
             </div>
-            <div class="modal-body" style="padding: 30px;">
-                <!-- Información del destacado -->
-                <div class="destacado-info" style="background: #404040; padding: 20px; border-radius: 10px; margin-bottom: 25px;">
-                    <h6 style="color: white; margin-bottom: 10px; font-weight: 600;" id="destacadoTitulo">Destacado Normal</h6>
-                    <p style="color: #ccc; margin: 0; font-size: 0.9rem;" id="destacadoDescripcion">Aparece en primera posición con badge "Destacado"</p>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
-                        <span style="color: white; font-weight: 600;">Precio:</span>
-                        <span style="color: #ff6b35; font-size: 1.2rem; font-weight: 700;" id="destacadoPrecio">0,99€</span>
-                    </div>
-                </div>
 
-                <!-- Opciones de pago -->
-                <div class="payment-options">
-                    <h6 style="color: white; margin-bottom: 15px; font-weight: 600;">Selecciona tu método de pago:</h6>
-                    
-                    <!-- Opción 1: Pago con tarjeta -->
-                    <div class="payment-option" style="background: #404040; border: 2px solid #555; border-radius: 10px; padding: 20px; margin-bottom: 15px; cursor: pointer; transition: all 0.3s ease;" id="opcionTarjeta">
-                        <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <div style="display: flex; align-items: center;">
-                                <i class="fas fa-credit-card" style="font-size: 1.5rem; color: #ff6b35; margin-right: 15px;"></i>
-                                <div>
-                                    <h6 style="color: white; margin: 0; font-weight: 600;">Pagar con tarjeta</h6>
-                                    <p style="color: #ccc; margin: 5px 0 0 0; font-size: 0.9rem;">Visa, Mastercard, American Express</p>
-                                </div>
-                            </div>
-                            <i class="fas fa-arrow-right" style="color: #ff6b35;"></i>
-                        </div>
-                    </div>
-
-                    <!-- Opción 2: Pago con saldo -->
-                    <div class="payment-option" style="background: #404040; border: 2px solid #555; border-radius: 10px; padding: 20px; margin-bottom: 15px; cursor: pointer; transition: all 0.3s ease;" id="opcionSaldo">
-                        <div style="display: flex; align-items: center; justify-content: space-between;">
-                            <div style="display: flex; align-items: center;">
-                                <i class="fas fa-wallet" style="font-size: 1.5rem; color: #ff6b35; margin-right: 15px;"></i>
-                                <div>
-                                    <h6 style="color: white; margin: 0; font-weight: 600;">Pagar con saldo</h6>
-                                    <p style="color: #ccc; margin: 5px 0 0 0; font-size: 0.9rem;" id="saldoDisponible">Usar tu saldo disponible</p>
-                                </div>
-                            </div>
-                            <i class="fas fa-arrow-right" style="color: #ff6b35;"></i>
-                        </div>
-                    </div>
-                </div>
-
-
-
-                <!-- Saldo del usuario -->
-                <div class="saldo-info" style="background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 25px; border-left: 4px solid #ff6b35;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="color: white; font-weight: 600;">
-                            <i class="fas fa-wallet" style="margin-right: 8px; color: #ff6b35;"></i>
-                            Tu saldo actual:
-                        </span>
-                        <span style="color: #ff6b35; font-size: 1.1rem; font-weight: 700;" id="saldoUsuario">0€</span>
-                    </div>
-                </div>
-
+            <!-- Opciones de pago -->
+            <div class="payment-options">
+                <h6 style="color: white; margin-bottom: 15px; font-weight: 600; font-size: 1.2rem;">Selecciona tu método de pago:</h6>
                 
+                <!-- Opción 1: Pago con tarjeta -->
+                <div class="payment-option" style="background: #404040; border: 2px solid #555; border-radius: 10px; padding: 20px; margin-bottom: 15px; cursor: pointer; transition: all 0.3s ease;" id="opcionTarjeta">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center;">
+                            <i class="fas fa-credit-card" style="font-size: 1.5rem; color: #E30613; margin-right: 15px;"></i>
+                            <div>
+                                <h6 style="color: white; margin: 0; font-weight: 600; font-size: 1.1rem;">Pagar con tarjeta</h6>
+                                <p style="color: #ccc; margin: 5px 0 0 0; font-size: 1rem;">Visa, Mastercard, American Express</p>
+                            </div>
+                        </div>
+                        <i class="fas fa-arrow-right" style="color: #E30613;"></i>
+                    </div>
+                </div>
+
+                <!-- Opción 2: Pago con saldo -->
+                <div class="payment-option" style="background: #404040; border: 2px solid #555; border-radius: 10px; padding: 20px; margin-bottom: 15px; cursor: pointer; transition: all 0.3s ease;" id="opcionSaldo">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center;">
+                            <i class="fas fa-coins" style="font-size: 1.5rem; color: #E30613; margin-right: 15px;"></i>
+                            <div>
+                                <h6 style="color: white; margin: 0; font-weight: 600; font-size: 1.1rem;">Pagar con saldo</h6>
+                                <p style="color: #ccc; margin: 5px 0 0 0; font-size: 1rem; color: #E30613;" id="saldoDisponible">Usar tu saldo disponible</p>
+                            </div>
+                        </div>
+                        <i class="fas fa-arrow-right" style="color: #E30613;"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Saldo del usuario y precio -->
+            <div class="saldo-info" style="background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 25px; border-left: 4px solid #E30613;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: white; font-weight: 600; font-size: 1.2rem;">
+                        <i class="fas fa-tag" style="margin-right: 8px; color: #E30613;"></i>
+                        Precio:
+                    </span>
+                    <span style="color: #E30613; font-size: 1.5rem; font-weight: 700;" id="destacadoPrecio">0,99€</span>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<?php get_footer(); ?>
 
 <script src="https://js.stripe.com/v3/"></script>
 <script>
@@ -542,20 +576,58 @@ var saldoUsuario = <?php echo $saldo_usuario; ?>; // Saldo cargado desde PHP
 
 // Cargar saldo del usuario al cargar la página
 $(document).ready(function() {
-    // Actualizar el saldo en el modal
-    $('#saldoUsuario').text(saldoUsuario + '€');
-    actualizarOpcionSaldo();
+    console.log("Sistema de destacar inicializado");
+    
+    // Verify custom modal logic
+    const modal = document.getElementById('modalPago');
+    const closeBtn = modal.querySelector('.login-modal-close');
+    
+    // Close on button click
+    closeBtn.onclick = function() {
+        closeModal();
+    };
+    
+    // Close on outside click
+    modal.onclick = function(e) {
+        if (e.target === modal) {
+            closeModal();
+        }
+    };
     
     configurarBotones();
-    configurarModal();
+    configurarModalHandlers();
 });
+
+// Helper to open modal
+function openModal() {
+    const modal = document.getElementById('modalPago');
+    modal.style.display = 'flex';
+    // Small delay to allow display change before adding active class (for transition)
+    setTimeout(() => {
+        modal.classList.add('active');
+    }, 10);
+    document.body.style.overflow = 'hidden';
+}
+
+// Helper to close modal
+function closeModal() {
+    const modal = document.getElementById('modalPago');
+    modal.classList.remove('active');
+    setTimeout(() => {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }, 300);
+}
 
 // El saldo ya se carga desde PHP, no necesitamos AJAX
 
 // Función para configurar los botones de destacar
 function configurarBotones() {
-    $('#destacar-normal, #destacar-super').on('click', function(e) {
+
+    $('#destacar-normal, #destacar-super, #destacar-guia').on('click', function(e) {
         e.preventDefault();
+        e.stopPropagation();
+        console.log("Click en destacar: " + $(this).data('tipo'));
         
         var tipo = $(this).data('tipo');
         var precio = $(this).data('price');
@@ -564,22 +636,31 @@ function configurarBotones() {
         // Configurar modal con la información del destacado
         configurarModalDestacado(tipo, precio, sku);
         
-        // Mostrar modal
-        $('#modalPago').modal('show');
+        // Mostrar modal usando custom logic
+        openModal();
     });
 }
 
+
 // Función para configurar el modal con la información del destacado
 function configurarModalDestacado(tipo, precio, sku) {
-    var titulo = tipo === 'normal' ? 'Destacado Normal' : 'Destacado Super';
-    var descripcion = tipo === 'normal' 
-        ? 'Aparece en primera posición con badge "Destacado" - Duración: 30 días'
-        : 'Aparece en primera posición con badge dorado - Duración: 60 días';
+    var titulo = tipo === 'normal' ? 'Destacado Normal' : (tipo === 'super_landing' ? 'Super Destacado en Guía' : 'Destacado Super');
     var precioFormateado = (precio / 100).toFixed(2) + '€';
     
     $('#destacadoTitulo').text(titulo);
-    $('#destacadoDescripcion').text(descripcion);
     $('#destacadoPrecio').text(precioFormateado);
+    
+    // Actualizar características según el tipo
+    if (tipo === 'normal') {
+        $('#badgeInfo').text('Badge "Destacado" visible');
+        $('#extraFeature').css('display', 'none');
+    } else if (tipo === 'super_landing') {
+        $('#badgeInfo').text('Badge "Destacado" dorado + Posición #1 en Guía');
+        $('#extraFeature').html('<i class="fas fa-check" style="color: #E30613; margin-right: 10px; font-size: 1rem;"></i><span>Sección "Recomendados por Editores"</span>').css('display', 'flex');
+    } else {
+        $('#badgeInfo').text('Badge "Destacado" dorado');
+        $('#extraFeature').html('<i class="fas fa-check" style="color: #E30613; margin-right: 10px; font-size: 1rem;"></i><span>Aparece en página principal</span>').css('display', 'flex');
+    }
     
     // Guardar datos para usar en el pago
     $('#modalPago').data('tipo', tipo);
@@ -592,12 +673,16 @@ function configurarModalDestacado(tipo, precio, sku) {
 
 // Función para actualizar la opción de pago con saldo
 function actualizarOpcionSaldo() {
+    // Verificar si el modal tiene datos, si no usar defaults o salir
     var precio = $('#modalPago').data('precio');
+    if (!precio) return;
+    
     var precioEuros = precio / 100;
     
     if (saldoUsuario >= precioEuros) {
+        var saldoRestante = saldoUsuario - precioEuros;
         $('#opcionSaldo').removeClass('disabled').css('opacity', '1');
-        $('#saldoDisponible').text('Saldo suficiente - ' + (saldoUsuario).toFixed(2) + '€ restantes');
+        $('#saldoDisponible').text(saldoRestante.toFixed(2) + '€ restantes');
         $('#opcionSaldo').find('h6').css('color', 'white');
     } else {
         $('#opcionSaldo').addClass('disabled').css('opacity', '0.5');
@@ -606,13 +691,13 @@ function actualizarOpcionSaldo() {
     }
 }
 
-// Función para configurar el modal
-function configurarModal() {
+// Función para configurar handlers del modal
+function configurarModalHandlers() {
     // Efectos hover para las opciones de pago
     $('.payment-option').hover(
         function() {
             if (!$(this).hasClass('disabled')) {
-                $(this).css('border-color', '#ff6b35');
+                $(this).css('border-color', '#E30613');
                 $(this).css('transform', 'translateY(-2px)');
             }
         },
@@ -625,14 +710,14 @@ function configurarModal() {
     );
     
     // Click en opción de tarjeta
-    $('#opcionTarjeta').on('click', function() {
+    $('#opcionTarjeta').off('click').on('click', function() {
         if (!$(this).hasClass('disabled')) {
             procesarPagoConTarjeta();
         }
     });
     
     // Click en opción de saldo
-    $('#opcionSaldo').on('click', function() {
+    $('#opcionSaldo').off('click').on('click', function() {
         if (!$(this).hasClass('disabled')) {
             procesarPagoConSaldo();
         }
@@ -644,27 +729,36 @@ function procesarPagoConTarjeta() {
     var tipo = $('#modalPago').data('tipo');
     var sku = $('#modalPago').data('sku');
     
-    $('#modalPago').modal('hide');
+    closeModal();
     
     // Mostrar loading en el botón correspondiente
-    var boton = tipo === 'normal' ? $('#destacar-normal') : $('#destacar-super');
+    var boton = tipo === 'normal' ? $('#destacar-normal') : (tipo === 'super_landing' ? $('#destacar-guia') : $('#destacar-super'));
     boton.addClass('loading').html('<i class="fas fa-spinner fa-spin"></i> Procesando...').prop('disabled', true);
     
-    stripe.redirectToCheckout({
-        mode: 'payment',
-        lineItems: [{
-            price: sku,
-            quantity: 1
-        }],
-        clientReferenceId: codigoId,
-        billingAddressCollection: 'auto',
-        successUrl: '<?php echo $GLOBALS["website"]; ?>felicidades_destacar?session_id={CHECKOUT_SESSION_ID}&codigo=' + codigoId + '&tipo=' + tipo,
-        cancelUrl: '<?php echo $GLOBALS["actual_url"]; ?>'
-    })
-    .then(function (result) {
-        if (result.error) {
-            boton.removeClass('loading').html(tipo === 'normal' ? '<i class="fas fa-star"></i> Destacar Normal' : '<i class="fas fa-crown"></i> Destacar Super').prop('disabled', false);
-            alert('Error: ' + result.error.message);
+    // Crear sesión en el servidor con metadata completa
+    $.ajax({
+        url: '/crear_sesion_destacar.php',
+        method: 'POST',
+        dataType: 'json',
+        data: {
+            codigo_id: codigoId,
+            tipo: tipo,
+            sku: sku
+        },
+        success: function(response) {
+            if (response.error) {
+                var btnHtml = tipo === 'normal' ? '<i class="fas fa-star"></i> Destacar Normal' : (tipo === 'super_landing' ? '<i class="fas fa-trophy"></i> Destacar en Guía' : '<i class="fas fa-crown"></i> Destacar Super');
+                boton.removeClass('loading').html(btnHtml).prop('disabled', false);
+                alert('Error: ' + response.error);
+            } else {
+                // Redirigir a Stripe Checkout
+                window.location.href = response.url;
+            }
+        },
+        error: function(xhr, status, error) {
+            var btnHtml = tipo === 'normal' ? '<i class="fas fa-star"></i> Destacar Normal' : (tipo === 'super_landing' ? '<i class="fas fa-trophy"></i> Destacar en Guía' : '<i class="fas fa-crown"></i> Destacar Super');
+            boton.removeClass('loading').html(btnHtml).prop('disabled', false);
+            alert('Error al crear la sesión de pago. Por favor, intenta de nuevo.');
         }
     });
 }
@@ -673,40 +767,93 @@ function procesarPagoConTarjeta() {
 function procesarPagoConSaldo() {
     var tipo = $('#modalPago').data('tipo');
     var precio = $('#modalPago').data('precio');
+    var sku = $('#modalPago').data('sku');
     
+    // Validación previa de saldo
     if (saldoUsuario < (precio / 100)) {
-        alert('Saldo insuficiente');
+        alert('Saldo insuficiente. Por favor, recarga tu saldo o selecciona otro método de pago.');
         return;
     }
     
-    // Crear formulario para enviar petición POST tradicional
-    var form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '/procesar_destacado_saldo';
+    // UI Feedback: Mostrar Overlay de Carga sobre el modal
+    var $modalContent = $('#modalPago .login-modal-content');
     
-    // Añadir campos ocultos
-    var codigoInput = document.createElement('input');
-    codigoInput.type = 'hidden';
-    codigoInput.name = 'codigo_id';
-    codigoInput.value = codigoId;
-    form.appendChild(codigoInput);
+    // Verificar que el contenedor tenga posición relativa para el absolute del overlay
+    if ($modalContent.css('position') === 'static') {
+        $modalContent.css('position', 'relative');
+    }
+
+    var $loadingOverlay = $('<div id="paymentLoading" style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(44, 44, 44, 0.98); z-index:100; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:12px; opacity:0; transition: opacity 0.3s ease;">' +
+        '<div style="background: rgba(227, 6, 19, 0.15); padding: 25px; border-radius: 50%; margin-bottom: 20px; box-shadow: 0 0 20px rgba(227, 6, 19, 0.2);">' +
+        '<i class="fas fa-circle-notch fa-spin fa-3x" style="color:#E30613;"></i></div>' +
+        '<h4 style="color:white; font-weight:600; margin-bottom:10px; font-size: 1.4rem;">Procesando pago...</h4>' +
+        '<p style="color:#aaa; text-align:center; max-width:80%; font-size: 0.95rem; line-height: 1.5;">Estamos confirmando tu destacado.<br>Por favor, no cierres esta ventana.</p>' +
+        '</div>');
+        
+    $modalContent.append($loadingOverlay);
     
-    var tipoInput = document.createElement('input');
-    tipoInput.type = 'hidden';
-    tipoInput.name = 'tipo';
-    tipoInput.value = tipo;
-    form.appendChild(tipoInput);
+    // Animar entrada
+    setTimeout(function() {
+        $loadingOverlay.css('opacity', 1);
+    }, 10);
     
-    var precioInput = document.createElement('input');
-    precioInput.type = 'hidden';
-    precioInput.name = 'precio';
-    precioInput.value = precio;
-    form.appendChild(precioInput);
+    // Ocultar botón de cerrar para evitar interrupciones
+    $('.login-modal-close').hide();
     
-    // Añadir formulario al DOM y enviarlo
-    document.body.appendChild(form);
-    form.submit();
+    // Enviar petición AJAX
+    $.ajax({
+        url: '/procesar_destacado_saldo',
+        method: 'POST',
+        data: {
+            codigo_id: codigoId,
+            tipo: tipo,
+            precio: precio,
+            sku: sku
+        },
+        dataType: 'json',
+        success: function(response) {
+            // Éxito: Mostrar estado de completado
+            var $content = $loadingOverlay.find('div, h4, p'); // Elementos internos
+            
+            // Efecto de transición suave
+            $content.fadeOut(200, function() {
+                $loadingOverlay.empty().append(
+                    '<div style="opacity:0; transform: translateY(10px); transition: all 0.4s ease; display:flex; flex-direction:column; align-items:center;">' +
+                    '<div style="background: rgba(40, 167, 69, 0.15); padding: 25px; border-radius: 50%; margin-bottom: 20px; box-shadow: 0 0 20px rgba(40, 167, 69, 0.2);">' +
+                    '<i class="fas fa-check fa-3x" style="color:#28a745;"></i></div>' +
+                    '<h4 style="color:white; font-weight:600; margin-bottom:10px; font-size: 1.4rem;">¡Pago Completado!</h4>' +
+                    '<p style="color:#aaa; text-align:center; font-size: 0.95rem;">Tu anuncio ha sido destacado correctamente.</p>' +
+                    '</div>'
+                );
+                
+                // Mostrar ticks de éxito
+                setTimeout(function() {
+                    $loadingOverlay.children().css({opacity: 1, transform: 'translateY(0)'});
+                }, 50);
+            });
+            
+            // Redirigir después de breve pausa para leer el mensaje
+            setTimeout(function() {
+                window.location.href = '/mis-anuncios?success=destacado_ok';
+            }, 2000);
+        },
+        error: function(xhr, status, error) {
+            // Error: Quitar overlay y mostrar mensaje
+            $loadingOverlay.fadeOut(300, function() {
+                $(this).remove();
+                $('.login-modal-close').show();
+            });
+            
+            var msg = 'Ha ocurrido un error al procesar el pago.';
+            if(xhr.responseJSON && xhr.responseJSON.error) {
+                msg = xhr.responseJSON.error;
+            } else if (status === 'timeout') {
+                msg = 'El servidor está tardando demasiado en responder, pero tu pago podría haberse procesado. Por favor verifica tus anuncios.';
+            }
+            
+            alert(msg);
+        },
+        timeout: 60000 // Timeout de 60 segundos por la lentitud de emails
+    });
 }
 </script>
-
-<?php get_footer(); ?>

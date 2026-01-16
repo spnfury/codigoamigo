@@ -1,9 +1,15 @@
 <?php
 
+// Iniciar sesión ANTES de cualquier output
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 // Cargar autoloader de Composer para MongoDB
 require_once __DIR__ . '/../vendor/autoload.php';
 
 include_once __DIR__ . '/../inc/includes.php';
+include_once __DIR__ . '/recaptcha_helper.php';
 
 
 
@@ -18,6 +24,10 @@ if ($_REQUEST) {
 
         case "login_user":
             login_user($datos);
+            break;
+
+        case "check_session":
+            check_session();
             break;
 
         case "more_codes":
@@ -48,17 +58,10 @@ if ($_REQUEST) {
 
         case "registrar_usuario":
             registrar_usuario($datos, $datos["origin"]);
-            $collection_usuarios = getCollectionUsuarios();
-            $usuario = $collection_usuarios->findOne(
-                [
-                    'mail' => $datos['correo']
-                ]
-            );
+            break;
 
-
-            $_SESSION["user_id"] = $usuario["_id"];
-            $_SESSION["mail"] = $usuario["mail"];
-            $_SESSION["username"] = $usuario["username"];
+        case "solicitar_activacion":
+            solicitar_activacion($datos);
             break;
 
         case "editar_perfil":
@@ -73,8 +76,70 @@ if ($_REQUEST) {
             baneo_temporal($datos);
             break;
 
+
         case "baneo_definitivo":
             baneo_definitivo($datos);
+            break;
+
+
+        case "añadir_favorito":
+            header('Content-Type: application/json');
+            session_start();
+            if (!isset($_SESSION['user_id'])) {
+                echo json_encode(['success' => false, 'message' => 'No autorizado']);
+                exit;
+            }
+            // Asegurar que funciones_usuario.php esté incluido
+            if (!function_exists('añadir_favorito')) {
+                include_once __DIR__ . '/funciones_usuario.php';
+            }
+            $result = añadir_favorito($_SESSION['user_id'], $datos['codigo_id']);
+            echo json_encode($result);
+            break;
+
+        case "eliminar_favorito":
+            header('Content-Type: application/json');
+            session_start();
+            if (!isset($_SESSION['user_id'])) {
+                echo json_encode(['success' => false, 'message' => 'No autorizado']);
+                exit;
+            }
+            // Asegurar que funciones_usuario.php esté incluido
+            if (!function_exists('eliminar_favorito')) {
+                include_once __DIR__ . '/funciones_usuario.php';
+            }
+            $result = eliminar_favorito($_SESSION['user_id'], $datos['codigo_id']);
+            echo json_encode($result);
+            break;
+
+        case "track_amazon":
+            header('Content-Type: application/json');
+            require_once __DIR__ . '/funciones_amazon_services.php';
+            
+            // Get data from request (supports both POST form-data and JSON input)
+            // But since this file uses $_REQUEST, we expect POST form-data usually.
+            // Our JS will send JSON, so we need to decode it if $_REQUEST is empty of our keys.
+            
+            $slug = $datos['slug'] ?? '';
+            $origin = $datos['origin'] ?? 'unknown';
+            
+            // If empty in $_REQUEST, try JSON input
+            if (empty($slug)) {
+                $json = json_decode(file_get_contents('php://input'), true);
+                if ($json) {
+                    $slug = $json['slug'] ?? '';
+                    $origin = $json['origin'] ?? 'unknown';
+                }
+            }
+            
+            $referrer = $_SERVER['HTTP_REFERER'] ?? '';
+            
+            if ($slug) {
+                logAmazonServiceClick($slug, $referrer, $origin);
+                echo json_encode(['success' => true]);
+            } else {
+                echo json_encode(['success' => false, 'error' => 'Missing slug']);
+            }
             break;
 
 
@@ -168,7 +233,51 @@ if ($_REQUEST) {
          *********************************/
 
         case "formulario_contacto":
-            echo formulario_contacto($datos);
+            // Validar reCAPTCHA v3 con verificación de score
+            $recaptchaValidado = false;
+            $recaptchaScore = 0;
+            
+            if (isset($datos['recaptcha_response']) && !empty($datos['recaptcha_response'])) {
+                $resultado = validarRecaptcha($datos['recaptcha_response'], $_SERVER['REMOTE_ADDR'] ?? null);
+                
+                if ($resultado['success']) {
+                    $recaptchaScore = $resultado['score'] ?? 0;
+                    // Score mínimo de 0.6 para reCAPTCHA v3 (más estricto que 0.5)
+                    // Score de 1.0 = humano, 0.0 = bot
+                    if ($recaptchaScore >= 0.6) {
+                        $recaptchaValidado = true;
+                    } else {
+                        // Score bajo = posible spam, rechazar
+                        error_log("reCAPTCHA score bajo rechazado: " . $recaptchaScore . " (IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida') . ")");
+                        echo "recaptcha_error";
+                        break;
+                    }
+                } else {
+                    error_log("reCAPTCHA validación fallida: " . ($resultado['error'] ?? 'error desconocido') . " (IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida') . ")");
+                }
+            }
+            
+            // Rechazar si no hay token o si la validación falló
+            if (!$recaptchaValidado) {
+                echo "recaptcha_error";
+                break;
+            }
+
+            // Antidoble envío: si mismo payload se envía en < 8s, no volver a disparar
+            if (session_status() === PHP_SESSION_NONE) { session_start(); }
+            $payloadHash = hash('sha256', trim(($datos['nombre'] ?? '') . '|' . ($datos['correo'] ?? '') . '|' . ($datos['telefono'] ?? '') . '|' . ($datos['mensaje'] ?? '')));
+            $nowTs = time();
+            if (isset($_SESSION['contact_last_hash']) && isset($_SESSION['contact_last_time'])) {
+                if ($_SESSION['contact_last_hash'] === $payloadHash && ($nowTs - (int)$_SESSION['contact_last_time']) < 8) {
+                    echo "success"; // idempotente: consideramos enviado
+                    break;
+                }
+            }
+            $_SESSION['contact_last_hash'] = $payloadHash;
+            $_SESSION['contact_last_time'] = $nowTs;
+
+            $result = formulario_contacto($datos);
+            echo $result;
             break;
 
     }
@@ -207,27 +316,195 @@ function editar_perfil($datos)
 {
     try {
         $collection_usuarios = getCollectionUsuarios();
+        
+        // Preparar datos para actualizar
+        $updateData = [
+            'username' => $datos['nombre'],
+            'notis' => isset($datos['notis']) ? (int)$datos['notis'] : 0,
+            'email_comm' => isset($datos['email_comm']) ? (int)$datos['email_comm'] : 0,
+        ];
+        
+        // Solo actualizar contraseña si se proporciona y no está vacía
+        if (!empty($datos['password'])) {
+            $updateData['pass'] = $datos['password'];
+            $updateData['confirm_password'] = $datos['password'];
+        }
+        
+        // Actualizar teléfono y whatsapp si se proporcionan
+        if (isset($datos['telefono'])) {
+            $updateData['telefono'] = $datos['telefono'];
+        }
+        if (isset($datos['whatsapp'])) {
+            $updateData['whatsapp'] = $datos['whatsapp'];
+        }
+        
         $updateResult = $collection_usuarios->updateOne(
             ['mail' => $datos["correo"]],
-            [
-                '$set' => [
-                    'username' => $datos['nombre'],
-                    'notis' => $datos['notis'],
-                    'email_comm' => $datos['email_comm'],
-                    'pass' => $datos['password'],
-                    'confirm_password' => $datos['password'],
-                    'telefono' => $datos['telefono'],
-                    'whatsapp' => $datos['whatsapp']
-                ]
-            ]
+            ['$set' => $updateData]
         );
-    } catch (MongoCursorException $e) {
-        echo "Error al modificar datos\n";
+        
+        if ($updateResult->getModifiedCount() > 0 || $updateResult->getMatchedCount() > 0) {
+            echo json_encode(['success' => true, 'message' => 'Usuario modificado correctamente']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'No se realizaron cambios']);
+        }
+    } catch (Exception $e) {
+        echo json_encode(['success' => false, 'message' => 'Error al modificar datos: ' . $e->getMessage()]);
     }
 }
 
 
+// Fallback anti-spam: permite unos pocos envíos aunque reCAPTCHA falle
+function permiteContactoSinRecaptcha() {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
 
+    $windowSeconds = 600; // 10 minutos
+    $maxAttemptsPerWindow = 10; // permitir hasta 10 intentos para pruebas/uso legítimo
 
+    if (!isset($_SESSION['contact_rate_limit'])) {
+        $_SESSION['contact_rate_limit'] = [];
+    }
 
-?>
+    if (!isset($_SESSION['contact_rate_limit'][$ip])) {
+        $_SESSION['contact_rate_limit'][$ip] = [];
+    }
+
+    $now = time();
+    $_SESSION['contact_rate_limit'][$ip] = array_values(array_filter(
+        $_SESSION['contact_rate_limit'][$ip],
+        function ($ts) use ($now, $windowSeconds) { return ($now - $ts) <= $windowSeconds; }
+    ));
+
+    if (count($_SESSION['contact_rate_limit'][$ip]) >= $maxAttemptsPerWindow) {
+        return false;
+    }
+
+    $_SESSION['contact_rate_limit'][$ip][] = $now;
+    return true;
+}
+
+// Función para solicitar nuevo email de activación
+function solicitar_activacion($datos) {
+    $correo = $datos['correo'];
+
+    // Buscar al usuario por email
+    $collection_usuarios = getCollectionUsuarios();
+    $usuario = $collection_usuarios->findOne(['mail' => $correo]);
+
+    if (!$usuario) {
+        echo "usuario_no_encontrado";
+        return;
+    }
+
+    if ($usuario['estado'] == 1) {
+        echo "usuario_ya_activo";
+        return;
+    }
+
+    // Crear datos para enviar email de activación
+    $datos_usuario = [
+        'mail' => $usuario['mail'],
+        'username' => $usuario['username']
+    ];
+
+    // Enviar email de activación
+    $email_enviado = enviarMailActivacion($datos_usuario);
+
+    if ($email_enviado) {
+        echo "email_enviado";
+    } else {
+        echo "error_envio";
+    }
+}
+
+// Función para verificar el estado de la sesión
+function clearCurrentSession() {
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        $_SESSION = [];
+        if (ini_get('session.use_cookies')) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+        }
+        session_destroy();
+    }
+}
+
+function check_session() {
+    // Asegurar que no haya output antes del header
+    if (ob_get_level() > 0) {
+        ob_clean();
+    }
+    
+    header('Content-Type: application/json');
+    
+    // Verificar que la sesión esté iniciada
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    // Incluir funciones necesarias si no están incluidas
+    if (!function_exists('getObjectUserWithSession')) {
+        require_once __DIR__ . '/funciones.php';
+    }
+    
+    // Verificar si hay una sesión de usuario activa
+    if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
+        clearCurrentSession();
+        $response = [
+            'success' => false,
+            'logged_in' => false,
+            'message' => 'Sesión no válida'
+        ];
+        echo json_encode($response);
+        exit;
+    }
+    
+    // Intentar obtener datos del usuario desde la base de datos para validar la sesión
+    try {
+        $usuario_completo = getObjectUserWithSession('_id', new MongoDB\BSON\ObjectId($_SESSION["user_id"]));
+        
+        if ($usuario_completo && isset($usuario_completo["username"])) {
+            // Sesión válida - devolver datos del usuario
+            $userData = [
+                'id' => $_SESSION["user_id"],
+                'username' => $usuario_completo['username'] ?? $_SESSION["username"] ?? 'Usuario',
+                'mail' => $usuario_completo['mail'] ?? $_SESSION["mail"] ?? '',
+                'img' => $usuario_completo['img'] ?? $_SESSION["img"] ?? 'https://www.codigoamigo.com/img/utilidades/usuario_sin_foto.jpg',
+                'avatar' => $usuario_completo['img'] ?? $_SESSION["img"] ?? 'https://www.codigoamigo.com/img/utilidades/usuario_sin_foto.jpg'
+            ];
+            
+            $response = [
+                'success' => true,
+                'logged_in' => true,
+                'user' => $userData
+            ];
+            echo json_encode($response);
+            exit;
+        } else {
+            // Usuario no encontrado en la base de datos - sesión inválida
+            clearCurrentSession();
+            $response = [
+                'success' => false,
+                'logged_in' => false,
+                'message' => 'Usuario no encontrado'
+            ];
+            echo json_encode($response);
+            exit;
+        }
+    } catch (Exception $e) {
+        // Error al obtener el usuario - sesión inválida
+        error_log("Error en check_session: " . $e->getMessage());
+        clearCurrentSession();
+        $response = [
+            'success' => false,
+            'logged_in' => false,
+            'message' => 'Error al validar sesión: ' . $e->getMessage()
+        ];
+        echo json_encode($response);
+        exit;
+    }
+}
+

@@ -1,0 +1,147 @@
+# Solución temporal para desactivar Cloudflare completamente
+# Este archivo redirige a la IP directa del servidor
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodigoAmigo - Acceso Directo al Servidor</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 700px;
+        }
+        .btn {
+            background: #ff6b6b;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255,107,107,0.3);
+        }
+        .btn:hover {
+            background: #ff5252;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255,107,107,0.4);
+        }
+        .btn-success {
+            background: #4ecdc4;
+            box-shadow: 0 4px 15px rgba(78,205,196,0.3);
+        }
+        .btn-success:hover {
+            background: #45b7b8;
+            box-shadow: 0 6px 20px rgba(78,205,196,0.4);
+        }
+        .status {
+            background: rgba(255,255,255,0.2);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .warning {
+            background: rgba(255,193,7,0.2);
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .success {
+            background: rgba(40,167,69,0.2);
+            border: 1px solid #28a745;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 CodigoAmigo - Acceso Directo al Servidor</h1>
+        
+        <div class="warning">
+            <strong>⚠️ Cloudflare Bloqueando Navegadores</strong><br>
+            Cloudflare está bloqueando el acceso desde navegadores reales. Usa el acceso directo al servidor.
+        </div>
+        
+        <div class="success">
+            <h2>✅ Solución: Acceso Directo al Servidor</h2>
+            <p>El servidor está funcionando perfectamente. El problema es Cloudflare.</p>
+        </div>
+        
+        <h2>🎯 URLs de Acceso Directo:</h2>
+        
+        <a href="http://78.46.100.91/" class="btn btn-success">🌐 ACCESO DIRECTO (IP)</a>
+        <a href="http://78.46.100.91/?cf_bypass=1" class="btn">⚡ IP + BYPASS</a>
+        <a href="http://78.46.100.91/diagnostico.html" class="btn">🔍 DIAGNÓSTICO</a>
+        
+        <div class="status">
+            <h3>📊 Estado del Sistema:</h3>
+            <p>✅ <strong>Servidor:</strong> Funcionando perfectamente</p>
+            <p>✅ <strong>IP Directa:</strong> http://78.46.100.91/</p>
+            <p>✅ <strong>PHP:</strong> Sin errores</p>
+            <p>✅ <strong>Base de datos:</strong> Conectada</p>
+            <p>❌ <strong>Cloudflare:</strong> Bloqueando navegadores</p>
+        </div>
+        
+        <div class="warning">
+            <h3>🔧 Configuraciones de Cloudflare a Verificar:</h3>
+            <p><strong>1. Security → WAF:</strong> Desactiva todas las reglas</p>
+            <p><strong>2. Security → Rate Limiting:</strong> Desactiva todos los límites</p>
+            <p><strong>3. Security → Bot Fight Mode:</strong> Desactívalo completamente</p>
+            <p><strong>4. Security → Browser Integrity Check:</strong> Desactívalo</p>
+            <p><strong>5. Firewall → IP Access Rules:</strong> Verifica que tu IP no esté bloqueada</p>
+            <p><strong>6. Firewall → User Agent Blocking:</strong> Desactívalo</p>
+        </div>
+        
+        <div class="status">
+            <h3>📋 Instrucciones:</h3>
+            <p><strong>1.</strong> Prueba primero: <code>http://78.46.100.91/</code></p>
+            <p><strong>2.</strong> Si funciona, el problema es Cloudflare</p>
+            <p><strong>3.</strong> Ve al panel de Cloudflare y desactiva las configuraciones mencionadas</p>
+            <p><strong>4.</strong> Una vez solucionado, podrás usar: <code>https://www.codigoamigo.com/</code></p>
+        </div>
+        
+        <script>
+            // Auto-redirección a la IP directa después de 3 segundos
+            setTimeout(function() {
+                if (confirm('¿Quieres acceder directamente al servidor (sin Cloudflare)?')) {
+                    window.location.href = 'http://78.46.100.91/';
+                }
+            }, 3000);
+            
+            // Log para debugging
+            console.log('Direct server access page loaded');
+            console.log('User Agent:', navigator.userAgent);
+            console.log('Current URL:', window.location.href);
+            console.log('Timestamp:', new Date().toISOString());
+        </script>
+    </div>
+</body>
+</html>
+

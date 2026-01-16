@@ -8,6 +8,7 @@
     include_once __DIR__ . '/../myphp/funciones_adsense.php';
     
     $modo_modificacion = isset($codigo_data);
+    $marca_es_nueva = false; // Variable para indicar si la marca es nueva
 
     if ($modo_modificacion) {
         $marca = $codigo_data['marca'];
@@ -22,7 +23,7 @@
         // Verificar si hay datos preservados de un error anterior
         if (isset($_SESSION['form_data']) && !empty($_SESSION['form_data'])) {
             $form_data = $_SESSION['form_data'];
-            $marca = $form_data['marca'] ?? '';
+            $marca = $form_data['marca_valor'] ?? $form_data['marca'] ?? '';
             $beneficio = $form_data['num_beneficio'] ?? '';
             $descuento = $form_data['descuento'] ?? '';
             $codigo = $form_data['codigo'] ?? '';
@@ -30,13 +31,41 @@
             $provincia = $form_data['provincia'] ?? '';
             $localidad = $form_data['localidad'] ?? '';
             $fecha_caducidad = $form_data['fecha_caducidad'] ?? '';
-            
+
             // Limpiar datos de la sesión después de usarlos
             unset($_SESSION['form_data']);
         } else {
             // Si hay una marca en la URL, preseleccionarla
-            $marca = isset($_GET['marca']) ? strtoupper($_GET['marca']) : '';
+            $marca_param = isset($_GET['marca']) ? $_GET['marca'] : '';
             $beneficio = $descuento = $codigo = $descripcion = $provincia = $localidad = $fecha_caducidad = '';
+            
+            $marca = '';
+            $marca_es_nueva = false;
+            
+            // Si viene de la URL, verificar si la marca existe en la BD
+            if (!empty($marca_param)) {
+                // Intentar buscar por slug (nombre_clave) primero
+                $marca_existe = getObjectMarca('nombre_clave', strtolower($marca_param));
+                
+                // Si no se encuentra por slug, intentar por nombre (case-insensitive para mayor robustez)
+                if (!$marca_existe) {
+                    $marca_existe = getObjectMarca('nombre', $marca_param);
+                }
+                
+                // Si aún no se encuentra, probar con el nombre en mayúsculas (comportamiento anterior)
+                if (!$marca_existe) {
+                    $marca_existe = getObjectMarca('nombre', strtoupper($marca_param));
+                }
+
+                if ($marca_existe) {
+                    // Si existe, usar el nombre original de la marca para preselección
+                    $marca = $marca_existe['nombre'];
+                } else {
+                    // Si no existe, marcar como nueva marca y usar el parámetro tal cual
+                    $marca_es_nueva = true;
+                    $marca = $marca_param;
+                }
+            }
         }
     }
 ?>
@@ -64,7 +93,7 @@
             top: 20px;
             left: 20px;
             z-index: 1000;
-            background: #ff6b35;
+            background: #E30613;
             color: white;
             border: none;
             padding: 12px 20px;
@@ -72,12 +101,12 @@
             font-size: 16px;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+            box-shadow: 0 4px 15px rgba(227, 6, 19, 0.3);
         }
         .back-button:hover {
-            background: #e55a2b;
+            background: #C40510;
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+            box-shadow: 0 6px 20px rgba(227, 6, 19, 0.4);
         }
         .back-button i {
             margin-right: 8px;
@@ -85,45 +114,81 @@
         .container {
             max-width: 800px;
             margin: 0 auto;
-            padding: 80px 20px 20px;
+            padding: 80px 20px 40px;
         }
+
+        /* Mejorar el diseño del formulario */
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-control {
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            transform: translateY(-1px);
+        }
+
+        /* Mejorar apariencia del botón de submit */
+        .btn-custom {
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(227, 6, 19, 0.3);
+        }
+
+        .btn-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(227, 6, 19, 0.4);
+        }
+
+        /* Responsive design improvements */
+        @media (max-width: 768px) {
+            .container {
+                padding: 70px 15px 30px;
+            }
+
+            .page-title {
+                font-size: 2rem;
+            }
+
+            .form-group {
+                margin-bottom: 20px;
+            }
+
+            .btn-custom {
+                width: 100%;
+                padding: 18px 30px;
+                font-size: 16px;
+            }
+        }
+
         .form-control {
             background: white;
             color: #333;
             border: 2px solid #555;
             border-radius: 8px;
-            padding: 12px 15px;
+            padding: 2px 15px;
             font-size: 16px;
-        }
-         .form-control:focus {
-             border-color: #ff6b35;
-             box-shadow: 0 0 0 0.2rem rgba(255, 107, 53, 0.25);
-         }
-         .form-control.error {
-             border-color: #f44336;
-             box-shadow: 0 0 0 0.2rem rgba(244, 67, 54, 0.25);
-             background-color: #ffebee;
-         }
-         .error-message {
-             color: #f44336;
-             font-size: 14px;
-             margin-top: 5px;
-             display: none;
-         }
-        .btn-custom {
-            background: #ff6b35;
-            border: none;
-            color: white;
-            padding: 15px 30px;
-            border-radius: 25px;
-            font-size: 18px;
-            font-weight: 600;
             transition: all 0.3s ease;
         }
-        .btn-custom:hover {
-            background: #e55a2b;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+
+        .form-control:focus {
+            border-color: #E30613;
+            box-shadow: 0 0 0 0.2rem rgba(227, 6, 19, 0.25);
+            transform: translateY(-1px);
+        }
+
+        .form-control.error {
+            border-color: #f44336;
+            box-shadow: 0 0 0 0.2rem rgba(244, 67, 54, 0.25);
+            background-color: #ffebee;
+        }
+
+        .error-message {
+            color: #f44336;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
         }
         .alert {
             border-radius: 8px;
@@ -135,7 +200,7 @@
             margin-bottom: 30px;
             font-size: 2.5rem;
             font-weight: bold;
-            color: #ff6b35;
+            color: #E30613;
         }
         .form-group label {
             color: white;
@@ -149,66 +214,59 @@
             margin-top: 5px;
         }
         .warning-text {
-            color: #ff6b35;
+            color: #E30613;
             font-weight: bold;
             text-align: center;
             margin: 20px 0;
             font-size: 16px;
         }
-        .easy-autocomplete {
-            width: 100% !important;
-            position: relative !important;
-        }
         
-        /* Estilos para Select2 con tema oscuro */
-        .select2-container--bootstrap .select2-selection--single {
-            background-color: #3a3a3a !important;
+        /* Estilos personalizados para Select2 - Tema claro para el formulario */
+        .select2-container--default .select2-selection--single {
+            background-color: white !important;
+            border: 2px solid #555 !important;
+            border-radius: 8px !important;
+            height: 48px !important;
+            color: #333 !important;
+        }
+
+        .select2-container--default .select2-selection__rendered {
+            color: #333 !important;
+            line-height: 44px !important;
+            padding-left: 15px !important;
+            padding-right: 30px !important;
+            font-size: 16px !important;
+        }
+
+        .select2-container--default .select2-selection__placeholder {
+            color: #999 !important;
+        }
+
+        .select2-container--default .select2-dropdown {
+            background-color: white !important;
             border: 1px solid #555 !important;
-            color: white !important;
-            height: 40px !important;
+            border-radius: 8px !important;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
         }
-        
-        .select2-container--bootstrap .select2-selection--single .select2-selection__rendered {
-            color: white !important;
-            line-height: 38px !important;
+
+        .select2-container--default .select2-results__option {
+            background-color: white !important;
+            color: #333 !important;
+            padding: 12px 15px !important;
         }
-        
-        .select2-container--bootstrap .select2-selection--single .select2-selection__placeholder {
-            color: #ccc !important;
-        }
-        
-        .select2-container--bootstrap .select2-selection--single .select2-selection__arrow {
-            height: 38px !important;
-        }
-        
-        .select2-container--bootstrap .select2-dropdown {
-            background-color: #3a3a3a !important;
-            border: 1px solid #555 !important;
-        }
-        
-        .select2-container--bootstrap .select2-results__option {
-            background-color: #3a3a3a !important;
+
+        .select2-container--default .select2-results__option--highlighted {
+            background-color: #E30613 !important;
             color: white !important;
         }
-        
-        .select2-container--bootstrap .select2-results__option--highlighted[aria-selected] {
-            background-color: #ff6b35 !important;
-            color: white !important;
-        }
-        
-        .select2-container--bootstrap .select2-results__option[aria-selected=true] {
-            background-color: #555 !important;
-            color: white !important;
-        }
-        
-        .select2-container--bootstrap .select2-search--dropdown .select2-search__field {
-            background-color: #2a2a2a !important;
-            border: 1px solid #555 !important;
-            color: white !important;
-        }
-        
-        .select2-container--bootstrap .select2-results__message {
-            color: #ccc !important;
+
+        .select2-container--default .select2-search__field {
+            background-color: white !important;
+            border: 1px solid #ddd !important;
+            color: #333 !important;
+            padding: 10px 15px !important;
+            border-radius: 6px !important;
+            margin: 8px !important;
         }
         
         /* Estilos para contenedores de publicidad */
@@ -240,36 +298,19 @@
                 padding: 10px;
             }
         }
-        .easy-autocomplete input {
-            border: 0px solid #e9ecef !important;
-            border-radius: 10px !important;
-            padding: 15px 20px !important;
-            font-size: 16px !important;
-            background: white !important;
-            color: #333 !important;
+        /* Asegurar que el selector de marcas tenga prioridad sobre otros estilos */
+        .select2-container {
+            z-index: 9999 !important;
         }
-        .easy-autocomplete input:focus {
-            border-color: #ff6b35 !important;
-            box-shadow: 0 0 0 0.2rem rgba(255, 107, 53, 0.25) !important;
+
+        /* Estilos específicos para el contenedor del selector de marcas */
+        #marca + .select2-container {
+            width: 100% !important;
         }
-        .easy-autocomplete ul {
-            background: white !important;
-            border: 1px solid #ddd !important;
-            border-radius: 8px !important;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
-        }
-        .easy-autocomplete li {
-            color: #333 !important;
-            padding: 10px 15px !important;
-            border-bottom: 1px solid #eee !important;
-        }
-        .easy-autocomplete li:hover {
-            background: #f8f9fa !important;
-        }
-        .easy-autocomplete .eac-category {
-            background: #ff6b35 !important;
-            color: white !important;
-            font-weight: bold !important;
+
+        /* Estilos para asegurar que el dropdown se vea correctamente */
+        .select2-dropdown {
+            z-index: 10000 !important;
         }
         
         /* Botón flotante para modificar código */
@@ -279,7 +320,7 @@
             left: 50%;
             transform: translateX(-50%);
             z-index: 1000;
-            background: #ff6b35;
+            background: #E30613;
             color: white;
             border: none;
             padding: 18px 40px;
@@ -288,7 +329,7 @@
             font-weight: 700;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 8px 25px rgba(255, 107, 53, 0.4);
+            box-shadow: 0 8px 25px rgba(227, 6, 19, 0.4);
             display: flex;
             align-items: center;
             gap: 10px;
@@ -297,13 +338,27 @@
         }
         
         .floating-save-button:hover {
-            background: #e55a2b;
+            background: #C40510;
             transform: translateX(-50%) translateY(-3px);
-            box-shadow: 0 12px 35px rgba(255, 107, 53, 0.5);
+            box-shadow: 0 12px 35px rgba(227, 6, 19, 0.5);
         }
         
         .floating-save-button:active {
             transform: translateX(-50%) translateY(-1px);
+        }
+
+        .floating-save-button:disabled {
+            background: #ccc;
+            color: #999;
+            cursor: not-allowed;
+            opacity: 0.6;
+            box-shadow: none;
+        }
+
+        .floating-save-button:disabled:hover {
+            transform: none;
+            box-shadow: none;
+            background: #ccc;
         }
         
         /* Ocultar el botón original solo cuando está el flotante (modo modificación) */
@@ -341,16 +396,22 @@
             .floating-save-button:active {
                 transform: translateY(-1px);
             }
+
+            .floating-save-button:disabled {
+                background: #ccc !important;
+                color: #999 !important;
+                transform: none !important;
+            }
         }
         
         /* Estilos para la nueva marca integrada */
         .nueva-marca-container {
             background: #f8f9fa;
-            border: 2px solid #ff6b35;
+            border: 2px solid #E30613;
             border-radius: 8px;
             padding: 20px;
             margin-top: 15px;
-            box-shadow: 0 2px 8px rgba(255, 107, 53, 0.1);
+            box-shadow: 0 2px 8px rgba(227, 6, 19, 0.1);
         }
         
         .nueva-marca-header {
@@ -363,7 +424,7 @@
         }
         
         .nueva-marca-header h4 {
-            color: #ff6b35;
+            color: #E30613;
             margin: 0;
             font-size: 18px;
             font-weight: 600;
@@ -412,7 +473,7 @@
         .nueva-marca-content select {
             width: 100%;
             padding: 12px 16px;
-            border: 2px solid #ff6b35;
+            border: 2px solid #E30613;
             border-radius: 6px;
             background: white;
             color: #333;
@@ -437,8 +498,8 @@
         
         .nueva-marca-content select:focus {
             outline: none;
-            border-color: #e55a2b;
-            box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.2);
+            border-color: #C40510;
+            box-shadow: 0 0 0 3px rgba(227, 6, 19, 0.2);
         }
         
         .nueva-marca-content select option {
@@ -484,14 +545,14 @@
         }
         
         .item_imagen:hover {
-            border-color: #ff6b35;
+            border-color: #E30613;
             transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(255, 107, 53, 0.2);
+            box-shadow: 0 4px 8px rgba(227, 6, 19, 0.2);
         }
         
         .item_imagen.img-selected {
-            border-color: #ff6b35;
-            box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.3);
+            border-color: #E30613;
+            box-shadow: 0 0 0 3px rgba(227, 6, 19, 0.3);
         }
         
         .item_imagen img {
@@ -532,6 +593,35 @@
             }
         }
     </style>
+
+    <!-- Cargar jQuery y Select2 -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    
+    <?php
+    // Obtener lista de marcas con Super Landing para el JS
+    include_once __DIR__ . '/../myphp/_super_landing_functions.php';
+    $super_landings_list = [];
+    if (function_exists('get_active_super_landings')) {
+        $raw_landings = get_active_super_landings(50);
+        foreach ($raw_landings as $landing) {
+            // Extraer slugs de marcas vinculadas
+            if (isset($landing['linked_brand_slugs'])) {
+                foreach ($landing['linked_brand_slugs'] as $bslug) {
+                    $super_landings_list[$bslug] = $landing['slug'];
+                }
+            }
+            // Fallback slug propio (ej: ing-cuenta-nomina -> ing-direct logic handling needs mapped brand slug)
+            // hardcodeamos mapeos comunes si es necesario, o confiamos en linked_brand_slugs
+            if (strpos($landing['slug'], 'ing-') !== false) $super_landings_list['ing-direct'] = $landing['slug'];
+            if (strpos($landing['slug'], 'ing-') !== false) $super_landings_list['ing'] = $landing['slug'];
+        }
+    }
+    ?>
+    <script>
+        window.superLandingsMap = <?php echo json_encode($super_landings_list); ?>;
+    </script>
 </head>
 <body>
     <button class="back-button" onclick="window.history.back()">
@@ -580,16 +670,26 @@
         }
         ?>
 
-        <form id="nuevo_codigo" method="post" action="<?php echo $modo_modificacion ? '/modificar_codigo/' . $codigo_data['codigo_id'] : '/codigo_insertado'; ?>">
+        <form id="nuevo_codigo" method="post" action="<?php echo $modo_modificacion ? '/modificar_codigo/' . $codigo_data['codigo_id'] : '/codigo_insertado'; ?>" enctype="multipart/form-data">
              <div class="form-group">
                  <label for="marca">Marca o Servicio</label>
-                 <select class="form-control" id="marca" name="marca" required>
-                     <option value="">Busca o selecciona una marca</option>
+                 <select class="form-control marca-selector" id="marca" name="marca" required style="width: 100%;">
+                     <option value="">selecciona una marca</option>
                  </select>
                  <input type="hidden" id="marca_valor" name="marca_valor" value="<?php echo htmlspecialchars($marca); ?>">
                  <div class="error-message" id="marca-error">La marca es obligatoria</div>
                  <div class="help-text">
                      Busca la marca a la que corresponde tu "Código amigo". Si no la encuentras, puedes añadirla fácilmente.
+                 </div>
+                 
+                 <div id="super-landing-alert" style="display:none; background: #fff9fa; border: 2px solid #E30613; border-radius: 8px; padding: 15px; margin-top: 15px;">
+                    <div style="display:flex; align-items:center; gap:15px;">
+                        <i class="fas fa-trophy" style="font-size: 24px; color: #E30613;"></i>
+                        <div>
+                            <h4 style="margin:0 0 5px 0; color:#E30613; font-weight:bold;">¡Oportunidad Premium!</h4>
+                            <p style="margin:0; color:#333; font-size:14px;">Esta marca tiene una <strong>Guía Oficial 2026</strong>. Si destacas tu código como "Super" aparecerá en la posición más privilegiada.</p>
+                        </div>
+                    </div>
                  </div>
                  
                  <!-- Div para nueva marca integrado -->
@@ -604,12 +704,14 @@
                          
                          <div class="nueva-marca-content">
                              <input id="url_imagen" name="url_imagen" type="hidden">
-                             
+                             <input id="categoria_valor" name="categoria_valor" type="hidden">
+                             <input id="categoria_clave" name="categoria_clave" type="hidden">
+
                              <div class="form-group">
                                  <label>1. Selecciona una categoría:</label>
-                                <select id="categoria" name="categoria" class="form-control">
+                                <select id="categoria" class="form-control">
                                     <option value="select">Selecciona una categoría para tu marca</option>
-                                    <?php 
+                                    <?php
                                     $listacategorias = getCategorias();
                                     foreach ($listacategorias as $cat) { ?>
                                         <option value="<?php echo $cat['nombre_clave']?>"><?php echo $cat['nombre']?></option>
@@ -631,11 +733,11 @@
              <div class="form-group">
                  <label for="num_beneficio">Beneficio económico</label>
                  <div class="row">
-                     <div class="col-md-6">
+                     <div class="col-md-2 col-xs-8">
                          <input type="number" class="form-control" id="num_beneficio" name="num_beneficio" placeholder="0" value="<?php echo htmlspecialchars($beneficio); ?>" required>
                          <div class="error-message" id="num_beneficio-error">El beneficio económico es obligatorio</div>
                      </div>
-                     <div class="col-md-6">
+                     <div class="col-md-2 col-xs-2">
                          <select class="form-control" name="tipo_beneficio">
                              <option value="euros" <?php echo ($descuento == 'euros') ? 'selected' : ''; ?>>euros</option>
                              <option value="porcentaje" <?php echo ($descuento == 'porcentaje') ? 'selected' : ''; ?>>%</option>
@@ -695,6 +797,22 @@
                 <input type="date" class="form-control" id="fecha_caducidad" name="fecha_caducidad" value="<?php echo htmlspecialchars($fecha_caducidad); ?>">
             </div>
 
+            <?php /* 
+            // Campo PDF temporalmente deshabilitado - pendiente de arreglar
+            <div class="form-group">
+                <label for="pdf_retencion">PDF de Retención (Opcional)</label>
+                <input type="file" class="form-control" id="pdf_retencion" name="pdf_retencion" accept=".pdf" style="padding: 10px;">
+                <div class="help-text">
+                    Sube un PDF con las condiciones de retención. Se mostrará como un carrusel de páginas.
+                </div>
+                <div id="pdf-preview" style="display: none; margin-top: 15px;">
+                    <div class="alert alert-info" style="background: #2196F3; color: white; padding: 10px; border-radius: 8px;">
+                        <i class="fas fa-file-pdf"></i> PDF seleccionado: <span id="pdf-name"></span>
+                    </div>
+                </div>
+            </div>
+            */ ?>
+
             <?php 
             // Publicidad final
             if (should_show_adsense()) {
@@ -702,7 +820,7 @@
             }
             ?>
             
-            <div class="text-center original-save-button" style="margin-top: 30px;">
+            <div class="text-center original-save-button hide" style="margin-top: 30px;">
                 <input type="submit" 
                        value="<?php echo $modo_modificacion ? 'Modificar código' : 'Añadir código amigo'; ?>"  
                        class="btn btn-custom" />
@@ -710,354 +828,524 @@
         </form>
     </div>
 
-    <!-- Botón flotante para modificar código -->
-    <?php if ($modo_modificacion) { ?>
-    <button type="button" class="floating-save-button" onclick="document.getElementById('nuevo_codigo').submit();">
+    <!-- Botón flotante para publicar código -->
+    <button type="button" class="floating-save-button" id="floating-save-button" onclick="$('#nuevo_codigo').submit();" disabled>
         <i class="fas fa-save"></i>
-        Modificar código
+        <?php echo $modo_modificacion ? 'Modificar código' : 'Añadir código amigo'; ?>
     </button>
-    <?php } ?>
 
-    <link rel="stylesheet" href="/css/easy-autocomplete.min.css">
-    
-     <script>
-     function initBrandSelector() {
-         // Verificar que el elemento existe
-         if (!$("#marca").length) {
-             console.error("Elemento #marca no encontrado");
-             return;
-         }
-         
-         // Función para validar un campo
-         function validateField(fieldId, errorId, errorMessage) {
-             var field = $("#" + fieldId);
-             var errorDiv = $("#" + errorId);
-             var value = field.val().trim();
-             
-             if (value === '') {
-                 field.addClass('error');
-                 errorDiv.show();
-                 return false;
-             } else {
-                 field.removeClass('error');
-                 errorDiv.hide();
-                 return true;
-             }
-         }
-         
-         // Función para limpiar errores
-         function clearErrors() {
-             $('.form-control').removeClass('error');
-             $('.error-message').hide();
-         }
-         
-         // Validación en tiempo real
-         $('#marca').on('blur', function() {
-             var marcaValue = $("#marca_valor").val();
-             if (marcaValue === '') {
-                 $("#marca").addClass('error');
-                 $("#marca-error").show();
-             } else {
-                 $("#marca").removeClass('error');
-                 $("#marca-error").hide();
-             }
-         });
-         
-         $('#num_beneficio').on('blur', function() {
-             validateField('num_beneficio', 'num_beneficio-error', 'El beneficio económico es obligatorio');
-         });
-         
-         $('#codigo').on('blur', function() {
-             validateField('codigo', 'codigo-error', 'El código promocional es obligatorio');
-         });
-         
-         $('#descripcion').on('blur', function() {
-             validateField('descripcion', 'descripcion-error', 'La descripción es obligatoria');
-         });
-         
-         // Validación al enviar el formulario
-         $('#nuevo_codigo').on('submit', function(e) {
-             clearErrors();
-             
-             var isValid = true;
-             
-             // Validar marca
-             var marcaValue = $("#marca_valor").val();
-             if (marcaValue === '') {
-                 $("#marca").addClass('error');
-                 $("#marca-error").show();
-                 isValid = false;
-             }
-             
-             // Validar beneficio económico
-             if (!validateField('num_beneficio', 'num_beneficio-error', 'El beneficio económico es obligatorio')) {
-                 isValid = false;
-             }
-             
-             // Validar código
-             if (!validateField('codigo', 'codigo-error', 'El código promocional es obligatorio')) {
-                 isValid = false;
-             }
-             
-             // Validar descripción
-             if (!validateField('descripcion', 'descripcion-error', 'La descripción es obligatoria')) {
-                 isValid = false;
-             }
-             
-             if (!isValid) {
-                 e.preventDefault();
-                 // Scroll al primer campo con error
-                 var firstError = $('.form-control.error').first();
-                 if (firstError.length) {
-                     $('html, body').animate({
-                         scrollTop: firstError.offset().top - 100
-                     }, 500);
-                 }
-                 return false;
-             }
-         });
-         
-        // Configurar Select2 para el selector de marcas
-        $("#marca").select2({
-            placeholder: "Busca o selecciona una marca",
-            allowClear: true,
-            width: '100%',
-            theme: 'bootstrap',
-            minimumInputLength: 0, // Permitir búsqueda sin mínimo de caracteres
-            language: {
-                noResults: function() {
-                    return "No se encontraron marcas";
-                },
-                searching: function() {
-                    return "Buscando...";
-                }
-            },
-            ajax: {
-                url: "/ajax/buscar_marcas.php",
-                dataType: 'json',
-                delay: 250,
-                data: function (params) {
-                    return {
-                        q: params.term || '', // Enviar cadena vacía si no hay término
-                        page: params.page || 1
-                    };
-                },
-                processResults: function (data, params) {
-                    params.page = params.page || 1;
-                    
-                    // Filtrar resultados válidos
-                    var validResults = data.filter(function(item) {
-                        return item.nombre && item.nombre !== 'false' && item.nombre.trim() !== '';
-                    });
-                    
-                    // Agregar opción de "No encontrado" si no hay resultados y hay término de búsqueda
-                    if (validResults.length === 0 && params.term && params.term.length >= 2) {
-                        var nuevaOpcion = {
-                            id: 'nueva_marca_' + params.term,
-                            text: params.term + ' (no encontrado) + Agregar nueva marca',
-                            nombre: params.term,
-                            is_new: true,
-                            imagen: '/img/no_image.png'
-                        };
-                        validResults.push(nuevaOpcion);
-                    }
-                    
-                    return {
-                        results: validResults.map(function(item) {
-                            return {
-                                id: item.nombre,
-                                text: item.text || item.nombre,
-                                nombre: item.nombre,
-                                imagen: item.imagen || '/img/no_image.png',
-                                is_new: item.is_new || false
-                            };
-                        }),
-                        pagination: {
-                            more: false
-                        }
-                    };
-                },
-                cache: true
-            },
-             templateResult: function(marca) {
-                 if (marca.is_new) {
-                     var nombreMarca = marca.nombre || marca.text || 'Nueva marca';
-                     var texto = 'Añadir nueva marca: ' + nombreMarca;
-                     return $('<div style="color: #ff6b35; font-weight: 600; text-align: center; padding: 10px;">' + texto + '</div>');
-                 }
-                 
-                 if (!marca.nombre) {
-                     return marca.text || marca.id;
-                 }
-                 
-                 var $result = $(
-                     '<div style="display: flex; align-items: center;">' +
-                         '<img src="' + (marca.imagen || '/img/no_image.png') + '" style="width: 30px; height: 30px; margin-right: 10px; border-radius: 5px;">' +
-                         '<span>' + (marca.nombre || marca.text) + '</span>' +
-                     '</div>'
-                 );
-                 
-                 return $result;
-             },
-             templateSelection: function(marca) {
-                 if (marca.is_new) {
-                     var nombreMarca = marca.nombre || marca.text || 'Nueva marca';
-                     return 'Añadir nueva marca: ' + nombreMarca;
-                 }
-                 
-                 if (!marca.nombre) {
-                     return marca.text || marca.id;
-                 }
-                 
-                 return marca.nombre;
-             }
-        });
-        
-        // Preseleccionar marca si estamos en modo modificación
-        <?php if ($modo_modificacion && !empty($marca)): ?>
-        $(document).ready(function() {
-            // Obtener información de la marca desde el backend
-            var marcaNombre = '<?php echo htmlspecialchars($marca); ?>';
-            var marcaClave = '<?php echo htmlspecialchars($codigo_data['marca_clave'] ?? ''); ?>';
-            
-            // Crear la opción para la marca actual
-            var marcaActual = {
-                id: marcaNombre,
-                text: marcaNombre,
-                nombre: marcaNombre,
-                imagen: '/img/no_image.png' // Se cargará la imagen correcta desde el backend
-            };
-            
-            // Agregar la opción al Select2
-            var newOption = new Option(marcaActual.text, marcaActual.id, true, true);
-            $("#marca").append(newOption).trigger('change');
-            
-            // Establecer el valor en el campo oculto
-            $("#marca_valor").val(marcaActual.nombre);
-            
-            console.log("Marca preseleccionada:", marcaActual);
-        });
-        <?php endif; ?>
-        
-        // Manejar selección de marca
-         $("#marca").on('select2:select', function (e) {
-             var data = e.params.data;
-             
-             if (data.is_new) {
-                 // Si es nueva marca, mostrar el formulario de nueva marca
-                 $('#creada').val(1);
-                 $("#marca").hide();
-                 $("#div_nueva_marca").show();
-                 $("#div_nueva_marca").removeClass("hide");
-                 $("#categoria").focus();
-                 $(".nombre_nuevo").html(data.nombre);
-                 $(".inserta_imagenes").empty();
-                 
-                 var busqueda = data.nombre + " logo";
-                 
-                 $.ajax({
-                     type: 'GET',
-                     data: {
-                         q: busqueda + ' logo',
-                         num: 10,
-                         searchType: "image",
-                         key: "AIzaSyBO8kzIr4NtCVBxLxQSxGkq8Whw4kHgAqI",
-                         cx: "011289846254342421780:ygm3rzpmf2a"
-                     },
-                     url: 'https://www.googleapis.com/customsearch/v1',
-                     success: function (data) {
-                         $.each(data["items"], function(index, item) {
-                             var img = $('<li><div class="item_imagen"><img data="' + item["link"] + '" src="' + item["link"] + '"/></div></li>');
-                             $('.inserta_imagenes').append(img);
-                         });
-                     }
-                 });
-             } else {
-                 // Marca existente seleccionada
-                 console.log("Marca seleccionada:", data);
-                 $("#marca_valor").val(data.nombre);
-                 $("#marca").removeClass('error');
-                 $("#marca-error").hide();
-             }
-         });
-         
-         // Manejar cambio de valor en el select
-         $("#marca").on('change', function() {
-             var selectedValue = $(this).val();
-             if (selectedValue && !selectedValue.startsWith('nueva_marca_')) {
-                 $("#marca_valor").val(selectedValue);
-             }
-         });
-         
-         
-         // Manejar cancelar nueva marca
-         $(document).on("click", "#cancelar", function() {
-             $("#marca").show();
-             $("#div_nueva_marca").addClass("hide").hide();
-             $('#creada').val(0);
-             $("#marca").val('').trigger('change');
-             $("#marca_valor").val('');
-         });
-         
-         // Permitir al usuario seleccionar una imagen
-         $(document).on("click", ".item_imagen", function(){
-             $(".item_imagen").each(function () {
-                 $(this).removeClass("img-selected");
-             });
-             $(this).addClass("img-selected");
-             $(".selectImagen").prop("checked", false);
-             var name = $(this).children("img").attr('src');
-             $("#url_imagen").val(name);
-         });
-     }
-     
-     </script>
-     
-<?php get_footer(); ?>
+    <!-- Modal de Confirmación de Reemplazo -->
+    <div id="modal_confirmar_reemplazo" class="modal fade" role="dialog" style="z-index: 99999;">
+      <div class="modal-dialog">
+        <!-- Modal content-->
+        <div class="modal-content" style="background: #333; color: white; border: 1px solid #555;">
+          <div class="modal-header" style="border-bottom: 1px solid #555;">
+            <button type="button" class="close" data-dismiss="modal" style="color: white;">&times;</button>
+            <h4 class="modal-title" style="color: #E30613; font-weight: bold;">⚠️ Código ya existente</h4>
+          </div>
+          <div class="modal-body" style="text-align: center; font-size: 16px;">
+            <p>Ya tienes un código publicado para la marca <strong id="modal_marca_nombre" style="color: #E30613;"></strong>.</p>
+            <p>¿Quieres borrar tu código anterior y publicar este nuevo en su lugar?</p>
+            <div style="background: #444; padding: 10px; border-radius: 5px; margin-top: 15px; font-size: 14px; color: #ccc;">
+                <strong>Nota:</strong> Esta acción eliminará permanentemente tu código anterior y sus estadísticas.
+            </div>
+          </div>
+          <div class="modal-footer" style="border-top: 1px solid #555; text-align: center;">
+            <button type="button" class="btn btn-default" data-dismiss="modal" style="background: transparent; color: white; border: 1px solid #999; margin-right: 10px;">Cancelar</button>
+            <button type="button" class="btn btn-danger" id="btn_confirmar_reemplazo" style="background: #E30613; border-color: #E30613;">Sí, borrar anterior y publicar este</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
-<script>
-// Función para cargar Select2 dinámicamente
-function loadSelect2() {
-    return new Promise(function(resolve, reject) {
-        if (typeof $.fn.select2 !== 'undefined') {
-            resolve();
+    <!-- Bootstrap JS (necesario para el modal) -->
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+
+    <?php
+    // No mostrar footer en página nuevo_codigo para evitar puntos de fuga
+    // El botón flotante es suficiente para la navegación
+    ?>
+    <?php // get_footer(); ?>
+
+    <script>
+    // Función para inicializar el selector de marcas
+    function initBrandSelector() {
+        console.log("Inicializando selector de marcas...");
+
+        // Verificar que el elemento existe
+        if (!document.getElementById('marca')) {
+            console.error("Elemento #marca no encontrado");
             return;
         }
-        
-        // Cargar Select2 CSS si no está cargado
-        if (!document.querySelector('link[href*="select2"]')) {
-            var css = document.createElement('link');
-            css.rel = 'stylesheet';
-            css.href = 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css';
-            document.head.appendChild(css);
-        }
-        
-        // Cargar Select2 JS
-        var script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js';
-        script.onload = function() {
-            resolve();
-        };
-        script.onerror = function() {
-            console.error("Error cargando Select2");
-            reject();
-        };
-        document.head.appendChild(script);
-    });
-}
 
-// Inicializar Select2 después de que se cargue el footer completo
-$(document).ready(function() {
-    console.log("jQuery disponible:", typeof $);
-    
-    // Cargar Select2 y luego inicializar
-    loadSelect2().then(function() {
-        console.log("Inicializando selector de marcas...");
-        initBrandSelector();
-    }).catch(function() {
-        console.error("No se pudo cargar Select2");
+        // Verificar que jQuery esté disponible
+        if (typeof $ === 'undefined') {
+            console.error("jQuery no está disponible");
+            return;
+        }
+
+        // Verificar que Select2 esté disponible
+        if (typeof $.fn.select2 === 'undefined') {
+            console.error("Select2 no está disponible");
+            return;
+        }
+
+    console.log("Configurando Select2 para el selector de marcas...");
+
+    // Función para validar si todos los campos obligatorios están completos
+    function validateAllRequiredFields() {
+        var marcaValue = $("#marca_valor").val().trim();
+        var beneficio = $("#num_beneficio").val().trim();
+        var codigo = $("#codigo").val().trim();
+        var descripcion = $("#descripcion").val().trim();
+
+        var allValid = marcaValue !== '' && beneficio !== '' && codigo !== '' && descripcion !== '';
+
+        // Habilitar/deshabilitar botón flotante
+        if (allValid) {
+            $("#floating-save-button").prop("disabled", false);
+        } else {
+            $("#floating-save-button").prop("disabled", true);
+        }
+
+        return allValid;
+    }
+
+    // Función para validar un campo individual
+    function validateField(fieldId, errorId, errorMessage) {
+        var field = $("#" + fieldId);
+        var errorDiv = $("#" + errorId);
+        var value = field.val().trim();
+
+        if (value === '') {
+            field.addClass('error');
+            errorDiv.show();
+            return false;
+        } else {
+            field.removeClass('error');
+            errorDiv.hide();
+            return true;
+        }
+    }
+
+        // Función para limpiar errores
+        function clearErrors() {
+            $('.form-control').removeClass('error');
+            $('.error-message').hide();
+        }
+
+        // Configurar Select2 para el selector de marcas
+        try {
+            $("#marca").select2({
+                placeholder: "selecciona una marca",
+                allowClear: true,
+                width: '100%',
+                minimumInputLength: 0,
+                minimumResultsForSearch: 0,
+                ajax: {
+                    url: "/ajax/buscar_marcas.php",
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) {
+                        return {
+                            q: params.term || ''
+                        };
+                    },
+                    processResults: function (data) {
+                        return {
+                            results: data
+                        };
+                    },
+                    cache: true
+                }
+            });
+            console.log("Select2 configurado correctamente");
+        } catch (error) {
+            console.error("Error configurando Select2:", error);
+        }
+
+        // Evento para poner foco en el input cuando se abre el dropdown
+        $("#marca").on('select2:open', function(e) {
+            // Usar setTimeout para asegurar que el DOM esté completamente renderizado
+            setTimeout(function() {
+                // Buscar el campo de búsqueda dentro del dropdown
+                var searchField = $('.select2-container--open .select2-search__field');
+                
+                if (searchField.length > 0) {
+                    // Enfocar el campo de búsqueda
+                    searchField.focus();
+                    // Seleccionar todo el texto si hay alguno
+                    searchField.select();
+                } else {
+                    // Si aún no existe, intentar varias veces con intervalos cortos
+                    var attempts = 0;
+                    var maxAttempts = 10;
+                    var interval = setInterval(function() {
+                        attempts++;
+                        var field = $('.select2-container--open .select2-search__field');
+                        if (field.length > 0) {
+                            field.focus();
+                            field.select();
+                            clearInterval(interval);
+                        } else if (attempts >= maxAttempts) {
+                            clearInterval(interval);
+                        }
+                    }, 50);
+                }
+            }, 10);
+        });
+
+    // Validación en tiempo real
+    $('#marca').on('blur', function() {
+        var marcaValue = $("#marca_valor").val();
+        if (marcaValue === '') {
+            $("#marca").addClass('error');
+            $("#marca-error").show();
+        } else {
+            $("#marca").removeClass('error');
+            $("#marca-error").hide();
+        }
+        validateAllRequiredFields(); // Verificar si habilitar botón
     });
-});
-</script>
+
+    $('#num_beneficio').on('blur input', function() {
+        validateField('num_beneficio', 'num_beneficio-error', 'El beneficio económico es obligatorio');
+        validateAllRequiredFields(); // Verificar si habilitar botón
+    });
+
+    $('#codigo').on('blur input', function() {
+        validateField('codigo', 'codigo-error', 'El código promocional es obligatorio');
+        validateAllRequiredFields(); // Verificar si habilitar botón
+    });
+
+    $('#descripcion').on('blur input', function() {
+        validateField('descripcion', 'descripcion-error', 'La descripción es obligatoria');
+        validateAllRequiredFields(); // Verificar si habilitar botón
+    });
+
+        // Manejar selección de marca
+        $("#marca").on('select2:select', function (e) {
+            var data = e.params.data;
+
+            if (data.is_new) {
+                // Si es nueva marca, mostrar el formulario de nueva marca
+                $('#creada').val(1);
+                $("#marca_valor").val(data.nombre); // Establecer el valor para nuevas marcas
+                $("#marca").val(data.nombre); // También actualizar el valor del select
+                console.log("Nueva marca seleccionada, estableciendo marca_valor:", data.nombre);
+                $("#marca").hide();
+                $("#div_nueva_marca").show();
+                $("#div_nueva_marca").removeClass("hide");
+                $("#categoria").focus();
+                $(".nombre_nuevo").html(data.nombre);
+                $(".inserta_imagenes").empty();
+
+                var busqueda = data.nombre + " logo";
+
+                $.ajax({
+                    type: 'GET',
+                    data: {
+                        q: busqueda + ' logo',
+                        num: 10,
+                        searchType: "image",
+                        key: "AIzaSyBO8kzIr4NtCVBxLxQSxGkq8Whw4kHgAqI",
+                        cx: "011289846254342421780:ygm3rzpmf2a"
+                    },
+                    url: 'https://www.googleapis.com/customsearch/v1',
+                    success: function (data) {
+                        $.each(data["items"], function(index, item) {
+                            var img = $('<li><div class="item_imagen"><img data="' + item["link"] + '" src="' + item["link"] + '"/></div></li>');
+                            $('.inserta_imagenes').append(img);
+                        });
+                    }
+                });
+        } else {
+            // Marca existente seleccionada
+            console.log("Marca seleccionada:", data);
+            // Usar nombre_clave si está disponible para asegurar coincidencia con BD
+            var valorMarca = data.nombre_clave ? data.nombre_clave : data.nombre;
+            $("#marca_valor").val(valorMarca);
+            $("#marca").removeClass('error');
+            $("#marca-error").hide();
+            
+            // CHECK SUPER LANDINGS
+            if (window.superLandingsMap && window.superLandingsMap[valorMarca]) {
+                 $('#super-landing-alert').fadeIn();
+            } else {
+                 $('#super-landing-alert').hide();
+            }
+            
+            validateAllRequiredFields(); // Verificar si habilitar botón
+        }
+        });
+
+        // Manejar cambio de valor en el select
+        $("#marca").on('change', function() {
+            var selectedValue = $(this).val();
+            console.log("Evento change en marca, valor seleccionado:", selectedValue);
+            if (selectedValue && !selectedValue.startsWith('nueva_marca_')) {
+                $("#marca_valor").val(selectedValue);
+                console.log("Estableciendo marca_valor para marca existente:", selectedValue);
+            } else if (selectedValue && selectedValue.startsWith('nueva_marca_')) {
+                console.log("Valor de nueva marca detectado, no cambiando marca_valor");
+            }
+            validateAllRequiredFields(); // Verificar si habilitar botón
+        });
+
+        // Validación al enviar el formulario
+        $('#nuevo_codigo').on('submit', function(e) {
+            clearErrors();
+
+            // Usar la misma validación que para habilitar el botón
+            if (!validateAllRequiredFields()) {
+                e.preventDefault();
+                showValidationErrors();
+                return false;
+            }
+
+            // Si ya estamos re-enviando confirmado, permitir submit
+            if ($(this).data('submitting_confirmed') === true) {
+                return true;
+            }
+            
+            // Si estamos en modo modificación, no hace falta chequear duplicados (ya es el mismo)
+            var modoModificacion = <?php echo $modo_modificacion ? 'true' : 'false'; ?>;
+            if (modoModificacion) {
+                return true;
+            }
+
+            // Si es nueva marca (creada por usuario), no tendrá duplicados previos
+            if ($('#div_nueva_marca').is(':visible')) {
+               return true;
+            }
+
+            // Interceptar submit para chequear duplicados AJAX
+            e.preventDefault();
+            var form = $(this);
+            var marcaNombre = $('#marca_valor').val();
+            
+            // Mostrar indicador de carga o deshabilitar botón si se desea...
+            
+            $.ajax({
+                url: '/ajax/check_existing_code.php',
+                type: 'GET',
+                data: { marca: marcaNombre },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success && response.exists) {
+                        // Existe código previo: Mostrar Modal
+                        $('#modal_marca_nombre').text(marcaNombre);
+                        $('#modal_confirmar_reemplazo').modal('show');
+                        
+                        // Handler para el botón confirmar del modal
+                        $('#btn_confirmar_reemplazo').off('click').on('click', function() {
+                            // Añadir flag de reemplazo
+                            $('<input>').attr({
+                                type: 'hidden',
+                                name: 'replace_existing',
+                                value: '1'
+                            }).appendTo(form);
+                            
+                            // Marcar como confirmado para evitar loop
+                            form.data('submitting_confirmed', true);
+                            
+                            // Cerrar modal y enviar
+                            $('#modal_confirmar_reemplazo').modal('hide');
+                            form.submit();
+                        });
+                        
+                    } else {
+                        // No existe, enviar normal
+                        form.data('submitting_confirmed', true);
+                        form.submit();
+                    }
+                },
+                error: function() {
+                    // Si falla AJAX, permitir envío y que el backend maneje el error como antes
+                    form.data('submitting_confirmed', true);
+                    form.submit();
+                }
+            });
+            
+            return false;
+        });
+
+        function showValidationErrors() {
+                 // Mostrar errores visuales para campos vacíos
+                var marcaValue = $("#marca_valor").val().trim();
+                var beneficio = $("#num_beneficio").val().trim();
+                var codigo = $("#codigo").val().trim();
+                var descripcion = $("#descripcion").val().trim();
+
+                if (marcaValue === '') {
+                    $("#marca").addClass('error');
+                    $("#marca-error").show();
+                }
+                if (beneficio === '') {
+                    $("#num_beneficio").addClass('error');
+                    $("#num_beneficio-error").show();
+                }
+                if (codigo === '') {
+                    $("#codigo").addClass('error');
+                    $("#codigo-error").show();
+                }
+                if (descripcion === '') {
+                    $("#descripcion").addClass('error');
+                    $("#descripcion-error").show();
+                }
+
+                // Scroll al primer campo con error
+                var firstError = $('.form-control.error').first();
+                if (firstError.length) {
+                    $('html, body').animate({
+                        scrollTop: firstError.offset().top - 100
+                    }, 500);
+                }
+        }
+
+        // Manejar cancelar nueva marca
+        $(document).on("click", "#cancelar", function() {
+            $("#marca").show();
+            $("#div_nueva_marca").addClass("hide").hide();
+            $('#creada').val(0);
+            $("#marca").val('').trigger('change');
+            $("#marca_valor").val('');
+            $("#url_imagen").val('');
+            $("#categoria_valor").val('');
+            $("#categoria_clave").val('');
+            $("#categoria").val('select');
+            validateAllRequiredFields(); // Verificar si deshabilitar botón
+        });
+
+        // Manejar cambio en el select de categoría
+        $("#categoria").on("change", function() {
+            var selectedValue = $(this).val();
+            var selectedText = $(this).find("option:selected").text();
+
+            if (selectedValue && selectedValue !== "select") {
+                $("#categoria_valor").val(selectedText);
+                $("#categoria_clave").val(selectedValue);
+                console.log("Categoría seleccionada:", selectedText, "Clave:", selectedValue);
+                console.log("Valor guardado en categoria_valor:", $("#categoria_valor").val());
+                console.log("Valor guardado en categoria_clave:", $("#categoria_clave").val());
+            } else {
+                $("#categoria_valor").val('');
+                $("#categoria_clave").val('');
+                console.log("Categoría limpiada");
+            }
+        });
+
+        // Permitir al usuario seleccionar una imagen
+        $(document).on("click", ".item_imagen", function(){
+            $(".item_imagen").each(function () {
+                $(this).removeClass("img-selected");
+            });
+            $(this).addClass("img-selected");
+            $(".selectImagen").prop("checked", false);
+            var name = $(this).children("img").attr('src');
+            $("#url_imagen").val(name);
+            console.log("Imagen seleccionada para nueva marca:", name);
+            console.log("Valor actual de marca_valor:", $("#marca_valor").val());
+        });
+
+        // Preseleccionar marca si estamos en modo modificación O si viene de la URL
+        <?php if ((isset($_GET['marca']) || $modo_modificacion) && !empty($marca)): ?>
+        // Obtener información de la marca desde el backend
+        var marcaNombre = '<?php echo htmlspecialchars($marca); ?>';
+        var marcaClave = '<?php echo htmlspecialchars(isset($codigo_data['marca_clave']) ? $codigo_data['marca_clave'] : ''); ?>';
+        var marcaEsNueva = <?php echo $marca_es_nueva ? 'true' : 'false'; ?>;
+
+        // Crear la opción para la marca actual
+        var marcaActual = {
+            id: marcaNombre,
+            text: marcaNombre,
+            nombre: marcaNombre,
+            imagen: '/img/no_image.png',
+            is_new: marcaEsNueva
+        };
+
+        // Agregar la opción al Select2
+        var newOption = new Option(marcaActual.text, marcaActual.id, true, true);
+        $("#marca").append(newOption);
+
+        // Establecer los datos en Select2
+        $("#marca").select2('trigger', 'select', { data: marcaActual });
+
+        // Establecer el valor en el campo oculto
+        $("#marca_valor").val(marcaActual.nombre);
+
+        console.log("Marca preseleccionada:", marcaActual);
+        
+        // Si es nueva marca, abrir el div de nueva marca
+        if (marcaEsNueva) {
+            $('#creada').val(1);
+            $("#marca").hide();
+            $("#div_nueva_marca").show();
+            $("#div_nueva_marca").removeClass("hide");
+            $("#categoria").focus();
+            $(".nombre_nuevo").html(marcaNombre);
+            $(".inserta_imagenes").empty();
+
+            var busqueda = marcaNombre + " logo";
+
+            $.ajax({
+                type: 'GET',
+                data: {
+                    q: busqueda + ' logo',
+                    num: 10,
+                    searchType: "image",
+                    key: "AIzaSyBO8kzIr4NtCVBxLxQSxGkq8Whw4kHgAqI",
+                    cx: "011289846254342421780:ygm3rzpmf2a"
+                },
+                url: 'https://www.googleapis.com/customsearch/v1',
+                success: function (data) {
+                    $.each(data["items"], function(index, item) {
+                        var img = $('<li><div class="item_imagen"><img data="' + item["link"] + '" src="' + item["link"] + '"/></div></li>');
+                        $('.inserta_imagenes').append(img);
+                    });
+                }
+            });
+        }
+        <?php endif; ?>
+    }
+
+    // Inicializar cuando la página esté lista
+    $(document).ready(function() {
+        console.log("jQuery disponible:", typeof $);
+        console.log("Página lista, inicializando componentes...");
+
+        // Pequeño delay para asegurar que todo esté cargado
+        setTimeout(function() {
+            console.log("Inicializando selector de marcas...");
+            initBrandSelector();
+
+            // Si estamos en modo modificación, verificar si el botón debe estar habilitado
+            <?php if ($modo_modificacion): ?>
+            setTimeout(function() {
+                validateAllRequiredFields();
+            }, 500); // Delay adicional para asegurar que los campos estén cargados
+            <?php endif; ?>
+
+        <?php /* 
+        // Manejar vista previa del PDF - temporalmente deshabilitado
+        $('#pdf_retencion').on('change', function() {
+            var file = this.files[0];
+            if (file) {
+                if (file.type === 'application/pdf') {
+                    $('#pdf-name').text(file.name);
+                    $('#pdf-preview').show();
+                } else {
+                    alert('Por favor, selecciona un archivo PDF válido.');
+                    $(this).val('');
+                    $('#pdf-preview').hide();
+                }
+            } else {
+                $('#pdf-preview').hide();
+            }
+        });
+        */ ?>
+        }, 200);
+    });
+    </script>
 </body>
 </html>

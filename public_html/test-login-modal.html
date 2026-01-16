@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Diagnóstico Modal Login - CodigoAmigo</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #0f0; }
+        .test { margin: 10px 0; padding: 10px; background: #333; border-left: 3px solid #0f0; }
+        .error { border-left-color: #f00; color: #f00; }
+        .ok { border-left-color: #0f0; color: #0f0; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Diagnóstico del Modal de Login</h1>
+    
+    <div id="results"></div>
+    
+    <h2>Pruebas Manuales:</h2>
+    <button onclick="testLoginButton()">Test 1: Click en botón login</button>
+    <button onclick="testModalExists()">Test 2: Verificar modal existe</button>
+    <button onclick="testJQuery()">Test 3: Verificar jQuery</button>
+    <button onclick="testEventListeners()">Test 4: Ver event listeners</button>
+    <button onclick="forceOpenModal()">Test 5: Forzar apertura modal</button>
+    
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script>
+        function log(msg, isOk = true) {
+            const div = document.createElement('div');
+            div.className = 'test ' + (isOk ? 'ok' : 'error');
+            div.innerHTML = msg;
+            document.getElementById('results').appendChild(div);
+        }
+        
+        function testLoginButton() {
+            const btn = document.querySelector('.open_modal_login');
+            if(btn) {
+                log('✓ Botón .open_modal_login encontrado: ' + btn.textContent);
+                log('✓ ID: ' + (btn.id || 'sin ID'));
+                log('✓ Classes: ' + btn.className);
+            } else {
+                log('✗ Botón .open_modal_login NO encontrado', false);
+            }
+        }
+        
+        function testModalExists() {
+            const modal = document.getElementById('modal_login');
+            if(modal) {
+                log('✓ Modal #modal_login encontrado');
+                log('✓ Display: ' + window.getComputedStyle(modal).display);
+                log('✓ Classes: ' + modal.className);
+            } else {
+                log('✗ Modal #modal_login NO encontrado', false);
+            }
+        }
+        
+        function testJQuery() {
+            if(typeof jQuery !== 'undefined') {
+                log('✓ jQuery cargado: v' + jQuery.fn.jquery);
+                log('✓ jQuery.fn.modal: ' + (typeof jQuery.fn.modal !== 'undefined' ? 'disponible' : 'NO disponible'));
+            } else {
+                log('✗ jQuery NO cargado', false);
+            }
+        }
+        
+        function testEventListeners() {
+            const btn = document.querySelector('.open_modal_login');
+            if(btn) {
+                log('Click listeners en el botón:');
+                // No podemos ver directamente los listeners, pero podemos intentar
+                $(btn).trigger('click');
+                log('✓ Trigger ejecutado');
+            }
+        }
+        
+        function forceOpenModal() {
+            try {
+                const modal = $('#modal_login');
+                if(modal.length) {
+                    if(typeof modal.modal === 'function') {
+                        modal.modal('show');
+                        log('✓ Modal abierto con .modal("show")');
+                    } else {
+                        modal.addClass('in show').css('display', 'block');
+                        $('body').addClass('modal-open');
+                        $('<div class="modal-backdrop fade show"></div>').appendTo('body');
+                        log('✓ Modal abierto manualmente (sin bootstrap modal)');
+                    }
+                } else {
+                    log('✗ Modal no encontrado para abrir', false);
+                }
+            } catch(e) {
+                log('✗ Error: ' + e.message, false);
+            }
+        }
+        
+        // Auto-diagnóstico al cargar
+        $(document).ready(function() {
+            log('=== DIAGNÓSTICO AUTOMÁTICO ===');
+            testLoginButton();
+            testModalExists();
+            testJQuery();
+            
+            log('=== VERIFICANDO HANDLERS ===');
+            const handlers = $._data(document, 'events');
+            if(handlers && handlers.click) {
+                log('✓ Hay ' + handlers.click.length + ' handlers de click en document');
+                handlers.click.forEach((h, i) => {
+                    log('  Handler ' + i + ': ' + (h.selector || 'sin selector'));
+                });
+            }
+        });
+    </script>
+</body>
+</html>

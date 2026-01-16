@@ -41,7 +41,7 @@ try {
         ])->toArray();
         
         if ($codigos_marca == 0 && ($codigos_nombre > 0 || count($codigos_variaciones) > 0)) {
-            echo "<div style='border: 1px solid #ff6b35; padding: 10px; margin: 10px 0; background: #fff5f2;'>";
+            echo "<div style='border: 1px solid #E30613; padding: 10px; margin: 10px 0; background: #fff5f2;'>";
             echo "<h3>🔍 Problema detectado en marca: " . htmlspecialchars($nombre) . "</h3>";
             echo "<p><strong>Nombre clave actual:</strong> " . htmlspecialchars($nombre_clave) . "</p>";
             echo "<p><strong>Códigos con nombre_clave actual:</strong> " . $codigos_marca . "</p>";

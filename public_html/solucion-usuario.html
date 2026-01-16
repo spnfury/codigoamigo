@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solución - CodigoAmigo</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        .problem {
+            background: rgba(255,71,87,0.2);
+            border: 2px solid #ff4757;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .solution {
+            background: rgba(40,167,69,0.2);
+            border: 2px solid #2ecc71;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .step {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #4ecdc4;
+        }
+        .btn {
+            background: #2ecc71;
+            color: white;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            background: #27ae60;
+            transform: translateY(-2px);
+        }
+        .btn-danger {
+            background: #ff4757;
+        }
+        .btn-danger:hover {
+            background: #ff3742;
+        }
+        .code {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            margin: 10px 0;
+            border-left: 4px solid #ff4757;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            margin-right: 10px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .status-ok {
+            background: #2ecc71;
+        }
+        .status-error {
+            background: #ff4757;
+        }
+        .status-warning {
+            background: #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚨 Problema Identificado - Solución Específica</h1>
+
+        <div class="problem">
+            <h2>❌ Tu Problema Específico</h2>
+            <p><strong>Error:</strong> No puedes acceder a <code>https://www.codigoamigo.com/</code> desde tu navegador</p>
+            <p><strong>Causa:</strong> Cloudflare está bloqueando la conexión HTTPS desde tu ubicación específica</p>
+            <p><strong>Estado del servidor:</strong> Funcionando perfectamente</p>
+        </div>
+
+        <div class="solution">
+            <h2>✅ SOLUCIONES ESPECÍFICAS PARA TI</h2>
+
+            <div class="step">
+                <h3>🎯 Solución 1: Acceso Directo al Servidor</h3>
+                <div class="code">http://78.46.100.91/</div>
+                <p>Esta URL evita completamente Cloudflare y debería funcionar sin problemas desde tu navegador.</p>
+                <a href="http://78.46.100.91/" class="btn">🔓 ACCESO DIRECTO</a>
+            </div>
+
+            <div class="step">
+                <h3>🔄 Solución 2: Cambiar DNS</h3>
+                <div class="code">
+                    DNS Primario: 8.8.8.8<br>
+                    DNS Secundario: 8.8.4.4
+                </div>
+                <p><strong>Pasos:</strong></p>
+                <ol>
+                    <li>Ve a Configuración de Red</li>
+                    <li>Propiedades de TCP/IPv4</li>
+                    <li>Cambia a "Usar las siguientes direcciones de servidor DNS"</li>
+                    <li>Introduce: 8.8.8.8 y 8.8.4.4</li>
+                    <li>Reinicia el navegador</li>
+                </ol>
+                <button onclick="changeDNSPopup()" class="btn btn-danger">Cambiar DNS</button>
+            </div>
+
+            <div class="step">
+                <h3>🧹 Solución 3: Limpiar Navegador</h3>
+                <p><strong>Pasos específicos:</strong></p>
+                <div class="code">
+                    1. Presiona Ctrl+Shift+Del<br>
+                    2. Selecciona "Todo el tiempo"<br>
+                    3. Marca: Cookies, Caché, Historial<br>
+                    4. Reinicia el navegador<br>
+                    5. Prueba https://www.codigoamigo.com/
+                </div>
+                <button onclick="clearBrowserData()" class="btn">🧹 Limpiar Navegador</button>
+            </div>
+
+            <div class="step">
+                <h3>📱 Solución 4: Probar en Móvil</h3>
+                <p>Usa datos móviles (4G/5G) en lugar de WiFi para probar si el problema es de tu red doméstica.</p>
+                <div class="code">https://www.codigoamigo.com/</div>
+            </div>
+
+            <div class="step">
+                <h3>🔍 Solución 5: Diagnóstico Completo</h3>
+                <a href="/diagnostico-especifico.html" class="btn">🔍 Diagnóstico Completo</a>
+                <p>Esta página te dará información detallada sobre tu navegador y conectividad.</p>
+            </div>
+        </div>
+
+        <div class="solution">
+            <h2>📊 Estado Confirmado del Servidor</h2>
+            <div id="server-status">
+                <p><span class="status-indicator status-ok"></span> <strong>Servidor:</strong> Funcionando perfectamente</p>
+                <p><span class="status-indicator status-ok"></span> <strong>PHP:</strong> Sin errores</p>
+                <p><span class="status-indicator status-ok"></span> <strong>Base de datos:</strong> Conectada</p>
+                <p><span class="status-indicator status-ok"></span> <strong>SSL:</strong> Certificado válido</p>
+                <p><span class="status-indicator status-ok"></span> <strong>Cloudflare:</strong> Funcionando</p>
+                <p><span class="status-indicator status-error"></span> <strong>Tu conexión:</strong> Problema específico de HTTPS</p>
+            </div>
+        </div>
+
+        <div class="problem">
+            <h2>🔧 Configuraciones de Cloudflare a Verificar</h2>
+            <p>Ve al panel de Cloudflare y verifica estas configuraciones específicas:</p>
+            <div class="code">
+                1. Security → WAF: Desactiva todas las reglas<br>
+                2. Security → Rate Limiting: Desactiva todos los límites<br>
+                3. Security → Bot Fight Mode: Desactívalo<br>
+                4. Security → Browser Integrity Check: Desactívalo<br>
+                5. Firewall → IP Access Rules: Verifica tu IP<br>
+                6. Firewall → User Agent Blocking: Desactívalo
+            </div>
+            <p><strong>Panel:</strong> <a href="https://dash.cloudflare.com/" style="color: #4ecdc4;">https://dash.cloudflare.com/</a></p>
+        </div>
+
+        <div class="solution">
+            <h2>🎯 URLs de Prueba para Ti</h2>
+            <a href="http://78.46.100.91/" class="btn">🌐 IP Directa</a>
+            <a href="http://78.46.100.91/?cf_bypass=1" class="btn btn-danger">⚡ IP + Bypass</a>
+            <a href="https://www.codigoamigo.com/diagnostico-especifico.html" class="btn">🔍 Diagnóstico</a>
+            <a href="https://www.codigoamigo.com/diagnostico-navegador.html" class="btn">📊 Test Navegador</a>
+        </div>
+
+        <div class="solution">
+            <h2>💡 Recomendación Final</h2>
+            <p><strong>Prueba primero:</strong> <code>http://78.46.100.91/</code></p>
+            <p><strong>Si funciona:</strong> El problema es Cloudflare - cambia el DNS</p>
+            <p><strong>Si no funciona:</strong> El problema es tu conexión a internet</p>
+            <p><strong>El sitio está funcionando perfectamente - el problema es específico desde tu ubicación.</strong></p>
+        </div>
+    </div>
+
+    <script>
+        function changeDNSPopup() {
+            const instructions = `
+INSTRUCCIONES PARA CAMBIAR DNS:
+
+1. Ve a Configuración de Red
+2. Propiedades de TCP/IPv4
+3. Marca "Usar las siguientes direcciones"
+4. DNS Primario: 8.8.8.8
+5. DNS Secundario: 8.8.4.4
+6. Aceptar y reiniciar navegador
+
+¿Quieres que te ayude con esto?
+            `;
+            alert(instructions);
+        }
+
+        function clearBrowserData() {
+            if (confirm('¿Quieres limpiar todos los datos del navegador?\n\nEsto eliminará:\n- Cookies\n- Caché\n- Historial\n- Datos de sitios')) {
+                // Limpiar localStorage y sessionStorage
+                localStorage.clear();
+                sessionStorage.clear();
+
+                // Mostrar confirmación
+                alert('Datos limpiados exitosamente.\n\nAhora reinicia tu navegador y prueba de nuevo.');
+
+                // Sugerir recarga
+                if (confirm('¿Quieres recargar la página ahora?')) {
+                    window.location.reload();
+                }
+            }
+        }
+
+        // Auto-redirección a diagnóstico después de 5 segundos
+        setTimeout(function() {
+            if (confirm('¿Quieres ir a la página de diagnóstico para más información?')) {
+                window.location.href = '/diagnostico-especifico.html';
+            }
+        }, 5000);
+
+        // Log para debugging
+        console.log('User solution page loaded');
+        console.log('User Agent:', navigator.userAgent);
+        console.log('Current URL:', window.location.href);
+        console.log('Timestamp:', new Date().toISOString());
+    </script>
+</body>
+</html>

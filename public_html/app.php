@@ -129,14 +129,15 @@ if ($_SESSION['user_id']) {
 
 
 
-$lifetime = 60000000;
-session_set_cookie_params($lifetime);
-// Configuración de sesiones
+// Configuración de sesiones - Sesión infinita (10 años)
+$lifetime = 315360000; // 10 años en segundos (60*60*24*365*10)
+ini_set('session.gc_maxlifetime', $lifetime); // Tiempo de vida de los archivos de sesión en el servidor
 ini_set('session.cookie_httponly', 1);
 ini_set('session.cookie_secure', isset($_SERVER['HTTPS']) ? 1 : 0);
 ini_set('session.use_strict_mode', 1);
 ini_set('session.cookie_samesite', 'Lax');
-session_set_cookie_params(0, '/', ".codigoamigo.com");
+// Configurar cookie de sesión con lifetime muy alto
+session_set_cookie_params($lifetime, '/', ".codigoamigo.com");
 
 
 if ((strstr($_SERVER['HTTP_USER_AGENT'], 'casinuevo_debug'))) {
@@ -319,6 +320,21 @@ $app->get('/listado', function ($request, $respon) {
     include_once $_SERVER['DOCUMENT_ROOT'] . '/public/listado_categorias.php';
 });
 
+// Ruta para URLs de Afiliados
+$app->get('/afiliados', function ($request, $respon) {
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/afiliados.php';
+});
+
+// Ruta para Panel de Administración de Afiliados
+$app->get('/admin_afiliados', function ($request, $respon) {
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/admin_afiliados.php';
+});
+
+// Ruta para Ingresos de Afiliado específico
+$app->get('/ingresos_afiliado', function ($request, $respon) {
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/ingresos_afiliado.php';
+});
+
 // Ruta para fichas rediseñadas
 $app->get('/ficha/{id}', function ($request, $respon, $args) {
     // Incluir configuración del rediseño
@@ -490,6 +506,178 @@ $app->get('/admin_logs', function ($request, $respon) {
     exit;
 });
 
+$app->get('/admin_chat', function ($request, $respon) {
+    header('Location: /public/admin_chat.php', true, 302);
+    exit;
+});
+
+$app->get('/admin_chollos', function ($request, $respon) {
+    header('Location: /public/admin_chollos.php');
+    exit;
+});
+
+$app->get('/admin_newsletters', function ($request, $respon) {
+    header('Location: /public/admin_newsletters.php');
+    exit;
+});
+
+/********************************************************************
+ * CHOLLOS
+ *******************************************************************/
+
+// Incluir funciones de chollos
+include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_chollos.php';
+include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_chollos_amazon.php';
+include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_chollos_groq.php';
+
+// Ruta principal de chollos
+$app->get('/chollos', function ($request, $respon) {
+    global $panel, $detect;
+    
+    // Inicializar variables globales
+    $GLOBALS['website'] = 'https://www.codigoamigo.com/';
+    $GLOBALS['actual_url'] = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+    
+    // Incluir archivos necesarios
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    
+    // Inicializar detector de móviles
+    if (!isset($detect)) {
+        $detect = new Mobile_Detect();
+    }
+    $GLOBALS['detect'] = $detect;
+    
+    // Incluir funciones modernas
+    include_once __DIR__ . '/myphp/funciones_modern.php';
+    include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true;
+    
+    // Obtener chollos
+    $filtros = [
+        'estado' => 1,
+        'limite' => 24
+    ];
+    
+    if (isset($_GET['categoria']) && !empty($_GET['categoria'])) {
+        $filtros['categoria'] = $_GET['categoria'];
+    }
+    
+    if (isset($_GET['busqueda']) && !empty($_GET['busqueda'])) {
+        $filtros['busqueda'] = $_GET['busqueda'];
+    }
+    
+    $chollos = obtenerChollos($filtros);
+    $categorias = obtenerCategoriasChollos();
+    
+    // Llamar a la función del header moderno
+    get_header_modern(
+        "Chollos y Ofertas - CodigoAmigo.com",
+        "Descubre los mejores chollos y ofertas de Amazon, Black Friday, electrónica, moda y más. Ahorra dinero con nuestras ofertas exclusivas.",
+        "chollos, ofertas, descuentos, amazon, black friday, electrónica, moda"
+    );
+    
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/chollos_listado.php';
+    
+    return $respon;
+});
+
+// Ruta del acortador de chollos /chollo/{id} - DEBE IR ANTES DE RUTAS GENÉRICAS
+$app->get('/chollo/{id}', function ($request, $respon, $args) {
+    // Incluir archivos necesarios
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/funciones_chollos.php';
+    
+    $chollo_id = $args['id'] ?? '';
+    
+    // Log para debugging
+    error_log("Acortador chollo - ID recibido: " . $chollo_id);
+    
+    if (empty($chollo_id)) {
+        error_log("Acortador chollo - ID vacío, redirigiendo a /chollos");
+        return $respon->withRedirect('/chollos', 301);
+    }
+    
+    // Obtener el chollo sin incrementar clicks (usaremos registrarClickChollo después)
+    $collection = getCollectionChollos();
+    if (!$collection) {
+        error_log("Acortador chollo - Error: No se pudo obtener colección");
+        return $respon->withRedirect('/chollos', 301);
+    }
+    
+    try {
+        $objectId = new MongoDB\BSON\ObjectId($chollo_id);
+        $doc = $collection->findOne(['_id' => $objectId]);
+        
+        if (!$doc) {
+            error_log("Acortador chollo - Chollo no encontrado con ID: " . $chollo_id);
+            return $respon->withRedirect('/chollos', 301);
+        }
+        
+        if (empty($doc['enlace'])) {
+            error_log("Acortador chollo - Chollo sin enlace, ID: " . $chollo_id);
+            return $respon->withRedirect('/chollos', 301);
+        }
+        
+        $enlace = $doc['enlace'];
+        error_log("Acortador chollo - Enlace encontrado: " . $enlace);
+        
+        // Redirigir a la URL original del chollo (absoluta)
+        if (!preg_match('/^https?:\/\//', $enlace)) {
+            // Si no tiene protocolo, añadir https://
+            $enlace = 'https://' . $enlace;
+        }
+
+        // Preparar datos para tracking
+        $enlace_original = $enlace;
+        $es_amazon = esEnlaceAmazon($enlace);
+        
+        // Cargar funciones de Amazon si no están cargadas
+        include_once __DIR__ . '/myphp/funciones_chollos_amazon.php';
+        
+        $asin = null;
+        if ($es_amazon) {
+            error_log("Acortador chollo - Es enlace de Amazon, aplicando tagging...");
+            $enlace = convertirEnlaceAmazonGarantizado($enlace, $chollo_id);
+            $asin = extraerASIN($enlace);
+        }
+
+        // Registrar el click con información detallada
+        $datos_click = [
+            'enlace_original' => $enlace_original,
+            'enlace_final' => $enlace,
+            'es_amazon' => $es_amazon,
+            'tiene_tag_afiliado' => ($es_amazon && strpos($enlace, 'tag=spnfuryy-21') !== false)
+        ];
+        if ($asin) { $datos_click['asin'] = $asin; }
+
+        registrarClickChollo($chollo_id, $datos_click);
+        
+        error_log("Acortador chollo - Redirigiendo a: " . $enlace);
+        return $respon->withRedirect($enlace, 302);
+    } catch (Exception $e) {
+        error_log("Error en acortador de chollo: " . $e->getMessage() . " - ID: " . $chollo_id);
+        error_log("Stack trace: " . $e->getTraceAsString());
+        return $respon->withRedirect('/chollos', 301);
+    }
+});
+
+// Ruta de detalle individual - Redirige directamente al short link
+$app->get('/chollos/{categoria}/{id}', function ($request, $respon, $args) {
+    $id = $args['id'];
+    
+    // Redirigir directamente al short link que lleva a Amazon
+    return $respon->withRedirect('/chollo/' . $id, 301);
+});
+
+// Webhook para Telegram
+$app->post('/webhook/telegram-chollos', function ($request, $respon) {
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/telegram_chollos_bot.php';
+    procesarMensajeTelegram($request->getBody());
+    return $respon->withJson(['success' => true]);
+});
+
 $app->get('/panel-de-control-usuarios', function ($request, $respon) {
 
     global $panel;
@@ -547,7 +735,7 @@ $app->get('/test2', function ($request, $respon) {
 
 });
 
-$app->get('/buscar/{termino}', function ($request, $respon, $args) {
+$app->get('/ofertas/{termino}', function ($request, $respon, $args) {
     global $author_web, $name_page;
 
     $termino = $args['termino'];
@@ -568,16 +756,90 @@ $app->get('/buscar/{termino}', function ($request, $respon, $args) {
     // Buscar en códigos con términos mejorados
     $array_filtro_codigos = crear_filtro_codigos_mejorado($terminos_busqueda);
 
-    $array_opciones = array(
-        'limit' => 20,
+    // Primero obtener códigos DESTACADOS que coincidan con la búsqueda
+    // Combinar el filtro de búsqueda con el filtro de destacados usando $and
+    $array_filtro_destacados = array();
+    
+    // Copiar todos los filtros excepto $or
+    foreach ($array_filtro_codigos as $key => $value) {
+        if ($key !== '$or') {
+            $array_filtro_destacados[$key] = $value;
+        }
+    }
+    
+    // Combinar condiciones de búsqueda y destacados con $and
+    $and_conditions = array();
+    
+    // Añadir condición de búsqueda si existe
+    if (isset($array_filtro_codigos['$or'])) {
+        $and_conditions[] = array('$or' => $array_filtro_codigos['$or']);
+    }
+    
+    // Añadir condición de destacados (destacado o destacado_social)
+    $and_conditions[] = array(
+        '$or' => array(
+            array('destacado' => array('$ne' => 0)),
+            array('destacado_social' => array('$ne' => 0))
+        )
+    );
+    
+    if (!empty($and_conditions)) {
+        $array_filtro_destacados['$and'] = $and_conditions;
+    }
+    
+    $array_opciones_destacados = array(
+        'limit' => 50,  // Aumentar límite para obtener más destacados
+        'sort' => array('destacado_social' => -1, 'destacado' => -1, '_id' => -1)
+    );
+    
+    $lista_codigos_destacados = get_all_listado_codigos_array($array_filtro_destacados, $array_opciones_destacados);
+    $codigos_destacados = isset($lista_codigos_destacados["results"]) ? $lista_codigos_destacados["results"] : [];
+    
+    // Luego obtener códigos NO DESTACADOS que coincidan con la búsqueda
+    // Excluir tanto destacado como destacado_social
+    $array_filtro_normales = array();
+    
+    // Copiar todos los filtros excepto $or
+    foreach ($array_filtro_codigos as $key => $value) {
+        if ($key !== '$or') {
+            $array_filtro_normales[$key] = $value;
+        }
+    }
+    
+    // Añadir condición de búsqueda si existe
+    if (isset($array_filtro_codigos['$or'])) {
+        $array_filtro_normales['$or'] = $array_filtro_codigos['$or'];
+    }
+    
+    // Excluir destacados: destacado = 0 Y destacado_social = 0 (o no existe)
+    $array_filtro_normales['$and'] = array(
+        array('destacado' => 0),
+        array('$or' => array(
+            array('destacado_social' => array('$exists' => false)),
+            array('destacado_social' => 0)
+        ))
+    );
+    
+    $array_opciones_normales = array(
+        'limit' => 50,  // Aumentar límite
         'sort' => array('_id' => -1)
     );
-
-    $lista_codigos = get_all_listado_codigos_array($array_filtro_codigos, $array_opciones);
+    
+    $lista_codigos_normales = get_all_listado_codigos_array($array_filtro_normales, $array_opciones_normales);
+    $codigos_normales = isset($lista_codigos_normales["results"]) ? $lista_codigos_normales["results"] : [];
+    
+    // Combinar: primero destacados, luego normales
+    $lista_codigos_combinada = array_merge($codigos_destacados, $codigos_normales);
+    
+    // Recrear la estructura esperada con los resultados combinados
+    $lista_codigos = array(
+        'results' => $lista_codigos_combinada,
+        'total_number' => count($lista_codigos_combinada)
+    );
 
     // Configurar variables para la vista
-    $title = "Resultados de búsqueda para: " . htmlspecialchars($termino);
-    $description = "Búsqueda de códigos y marcas relacionados con " . htmlspecialchars($termino) . " en " . $author_web;
+    $title = htmlspecialchars($termino) . " ofertas y chollos";
+    $description = htmlspecialchars($termino) . " ofertas y chollos. Encuentra las mejores ofertas, códigos descuento y cupones para " . htmlspecialchars($termino) . " en " . $author_web;
     $name_page = "busqueda";
 
 
@@ -627,7 +889,7 @@ $app->get('/', function ($request, $respon) {
         $limit2 = 100;
     } else {
         $limit = 50; // Aumentar límite para códigos destacados
-        $limit2 = 16;
+        $limit2 = 9; // Limitar a 9 códigos en la home para dar espacio
     }
 
 
@@ -658,12 +920,12 @@ $app->get('/', function ($request, $respon) {
         }
     }
 
-    $sort_order_destacados = array('destacado' => -1);
+    $sort_order_destacados = array('destacado_social' => -1, '_id' => -1);
 
 
     /* Listado DESTACADOS */
-    $array_filtro = array("estado" => 0);
-    $array_filtro = array_merge($array_filtro, array("destacado" => array('$ne' => 0)));
+    $array_filtro = array("estado" => array('$in' => [0, -1, 1]));
+    $array_filtro = array_merge($array_filtro, array("destacado_social" => array('$ne' => 0)));
 
     $array_skip = array("limit" => $limit);
     $array_skip = array_merge($array_skip, array("skip" => $skip_patrocinados));
@@ -675,8 +937,7 @@ $app->get('/', function ($request, $respon) {
     $lista_codigos_patrocinados = $lista_codigos_patrocinados_pre["results"];
 
     /* Listado NORMAL */
-    $array_filtro = array("estado" => 0);
-    $array_filtro = array_merge($array_filtro, array("estado" => 0));
+    $array_filtro = array("estado" => array('$in' => [0, -1, 1]));
     $array_filtro = array_merge($array_filtro, array("destacado" => 0));
 
     $array_skip = array("limit" => $limit2);
@@ -694,6 +955,11 @@ $app->get('/', function ($request, $respon) {
         (is_array($lista_codigos_patrocinados) && !empty($lista_codigos_patrocinados) ? $lista_codigos_patrocinados : []),
         (is_array($lista_codigos) && !empty($lista_codigos) ? $lista_codigos : [])
     );
+    
+    // Limitar a 9 códigos totales en la home (sin página) para dar espacio
+    if (!$_REQUEST["page"]) {
+        $lista_codigos = array_slice($lista_codigos, 0, 9);
+    }
     $total_pag = (intval($numero_codigos / 10)) + 1;
 
     if (filter_input(INPUT_GET, "page", FILTER_SANITIZE_STRING) > 999 || filter_input(INPUT_GET, "page", FILTER_SANITIZE_STRING) > $total_pag || filter_input(INPUT_GET, "page", FILTER_SANITIZE_STRING) == 1) {
@@ -739,13 +1005,28 @@ $app->get('/', function ($request, $respon) {
 
 $app->post('/google_sign', function ($request, $respon) {
 
-    $respon->withHeader('Content-Type', 'application/json');
+    $respon = $respon->withHeader('Content-Type', 'application/json');
 
     global $author_web, $detect, $num_inicio;
 
+    ob_start();
     include_once $_SERVER['DOCUMENT_ROOT'] . '/public/google-sign-in.php';
+    $payload = ob_get_clean();
+    $trimmedPayload = trim($payload);
 
+    if ($trimmedPayload === '') {
+        $trimmedPayload = json_encode([
+            'success' => false,
+            'error' => 'Respuesta vacía del servicio de autenticación'
+        ]);
+        error_log('[google_sign route] Respuesta vacía después de incluir google-sign-in.php');
+    } elseif ($trimmedPayload[0] !== '{' && $trimmedPayload[0] !== '[') {
+        error_log('[google_sign route] Respuesta inesperada: ' . substr($trimmedPayload, 0, 400));
+    }
 
+    $respon->getBody()->write($trimmedPayload);
+
+    return $respon;
 
 });
 
@@ -1020,7 +1301,25 @@ $app->group('/usuario', function () use ($app) {
         $offset = ($page - 1) * $per_page;
 
         // 3. Obtener códigos con límite
-        $estado = ($_REQUEST["borrados"] == 1) ? -2 : 0;
+        $estado_param = filter_input(INPUT_GET, 'estado', FILTER_SANITIZE_STRING);
+        
+        if ($estado_param === 'activos') {
+            $estado = 0; // Solo activos
+        } elseif ($estado_param === 'inactivos') {
+            $estado = array('$in' => [-1, 1]); // Solo inactivos
+        } elseif ($estado_param === 'borrados') {
+            $estado = -2; // Solo borrados
+        } elseif ($estado_param === 'all') {
+            $estado = array('$in' => [0, -1, 1, -2]); // Todos los estados
+        } else {
+            // Por defecto: mostrar todos excepto borrados (comportamiento original)
+            // pero permitir ver borrados con ?borrados=1
+            if ($_REQUEST["borrados"] == 1) {
+                $estado = array('$in' => [0, -1, 1, -2]); // Todos incluyendo borrados
+            } else {
+                $estado = array('$in' => [0, -1, 1]); // Activos + inactivos
+            }
+        }
 
         // Consulta optimizada con límite y skip
         $filter = [
@@ -1111,6 +1410,16 @@ $app->get('/usuario', function ($request, $respon) {
 
 });
 
+$app->get('/chat', function ($request, $respon) {
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/chat_usuario.php';
+    return $respon;
+});
+
+$app->get('/chat-usuario', function ($request, $respon) {
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/chat_usuario.php';
+    return $respon;
+});
+
 /********************************************************************
  * MARCA
  *******************************************************************/
@@ -1147,7 +1456,7 @@ $app->any('/codigos-de-{marca}-en-{provincia}', function ($request, $respon, $ar
 
     $array_filtro = array("marca" => $marca["nombre_clave"]);
     $array_filtro = array_merge($array_filtro, array("provincia" => strtoupper($args["provincia"])));
-    $array_filtro = array_merge($array_filtro, array("estado" => 0));
+    $array_filtro = array_merge($array_filtro, array("estado" => array('$in' => [0, -1, 1])));
     $array_filtro = array_merge($array_filtro, array("destacado" => array('$ne' => 0)));
 
     $array_skip = array("limit" => 13);
@@ -1180,7 +1489,7 @@ $app->any('/codigos-de-{marca}-en-{provincia}', function ($request, $respon, $ar
 
     $array_filtro = array("marca" => $marca["nombre_clave"]);
     $array_filtro = array_merge($array_filtro, array("provincia" => strtoupper($args["provincia"])));
-    $array_filtro = array_merge($array_filtro, array("estado" => 0));
+    $array_filtro = array_merge($array_filtro, array("estado" => array('$in' => [0, -1, 1])));
     $array_filtro = array_merge($array_filtro, array("destacado" => 0));
 
 
@@ -1320,7 +1629,7 @@ $app->get('/de-{marca}', function ($request, $respon, $args) {
 
             /* Listado PATROCINADOS */
             $array_filtro = array("marca" => $marca["nombre_clave"]);
-            $array_filtro = array_merge($array_filtro, array("estado" => 0));
+            $array_filtro = array_merge($array_filtro, array("estado" => array('$in' => [0, -1, 1])));
             $array_filtro = array_merge($array_filtro, array("destacado" => array('$ne' => 0)));
 
             $array_skip = array("limit" => 7);
@@ -1340,7 +1649,7 @@ $app->get('/de-{marca}', function ($request, $respon, $args) {
 
             /* Listado NORMAL */
             $array_filtro = array("marca" => $marca["nombre_clave"]);
-            $array_filtro = array_merge($array_filtro, array("estado" => 0));
+            $array_filtro = array_merge($array_filtro, array("estado" => array('$in' => [0, -1, 1])));
             $array_filtro = array_merge($array_filtro, array("destacado" => 0));
 
 
@@ -1368,9 +1677,10 @@ $app->get('/de-{marca}', function ($request, $respon, $args) {
 
             $imagen_social = $marca["imagen"];
 
-            if ($_SESSION["user_id"]) {
+            // Inicializar $codigo_existente siempre, incluso si el usuario no tiene código
+            $codigo_existente = null;
+            if (isset($_SESSION["user_id"]) && !empty($_SESSION["user_id"])) {
                 $codigo_existente = get_codigos_by_user_brand($marca["nombre_clave"], $_SESSION["user_id"]);
-
             }
 
         } else {
@@ -1380,6 +1690,9 @@ $app->get('/de-{marca}', function ($request, $respon, $args) {
             $lista_codigos = getCodeByID_prelista($obj_id_codigo);
             $codigo_to_show = getCodeByID($obj_id_codigo);
             if (is_object($codigo_to_show)) { $codigo_to_show = (array)$codigo_to_show; }
+            
+            // Incrementar contador de vistas
+            añadir_vista_codigo($codigo_to_show);
 
             $u = getObjectUser('_id', $codigo_to_show["id_usuario"] ?? null);
             //     if($u && $u != "") { $info_user = get_array_de_usuario($u); }
@@ -1428,7 +1741,11 @@ $app->get('/de-{marca}', function ($request, $respon, $args) {
         $num_beneficio_euros = 0;
         $num_beneficio_minutos = 0;
 
-        $title_marca_rs = "Códigos Amigo y códigos descuento de " . $marca["nombre"];
+        if ($marca["nombre_clave"] == 'lixsaai') {
+            $title_marca_rs = "Códigos de Descuento y Ofertas de " . $marca["nombre"] . " - Ahorra hasta 50€";
+        } else {
+            $title_marca_rs = "Códigos Amigo y códigos descuento de " . $marca["nombre"];
+        }
         $url_marca_rs = "https://www.codigoamigo.com/de-" . $marca["nombre_clave"];
         $url_logo_rs = $marca["imagen"];
         if (strpos($url_logo_rs, 'codigoamigo.com') !== false) {
@@ -1528,6 +1845,8 @@ $app->get('/de-{marca}', function ($request, $respon, $args) {
                 $pre_txt = "Códigos Invitación ";
             } elseif ($marca["nombre_clave"] == 'traderepublic') {
                 $pre_txt = "Código Invitación ";
+            } elseif ($marca["nombre_clave"] == 'lixsaai') {
+                $pre_txt = "Códigos de Descuento ";
             } else {
                 $pre_txt = "Cupones descuento ";
             }
@@ -1546,7 +1865,11 @@ $app->get('/de-{marca}', function ($request, $respon, $args) {
             $desc_icon = "✅";
 
 
-            $description = trim($string_mejor_codigo) . " con tu de código invitación " . $marca["nombre"] . ". Códigos descuento y cupones descuento válidos para" . $string_fecha . "$desc_icon - ¡Aprovecha y gana dinero";
+            if ($marca["nombre_clave"] == 'lixsaai') {
+                $description = "Ahorra hasta 50€ con códigos de descuento de " . $marca["nombre"] . ". Códigos promocionales para servicios de IA y automatización válidos para" . $string_fecha . "$desc_icon - ¡Automatiza tu negocio y ahorra dinero!";
+            } else {
+                $description = trim($string_mejor_codigo) . " con tu de código invitación " . $marca["nombre"] . ". Códigos descuento y cupones descuento válidos para" . $string_fecha . "$desc_icon - ¡Aprovecha y gana dinero";
+            }
 
             //Ahorra 200€ con tu código invitación Trade Republic. Códigos descuento y cupones válidos para julio 2024. ¡Aprovecha y gana dinero ahora!
 
@@ -1561,6 +1884,11 @@ $app->get('/de-{marca}', function ($request, $respon, $args) {
         $description_social = $description;
 
         $name_page = "marca";
+
+        // Incluir funciones modernas necesarias para marca_moderna.php
+        include_once __DIR__ . '/myphp/_header_modern.php';
+        include_once __DIR__ . '/myphp/funciones_usuario.php';
+        include_once __DIR__ . '/myphp/funciones_html.php';
 
         include_once $_SERVER['DOCUMENT_ROOT'] . '/public/marca_moderna.php';
 
@@ -1735,6 +2063,12 @@ $app->get('/nuevo_codigo', function ($request, $respon) {
 
     global $author_web, $show_adsense, $name_page;
 
+    // Validar que el usuario esté logueado
+    if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
+        $_SESSION['msg_error'] = "Debes iniciar sesión para publicar códigos";
+        return $respon->withRedirect($GLOBALS["website"] . "login");
+    }
+
     $show_adsense = 0;
 
     $title = "Insertar nuevo código";
@@ -1788,6 +2122,11 @@ $app->get('/modificar_codigo/{codigo_id}', function ($request, $response, $args)
     if ($codigo_user_id != $_SESSION["user_id"]) {
         $_SESSION['msg_error'] = "No tienes permiso para modificar este código";
         return $response->withRedirect($GLOBALS["website"]);
+    }
+
+    // Verificar si el código está borrado y mostrar alerta
+    if (isset($codigo_to_show["estado"]) && $codigo_to_show["estado"] == -2) {
+        $_SESSION['msg_warning'] = "⚠️ Este código está marcado como borrado. Al guardar los cambios, se restaurará automáticamente.";
     }
 
     // El usuario está autorizado, cargar datos para edición
@@ -1858,6 +2197,33 @@ $app->post('/modificar_codigo/{codigo_id}', function ($request, $response, $args
             }
         }
 
+        // Verificar si el código está borrado y restaurarlo automáticamente
+        $codigo_id_obj = new \MongoDB\BSON\ObjectId($args['codigo_id']);
+        $codigo_actual = getCodeByID($codigo_id_obj);
+        
+        if ($codigo_actual && isset($codigo_actual["estado"]) && $codigo_actual["estado"] == -2) {
+            // El código está borrado, restaurarlo primero
+            $db = createConnection();
+            $collection = $db->selectCollection('codigos');
+            
+            $collection->updateOne(
+                ['_id' => $codigo_id_obj],
+                ['$set' => [
+                    'estado' => 0,
+                    'fecha_modificacion' => new \MongoDB\BSON\UTCDateTime(),
+                    'updated_at' => new \MongoDB\BSON\UTCDateTime()
+                ]]
+            );
+            
+            // Recalcular visibilidad
+            $codigo_id_string = (string)$codigo_id_obj;
+            $marca_clave = $codigo_actual['marca'] ?? '';
+            if ($marca_clave) {
+                updateCodeVisibilityByPosition($codigo_id_string, $marca_clave);
+                updateAllCodesVisibilityInBrand($marca_clave);
+            }
+        }
+
         // Intentar actualizar el código
         $update_result = updateExistingCode($_POST, $_SESSION["user_id"]);
         
@@ -1886,6 +2252,54 @@ $app->post('/modificar_codigo/{codigo_id}', function ($request, $response, $args
         
         $_SESSION['msg_error'] = "Error interno del servidor al modificar el código";
         return $response->withRedirect($GLOBALS["website"]);
+    }
+});
+
+$app->post('/borrar_codigo/{codigo_id}', function ($request, $response, $args) {
+    global $author_web;
+
+    try {
+        // Verificar que el usuario esté logueado
+        if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
+            $_SESSION['msg_error'] = "Debes iniciar sesión para borrar códigos";
+            return $response->withRedirect('/');
+        }
+
+        $codigo_id = $args['codigo_id'];
+
+        // Verificar que el código existe y pertenece al usuario
+        $codigo = getObjectCode('_id', $codigo_id);
+
+        if (!$codigo) {
+            $_SESSION['msg_error'] = "El código no existe";
+            return $response->withRedirect('/');
+        }
+
+        if ($codigo['id_usuario'] !== $_SESSION["user_id"]) {
+            $_SESSION['msg_error'] = "No tienes permisos para borrar este código";
+            return $response->withRedirect('/');
+        }
+
+        // Borrar el código
+        $collection = getCollectionCodigos();
+        $result = $collection->deleteOne(['_id' => new MongoDB\BSON\ObjectId($codigo_id)]);
+
+        if ($result->getDeletedCount() > 0) {
+            $_SESSION['msg'] = "Código borrado correctamente";
+        } else {
+            $_SESSION['msg_error'] = "Error al borrar el código";
+        }
+
+        // Redirigir a la página de la marca
+        $marca = getObjectMarca('nombre_clave', $codigo['marca']);
+        $url_marca = "https://www.codigoamigo.com/de-" . $marca['nombre_clave'];
+
+        return $response->withRedirect($url_marca);
+
+    } catch (Exception $e) {
+        error_log("Error al borrar código: " . $e->getMessage());
+        $_SESSION['msg_error'] = "Error interno del servidor";
+        return $response->withRedirect('/');
     }
 });
 
@@ -2077,15 +2491,46 @@ $app->get('/cambiar_password', function ($request, $respon) {
     include __DIR__ . '/../public/cambiar_password.php';
 });
 
-$app->post('/cambio_password', function ($request, $respon) {
+$app->post('/cambio_password', function ($request, $response) {
 
     global $noindex;
 
     $noindex = 1;
 
-    // Obtener el email del formulario de recuperación de contraseña
-    $mail_ = filter_input(INPUT_POST, "mail", FILTER_SANITIZE_STRING);
-    include __DIR__ . '/../php/cambio_password.php';
+    try {
+        // Incluir archivos necesarios para las funciones de correo y usuario
+        include_once __DIR__ . '/myphp/funciones_usuario.php';
+        include_once __DIR__ . '/myphp/funciones_mail.php';
+        include_once __DIR__ . '/inc/funciones.php';
+
+        // Obtener el email del formulario de recuperación de contraseña
+        $mail_ = filter_input(INPUT_POST, "mail", FILTER_SANITIZE_EMAIL);
+        
+        if (empty($mail_)) {
+            return $response->withRedirect('/cambiar_password?msg_error=ok');
+        }
+        
+        // Usar la variable $mail_ para buscar el usuario
+        $usuario = getObjectUser('mail', $mail_);
+
+        if (empty($usuario) || !is_array($usuario) || empty($usuario["username"])) {
+            return $response->withRedirect('/cambiar_password?msg_error=ok');
+        }
+
+        if($usuario["estado"] == 0){ //SI ES 0 REENVIO ACTIVACION
+            $usuario["correo"] = $usuario["mail"];
+            $usuario["nombre"] = $usuario["username"];
+            enviar_mail_activacion($usuario);
+        } else {
+            enviarMailRecuerdoPass($usuario);
+        }
+        
+        return $response->withRedirect('/cambiar_password?msg=ok');
+        
+    } catch (Exception $e) {
+        error_log("Error en cambio_password: " . $e->getMessage());
+        return $response->withRedirect('/cambiar_password?msg_error=ok');
+    }
 });
 
 $app->get('/nuevo_password', function ($request, $respon) {
@@ -2120,7 +2565,7 @@ $app->get('/nuevo_password', function ($request, $respon) {
     include __DIR__ . '/../public/nuevo_password.php';
 });
 
-$app->post('/actualizar_usuario', function ($request, $respon) {
+$app->post('/actualizar_usuario', function ($request, $response) {
 
     $new_password = filter_input(INPUT_POST, "nueva_password", FILTER_SANITIZE_STRING);
     $new_confirm_password = filter_input(INPUT_POST, "nueva_confirm_password", FILTER_SANITIZE_STRING);
@@ -2257,7 +2702,7 @@ $app->group('/api_final', function () use ($app) {
             // Obtener códigos del usuario
             $array_filtro = [
                 "id_usuario" => $userId,
-                "estado" => 0
+                "estado" => array('$in' => [0, -1, 1])
             ];
 
             $array_opciones = [
@@ -2429,8 +2874,7 @@ function renderTrendPage($respon, $pageData) {
     return $respon;
 }
 
-// Incluir y ejecutar el footer antes de ejecutar la aplicación
-include_once __DIR__ . '/myphp/_footer.php';
+// Ejecutar el footer (ya se incluye a través de inc/includes.php)
 get_footer();
 
 // Ejecutar la aplicación Slim

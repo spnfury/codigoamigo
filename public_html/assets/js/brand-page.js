@@ -54,11 +54,21 @@ class BrandPage {
             const response = await this.sendVote(codigoId, isPositive);
             
             if (response.success) {
-                // Actualizar contador
-                this.updateVoteCount(voteCountElement, response.newCount);
+                // Actualizar contador con el total (positivos - negativos)
+                this.updateVoteCount(voteCountElement, response.total || 0);
                 this.showVoteSuccess(button, isPositive);
+                
+                // Deshabilitar botones de votación ya que el usuario ya votó
+                const voteSection = button.closest('.vote-section');
+                if (voteSection) {
+                    const voteButtons = voteSection.querySelectorAll('.vote-btn');
+                    voteButtons.forEach(btn => {
+                        btn.disabled = true;
+                        btn.style.opacity = '0.6';
+                    });
+                }
             } else {
-                this.showVoteError(button, response.message);
+                this.showVoteError(button, response.message || 'Error al votar');
             }
         } catch (error) {
             console.error('Error en la votación:', error);
@@ -74,11 +84,12 @@ class BrandPage {
      */
     async sendVote(codigoId, isPositive) {
         const formData = new FormData();
-        formData.append('action', 'vote_codigo');
-        formData.append('codigo_id', codigoId);
-        formData.append('tipo_voto', isPositive ? 'positivo' : 'negativo');
+        formData.append('metodo', 'votar_codigo');
+        formData.append('id_codigo', codigoId);
+        formData.append('votos_positivos', isPositive ? 1 : 0);
+        formData.append('votos_negativos', isPositive ? 0 : 1);
         
-        const response = await fetch('/ajax_handler.php', {
+        const response = await fetch('/ajax', {
             method: 'POST',
             body: formData
         });

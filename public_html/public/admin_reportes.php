@@ -5,6 +5,7 @@ session_start();
 include_once __DIR__ . '/../inc/includes.php';
 include_once __DIR__ . '/../myphp/funciones.php';
 include_once __DIR__ . '/../inc/funciones.php';
+include_once __DIR__ . '/admin_sidebar_menu.php';
 
 // Verificar permisos de administrador
 $array_codigos_acceso[] = "58bd851da54e295b8b52f702"; //thevega82@gmail.com
@@ -12,7 +13,8 @@ $array_codigos_acceso[] = "5e78170e6b68e6519b7c5df2"; //edna
 $array_codigos_acceso[] = "639899bc6321ee0d0e4010d2"; //aron
 $array_codigos_acceso[] = "5c8a10ce2f55c86d6e707d82"; //jose
 
-if (!in_array($_SESSION["user_id"], $array_codigos_acceso)) {
+// Verificar que el usuario esté logueado y tenga permisos
+if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"]) || !in_array($_SESSION["user_id"], $array_codigos_acceso)) {
     header('Location: https://www.codigoamigo.com');
     die();
 }
@@ -227,43 +229,7 @@ $title = "Reportes y Estadísticas - Panel de Administración";
     <div class="container-fluid">
         <div class="row">
             <!-- Sidebar -->
-            <div class="col-md-3 col-lg-2 sidebar p-0">
-                <div class="p-3">
-                    <h4 class="text-white mb-4">
-                        <i class="fas fa-cogs me-2"></i>Admin Panel
-                    </h4>
-                    <nav class="nav flex-column">
-                        <a class="nav-link" href="admin_dashboard.php">
-                            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
-                        </a>
-                        <a class="nav-link" href="admin_usuarios.php">
-                            <i class="fas fa-users me-2"></i>Usuarios
-                        </a>
-                        <a class="nav-link" href="admin_marcas.php">
-                            <i class="fas fa-tags me-2"></i>Marcas
-                        </a>
-                        <a class="nav-link" href="admin_codigos.php">
-                            <i class="fas fa-code me-2"></i>Códigos
-                        </a>
-                        <a class="nav-link" href="admin_transacciones.php">
-                            <i class="fas fa-credit-card me-2"></i>Transacciones
-                        </a>
-                        <a class="nav-link active" href="admin_reportes.php">
-                            <i class="fas fa-chart-bar me-2"></i>Reportes
-                        </a>
-                        <a class="nav-link" href="admin_configuracion.php">
-                            <i class="fas fa-cog me-2"></i>Configuración
-                        </a>
-                        <a class="nav-link" href="admin_logs.php">
-                            <i class="fas fa-file-alt me-2"></i>Logs
-                        </a>
-                        <hr class="text-white">
-                        <a class="nav-link" href="https://www.codigoamigo.com">
-                            <i class="fas fa-home me-2"></i>Volver al sitio
-                        </a>
-                    </nav>
-                </div>
-            </div>
+            <?php echo get_admin_sidebar_menu('admin_reportes.php'); ?>
 
             <!-- Main Content -->
             <div class="col-md-9 col-lg-10 main-content">

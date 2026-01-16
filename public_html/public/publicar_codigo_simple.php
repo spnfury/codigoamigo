@@ -29,7 +29,7 @@
     <title><?php echo $modo_modificacion ? 'Modificar Código' : 'Nuevo Código'; ?> - Código Amigo</title>
     <link rel="shortcut icon" href="/img/favicon_moneda_real.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
             background: #2C2C2C;
@@ -43,7 +43,7 @@
             top: 20px;
             left: 20px;
             z-index: 1000;
-            background: #ff6b35;
+            background: #E30613;
             color: white;
             border: none;
             padding: 12px 20px;
@@ -51,12 +51,12 @@
             font-size: 16px;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+            box-shadow: 0 4px 15px rgba(227, 6, 19, 0.3);
         }
         .back-button:hover {
-            background: #e55a2b;
+            background: #C40510;
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+            box-shadow: 0 6px 20px rgba(227, 6, 19, 0.4);
         }
         .back-button i {
             margin-right: 8px;
@@ -75,11 +75,11 @@
             font-size: 16px;
         }
         .form-control:focus {
-            border-color: #ff6b35;
-            box-shadow: 0 0 0 0.2rem rgba(255, 107, 53, 0.25);
+            border-color: #E30613;
+            box-shadow: 0 0 0 0.2rem rgba(227, 6, 19, 0.25);
         }
         .btn-custom {
-            background: #ff6b35;
+            background: #E30613;
             border: none;
             color: white;
             padding: 15px 30px;
@@ -89,9 +89,9 @@
             transition: all 0.3s ease;
         }
         .btn-custom:hover {
-            background: #e55a2b;
+            background: #C40510;
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
+            box-shadow: 0 6px 20px rgba(227, 6, 19, 0.4);
         }
         .alert {
             border-radius: 8px;
@@ -103,7 +103,7 @@
             margin-bottom: 30px;
             font-size: 2.5rem;
             font-weight: bold;
-            color: #ff6b35;
+            color: #E30613;
         }
         .form-group label {
             color: white;
@@ -117,7 +117,7 @@
             margin-top: 5px;
         }
         .warning-text {
-            color: #ff6b35;
+            color: #E30613;
             font-weight: bold;
             text-align: center;
             margin: 20px 0;
@@ -135,8 +135,8 @@
             color: #333 !important;
         }
         .easy-autocomplete input:focus {
-            border-color: #ff6b35 !important;
-            box-shadow: 0 0 0 0.2rem rgba(255, 107, 53, 0.25) !important;
+            border-color: #E30613 !important;
+            box-shadow: 0 0 0 0.2rem rgba(227, 6, 19, 0.25) !important;
         }
         .easy-autocomplete ul {
             background: white !important;
@@ -153,7 +153,7 @@
             background: #f8f9fa !important;
         }
         .easy-autocomplete .eac-category {
-            background: #ff6b35 !important;
+            background: #E30613 !important;
             color: white !important;
             font-weight: bold !important;
         }
@@ -269,6 +269,7 @@
                 return "/ajax/buscar_marcas.php?q=" + phrase;
             },
             getValue: "nombre",
+            maxListSize: 10,
             template: {
                 type: "custom",
                 method: function(value, item) {
@@ -286,7 +287,13 @@
             }
         };
         
-        $("#marca").easyAutocomplete(options);
+        /* Aplicar EasyAutocomplete solo si Select2 no está presente */
+        if (typeof $.fn.select2 === 'undefined') {
+            $("#marca").easyAutocomplete(options);
+            console.log("EasyAutocomplete aplicado a #marca (Select2 no disponible)");
+        } else {
+            console.log("Select2 está disponible, omitiendo EasyAutocomplete");
+        }
     });
     </script>
     

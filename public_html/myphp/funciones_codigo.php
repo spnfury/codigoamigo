@@ -33,6 +33,16 @@
 
     }
 
+    function getCollectionVotos () {
+
+        $db = createConnection();
+
+        $collection_votos = $db->selectCollection('votos');
+
+        return $collection_votos;
+
+    }
+
     function get_code_position ($marca,$mi_id){
         
 
@@ -217,35 +227,112 @@
 
 
     function votar_codigo($datos) {
-
-
         session_start();
 
-        $collection_codigos = getCollectionCodigos();
-
-
-
-        if($datos["id_codigo"]){
-
-            try {
-                echo "voyyy";
-                $updateResult = $collection_codigos->updateOne(
-                    ['_id' => new \MongoDB\BSON\ObjectId($datos["id_codigo"]) ],
-                    ['$inc' =>
-                        [
-                            'votos_positivos' => intval($datos["votos_positivos"]),
-                            'votos_negativos' => intval($datos["votos_negativos"])
-                        ]
-                    ]
-                );
-
-            } catch(MongoDB\Driver\Exception\WriteException $e) {
-                $writeResult = $e->getWriteResult();
-                echo "Errores en MongoDB\n";
-            }
+        // Verificar que el usuario esté logueado
+        if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
+            return ['success' => false, 'message' => 'Debes iniciar sesión para votar'];
         }
 
+        $user_id = $_SESSION["user_id"];
+        $codigo_id = $datos["id_codigo"] ?? '';
+        $votos_positivos = intval($datos["votos_positivos"] ?? 0);
+        $votos_negativos = intval($datos["votos_negativos"] ?? 0);
 
+        if (empty($codigo_id)) {
+            return ['success' => false, 'message' => 'ID de código no válido'];
+        }
+
+        $collection_codigos = getCollectionCodigos();
+        $collection_votos = getCollectionVotos();
+
+        try {
+            // Verificar si el usuario ya votó este código
+            $voto_existente = $collection_votos->findOne([
+                'usuario_id' => $user_id,
+                'codigo_id' => $codigo_id
+            ]);
+
+            if ($voto_existente) {
+                // Si ya votó, verificar si está cambiando el voto
+                $voto_anterior = $voto_existente['tipo_voto']; // 'positivo' o 'negativo'
+                $nuevo_tipo = $votos_positivos > 0 ? 'positivo' : 'negativo';
+
+                if ($voto_anterior === $nuevo_tipo) {
+                    return ['success' => false, 'message' => 'Ya has votado este código'];
+                }
+
+                // Cambiar el voto
+                if ($voto_anterior === 'positivo') {
+                    // Quitar voto positivo, añadir negativo
+                    $collection_codigos->updateOne(
+                        ['_id' => new \MongoDB\BSON\ObjectId($codigo_id)],
+                        ['$inc' => ['votos_positivos' => -1, 'votos_negativos' => 1]]
+                    );
+                } else {
+                    // Quitar voto negativo, añadir positivo
+                    $collection_codigos->updateOne(
+                        ['_id' => new \MongoDB\BSON\ObjectId($codigo_id)],
+                        ['$inc' => ['votos_positivos' => 1, 'votos_negativos' => -1]]
+                    );
+                }
+
+                // Actualizar el voto en la colección
+                $collection_votos->updateOne(
+                    ['_id' => $voto_existente['_id']],
+                    ['$set' => [
+                        'tipo_voto' => $nuevo_tipo,
+                        'fecha_modificacion' => date('Y-m-d H:i:s'),
+                        'updated_at' => new MongoDB\BSON\UTCDateTime()
+                    ]]
+                );
+            } else {
+                // Nuevo voto
+                $updateResult = $collection_codigos->updateOne(
+                    ['_id' => new \MongoDB\BSON\ObjectId($codigo_id)],
+                    ['$inc' => [
+                        'votos_positivos' => $votos_positivos,
+                        'votos_negativos' => $votos_negativos
+                    ]]
+                );
+
+                // Guardar el voto del usuario
+                $collection_votos->insertOne([
+                    'usuario_id' => $user_id,
+                    'codigo_id' => $codigo_id,
+                    'tipo_voto' => $votos_positivos > 0 ? 'positivo' : 'negativo',
+                    'fecha_creacion' => date('Y-m-d H:i:s'),
+                    'fecha_modificacion' => date('Y-m-d H:i:s'),
+                    'created_at' => new MongoDB\BSON\UTCDateTime(),
+                    'updated_at' => new MongoDB\BSON\UTCDateTime()
+                ]);
+            }
+
+            // Obtener los nuevos contadores
+            $codigo = $collection_codigos->findOne(['_id' => new \MongoDB\BSON\ObjectId($codigo_id)]);
+            $nuevos_positivos = $codigo['votos_positivos'] ?? 0;
+            $nuevos_negativos = $codigo['votos_negativos'] ?? 0;
+            $nuevo_total = $nuevos_positivos - $nuevos_negativos;
+
+            return [
+                'success' => true,
+                'message' => 'Voto registrado correctamente',
+                'votos_positivos' => $nuevos_positivos,
+                'votos_negativos' => $nuevos_negativos,
+                'total' => $nuevo_total
+            ];
+
+        } catch(MongoDB\Driver\Exception\WriteException $e) {
+            if (function_exists('log_error')) {
+                log_error("Error al votar código", ['error' => $e->getMessage(), 'codigo_id' => $codigo_id, 'user_id' => $user_id]);
+            }
+            return ['success' => false, 'message' => 'Error al registrar el voto'];
+        } catch(Exception $e) {
+            if (function_exists('log_error')) {
+                log_error("Error al votar código", ['error' => $e->getMessage(), 'codigo_id' => $codigo_id, 'user_id' => $user_id]);
+            }
+            return ['success' => false, 'message' => 'Error al registrar el voto'];
+        }
     }
 
     /******************************************************
@@ -346,7 +433,7 @@
                         'provincia' => $datos["provincia"],
                         'localidad' => $datos["localidad"],
                         'fecha_caducidad' => $fechafinal,
-                        'visibilidad' => 'media'
+                        'visibilidad' => 'baja' // Los códigos nuevos empiezan con baja visibilidad
                     ];
                     
                     // Usar función unificada para crear el código
@@ -509,15 +596,66 @@
 
 
     function borrar_codigo($datos) {
-
-        $collection_codigos = getCollectionCodigos();
-        $object_id_codigo = new \MongoDB\BSON\ObjectId($datos["id_codigo"]);
-
-        if ($object_id_codigo instanceof \MongoDB\BSON\ObjectID) {
-            $data = ['_id' => $object_id_codigo];
-            $collection_codigos->deleteOne($data);
+        // Limpiar cualquier output previo
+        if (ob_get_level() > 0) {
+            ob_clean();
+        }
+        
+        // Iniciar sesión si no está iniciada
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
         }
 
+        // Verificar que el usuario esté logueado
+        if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Usuario no autenticado']);
+            exit;
+        }
+
+        // Verificar que se proporcionó el ID del código
+        if (!isset($datos["id_codigo"]) || empty($datos["id_codigo"])) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'ID de código no válido']);
+            exit;
+        }
+
+        try {
+            // Obtener el código para verificar permisos
+            $object_id_codigo = new \MongoDB\BSON\ObjectId($datos["id_codigo"]);
+            $codigo = getCodeByID($object_id_codigo);
+
+            if (!$codigo) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => 'Código no encontrado']);
+                exit;
+            }
+
+            // Verificar que el código pertenece al usuario
+            if ((string)$codigo['id_usuario'] !== $_SESSION["user_id"]) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => 'No tienes permisos para eliminar este código']);
+                exit;
+            }
+
+            // Eliminar el código
+            $collection_codigos = getCollectionCodigos();
+            $result = $collection_codigos->deleteOne(['_id' => $object_id_codigo]);
+
+            if ($result->getDeletedCount() > 0) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => true, 'message' => 'Código eliminado correctamente']);
+            } else {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => 'Error al eliminar el código']);
+            }
+            exit;
+
+        } catch (Exception $e) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Error interno: ' . $e->getMessage()]);
+            exit;
+        }
     }
 
 

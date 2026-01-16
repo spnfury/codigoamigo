@@ -87,6 +87,8 @@ function transformafechaV2($date){
     
     
     global $amZona,$debugAdmin;
+    $morelong = false; // Inicializar variable $morelong
+    $zona = ''; // Inicializar variable $zona
     
     
     //no puede mostrar fechas en el futuro
@@ -103,31 +105,37 @@ function transformafechaV2($date){
     
     
     
-    if(date("d-m-y")==date("d-m-y",$date)){
+    // Asegurar que $date sea un timestamp válido
+    $timestamp = is_numeric($date) ? $date : strtotime($date);
+    if($timestamp === false) {
+        $timestamp = time();
+    }
+    
+    if(date("d-m-y")==date("d-m-y",$timestamp)){
         if(!$morelong){
             $str_week = " ";
         }else{
-            $str_week = isset($GLOBALS['weekdays_arr'][date("w",$date)+1]) ? $GLOBALS['weekdays_arr'][date("w",$date)+1] : "";
+            $str_week = isset($GLOBALS['weekdays_arr'][date("w",$timestamp)+1]) ? $GLOBALS['weekdays_arr'][date("w",$timestamp)+1] : "";
         }
     }else{
-        $str_week = isset($GLOBALS['weekdays_arr'][date("w",$date)+1]) ? $GLOBALS['weekdays_arr'][date("w",$date)+1] : "";
+        $str_week = isset($GLOBALS['weekdays_arr'][date("w",$timestamp)+1]) ? $GLOBALS['weekdays_arr'][date("w",$timestamp)+1] : "";
     }
     
-    $day = date("d",$date);
+    $day = date("d",$timestamp);
     
-    $month = isset($GLOBALS['month_arr'][date("n",$date)]) ? $GLOBALS['month_arr'][date("n",$date)] : "";
-    $month_l = isset($GLOBALS['month_arr_long'][date("n",$date)]) ? $GLOBALS['month_arr_long'][date("n",$date)] : "";
+    $month = isset($GLOBALS['month_arr'][date("n",$timestamp)]) ? $GLOBALS['month_arr'][date("n",$timestamp)] : "";
+    $month_l = isset($GLOBALS['month_arr_long'][date("n",$timestamp)]) ? $GLOBALS['month_arr_long'][date("n",$timestamp)] : "";
     
-    $year = date("y",$date);
-    $yearF = date("Y",$date);
-    $hora = date("H:i",$date);
+    $year = date("y",$timestamp);
+    $yearF = date("Y",$timestamp);
+    $hora = date("H:i",$timestamp);
     
-    $nuevahora = strtotime('now')-$date;
+    $nuevahora = strtotime('now')-$timestamp;
     $nuevahora_horas = (int)($nuevahora/(60*60));
     $nuevahora_minutos = date("i",$nuevahora);
     
     $f1 = date('Ymd');
-    $f2 = date('Ymd', $date);
+    $f2 = date('Ymd', $timestamp);
     
     
     
@@ -362,9 +370,40 @@ function transformafechaV2($date){
                                          data-ad-slot="6883957062"
                                          data-ad-format="rectangle"
                                          data-full-width-responsive="true"></ins>
-                                     <script>
-                                     (adsbygoogle = window.adsbygoogle || []).push({});
-                                	</script>
+                                    <script>
+                                    (function() {
+                                        try {
+                                            if (typeof window.adsbygoogle === "undefined") {
+                                                window.adsbygoogle = [];
+                                            }
+
+                                            var adElement = document.currentScript.previousElementSibling;
+                                            if (!adElement || !adElement.classList.contains("adsbygoogle")) {
+                                                return;
+                                            }
+
+                                            if (adElement.children.length > 0) {
+                                                return;
+                                            }
+
+                       	                 var status = adElement.getAttribute("data-adsbygoogle-status");
+                                            if (status && status !== "") {
+                                                return;
+                                            }
+
+                                            if (adElement.hasAttribute("data-processed")) {
+                                                return;
+                                            }
+
+                                            adElement.setAttribute("data-processed", "true");
+                                            window.adsbygoogle.push({});
+                                        } catch (e) {
+                                            if (!e || !e.message || e.message.indexOf("adsbygoogle.push() error") === -1) {
+                                                console.warn("Error al inicializar el bloque AdSense intermedio:", e);
+                                            }
+                                        }
+                                    })();
+                                    </script>
                                 </div>
                             </div>
                         </div>
@@ -385,7 +424,11 @@ function transformafechaV2($date){
                 if($usuario && $usuario != "") { $usuario = getObjectUser('_id', new \MongoDB\BSON\ObjectId($item["id_usuario"])); }
                 if($usuario && $usuario != "") {$datos_usuario = get_array_de_usuario($usuario); }
                 $marca = getObjectMarca('nombre_clave', $item["marca"]);
-                $marca["nombre"] = ucfirst(strtolower($marca["nombre"]));
+                if($marca && isset($marca["nombre"])) {
+                    $marca["nombre"] = ucfirst(strtolower($marca["nombre"]));
+                } else {
+                    $marca = array("nombre" => ucfirst($item["marca"]));
+                }
                 
             
                 if($marca["nombre"]){
@@ -399,6 +442,14 @@ function transformafechaV2($date){
             if($item["destacado"] && $item["destacado"] > 0): ?>
                 <div class="featured-badge">
                     <i class="fas fa-star"></i> Destacado
+                </div>
+            <?php endif; ?>
+            
+            <?php 
+            // Mostrar badge de borrado si el código está borrado
+            if($item["estado"] == -2): ?>
+                <div class="deleted-badge">
+                    <i class="fas fa-trash"></i> Borrado
                 </div>
             <?php endif; ?>
             
@@ -775,18 +826,58 @@ function transformafechaV2($date){
                     }
                     
                     
-                	  if(isset($_SESSION["user_id"]) && $item["id_usuario"] == $_SESSION["user_id"] && $item["estado"] != '-2') { ?>
+                	  if(isset($_SESSION["user_id"]) && $item["id_usuario"] == $_SESSION["user_id"]) { ?>
 
-                    	  <a class="btn btn_codigo_amigo btn_interno btn_a_destacar"  title="Destacar el código" href="<?php echo link_codigo($item["_id"], $marca["nombre_clave"],'1'); ?>">☝️ Destacar Gratis</a>
-                    	  <a class="btn btn_codigo_amigo btn_interno btn_a_destacar"  title="Destacar el código" href="/modificar_codigo/<?php echo (string)($item["_id"]);?>">✍🏼️ Modificar Código</a>
-                    	  
-                    	  <a class="btn btn_codigo_amigo btn_interno btn_a_compartir open_modal_compartir" data-codigo-url="https://www.codigoamigo.com/de-<? echo $marca["nombre_clave"]; ?>?codigo=<?php echo $item["_id"]; ?>" title="Compartir en redes"><i class="fas fa-share"></i> Compartir</a>
-                    	  <a class="btn btn_codigo_amigo btn_interno btn_a_compartir open_modal_estadisticas" data-codigo-id="<?php echo $item["_id"]; ?>" data-codigo-url="https://www.codigoamigo.com/estadisticas?codigo=<?php echo $item["_id"]; ?>" title="Estadísticas de tu código"><i class="fas fa-chart-bar"></i> Estadísticas</a>
-                          <a data-id-codigo="<?php echo $item["_id"]; ?>" class="btn btn-danger btn_codigo_amigo desactivar_codigo_usuario"><i class="fas fa-trash"></i> </a>
-
-                    <?php }elseif(isset($_SESSION["user_id"]) && $item["id_usuario"] == $_SESSION["user_id"] && $item["estado"] == '-2') { ?>
-
-                    	  <a data-id-codigo="<?php echo $item["_id"]; ?>"  class="btn btn_codigo_amigo btn_a_restaurar" style="width:100%;"  title="Restaurar el código">Restaurar el código</a>
+                    	  <!-- Menú de acciones para códigos propios -->
+                    	  <div class="code-actions-menu">
+                    	      <button class="btn btn-primary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    	          <i class="fas fa-cog"></i> Acciones
+                    	      </button>
+                    	      <ul class="dropdown-menu">
+                    	          <?php if($item["estado"] != '-2') { ?>
+                    	          <li>
+                    	              <a class="dropdown-item" href="<?php echo link_codigo($item["_id"], $marca["nombre_clave"],'1'); ?>" title="Destacar el código">
+                    	                  <i class="fas fa-star"></i> Destacar
+                    	              </a>
+                    	          </li>
+                    	          <li>
+                    	              <a class="dropdown-item" href="/modificar_codigo/<?php echo (string)($item["_id"]);?>" title="Editar el código">
+                    	                  <i class="fas fa-edit"></i> Editar
+                    	              </a>
+                    	          </li>
+                    	          <?php if($item["estado"] != '-2') { ?>
+                    	          <li>
+                    	              <a class="dropdown-item" href="/crear-promocion?codigo_id=<?php echo (string)($item["_id"]); ?>" title="Crear promoción temporal">
+                    	                  <i class="fas fa-tag"></i> Crear Promoción
+                    	              </a>
+                    	          </li>
+                    	          <?php } ?>
+                    	          <li><hr class="dropdown-divider"></li>
+                    	          <li>
+                    	              <a class="dropdown-item open_modal_compartir" data-codigo-url="https://www.codigoamigo.com/de-<? echo $marca["nombre_clave"]; ?>?codigo=<?php echo $item["_id"]; ?>" title="Compartir en redes">
+                    	                  <i class="fas fa-share"></i> Compartir
+                    	              </a>
+                    	          </li>
+                    	          <li>
+                    	              <a class="dropdown-item open_modal_estadisticas" data-codigo-id="<?php echo $item["_id"]; ?>" data-codigo-url="https://www.codigoamigo.com/estadisticas?codigo=<?php echo $item["_id"]; ?>" title="Estadísticas de tu código">
+                    	                  <i class="fas fa-chart-bar"></i> Estadísticas
+                    	              </a>
+                    	          </li>
+                    	          <li><hr class="dropdown-divider"></li>
+                    	          <li>
+                    	              <a class="dropdown-item text-danger desactivar_codigo_usuario" data-id-codigo="<?php echo $item["_id"]; ?>" title="Eliminar código">
+                    	                  <i class="fas fa-trash"></i> Eliminar
+                    	              </a>
+                    	          </li>
+                    	          <?php } else { ?>
+                    	          <li>
+                    	              <a class="dropdown-item text-success restaurar_codigo_usuario" data-id-codigo="<?php echo $item["_id"]; ?>" title="Restaurar código">
+                    	                  <i class="fas fa-undo"></i> Restaurar
+                    	              </a>
+                    	          </li>
+                    	          <?php } ?>
+                    	      </ul>
+                    	  </div>
 
 
                     <?php }elseif(!$destacado){
@@ -1686,7 +1777,10 @@ filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#262626', end
             	/* CHECK BUZZ */
             	//check_buzz($datos["visita"]["fecha_vista"],$c,$datos["usuario"]["_id"]);
 
-            	if($datos["usuario"]["username"]){?><a class="btn btn-custom envia_buzz" data-codigo-id-user="<?php echo $datos["usuario"]["_id"]; ?>" data-codigo-id="<?php echo $obj_id_codigo; ?>"><i class="far fa-bell"></i> Enviar Zumbido</a><?php } ?></td>
+            	if($datos["usuario"]["username"]){?>
+                    <a class="btn btn-custom envia_buzz" data-codigo-id-user="<?php echo $datos["usuario"]["_id"]; ?>" data-codigo-id="<?php echo $obj_id_codigo; ?>"><i class="far fa-bell"></i> Enviar Zumbido</a>
+                    <a class="btn btn-primary envia_chat" onclick="if(window.parent && typeof window.parent.openChatModal === 'function') { window.parent.openChatModal('<?php echo (string)$datos["usuario"]["_id"]; ?>', '<?php echo $datos["usuario"]["username"]; ?>', '<?php echo $datos["usuario"]["img"]; ?>'); } else { window.parent.location.href='/chat?usuario=<?php echo (string)$datos["usuario"]["_id"]; ?>'; }" style="background: #28a745; border-color: #28a745; margin-left: 5px; color: white;"><i class="fas fa-comments"></i> Chatear</a>
+                <?php } ?></td>
             </tr>
 
             <?
@@ -1931,11 +2025,502 @@ filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#262626', end
 
     <?php }
 
+    // Función para generar tarjetas de códigos modernas para página de marca
+    function block_listado_codigos_marca($lista_codigos, $marca_info) {
+        global $detect_device, $url_usuario_sin_imagen, $data_usuario, $provincia, $marca, $num_codigos_global, $keywords, $actual_link;
+        
+        $html = "";
+        
+        if(empty($lista_codigos)) {
+            $html .= '<div class="no-codes-message text-center py-5">';
+            $html .= '<i class="fas fa-search fa-3x text-muted mb-3"></i>';
+            $html .= '<h4>No hay códigos disponibles</h4>';
+            $html .= '<p class="text-muted">No se encontraron códigos para esta marca.</p>';
+            $html .= '</div>';
+            return $html;
+        }
+        
+        $html .= '<div class="row codes-grid-marca">';
+        
+        foreach($lista_codigos as $item) {
+            // Obtener datos del usuario
+            $datos_usuario = array();
+            $usuario = getObjectUser('_id', $item["id_usuario"]);
+            if($usuario && $usuario != "") { 
+                $usuario = getObjectUser('_id', new \MongoDB\BSON\ObjectId($item["id_usuario"])); 
+            }
+            if($usuario && $usuario != "") {
+                $datos_usuario = get_array_de_usuario($usuario); 
+            }
+            
+            // Obtener información de la marca
+            $marca_data = getObjectMarca('nombre_clave', $item["marca"]);
+            if($marca_data && isset($marca_data["nombre"])) {
+                $marca_data["nombre"] = ucfirst(strtolower($marca_data["nombre"]));
+            } else {
+                $marca_data = array("nombre" => ucfirst($item["marca"]));
+            }
+            
+            // Badge de destacado
+            $destacado_badge = '';
+            if($item["destacado"]) {
+                $destacado_fecha = transformafechaV2($item["destacado"]);
+                $destacado_badge = '<div class="featured-badge-marca">
+                    <i class="fas fa-star"></i> Destacado
+                </div>';
+            }
+            
+            // Información del usuario
+            $user_avatar = isset($datos_usuario["img"]) && $datos_usuario["img"] ? $datos_usuario["img"] : $url_usuario_sin_imagen;
+            $username = isset($datos_usuario["username"]) ? $datos_usuario["username"] : 'Usuario';
+            // Convertir user_id a string si es un ObjectId
+            $user_id_raw = isset($datos_usuario["_id"]) ? $datos_usuario["_id"] : '';
+            if ($user_id_raw instanceof MongoDB\BSON\ObjectId) {
+                $user_id = (string)$user_id_raw;
+            } elseif (isset($datos_usuario["id_string"])) {
+                $user_id = $datos_usuario["id_string"];
+            } else {
+                $user_id = (string)$user_id_raw;
+            }
+            // Generar enlace al perfil público del usuario
+            $user_link = !empty($user_id) && !empty($username) ? link_usuario($username, $user_id) : '#';
+            
+            // Información de la marca
+            $marca_imagen = isset($marca_data["imagen"]) ? $marca_data["imagen"] : '';
+            $marca_nombre = $marca_data["nombre"];
+            $marca_clave = $item["marca"];
+            
+            // Beneficio
+            $beneficio = isset($item["num_beneficio"]) ? $item["num_beneficio"] : 0;
+            $tipo_descuento = isset($item["tipo_descuento"]) ? $item["tipo_descuento"] : 'Descuento';
+            
+            // Fecha
+            $fecha_publicacion = isset($item["fecha_publicacion"]) ? formatDateAgoLarge($item["fecha_publicacion"]) : 'Fecha no disponible';
+            
+            // Descripción
+            $descripcion = isset($item["descripcion"]) ? $item["descripcion"] : '';
+            $descripcion = strip_tags($descripcion);
+            $descripcion = mb_substr($descripcion, 0, 100) . (mb_strlen($descripcion) > 100 ? '...' : '');
+            
+            // Clicks
+            $total_clicks = isset($item["totalclicks"]) ? $item["totalclicks"] : 0;
+            
+            // Menú de acciones para códigos propios
+            $actions_menu = '';
+            if(isset($_SESSION["user_id"]) && $item["id_usuario"] == $_SESSION["user_id"]) {
+                if($item["estado"] != '-2') {
+                    $actions_menu = '
+                    <div class="code-actions-menu">
+                        <button class="btn btn-primary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-cog"></i> Acciones
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a class="dropdown-item" href="' . link_codigo($item["_id"], $marca_clave, '1') . '" title="Destacar el código">
+                                    <i class="fas fa-star"></i> Destacar
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="/modificar_codigo/' . (string)($item["_id"]) . '" title="Editar el código">
+                                    <i class="fas fa-edit"></i> Editar
+                                </a>
+                            </li>';
+            if($item["estado"] != '-2') {
+                $actions_menu .= '
+                            <li>
+                                <a class="dropdown-item" href="/crear-promocion?codigo_id=' . (string)($item["_id"]) . '" title="Crear promoción temporal">
+                                    <i class="fas fa-tag"></i> Crear Promoción
+                                </a>
+                            </li>';
+            }
+            $actions_menu .= '
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item open_modal_compartir" data-codigo-url="https://www.codigoamigo.com/de-' . $marca_clave . '?codigo=' . $item["_id"] . '" title="Compartir en redes">
+                                    <i class="fas fa-share"></i> Compartir
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item open_modal_estadisticas" data-codigo-id="' . $item["_id"] . '" data-codigo-url="https://www.codigoamigo.com/estadisticas?codigo=' . $item["_id"] . '" title="Estadísticas de tu código">
+                                    <i class="fas fa-chart-bar"></i> Estadísticas
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item text-danger desactivar_codigo_usuario" data-id-codigo="' . $item["_id"] . '" title="Eliminar código">
+                                    <i class="fas fa-trash"></i> Eliminar
+                                </a>
+                            </li>
+                        </ul>
+                    </div>';
+                } else {
+                    $actions_menu = '
+                    <div class="code-actions-menu">
+                        <button class="btn btn-primary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-cog"></i> Acciones
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a class="dropdown-item text-success restaurar_codigo_usuario" data-id-codigo="' . $item["_id"] . '" title="Restaurar código">
+                                    <i class="fas fa-undo"></i> Restaurar
+                                </a>
+                            </li>
+                        </ul>
+                    </div>';
+                }
+            }
+            
+            $html .= '
+            <div class="col-lg-3 col-md-4 col-sm-6 mb-4">
+                <div class="code-card-marca">
+                    ' . $destacado_badge . '
+                    
+                    <!-- Header con logo de marca y usuario -->
+                    <div class="card-header-marca">
+                        <div class="brand-logo-marca">
+                            <img src="' . htmlspecialchars($marca_imagen) . '" alt="' . htmlspecialchars($marca_nombre) . '" class="brand-image-marca">
+                        </div>
+                        <a href="' . htmlspecialchars($user_link) . '" class="user-info-marca" title="Ver perfil de ' . htmlspecialchars($username) . '">
+                            <img src="' . htmlspecialchars($user_avatar) . '" alt="Avatar de ' . htmlspecialchars($username) . '" class="user-avatar-marca">
+                            <span class="username-marca">' . htmlspecialchars($username) . '</span>
+                        </a>
+                    </div>
+                    
+                    <!-- Contenido principal -->
+                    <div class="card-content-marca">
+                        <h5 class="brand-name-marca">' . htmlspecialchars($marca_nombre) . '</h5>
+                        
+                        <div class="benefit-section-marca">
+                            <div class="benefit-amount-marca">' . $beneficio . '€</div>
+                            <div class="benefit-type-marca">' . htmlspecialchars($tipo_descuento) . '</div>
+                        </div>
+                        
+                        <div class="description-marca">' . htmlspecialchars($descripcion) . '</div>
+                        
+                        <div class="card-meta-marca">
+                            <div class="meta-item">
+                                <i class="fas fa-eye"></i>
+                                <span>' . $total_clicks . '</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="far fa-clock"></i>
+                                <span>' . $fecha_publicacion . '</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Footer con botón y acciones -->
+                    <div class="card-footer-marca">
+                        <a href="' . link_codigo($item["_id"], $marca_clave) . '" class="btn btn-primary btn-block-marca">
+                            <i class="fas fa-eye"></i> Ver Código
+                        </a>
+                        ' . $actions_menu . '
+                    </div>
+                </div>
+            </div>';
+        }
+        
+        $html .= '</div>';
+        
+        return $html;
+    }
 
-
-
-
-
-
+    // Estilos CSS para el menú de acciones de códigos
+    function get_code_actions_css() {
+        return '
+        <style>
+        .code-actions-menu {
+            margin: 10px 0;
+            text-align: center;
+        }
+        
+        .code-actions-menu .dropdown-toggle {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .code-actions-menu .dropdown-toggle:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .code-actions-menu .dropdown-toggle:focus {
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.25);
+        }
+        
+        .code-actions-menu .dropdown-menu {
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 8px 0;
+            min-width: 180px;
+        }
+        
+        .code-actions-menu .dropdown-item {
+            padding: 10px 16px;
+            font-size: 14px;
+            color: #333;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+        }
+        
+        .code-actions-menu .dropdown-item:hover {
+            background-color: #f8f9fa;
+            color: #667eea;
+        }
+        
+        .code-actions-menu .dropdown-item i {
+            margin-right: 8px;
+            width: 16px;
+            text-align: center;
+        }
+        
+        .code-actions-menu .dropdown-item.text-danger:hover {
+            background-color: #f8d7da;
+            color: #dc3545;
+        }
+        
+        .code-actions-menu .dropdown-divider {
+            margin: 8px 0;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .code-actions-menu .dropdown-toggle {
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+            
+            .code-actions-menu .dropdown-menu {
+                min-width: 160px;
+            }
+            
+            .code-actions-menu .dropdown-item {
+                padding: 8px 12px;
+                font-size: 13px;
+            }
+        }
+        
+        /* Estilos para tarjetas de marca */
+        .codes-grid-marca {
+            margin: 0 -15px;
+        }
+        
+        .code-card-marca {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: all 0.3s ease;
+            position: relative;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .code-card-marca:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .featured-badge-marca {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: linear-gradient(135deg, #E30613, #f7931e);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            z-index: 2;
+        }
+        
+        .card-header-marca {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 15px 10px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .brand-logo-marca {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .brand-image-marca {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        .user-info-marca {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+            color: inherit;
+            transition: opacity 0.2s ease;
+        }
+        
+        .user-info-marca:hover {
+            opacity: 0.8;
+        }
+        
+        .user-info-marca:hover .username-marca {
+            color: #667eea;
+        }
+        
+        .user-avatar-marca {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        
+        .username-marca {
+            font-size: 12px;
+            color: #666;
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+        
+        .card-content-marca {
+            padding: 15px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .brand-name-marca {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin: 0 0 10px 0;
+        }
+        
+        .benefit-section-marca {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        
+        .benefit-amount-marca {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        
+        .benefit-type-marca {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .description-marca {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.4;
+            margin-bottom: 12px;
+            flex-grow: 1;
+        }
+        
+        .card-meta-marca {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: #999;
+            margin-bottom: 10px;
+        }
+        
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .card-footer-marca {
+            padding: 15px;
+            border-top: 1px solid #f0f0f0;
+            background: #fafafa;
+        }
+        
+        .btn-block-marca {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 8px;
+            padding: 10px;
+            font-weight: 600;
+            color: white;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-block-marca:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            color: white;
+        }
+        
+        .code-actions-menu {
+            margin-top: 8px;
+        }
+        
+        /* Responsive para tarjetas de marca */
+        @media (max-width: 768px) {
+            .codes-grid-marca {
+                margin: 0 -10px;
+            }
+            
+            .code-card-marca {
+                margin-bottom: 15px;
+            }
+            
+            .card-header-marca {
+                padding: 12px;
+            }
+            
+            .card-content-marca {
+                padding: 12px;
+            }
+            
+            .card-footer-marca {
+                padding: 12px;
+            }
+            
+            .benefit-amount-marca {
+                font-size: 18px;
+            }
+            
+            .brand-name-marca {
+                font-size: 14px;
+            }
+        }
+        </style>';
+    }
 
 ?>

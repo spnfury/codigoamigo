@@ -4,7 +4,6 @@
 	require '/home/admin/web/codigoamigo.com/public_html'.'/vendor/autoload.php';
 	
 
-
 	/* LIBRERIAS */
 	include_once '/home/admin/web/codigoamigo.com/public_html'.'/myphp/librerias/Mobile_Detect.php';
 

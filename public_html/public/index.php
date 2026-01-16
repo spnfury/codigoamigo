@@ -29,6 +29,9 @@ $app = new \Slim\App([
 // Ruta principal que incluye el contenido original
 $app->get('/', function ($request, $response) {
     // Inicializar Mobile_Detect
+    if (!class_exists('Mobile_Detect')) {
+        require_once __DIR__ . '/../myphp/librerias/Mobile_Detect.php';
+    }
     $detect = new Mobile_Detect();
     $GLOBALS['detect'] = $detect;
     

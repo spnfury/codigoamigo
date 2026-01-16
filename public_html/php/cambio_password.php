@@ -4,7 +4,7 @@
     $usuario = getObjectUser('mail', $mail_);
 
     if(empty($usuario["username"])) {
-        print "<script>window.location='../cambiar_password?msg_error=ok';</script>";
+        return $response->withRedirect('/cambiar_password?msg_error=ok');
     } else {
 
         if($usuario["estado"] == 0){ //SI ES 0 REENVIO ACTIVACION
@@ -14,7 +14,7 @@
         }else{
             enviarMailRecuerdoPass($usuario);
         }
-        print "<script>window.location='../cambiar_password?msg=ok';</script>";
+        return $response->withRedirect('/cambiar_password?msg=ok');
     }
 
 ?>

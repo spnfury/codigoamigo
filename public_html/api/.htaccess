@@ -1,8 +1,0 @@
-# Configuración para archivos API
-<Files "*.php">
-    SetHandler application/x-httpd-php
-    Header set Content-Type "application/json"
-</Files>
-
-# Deshabilitar rewrite rules para esta carpeta
-RewriteEngine Off

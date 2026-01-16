@@ -1297,7 +1297,7 @@ if($quiza){
                     <a href="https://t.me/spnfury?text=<?php echo urlencode('Hola ' . $u['username'] . ', necesito ayuda con el código de ' . $marca['nombre']); ?>" 
                        target="_blank" 
                        class="btn btn-telegram">
-                        <i class="fab fa-telegram"></i> Chatear por Telegram
+                        <i class="fa-brands fa-telegram"></i> Chatear por Telegram
                     </a>
                     <button type="button" class="btn btn-default" data-dismiss="modal">Configurar solo</button>
 </div>

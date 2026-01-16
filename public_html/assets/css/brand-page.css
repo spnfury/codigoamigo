@@ -45,7 +45,7 @@
 }
 
 .brand-benefit {
-    background: linear-gradient(135deg, #ff6b35, #f7931e);
+    background: linear-gradient(135deg, #E30613, #f7931e);
     color: white;
     padding: 8px 16px;
     border-radius: 20px;
@@ -53,7 +53,7 @@
     font-weight: 600;
     display: inline-block;
     margin-top: 10px;
-    box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+    box-shadow: 0 4px 15px rgba(227, 6, 19, 0.3);
 }
 
 .brand-description {

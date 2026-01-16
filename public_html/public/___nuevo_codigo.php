@@ -1,4 +1,30 @@
-<?php get_header_new($title, $description, $image_src, $author); ?>
+<?php 
+// Usar header personalizado sin footer CSS para evitar puntos de fuga
+get_header_new($title, $description, $image_src, $author); 
+
+// Agregar CSS para ocultar cualquier elemento de footer que pueda aparecer
+?>
+<style>
+/* Ocultar footer y elementos relacionados en la página de nuevo código */
+.footer, 
+.footer-modern, 
+.footer-main, 
+.footer-links, 
+.telegram-float-new,
+.footer-top,
+.footer-bottom {
+    display: none !important;
+}
+
+/* Asegurar que el contenido principal ocupe toda la pantalla */
+body {
+    min-height: 100vh;
+}
+
+.container-top {
+    min-height: calc(100vh - 200px);
+}
+</style>
 
 <?php if($_GET["ayuda"] == "") { ?>
 <p>Estamos en mantenimiento. Volveremos en breve</p>
@@ -94,6 +120,3 @@
 </div>
 
 <?php } ?>
-
-
-<?php get_footer(); ?>

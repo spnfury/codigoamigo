@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodigoAmigo - Diagnóstico Cloudflare</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            background: #e8f5e8;
+            border: 1px solid #4caf50;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .error {
+            background: #ffebee;
+            border: 1px solid #f44336;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .warning {
+            background: #fff3e0;
+            border: 1px solid #ff9800;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .btn {
+            background: #2196f3;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn:hover {
+            background: #1976d2;
+        }
+        .info {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 CodigoAmigo - Diagnóstico Cloudflare</h1>
+        
+        <div class="status">
+            <h2>✅ Estado del Servidor</h2>
+            <p><strong>Servidor:</strong> Funcionando correctamente</p>
+            <p><strong>PHP:</strong> Sin errores fatales</p>
+            <p><strong>Base de datos:</strong> Conectada</p>
+            <p><strong>Fecha/Hora:</strong> <span id="datetime"></span></p>
+        </div>
+        
+        <div class="info">
+            <h2>📊 Información del Navegador</h2>
+            <p><strong>User Agent:</strong> <span id="useragent"></span></p>
+            <p><strong>URL Actual:</strong> <span id="currenturl"></span></p>
+            <p><strong>Protocolo:</strong> <span id="protocol"></span></p>
+            <p><strong>Host:</strong> <span id="host"></span></p>
+            <p><strong>Puerto:</strong> <span id="port"></span></p>
+        </div>
+        
+        <div class="warning">
+            <h2>⚠️ Problema Identificado</h2>
+            <p>Cloudflare está bloqueando el acceso desde navegadores reales, pero permite el acceso desde herramientas como curl.</p>
+            <p>Esto indica que hay configuraciones adicionales en Cloudflare que no hemos modificado.</p>
+        </div>
+        
+        <div class="error">
+            <h2>🚨 Configuraciones de Cloudflare a Verificar</h2>
+            <p>Ve al panel de Cloudflare y verifica estas configuraciones:</p>
+            <ol>
+                <li><strong>Security → WAF:</strong> Desactiva todas las reglas</li>
+                <li><strong>Security → Rate Limiting:</strong> Desactiva todos los límites</li>
+                <li><strong>Security → Bot Fight Mode:</strong> Desactívalo completamente</li>
+                <li><strong>Security → Browser Integrity Check:</strong> Desactívalo</li>
+                <li><strong>Security → Challenge Passage:</strong> Configura a "5 minutes"</li>
+                <li><strong>Security → Security Level:</strong> Ya está en "Essentially Off"</li>
+                <li><strong>Firewall → IP Access Rules:</strong> Verifica que tu IP no esté bloqueada</li>
+                <li><strong>Firewall → User Agent Blocking:</strong> Desactívalo</li>
+                <li><strong>Firewall → Country Blocking:</strong> Verifica que España no esté bloqueada</li>
+            </ol>
+        </div>
+        
+        <div class="info">
+            <h2>🔧 URLs de Prueba</h2>
+            <p>Prueba estas URLs en tu navegador:</p>
+            <ul>
+                <li><a href="/?cf_bypass=1&force=1&ultra=1" class="btn">Bypass Ultra</a></li>
+                <li><a href="/force-bypass.php" class="btn">Bypass Forzado</a></li>
+                <li><a href="http://78.46.100.91/" class="btn">IP Directa</a></li>
+                <li><a href="/bypass-ultra.html" class="btn">Bypass Ultra HTML</a></li>
+            </ul>
+        </div>
+        
+        <div class="status">
+            <h2>📋 Información Técnica</h2>
+            <pre id="techinfo"></pre>
+        </div>
+        
+        <div class="warning">
+            <h2>🎯 Solución Recomendada</h2>
+            <p><strong>1.</strong> Ve a <a href="https://dash.cloudflare.com/" target="_blank">dash.cloudflare.com</a></p>
+            <p><strong>2.</strong> Selecciona codigoamigo.com</p>
+            <p><strong>3.</strong> Ve a <strong>Security → WAF</strong> y desactiva todas las reglas</p>
+            <p><strong>4.</strong> Ve a <strong>Security → Rate Limiting</strong> y desactiva todos los límites</p>
+            <p><strong>5.</strong> Ve a <strong>Firewall → IP Access Rules</strong> y verifica que no haya reglas que bloqueen tu IP</p>
+            <p><strong>6.</strong> Guarda todos los cambios</p>
+        </div>
+    </div>
+    
+    <script>
+        // Mostrar información del navegador
+        document.getElementById('useragent').textContent = navigator.userAgent;
+        document.getElementById('currenturl').textContent = window.location.href;
+        document.getElementById('protocol').textContent = window.location.protocol;
+        document.getElementById('host').textContent = window.location.host;
+        document.getElementById('port').textContent = window.location.port || '80/443';
+        
+        // Mostrar fecha y hora
+        document.getElementById('datetime').textContent = new Date().toLocaleString();
+        
+        // Información técnica
+        const techInfo = {
+            'User Agent': navigator.userAgent,
+            'Platform': navigator.platform,
+            'Language': navigator.language,
+            'Cookie Enabled': navigator.cookieEnabled,
+            'Online': navigator.onLine,
+            'Screen Resolution': screen.width + 'x' + screen.height,
+            'Color Depth': screen.colorDepth,
+            'Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone,
+            'Current URL': window.location.href,
+            'Referrer': document.referrer || 'None',
+            'Timestamp': new Date().toISOString()
+        };
+        
+        document.getElementById('techinfo').textContent = JSON.stringify(techInfo, null, 2);
+        
+        // Log para debugging
+        console.log('Diagnostic page loaded');
+        console.log('Tech Info:', techInfo);
+    </script>
+</body>
+</html>
+

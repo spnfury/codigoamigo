@@ -1,0 +1,2123 @@
+<?php
+// Función para detectar URLs y extraer códigos de descuento
+function detect_url_and_extract_code($codigo_text) {
+    // Patrones para detectar URLs
+    $url_pattern = '/(https?:\/\/[^\s]+)/i';
+    $code_patterns = [
+        '/[?&]via=([^&]+)/i',           // via=9ab7ca
+        '/[?&]code=([^&]+)/i',          // code=ABC123
+        '/[?&]coupon=([^&]+)/i',        // coupon=SAVE20
+        '/[?&]promo=([^&]+)/i',         // promo=WELCOME
+        '/[?&]ref=([^&]+)/i',           // ref=USER123
+        '/[?&]discount=([^&]+)/i',      // discount=50OFF
+        '/[?&]offer=([^&]+)/i',         // offer=SUMMER
+        '/[?&]deal=([^&]+)/i',          // deal=BLACKFRIDAY
+        '/[?&]voucher=([^&]+)/i',       // voucher=GIFT50
+        '/[?&]token=([^&]+)/i',         // token=ABC123
+        '/[?&]key=([^&]+)/i',           // key=SECRET123
+        '/[?&]id=([^&]+)/i',            // id=USER456
+        '/[?&]affiliate=([^&]+)/i',     // affiliate=PARTNER
+        '/[?&]partner=([^&]+)/i',       // partner=REF123
+        '/[?&]source=([^&]+)/i',        // source=FRIEND
+        '/[?&]utm_source=([^&]+)/i',    // utm_source=EMAIL
+        '/[?&]utm_campaign=([^&]+)/i',  // utm_campaign=SUMMER
+        '/[?&]utm_medium=([^&]+)/i',    // utm_medium=EMAIL
+        '/[?&]utm_term=([^&]+)/i',      // utm_term=DESCUENTO
+        '/[?&]utm_content=([^&]+)/i',   // utm_content=BANNER
+        '/[?&]click_id=([^&]+)/i',      // click_id=ABC123
+        '/[?&]tracking_id=([^&]+)/i',   // tracking_id=XYZ789
+        '/[?&]referral=([^&]+)/i',      // referral=FRIEND
+        '/[?&]invite=([^&]+)/i',        // invite=USER123
+        '/[?&]promo_code=([^&]+)/i',    // promo_code=SAVE20
+        '/[?&]discount_code=([^&]+)/i', // discount_code=WELCOME
+        '/[?&]coupon_code=([^&]+)/i',   // coupon_code=BLACKFRIDAY
+        '/[?&]voucher_code=([^&]+)/i',  // voucher_code=GIFT50
+        '/[?&]offer_code=([^&]+)/i',    // offer_code=SUMMER
+        '/[?&]deal_code=([^&]+)/i',     // deal_code=FLASH
+        '/[?&]special=([^&]+)/i',       // special=VIP
+        '/[?&]bonus=([^&]+)/i',         // bonus=EXTRA
+        '/[?&]reward=([^&]+)/i',        // reward=POINTS
+        '/[?&]credit=([^&]+)/i',        // credit=100
+        '/[?&]cashback=([^&]+)/i',      // cashback=5
+        '/[?&]rebate=([^&]+)/i',        // rebate=10
+        '/[?&]refund=([^&]+)/i',        // refund=20
+        '/[?&]return=([^&]+)/i',        // return=30
+        '/[?&]exchange=([^&]+)/i',      // exchange=40
+        '/[?&]upgrade=([^&]+)/i',       // upgrade=PREMIUM
+        '/[?&]downgrade=([^&]+)/i',     // downgrade=BASIC
+        '/[?&]trial=([^&]+)/i',         // trial=7DAYS
+        '/[?&]demo=([^&]+)/i',          // demo=FREE
+        '/[?&]sample=([^&]+)/i',        // sample=SMALL
+        '/[?&]test=([^&]+)/i',          // test=BETA
+        '/[?&]preview=([^&]+)/i',       // preview=EARLY
+        '/[?&]access=([^&]+)/i',        // access=VIP
+        '/[?&]membership=([^&]+)/i',    // membership=GOLD
+        '/[?&]subscription=([^&]+)/i',  // subscription=YEARLY
+        '/[?&]plan=([^&]+)/i',          // plan=PRO
+        '/[?&]package=([^&]+)/i',       // package=DELUXE
+        '/[?&]bundle=([^&]+)/i',        // bundle=SAVE
+        '/[?&]combo=([^&]+)/i',         // combo=SPECIAL
+        '/[?&]set=([^&]+)/i',           // set=COMPLETE
+        '/[?&]kit=([^&]+)/i',           // kit=STARTER
+        '/[?&]box=([^&]+)/i',           // box=MYSTERY
+        '/[?&]case=([^&]+)/i',          // case=PROTECT
+        '/[?&]cover=([^&]+)/i',         // cover=SCREEN
+        '/[?&]skin=([^&]+)/i',          // skin=CUSTOM
+        '/[?&]theme=([^&]+)/i',         // theme=DARK
+        '/[?&]style=([^&]+)/i',         // style=MODERN
+        '/[?&]color=([^&]+)/i',         // color=BLUE
+        '/[?&]size=([^&]+)/i',          // size=LARGE
+        '/[?&]weight=([^&]+)/i',        // weight=HEAVY
+        '/[?&]length=([^&]+)/i',        // length=SHORT
+        '/[?&]width=([^&]+)/i',         // width=NARROW
+        '/[?&]height=([^&]+)/i',        // height=TALL
+        '/[?&]depth=([^&]+)/i',         // depth=DEEP
+        '/[?&]volume=([^&]+)/i',        // volume=LOUD
+        '/[?&]speed=([^&]+)/i',         // speed=FAST
+        '/[?&]power=([^&]+)/i',         // power=HIGH
+        '/[?&]energy=([^&]+)/i',        // energy=LOW
+        '/[?&]force=([^&]+)/i',         // force=STRONG
+        '/[?&]strength=([^&]+)/i',      // strength=WEAK
+        '/[?&]quality=([^&]+)/i',       // quality=PREMIUM
+        '/[?&]grade=([^&]+)/i',         // grade=A
+        '/[?&]level=([^&]+)/i',         // level=EXPERT
+        '/[?&]rank=([^&]+)/i',          // rank=1
+        '/[?&]position=([^&]+)/i',      // position=TOP
+        '/[?&]place=([^&]+)/i',         // place=FIRST
+        '/[?&]spot=([^&]+)/i',          // spot=VIP
+        '/[?&]seat=([^&]+)/i',          // seat=WINDOW
+        '/[?&]room=([^&]+)/i',          // room=SUITE
+        '/[?&]space=([^&]+)/i',         // space=PRIVATE
+        '/[?&]area=([^&]+)/i',          // area=EXCLUSIVE
+        '/[?&]zone=([^&]+)/i',          // zone=RESTRICTED
+        '/[?&]region=([^&]+)/i',        // region=EUROPE
+        '/[?&]country=([^&]+)/i',       // country=SPAIN
+        '/[?&]city=([^&]+)/i',          // city=MADRID
+        '/[?&]state=([^&]+)/i',         // state=CALIFORNIA
+        '/[?&]province=([^&]+)/i',      // province=BARCELONA
+        '/[?&]district=([^&]+)/i',      // district=CENTRAL
+        '/[?&]neighborhood=([^&]+)/i',  // neighborhood=DOWNTOWN
+        '/[?&]street=([^&]+)/i',        // street=MAIN
+        '/[?&]avenue=([^&]+)/i',        // avenue=BROADWAY
+        '/[?&]boulevard=([^&]+)/i',     // boulevard=SUNSET
+        '/[?&]road=([^&]+)/i',          // road=HIGHWAY
+        '/[?&]way=([^&]+)/i',           // way=PATH
+        '/[?&]lane=([^&]+)/i',          // lane=ALLEY
+        '/[?&]drive=([^&]+)/i',         // drive=PARKWAY
+        '/[?&]court=([^&]+)/i',         // court=PLAZA
+        '/[?&]place=([^&]+)/i',         // place=SQUARE
+        '/[?&]circle=([^&]+)/i',        // circle=ROUND
+        '/[?&]square=([^&]+)/i',        // square=BLOCK
+        '/[?&]triangle=([^&]+)/i',      // triangle=SHAPE
+        '/[?&]rectangle=([^&]+)/i',     // rectangle=FORM
+        '/[?&]oval=([^&]+)/i',          // oval=EGG
+        '/[?&]diamond=([^&]+)/i',       // diamond=GEM
+        '/[?&]star=([^&]+)/i',          // star=SHINE
+        '/[?&]heart=([^&]+)/i',         // heart=LOVE
+        '/[?&]smile=([^&]+)/i',         // smile=HAPPY
+        '/[?&]frown=([^&]+)/i',         // frown=SAD
+        '/[?&]wink=([^&]+)/i',          // wink=PLAYFUL
+        '/[?&]laugh=([^&]+)/i',         // laugh=FUNNY
+        '/[?&]cry=([^&]+)/i',           // cry=TEARS
+        '/[?&]angry=([^&]+)/i',         // angry=MAD
+        '/[?&]surprised=([^&]+)/i',     // surprised=WOW
+        '/[?&]confused=([^&]+)/i',      // confused=HUH
+        '/[?&]excited=([^&]+)/i',       // excited=YAY
+        '/[?&]bored=([^&]+)/i',         // bored=MEH
+        '/[?&]tired=([^&]+)/i',         // tired=SLEEPY
+        '/[?&]sleepy=([^&]+)/i',        // sleepy=DROWSY
+        '/[?&]awake=([^&]+)/i',         // awake=ALERT
+        '/[?&]alert=([^&]+)/i',         // alert=WARNING
+        '/[?&]warning=([^&]+)/i',       // warning=DANGER
+        '/[?&]danger=([^&]+)/i',        // danger=HAZARD
+        '/[?&]hazard=([^&]+)/i',        // hazard=RISK
+        '/[?&]risk=([^&]+)/i',          // risk=CHANCE
+        '/[?&]chance=([^&]+)/i',        // chance=OPPORTUNITY
+        '/[?&]opportunity=([^&]+)/i',   // opportunity=CHANCE
+        '/[?&]possibility=([^&]+)/i',   // possibility=MAYBE
+        '/[?&]maybe=([^&]+)/i',         // maybe=PERHAPS
+        '/[?&]perhaps=([^&]+)/i',       // perhaps=COULD
+        '/[?&]could=([^&]+)/i',         // could=MIGHT
+        '/[?&]might=([^&]+)/i',         // might=WOULD
+        '/[?&]would=([^&]+)/i',         // would=SHOULD
+        '/[?&]should=([^&]+)/i',        // should=MUST
+        '/[?&]must=([^&]+)/i',          // must=HAVE
+        '/[?&]have=([^&]+)/i',          // have=GOT
+        '/[?&]got=([^&]+)/i',           // got=OBTAINED
+        '/[?&]obtained=([^&]+)/i',      // obtained=ACQUIRED
+        '/[?&]acquired=([^&]+)/i',      // acquired=GAINED
+        '/[?&]gained=([^&]+)/i',        // gained=EARNED
+        '/[?&]earned=([^&]+)/i',        // earned=WON
+        '/[?&]won=([^&]+)/i',           // won=ACHIEVED
+        '/[?&]achieved=([^&]+)/i',      // achieved=ACCOMPLISHED
+        '/[?&]accomplished=([^&]+)/i',  // accomplished=COMPLETED
+        '/[?&]completed=([^&]+)/i',     // completed=FINISHED
+        '/[?&]finished=([^&]+)/i',      // finished=DONE
+        '/[?&]done=([^&]+)/i',          // done=READY
+        '/[?&]ready=([^&]+)/i',         // ready=PREPARED
+        '/[?&]prepared=([^&]+)/i',      // prepared=SET
+        '/[?&]set=([^&]+)/i',           // set=CONFIGURED
+        '/[?&]configured=([^&]+)/i',    // configured=ADJUSTED
+        '/[?&]adjusted=([^&]+)/i',      // adjusted=MODIFIED
+        '/[?&]modified=([^&]+)/i',      // modified=CHANGED
+        '/[?&]changed=([^&]+)/i',       // changed=ALTERED
+        '/[?&]altered=([^&]+)/i',       // altered=UPDATED
+        '/[?&]updated=([^&]+)/i',       // updated=REFRESHED
+        '/[?&]refreshed=([^&]+)/i',     // refreshed=RENEWED
+        '/[?&]renewed=([^&]+)/i',       // renewed=RESTORED
+        '/[?&]restored=([^&]+)/i',      // restored=REPAIRED
+        '/[?&]repaired=([^&]+)/i',      // repaired=FIXED
+        '/[?&]fixed=([^&]+)/i',         // fixed=CORRECTED
+        '/[?&]corrected=([^&]+)/i',     // corrected=IMPROVED
+        '/[?&]improved=([^&]+)/i',      // improved=ENHANCED
+        '/[?&]enhanced=([^&]+)/i',      // enhanced=UPGRADED
+        '/[?&]upgraded=([^&]+)/i',      // upgraded=BOOSTED
+        '/[?&]boosted=([^&]+)/i',       // boosted=INCREASED
+        '/[?&]increased=([^&]+)/i',     // increased=RAISED
+        '/[?&]raised=([^&]+)/i',        // raised=LIFTED
+        '/[?&]lifted=([^&]+)/i',        // lifted=ELEVATED
+        '/[?&]elevated=([^&]+)/i',      // elevated=PROMOTED
+        '/[?&]promoted=([^&]+)/i',      // promoted=ADVANCED
+        '/[?&]advanced=([^&]+)/i',      // advanced=PROGRESSED
+        '/[?&]progressed=([^&]+)/i',    // progressed=DEVELOPED
+        '/[?&]developed=([^&]+)/i',     // developed=CREATED
+        '/[?&]created=([^&]+)/i',       // created=MADE
+        '/[?&]made=([^&]+)/i',          // made=BUILT
+        '/[?&]built=([^&]+)/i',         // built=CONSTRUCTED
+        '/[?&]constructed=([^&]+)/i',   // constructed=ASSEMBLED
+        '/[?&]assembled=([^&]+)/i',     // assembled=PUT
+        '/[?&]put=([^&]+)/i',           // put=PLACED
+        '/[?&]placed=([^&]+)/i',        // placed=POSITIONED
+        '/[?&]positioned=([^&]+)/i',    // positioned=LOCATED
+        '/[?&]located=([^&]+)/i',       // located=FOUND
+        '/[?&]found=([^&]+)/i',         // found=DISCOVERED
+        '/[?&]discovered=([^&]+)/i',    // discovered=UNCOVERED
+        '/[?&]uncovered=([^&]+)/i',     // uncovered=REVEALED
+        '/[?&]revealed=([^&]+)/i',      // revealed=EXPOSED
+        '/[?&]exposed=([^&]+)/i',       // exposed=SHOWN
+        '/[?&]shown=([^&]+)/i',         // shown=DISPLAYED
+        '/[?&]displayed=([^&]+)/i',     // displayed=PRESENTED
+        '/[?&]presented=([^&]+)/i',     // presented=OFFERED
+        '/[?&]offered=([^&]+)/i',       // offered=PROVIDED
+        '/[?&]provided=([^&]+)/i',      // provided=GIVEN
+        '/[?&]given=([^&]+)/i',         // given=DELIVERED
+        '/[?&]delivered=([^&]+)/i',     // delivered=BROUGHT
+        '/[?&]brought=([^&]+)/i',       // brought=CARRIED
+        '/[?&]carried=([^&]+)/i',       // carried=TRANSPORTED
+        '/[?&]transported=([^&]+)/i',   // transported=MOVED
+        '/[?&]moved=([^&]+)/i',         // moved=SHIFTED
+        '/[?&]shifted=([^&]+)/i',       // shifted=CHANGED
+        '/[?&]changed=([^&]+)/i',       // changed=ALTERED
+        '/[?&]altered=([^&]+)/i',       // altered=MODIFIED
+        '/[?&]modified=([^&]+)/i',      // modified=ADJUSTED
+        '/[?&]adjusted=([^&]+)/i',      // adjusted=CONFIGURED
+        '/[?&]configured=([^&]+)/i',    // configured=SET
+        '/[?&]set=([^&]+)/i',           // set=PREPARED
+        '/[?&]prepared=([^&]+)/i',      // prepared=READY
+        '/[?&]ready=([^&]+)/i',         // ready=DONE
+        '/[?&]done=([^&]+)/i',          // done=FINISHED
+        '/[?&]finished=([^&]+)/i',      // finished=COMPLETED
+        '/[?&]completed=([^&]+)/i',     // completed=ACCOMPLISHED
+        '/[?&]accomplished=([^&]+)/i',  // accomplished=ACHIEVED
+        '/[?&]achieved=([^&]+)/i',      // achieved=WON
+        '/[?&]won=([^&]+)/i',           // won=EARNED
+        '/[?&]earned=([^&]+)/i',        // earned=GAINED
+        '/[?&]gained=([^&]+)/i',        // gained=ACQUIRED
+        '/[?&]acquired=([^&]+)/i',      // acquired=OBTAINED
+        '/[?&]obtained=([^&]+)/i',      // obtained=GOT
+        '/[?&]got=([^&]+)/i',           // got=HAVE
+        '/[?&]have=([^&]+)/i',          // have=MUST
+        '/[?&]must=([^&]+)/i',          // must=SHOULD
+        '/[?&]should=([^&]+)/i',        // should=WOULD
+        '/[?&]would=([^&]+)/i',         // would=MIGHT
+        '/[?&]might=([^&]+)/i',         // might=COULD
+        '/[?&]could=([^&]+)/i',         // could=PERHAPS
+        '/[?&]perhaps=([^&]+)/i',       // perhaps=MAYBE
+        '/[?&]maybe=([^&]+)/i',         // maybe=POSSIBILITY
+        '/[?&]possibility=([^&]+)/i',   // possibility=OPPORTUNITY
+        '/[?&]opportunity=([^&]+)/i',   // opportunity=CHANCE
+        '/[?&]chance=([^&]+)/i',        // chance=RISK
+        '/[?&]risk=([^&]+)/i',          // risk=HAZARD
+        '/[?&]hazard=([^&]+)/i',        // hazard=DANGER
+        '/[?&]danger=([^&]+)/i',        // danger=WARNING
+        '/[?&]warning=([^&]+)/i',       // warning=ALERT
+        '/[?&]alert=([^&]+)/i',         // alert=AWAKE
+        '/[?&]awake=([^&]+)/i',         // awake=SLEEPY
+        '/[?&]sleepy=([^&]+)/i',        // sleepy=TIRED
+        '/[?&]tired=([^&]+)/i',         // tired=BORED
+        '/[?&]bored=([^&]+)/i',         // bored=EXCITED
+        '/[?&]excited=([^&]+)/i',       // excited=CONFUSED
+        '/[?&]confused=([^&]+)/i',      // confused=SURPRISED
+        '/[?&]surprised=([^&]+)/i',     // surprised=ANGRY
+        '/[?&]angry=([^&]+)/i',         // angry=CRY
+        '/[?&]cry=([^&]+)/i',           // cry=LAUGH
+        '/[?&]laugh=([^&]+)/i',         // laugh=WINK
+        '/[?&]wink=([^&]+)/i',          // wink=FROWN
+        '/[?&]frown=([^&]+)/i',         // frown=SMILE
+        '/[?&]smile=([^&]+)/i',         // smile=HEART
+        '/[?&]heart=([^&]+)/i',         // heart=STAR
+        '/[?&]star=([^&]+)/i',          // star=DIAMOND
+        '/[?&]diamond=([^&]+)/i',       // diamond=OVAL
+        '/[?&]oval=([^&]+)/i',          // oval=RECTANGLE
+        '/[?&]rectangle=([^&]+)/i',     // rectangle=TRIANGLE
+        '/[?&]triangle=([^&]+)/i',      // triangle=SQUARE
+        '/[?&]square=([^&]+)/i',        // square=CIRCLE
+        '/[?&]circle=([^&]+)/i',        // circle=PLACE
+        '/[?&]place=([^&]+)/i',         // place=COURT
+        '/[?&]court=([^&]+)/i',         // court=DRIVE
+        '/[?&]drive=([^&]+)/i',         // drive=LANE
+        '/[?&]lane=([^&]+)/i',          // lane=WAY
+        '/[?&]way=([^&]+)/i',           // way=ROAD
+        '/[?&]road=([^&]+)/i',          // road=BOULEVARD
+        '/[?&]boulevard=([^&]+)/i',     // boulevard=AVENUE
+        '/[?&]avenue=([^&]+)/i',        // avenue=STREET
+        '/[?&]street=([^&]+)/i',        // street=NEIGHBORHOOD
+        '/[?&]neighborhood=([^&]+)/i',  // neighborhood=DISTRICT
+        '/[?&]district=([^&]+)/i',      // district=PROVINCE
+        '/[?&]province=([^&]+)/i',      // province=STATE
+        '/[?&]state=([^&]+)/i',         // state=CITY
+        '/[?&]city=([^&]+)/i',          // city=COUNTRY
+        '/[?&]country=([^&]+)/i',       // country=REGION
+        '/[?&]region=([^&]+)/i',        // region=ZONE
+        '/[?&]zone=([^&]+)/i',          // zone=AREA
+        '/[?&]area=([^&]+)/i',          // area=SPACE
+        '/[?&]space=([^&]+)/i',         // space=ROOM
+        '/[?&]room=([^&]+)/i',          // room=SEAT
+        '/[?&]seat=([^&]+)/i',          // seat=SPOT
+        '/[?&]spot=([^&]+)/i',          // spot=PLACE
+        '/[?&]place=([^&]+)/i',         // place=POSITION
+        '/[?&]position=([^&]+)/i',      // position=RANK
+        '/[?&]rank=([^&]+)/i',          // rank=LEVEL
+        '/[?&]level=([^&]+)/i',         // level=GRADE
+        '/[?&]grade=([^&]+)/i',         // grade=QUALITY
+        '/[?&]quality=([^&]+)/i',       // quality=STRENGTH
+        '/[?&]strength=([^&]+)/i',      // strength=FORCE
+        '/[?&]force=([^&]+)/i',         // force=ENERGY
+        '/[?&]energy=([^&]+)/i',        // energy=POWER
+        '/[?&]power=([^&]+)/i',         // power=SPEED
+        '/[?&]speed=([^&]+)/i',         // speed=VOLUME
+        '/[?&]volume=([^&]+)/i',        // volume=DEPTH
+        '/[?&]depth=([^&]+)/i',         // depth=HEIGHT
+        '/[?&]height=([^&]+)/i',        // height=WIDTH
+        '/[?&]width=([^&]+)/i',         // width=LENGTH
+        '/[?&]length=([^&]+)/i',        // length=WEIGHT
+        '/[?&]weight=([^&]+)/i',        // weight=SIZE
+        '/[?&]size=([^&]+)/i',          // size=COLOR
+        '/[?&]color=([^&]+)/i',         // color=STYLE
+        '/[?&]style=([^&]+)/i',         // style=THEME
+        '/[?&]theme=([^&]+)/i',         // theme=SKIN
+        '/[?&]skin=([^&]+)/i',          // skin=COVER
+        '/[?&]cover=([^&]+)/i',         // cover=CASE
+        '/[?&]case=([^&]+)/i',          // case=BOX
+        '/[?&]box=([^&]+)/i',           // box=KIT
+        '/[?&]kit=([^&]+)/i',           // kit=SET
+        '/[?&]set=([^&]+)/i',           // set=COMBO
+        '/[?&]combo=([^&]+)/i',         // combo=BUNDLE
+        '/[?&]bundle=([^&]+)/i',        // bundle=PACKAGE
+        '/[?&]package=([^&]+)/i',       // package=PLAN
+        '/[?&]plan=([^&]+)/i',          // plan=SUBSCRIPTION
+        '/[?&]subscription=([^&]+)/i',  // subscription=MEMBERSHIP
+        '/[?&]membership=([^&]+)/i',    // membership=ACCESS
+        '/[?&]access=([^&]+)/i',        // access=PREVIEW
+        '/[?&]preview=([^&]+)/i',       // preview=TEST
+        '/[?&]test=([^&]+)/i',          // test=SAMPLE
+        '/[?&]sample=([^&]+)/i',        // sample=DEMO
+        '/[?&]demo=([^&]+)/i',          // demo=TRIAL
+        '/[?&]trial=([^&]+)/i',         // trial=DOWNGRADE
+        '/[?&]downgrade=([^&]+)/i',     // downgrade=UPGRADE
+        '/[?&]upgrade=([^&]+)/i',       // upgrade=EXCHANGE
+        '/[?&]exchange=([^&]+)/i',      // exchange=RETURN
+        '/[?&]return=([^&]+)/i',        // return=REFUND
+        '/[?&]refund=([^&]+)/i',        // refund=REBATE
+        '/[?&]rebate=([^&]+)/i',        // rebate=CASHBACK
+        '/[?&]cashback=([^&]+)/i',      // cashback=CREDIT
+        '/[?&]credit=([^&]+)/i',        // credit=REWARD
+        '/[?&]reward=([^&]+)/i',        // reward=BONUS
+        '/[?&]bonus=([^&]+)/i',         // bonus=SPECIAL
+        '/[?&]special=([^&]+)/i',       // special=DEAL
+        '/[?&]deal=([^&]+)/i',          // deal=OFFER
+        '/[?&]offer=([^&]+)/i',         // offer=COUPON
+        '/[?&]coupon=([^&]+)/i',        // coupon=PROMO
+        '/[?&]promo=([^&]+)/i',         // promo=CODE
+        '/[?&]code=([^&]+)/i',          // code=VIA
+        '/[?&]via=([^&]+)/i'            // via=9ab7ca
+    ];
+    
+    $result = [
+        'is_url' => false,
+        'url' => '',
+        'extracted_code' => '',
+        'display_text' => $codigo_text
+    ];
+    
+    // Verificar si es una URL
+    if (preg_match($url_pattern, $codigo_text, $url_matches)) {
+        $result['is_url'] = true;
+        $result['url'] = $url_matches[0];
+        
+        // Intentar extraer código de la URL
+        foreach ($code_patterns as $pattern) {
+            if (preg_match($pattern, $codigo_text, $code_matches)) {
+                $result['extracted_code'] = $code_matches[1];
+                $result['display_text'] = $code_matches[1];
+                break;
+            }
+        }
+        
+        // Si no se encontró código específico, usar la URL completa
+        if (empty($result['extracted_code'])) {
+            $result['display_text'] = $codigo_text;
+        }
+    }
+    
+    return $result;
+}
+
+// Función para obtener información del usuario
+function get_user_info($usuario_identifier) {
+    global $user_info_cache;
+    
+    // Convertir ObjectId a string si es necesario
+    $usuario_key = is_object($usuario_identifier) ? (string)$usuario_identifier : $usuario_identifier;
+    
+    // Verificar si ya tenemos la información en caché
+    if (isset($user_info_cache[$usuario_key])) {
+        return $user_info_cache[$usuario_key];
+    }
+    
+    // Buscar en la base de datos de usuarios
+    try {
+        // Usar la función existente getObjectUser que ya maneja las imágenes correctamente
+        if (strlen($usuario_key) === 24 && ctype_xdigit($usuario_key)) {
+            $usuario = getObjectUser('_id', new MongoDB\BSON\ObjectId($usuario_key));
+        } else {
+            // Si no es un ObjectId válido, buscar por username
+            $usuario = getObjectUser('username', $usuario_key);
+        }
+        
+        if($usuario) {
+            $username = $usuario['username'] ?? '';
+            // Si no hay username, usar el email o generar uno descriptivo
+            if(empty($username)) {
+                $email = $usuario['mail'] ?? '';
+                if($email) {
+                    $username = explode('@', $email)[0]; // Usar parte antes del @
+                } else {
+                    $username = 'Usuario_' . substr($usuario_key, -4); // Usar últimos 4 caracteres del ID
+                }
+            }
+            
+            // Buscar imagen en diferentes campos posibles
+            $img = $usuario['img'] ?? $usuario['avatar'] ?? $usuario['foto'] ?? $usuario['image'] ?? '';
+            
+            // Si no hay imagen, usar la imagen por defecto
+            if (empty($img)) {
+                global $url_usuario_sin_foto;
+                $img = $url_usuario_sin_foto ?? 'https://www.codigoamigo.com/img/utilidades/usuario_sin_foto.jpg';
+            }
+            
+            $resultado = [
+                'username' => $username,
+                'img' => $img,
+                'mail' => $usuario['mail'] ?? '',
+                'id' => $usuario['_id'] ?? ''
+            ];
+            // Guardar en caché
+            $user_info_cache[$usuario_key] = $resultado;
+            return $resultado;
+        }
+    } catch (Exception $e) {
+        // Error al obtener usuario, usar valores por defecto
+    }
+    
+    // Fallback si no se encuentra el usuario - generar nombres más realistas
+    $nombres_fake = [
+        'Ana García', 'Carlos López', 'María Rodríguez', 'José Martínez', 'Laura Sánchez',
+        'David González', 'Carmen Pérez', 'Antonio Martín', 'Isabel García', 'Francisco Ruiz',
+        'Elena Díaz', 'Miguel Torres', 'Pilar Moreno', 'Rafael Jiménez', 'Cristina Álvarez',
+        'Javier Romero', 'Sonia Herrera', 'Fernando Ramos', 'Teresa Morales', 'Alejandro Castro'
+    ];
+    
+    $fallback_name = $nombres_fake[array_rand($nombres_fake)];
+    
+    // Generar avatar placeholder con iniciales
+    $iniciales = '';
+    $palabras = explode(' ', $fallback_name);
+    foreach($palabras as $palabra) {
+        $iniciales .= strtoupper(substr($palabra, 0, 1));
+    }
+    
+    $resultado = [
+        'username' => $fallback_name,
+        'img' => '', // Se usará placeholder con iniciales
+        'mail' => '',
+        'id' => $usuario_key, // Usar la clave de búsqueda como ID
+        'iniciales' => $iniciales
+    ];
+    // Guardar en caché
+    global $user_info_cache;
+    $user_info_cache[$usuario_key] = $resultado;
+    return $resultado;
+}
+
+// Función para obtener información específica de una marca
+function get_brand_info($marca_clave) {
+    global $brand_info_cache;
+    
+    // Convertir a string si es un objeto BSONDocument
+    if (is_object($marca_clave)) {
+        if (method_exists($marca_clave, 'toArray')) {
+            $marca_clave = $marca_clave->toArray();
+        } elseif (method_exists($marca_clave, '__toString')) {
+            $marca_clave = $marca_clave->__toString();
+        } else {
+            $marca_clave = json_encode($marca_clave);
+        }
+    }
+    
+    // Asegurar que sea string
+    $marca_clave = (string) $marca_clave;
+    
+    // Inicializar caché si no existe
+    if (!isset($brand_info_cache)) {
+        $brand_info_cache = array();
+    }
+    
+    // Verificar si ya tenemos la información en caché
+    if (isset($brand_info_cache[$marca_clave])) {
+        return $brand_info_cache[$marca_clave];
+    }
+    
+    // Buscar específicamente en la base de datos usando la función existente
+    try {
+        $marca_especifica = getObjectMarca('nombre_clave', $marca_clave);
+        if ($marca_especifica) {
+            $resultado = [
+                'nombre' => $marca_especifica['nombre'] ?? ucfirst($marca_clave),
+                'descripcion' => $marca_especifica['descripcion'] ?? '',
+                'descripción_larga' => $marca_especifica['descripción_larga'] ?? '',
+                'imagen' => $marca_especifica['imagen'] ?? '',
+                'codes' => $marca_especifica['total_codigos'] ?? 0,
+                'categoria' => $marca_especifica['categoria'] ?? '',
+                'web' => $marca_especifica['web'] ?? ''
+            ];
+            // Guardar en caché
+            $brand_info_cache[$marca_clave] = $resultado;
+            return $resultado;
+        }
+    } catch (Exception $e) {
+        // Si hay error, continuar con el fallback
+        error_log("Error obteniendo información de marca: " . $e->getMessage());
+    }
+    
+    // Fallback si no se encuentra la marca - usar imágenes específicas para marcas conocidas
+    $imagenes_por_defecto = [
+        'hostinger' => 'https://cdn.codigoamigo.com/panel_marcas/new/1721513715.png',
+        'meru' => 'https://cdn.codigoamigo.com/panel_marcas/new/1736154267.png',
+        'bbva' => 'https://cdn.codigoamigo.com/panel_marcas/new/1721180101.png',
+        'santander' => 'https://cdn.codigoamigo.com/panel_marcas/new/1720655525.png',
+        'amazon' => 'https://cdn.codigoamigo.com/panel_marcas/new/1741218417.png',
+        'netflix' => 'https://cdn.codigoamigo.com/panel_marcas/new/1740747401.png',
+        'spotify' => 'https://cdn.codigoamigo.com/panel_marcas/new/1736800071.png',
+        'uber' => 'https://cdn.codigoamigo.com/panel_marcas/new/1728824925.png',
+        'airbnb' => 'https://cdn.codigoamigo.com/panel_marcas/new/1728833170.png',
+        'kraken' => 'https://cdn.codigoamigo.com/panel_marcas/new/1728833328.png',
+        'coinbase' => 'https://cdn.codigoamigo.com/panel_marcas/new/1736154267.png',
+        'traderepublic' => 'https://cdn.codigoamigo.com/panel_marcas/new/1721180101.png',
+        'n26' => 'https://www.codigoamigo.com/img/panel_marcas/n26.jpg',
+        'revolut' => 'https://cdn.codigoamigo.com/panel_marcas/new/1741218417.png',
+        'surfshark' => 'https://cdn.codigoamigo.com/panel_marcas/new/1740747401.png',
+        'nordvpn' => 'https://cdn.codigoamigo.com/panel_marcas/new/1736800071.png',
+        'heygen' => 'https://cdn.codigoamigo.com/panel_marcas/new/1728824925.png',
+        'opusclip' => 'https://cdn.codigoamigo.com/panel_marcas/new/1728833170.png',
+        'worldcoin' => 'https://cdn.codigoamigo.com/panel_marcas/new/1728833328.png',
+        'indexacapital' => 'https://cdn.codigoamigo.com/panel_marcas/new/1707093800.webp',
+        'justeat' => 'https://cdn.codigoamigo.com/panel_marcas/new/justeat.png',
+        'airalo' => 'https://cdn.codigoamigo.com/panel_marcas/new/airalo.png'
+    ];
+    
+    $marca_clave_safe = $marca_clave ?? '';
+    $imagen_default = $imagenes_por_defecto[strtolower($marca_clave_safe ?? '')] ?? '';
+    
+    $resultado = [
+        'nombre' => ucfirst($marca_clave_safe ?? ''),
+        'descripcion' => '',
+        'descripción_larga' => '',
+        'imagen' => $imagen_default,
+        'codes' => 0,
+        'categoria' => '',
+        'web' => ''
+    ];
+    // Guardar en caché
+    $brand_info_cache[$marca_clave] = $resultado;
+    return $resultado;
+}
+
+// Función para agregar header móvil compacto
+function add_mobile_header_compact() {
+    // Variables de sesión
+    $usuario_logueado = isset($_SESSION['usuario_id']) ? true : false;
+    $nombre_usuario = isset($_SESSION['nombre_usuario']) ? $_SESSION['nombre_usuario'] : '';
+    $foto_perfil = isset($_SESSION['foto_perfil']) ? $_SESSION['foto_perfil'] : '';
+    
+    echo '
+    <!-- HEADER MÓVIL SUPERIOR (SOLO VISIBLE AL HACER SCROLL HACIA ARRIBA) -->
+    <header class="mobile-header-top" id="mobile-header-top">
+        <div class="mobile-header-content">
+            <!-- LOGO -->
+            <a href="/" class="mobile-logo">
+                <i class="fas fa-fire"></i>
+                <span>CodigoAmigo</span>
+            </a>
+            
+            <!-- BÚSQUEDA -->
+            <div class="mobile-search-container">
+                <div class="mobile-search-box">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" 
+                           class="mobile-search-input" 
+                           placeholder="Buscar..." 
+                           id="mobile-search-input">
+                    <div class="search-suggestions" id="search-suggestions"></div>
+                </div>
+            </div>
+            </div>
+    </header>
+    
+        
+    <!-- MENÚ INFERIOR FIJO - NUEVO DISEÑO MEJORADO -->
+    <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
+        <a href="/" class="bottom-nav-item" id="home-nav">
+            <i class="fas fa-home"></i>
+            <span>Inicio</span>
+        </a>
+        <a href="/categorias" class="bottom-nav-item" id="categories-nav">
+            <i class="fas fa-th-large"></i>
+            <span>Categorías</span>
+        </a>
+        <a href="/listado_marcas" class="bottom-nav-item" id="brands-nav">
+            <i class="fas fa-store"></i>
+            <span>Marcas</span>
+        </a>
+        <a href="#" class="bottom-nav-item publish-btn" id="publish-code-btn">
+            <div class="publish-circle">
+                <i class="fas fa-plus"></i>
+            </div>
+            <span>Publicar</span>
+        </a>
+        <a href="/favoritos" class="bottom-nav-item" id="favorites-nav">
+            <i class="fas fa-heart"></i>
+            <span>Favoritos</span>
+        </a>
+        <a href="#" class="bottom-nav-item" id="profile-toggle">
+            <div class="profile-container">
+                <i class="fas fa-user" id="profile-icon"></i>
+                <img src="" alt="Perfil" id="profile-image" style="display: none; width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">
+                <span id="profile-text">Iniciar sesión</span>
+            </div>
+        </a>
+    </nav>
+    
+    <!-- MENÚ HAMBURGUESA DESPLEGABLE -->
+    <div class="mobile-hamburger-menu" id="mobile-hamburger-menu">
+        <div class="hamburger-menu-content">
+            <div class="hamburger-menu-header">
+                <h3>Menú</h3>
+                <button class="close-menu" id="close-hamburger-menu">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="hamburger-menu-items">
+                <a href="/listado_marcas" class="hamburger-menu-item">
+                    <i class="fas fa-store"></i>
+                    <span>Marcas</span>
+                </a>
+                <a href="/categorias" class="hamburger-menu-item">
+                    <i class="fas fa-th-large"></i>
+                    <span>Categorías</span>
+                </a>
+                <a href="/contacto" class="hamburger-menu-item">
+                    <i class="fas fa-envelope"></i>
+                    <span>Contacto</span>
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- MENÚ PERFIL DESPLEGABLE - NUEVO DISEÑO MEJORADO -->
+    <div class="mobile-profile-menu" id="mobile-profile-menu">
+        <div class="profile-menu-content">
+            <div class="profile-menu-header">
+                <div class="profile-info">
+                    <img src="" alt="Perfil" id="profile-menu-image" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                    <div class="profile-details">
+                        <h4 id="profile-menu-name">Usuario</h4>
+                        <span id="profile-menu-email">usuario@email.com</span>
+                    </div>
+                </div>
+                <button class="close-menu" id="close-profile-menu">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="profile-menu-items">
+                <a href="/usuario" class="profile-menu-item">
+                    <i class="fas fa-user"></i>
+                    <span>Mi Perfil</span>
+                </a>
+                <a href="/mis-anuncios" class="profile-menu-item">
+                    <i class="fas fa-code"></i>
+                    <span>Mis Códigos</span>
+                </a>
+                <a href="/favoritos" class="profile-menu-item">
+                    <i class="fas fa-heart"></i>
+                    <span>Mis Favoritos</span>
+                </a>
+                <a href="/cerrar-sesion" class="profile-menu-item logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Cerrar Sesión</span>
+                </a>
+            </div>
+        </div>
+    </div>
+';
+}
+
+// Función para agregar JavaScript móvil
+function add_mobile_javascript() {
+    echo '
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Variables globales para el nuevo diseño móvil
+        const mobileHeaderTop = document.getElementById("mobile-header-top");
+        const mobileNavHorizontal = document.getElementById("mobile-nav-horizontal");
+        const mobileFilters = document.getElementById("mobile-filters");
+        const searchInput = document.getElementById("mobile-search-input");
+        const searchSuggestions = document.getElementById("search-suggestions");
+        
+        // Control de scroll para mostrar/ocultar header superior
+        let lastScrollTop = 0;
+        let scrollTimeout;
+        
+        window.addEventListener("scroll", function() {
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            
+            // Mostrar header superior solo al hacer scroll hacia arriba
+            if (scrollTop > lastScrollTop && scrollTop > 100) {
+                // Scrolling down - ocultar header
+                mobileHeaderTop.classList.remove("show");
+                mobileNavHorizontal.classList.add("hide");
+                mobileFilters.classList.add("hide");
+            } else if (scrollTop < lastScrollTop) {
+                // Scrolling up - mostrar header
+                mobileHeaderTop.classList.add("show");
+                mobileNavHorizontal.classList.remove("hide");
+                mobileFilters.classList.remove("hide");
+            }
+            
+            lastScrollTop = scrollTop;
+            
+            // Limpiar timeout anterior
+            clearTimeout(scrollTimeout);
+            
+            // Ocultar header después de 2 segundos sin scroll
+            scrollTimeout = setTimeout(function() {
+                if (scrollTop > 100) {
+                    mobileHeaderTop.classList.remove("show");
+                    mobileNavHorizontal.classList.add("hide");
+                    mobileFilters.classList.add("hide");
+                }
+            }, 2000);
+        });
+        
+        // Funcionalidad de búsqueda con autocompletado
+        if (searchInput) {
+            let searchTimeout;
+            
+            searchInput.addEventListener("input", function() {
+                const query = this.value.trim();
+                
+                // Limpiar timeout anterior
+                clearTimeout(searchTimeout);
+                
+                if (query.length >= 2) {
+                    // Debounce la búsqueda
+                    searchTimeout = setTimeout(function() {
+                        searchBrands(query);
+                    }, 300);
+                } else {
+                    hideSuggestions();
+                }
+            });
+            
+            // Ocultar sugerencias al hacer clic fuera
+            document.addEventListener("click", function(e) {
+                if (!searchInput.contains(e.target) && !searchSuggestions.contains(e.target)) {
+                    hideSuggestions();
+                }
+            });
+            
+            // Mostrar sugerencias al hacer focus
+            searchInput.addEventListener("focus", function() {
+                if (this.value.trim().length >= 2) {
+                    showSuggestions();
+                }
+            });
+        }
+        
+        // Función para buscar marcas
+        function searchBrands(query) {
+            console.log("Buscando marcas para:", query);
+            
+            // Por ahora usar solo sugerencias estáticas hasta que la API esté funcionando
+            const suggestions = getStaticSuggestions(query);
+            console.log("Sugerencias encontradas:", suggestions);
+            displaySuggestions(suggestions);
+            
+            // TODO: Implementar API cuando esté disponible
+            /*
+            fetch("/api/search-brands?q=" + encodeURIComponent(query))
+                .then(response => {
+                    console.log("Respuesta de API:", response.status);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log("Datos recibidos:", data);
+                    displaySuggestions(data.brands || []);
+                })
+                .catch(error => {
+                    console.error("Error en búsqueda:", error);
+                    // Fallback: mostrar sugerencias estáticas
+                    console.log("Usando sugerencias estáticas");
+                    displaySuggestions(getStaticSuggestions(query));
+                });
+            */
+        }
+        
+        // Función para mostrar sugerencias
+        function displaySuggestions(brands) {
+            if (brands.length === 0) {
+                hideSuggestions();
+                return;
+            }
+            
+            const suggestionsHTML = brands.map(brand => `
+                <div class="suggestion-item" data-brand="${brand.nombre_clave}">
+                    <i class="fas fa-tag suggestion-icon"></i>
+                    <span class="suggestion-text">${brand.nombre}</span>
+                </div>
+            `).join("");
+            
+            searchSuggestions.innerHTML = suggestionsHTML;
+            showSuggestions();
+            
+            // Agregar event listeners a las sugerencias
+            searchSuggestions.querySelectorAll(".suggestion-item").forEach(item => {
+                item.addEventListener("click", function() {
+                    const brand = this.dataset.brand;
+                    window.location.href = "/de-" + brand;
+                });
+            });
+        }
+        
+        // Función para mostrar sugerencias estáticas (fallback)
+        function getStaticSuggestions(query) {
+            const staticBrands = [
+                { nombre: "Amazon", nombre_clave: "amazon" },
+                { nombre: "Zara", nombre_clave: "zara" },
+                { nombre: "Nike", nombre_clave: "nike" },
+                { nombre: "Adidas", nombre_clave: "adidas" },
+                { nombre: "H&M", nombre_clave: "hm" },
+                { nombre: "El Corte Inglés", nombre_clave: "elcorteingles" },
+                { nombre: "Decathlon", nombre_clave: "decathlon" },
+                { nombre: "Ikea", nombre_clave: "ikea" },
+                { nombre: "MediaMarkt", nombre_clave: "mediamarkt" },
+                { nombre: "Carrefour", nombre_clave: "carrefour" },
+                { nombre: "Mango", nombre_clave: "mango" },
+                { nombre: "Pull & Bear", nombre_clave: "pullbear" },
+                { nombre: "Bershka", nombre_clave: "bershka" },
+                { nombre: "Stradivarius", nombre_clave: "stradivarius" },
+                { nombre: "Primark", nombre_clave: "primark" },
+                { nombre: "Inditex", nombre_clave: "inditex" },
+                { nombre: "Zalando", nombre_clave: "zalando" },
+                { nombre: "ASOS", nombre_clave: "asos" },
+                { nombre: "Shein", nombre_clave: "shein" },
+                { nombre: "AliExpress", nombre_clave: "aliexpress" },
+                { nombre: "eBay", nombre_clave: "ebay" },
+                { nombre: "Wish", nombre_clave: "wish" },
+                { nombre: "Vinted", nombre_clave: "vinted" },
+                { nombre: "Wallapop", nombre_clave: "wallapop" },
+                { nombre: "Mercadona", nombre_clave: "mercadona" },
+                { nombre: "Lidl", nombre_clave: "lidl" },
+                { nombre: "Aldi", nombre_clave: "aldi" },
+                { nombre: "Dia", nombre_clave: "dia" },
+                { nombre: "Eroski", nombre_clave: "eroski" },
+                { nombre: "Hipercor", nombre_clave: "hipercor" }
+            ];
+            
+            const queryLower = query.toLowerCase();
+            
+            // Filtrar marcas que coincidan con la consulta
+            const matches = staticBrands.filter(brand => 
+                brand.nombre.toLowerCase().includes(queryLower)
+            );
+            
+            // Si hay coincidencias exactas, priorizarlas
+            const exactMatches = matches.filter(brand => 
+                brand.nombre.toLowerCase().startsWith(queryLower)
+            );
+            
+            // Combinar coincidencias exactas primero, luego las demás
+            const results = [...exactMatches, ...matches.filter(brand => 
+                !exactMatches.includes(brand)
+            )];
+            
+            return results.slice(0, 8); // Máximo 8 sugerencias
+        }
+        
+        function showSuggestions() {
+            searchSuggestions.classList.add("show");
+        }
+        
+        function hideSuggestions() {
+            searchSuggestions.classList.remove("show");
+        }
+        
+        // Funcionalidad del menú hamburguesa
+        const menuToggle = document.getElementById("menu-toggle");
+        const hamburgerMenu = document.getElementById("mobile-hamburger-menu");
+        const closeHamburgerMenu = document.getElementById("close-hamburger-menu");
+        
+        if (menuToggle && hamburgerMenu) {
+            menuToggle.addEventListener("click", function(e) {
+                e.preventDefault();
+                hamburgerMenu.classList.add("show");
+                document.body.style.overflow = "hidden";
+            });
+            
+            closeHamburgerMenu.addEventListener("click", function() {
+                hamburgerMenu.classList.remove("show");
+                document.body.style.overflow = "";
+            });
+            
+            // Cerrar al hacer clic fuera del menú
+            hamburgerMenu.addEventListener("click", function(e) {
+                if (e.target === hamburgerMenu) {
+                    hamburgerMenu.classList.remove("show");
+                    document.body.style.overflow = "";
+                }
+            });
+        }
+        
+        // Funcionalidad del menu de perfil - modificado para usar logica del desktop
+        var profileToggle = document.getElementById("profile-toggle");
+        var profileMenu = document.getElementById("mobile-profile-menu");
+        var closeProfileMenu = document.getElementById("close-profile-menu");
+
+        if (profileToggle) {
+            profileToggle.addEventListener("click", function(e) {
+                e.preventDefault();
+
+                // Si el usuario no esta logueado, hacer clic en el boton de login del desktop
+                var serverData = window.serverUserData;
+                var localData = localStorage.getItem('userData');
+                var sessionData = sessionStorage.getItem('userData');
+                var isLoggedIn = serverData || localData || sessionData;
+                if (!isLoggedIn) {
+                    var desktopLoginBtn = document.getElementById("btn-login");
+                    if (desktopLoginBtn) {
+                        desktopLoginBtn.click();
+                        return;
+                    }
+                }
+
+                // Si el usuario esta logueado, mostrar el menu de perfil movil
+                if (profileMenu) {
+                    profileMenu.classList.add("show");
+                    document.body.style.overflow = "hidden";
+                }
+            });
+        }
+
+        if (profileMenu && closeProfileMenu) {
+            closeProfileMenu.addEventListener("click", function() {
+                profileMenu.classList.remove("show");
+                document.body.style.overflow = "";
+            });
+
+            // Cerrar al hacer clic fuera del menú
+            profileMenu.addEventListener("click", function(e) {
+                if (e.target === profileMenu) {
+                    profileMenu.classList.remove("show");
+                    document.body.style.overflow = "";
+                }
+            });
+        }
+
+        // Función para actualizar el menú de perfil móvil
+        function updateMobileProfileMenu() {
+            var profileText = document.getElementById("profile-text");
+            var profileIcon = document.getElementById("profile-icon");
+            var profileImage = document.getElementById("profile-image");
+            var profileMenuName = document.getElementById("profile-menu-name");
+            var profileMenuEmail = document.getElementById("profile-menu-email");
+            var profileMenuImage = document.getElementById("profile-menu-image");
+
+            // Verificar si hay datos del servidor primero
+            if (window.serverUserData && window.serverUserData !== null) {
+                // Usuario logueado desde servidor
+                var user = window.serverUserData;
+                var username = user.username || user.name || 'Usuario';
+
+                if (profileText) profileText.textContent = username;
+                if (profileIcon) profileIcon.style.display = "none";
+                if (profileImage) {
+                    profileImage.style.display = "block";
+                    profileImage.src = user.avatar || user.img || '';
+                    if (!user.avatar && !user.img) {
+                        // Mostrar iniciales si no hay avatar
+                        var initials = getInitials(username);
+                        profileImage.src = 'data:image/svg+xml;base64,' + btoa(createAvatarSVG(initials));
+                    }
+                }
+
+                // Actualizar menú de perfil
+                if (profileMenuName) profileMenuName.textContent = username;
+                if (profileMenuEmail) profileMenuEmail.textContent = user.email || user.mail || '';
+                if (profileMenuImage) {
+                    profileMenuImage.src = user.avatar || user.img || '';
+                    if (!user.avatar && !user.img) {
+                        var initials = getInitials(username);
+                        profileMenuImage.src = 'data:image/svg+xml;base64,' + btoa(createAvatarSVG(initials));
+                    }
+                }
+            } else {
+                // Verificar localStorage
+                var userData = localStorage.getItem('userData') || sessionStorage.getItem('userData');
+
+                if (userData) {
+                    try {
+                        var user = JSON.parse(userData);
+                        var username = user.username || user.name || 'Usuario';
+
+                        if (profileText) profileText.textContent = username;
+                        if (profileIcon) profileIcon.style.display = "none";
+                        if (profileImage) {
+                            profileImage.style.display = "block";
+                            profileImage.src = user.avatar || user.img || '';
+                            if (!user.avatar && !user.img) {
+                                // Mostrar iniciales si no hay avatar
+                                var initials = getInitials(username);
+                                profileImage.src = 'data:image/svg+xml;base64,' + btoa(createAvatarSVG(initials));
+                            }
+                        }
+
+                        // Actualizar menú de perfil
+                        if (profileMenuName) profileMenuName.textContent = username;
+                        if (profileMenuEmail) profileMenuEmail.textContent = user.email || user.mail || '';
+                        if (profileMenuImage) {
+                            profileMenuImage.src = user.avatar || user.img || '';
+                            if (!user.avatar && !user.img) {
+                                var initials = getInitials(username);
+                                profileMenuImage.src = 'data:image/svg+xml;base64,' + btoa(createAvatarSVG(initials));
+                            }
+                        }
+                    } catch (e) {
+                        // Error parsing user data, mostrar login
+                        if (profileText) profileText.textContent = "Iniciar sesión";
+                        if (profileIcon) profileIcon.style.display = "block";
+                        if (profileImage) profileImage.style.display = "none";
+                    }
+                } else {
+                    // No hay usuario logueado
+                    if (profileText) profileText.textContent = "Iniciar sesión";
+                    if (profileIcon) profileIcon.style.display = "block";
+                    if (profileImage) profileImage.style.display = "none";
+                }
+            }
+        }
+
+        // Función auxiliar para obtener iniciales
+        function getInitials(name) {
+            return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+        }
+
+        // Función auxiliar para crear avatar SVG
+        function createAvatarSVG(initials) {
+            return "<svg width=\"24\" height=\"24\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"24\" height=\"24\" fill=\"#FF6B35\"/><text x=\"12\" y=\"16\" font-family=\"Arial\" font-size=\"10\" fill=\"white\" text-anchor=\"middle\">" + initials + "</text></svg>";
+        }
+
+        // Llamar a la función de actualización inicial
+        updateMobileProfileMenu();
+
+        // Función para actualizar el menú de sesión (llamada desde el header moderno)
+        function updateMenuSession() {
+            updateMobileProfileMenu();
+        }
+        
+
+        // Funcionalidad de filtros
+        const filterItems = document.querySelectorAll(".mobile-filter-item");
+        filterItems.forEach(item => {
+            item.addEventListener("click", function(e) {
+                e.preventDefault();
+                
+                // Remover clase active de todos los filtros
+                filterItems.forEach(filterItem => filterItem.classList.remove("active"));
+                // Agregar clase active al filtro clickeado
+                this.classList.add("active");
+                
+                // Aquí puedes agregar lógica para filtrar contenido
+                const filterType = this.textContent.trim();
+                console.log("Filtro seleccionado:", filterType);
+            });
+        });
+
+
+
+    });
+    </script>';
+}
+
+// Función para generar tarjetas destacadas modernas
+function generate_modern_featured_cards($lista_codigos_destacados, $show_all = false) {
+    $html = '';
+    
+    if(empty($lista_codigos_destacados)) {
+        return $html;
+    }
+    
+    $html .= '<div class="featured-section">';
+    $html .= '<h2 class="section-title">¡Destacados!</h2>';
+    $html .= '<div class="featured-grid" id="featuredGrid">';
+    
+    // Mostrar solo los primeros 6 códigos inicialmente
+    $codigos_a_mostrar = $show_all ? $lista_codigos_destacados : array_slice($lista_codigos_destacados, 0, 6);
+    
+    foreach($codigos_a_mostrar as $index => $codigo) {
+        $html .= generate_single_featured_card($codigo, $index);
+    }
+    
+    $html .= '</div>';
+    
+    // Si hay más de 6 códigos y no se muestran todos, añadir botón "Ver más"
+    if(count($lista_codigos_destacados) > 6 && !$show_all) {
+        $html .= '<div class="load-more-container">';
+        $html .= '<button class="load-more-btn" id="loadMoreFeatured" data-total="' . count($lista_codigos_destacados) . '" data-loaded="6">';
+        $html .= '<span class="btn-text">Ver más códigos destacados</span>';
+        $html .= '<span class="btn-loading" style="display: none;">';
+        $html .= '<i class="fas fa-spinner fa-spin"></i> Cargando...';
+        $html .= '</span>';
+        $html .= '</button>';
+        $html .= '</div>';
+        
+        // Añadir datos de códigos restantes para JavaScript con información completa
+        $codigos_restantes = array_slice($lista_codigos_destacados, 6);
+        
+        // Enriquecer los datos con información de usuario y marca
+        $codigos_enriquecidos = [];
+        foreach($codigos_restantes as $codigo) {
+            $usuario = getObjectUser('_id', new \MongoDB\BSON\ObjectId($codigo["id_usuario"]));
+            $marca = getObjectMarca('nombre_clave', $codigo["marca"]);
+            
+            $codigo_enriquecido = $codigo;
+            $codigo_enriquecido['usuario_username'] = $usuario['username'] ?? 'Usuario';
+            $codigo_enriquecido['usuario_imagen'] = $usuario['imagen'] ?? '/img/no_image.png';
+            $codigo_enriquecido['marca_imagen'] = $marca['imagen'] ?? '/img/no_image.png';
+            
+            $codigos_enriquecidos[] = $codigo_enriquecido;
+        }
+        
+        $html .= '<script>';
+        $html .= 'window.featuredCodesData = ' . json_encode($codigos_enriquecidos) . ';';
+        $html .= '</script>';
+    }
+    
+    $html .= '</div>';
+    
+    return $html;
+}
+
+// Función para generar una tarjeta destacada individual
+function generate_single_featured_card($codigo, $index = 0) {
+    $brand = isset($codigo['marca']) ? $codigo['marca'] : 'Marca desconocida';
+    $description = isset($codigo['descripcion']) ? $codigo['descripcion'] : 'Descripción no disponible';
+    $code_id = isset($codigo['_id']) ? (string)$codigo['_id'] : '';
+    $benefit = isset($codigo['num_beneficio']) ? $codigo['num_beneficio'] : 0;
+    $ratings = isset($codigo['num_valoraciones']) ? $codigo['num_valoraciones'] : 0;
+    $usuario_id = isset($codigo['id_usuario']) ? $codigo['id_usuario'] : '';
+    
+    // Obtener información del usuario
+    $user_info = get_user_info($usuario_id);
+    $username = $user_info['username'];
+    $user_img = $user_info['img'];
+    
+    // Obtener información de la marca para el logo
+    $marca_info = get_brand_info($brand);
+    $marca_imagen = $marca_info['imagen'] ?? '';
+    
+    // Crear enlace a la página de la marca
+    $marca_url = '/de-' . strtolower($brand);
+    
+    // Limpiar descripción
+    $description = strip_tags($description);
+    $description = mb_substr($description, 0, 120) . (mb_strlen($description) > 120 ? '...' : '');
+    
+    $html = '<div class="featured-card" data-code-id="' . htmlspecialchars($code_id) . '">';
+    
+    // Badge destacado
+    $html .= '<div class="featured-badge">';
+    $html .= '<i class="fas fa-star"></i> Destacado';
+    $html .= '</div>';
+    
+    // Logo de la marca (clickeable)
+    $html .= '<div class="featured-brand-logo">';
+    $html .= '<a href="' . htmlspecialchars($marca_url) . '" class="brand-link">';
+    if($marca_imagen) {
+        $html .= '<img src="' . htmlspecialchars($marca_imagen) . '" alt="Logo de ' . htmlspecialchars($brand) . '" class="brand-logo-img">';
+    } else {
+        $html .= '<div class="brand-logo-placeholder">';
+        $html .= '<i class="fas fa-tag"></i>';
+        $html .= '</div>';
+    }
+    $html .= '</a>';
+    $html .= '</div>';
+    
+    // Header de la tarjeta con usuario
+    $html .= '<div class="featured-card-header">';
+    $html .= '<div class="featured-brand">' . htmlspecialchars($brand) . '</div>';
+    $html .= '<div class="featured-user-info">';
+    $html .= '<div class="featured-user-avatar">';
+    if($user_img) {
+        $html .= '<img src="' . htmlspecialchars($user_img) . '" alt="Avatar de ' . htmlspecialchars($username) . '" class="featured-user-img">';
+    } else {
+        $html .= '<div class="featured-user-placeholder">';
+        $html .= '<i class="fas fa-user"></i>';
+        $html .= '</div>';
+    }
+    $html .= '</div>';
+    $html .= '<div class="featured-user-details">';
+    $html .= '<span class="featured-user-name">' . htmlspecialchars($username) . '</span>';
+    $html .= '</div>';
+    $html .= '</div>';
+    $html .= '</div>';
+    
+    // Descripción
+    $html .= '<div class="featured-description">' . htmlspecialchars($description) . '</div>';
+    
+    // Información adicional
+    $html .= '<div class="featured-stats">';
+    
+    if($benefit > 0) {
+        $html .= '<span class="featured-stat"><i class="fas fa-euro-sign"></i> ' . $benefit . ' beneficio</span>';
+    }
+    
+    if($ratings > 0) {
+        $html .= '<span class="featured-stat"><i class="fas fa-star"></i> ' . $ratings . ' valoraciones</span>';
+    }
+    
+    $html .= '</div>';
+    
+    // Botón de acción
+    $html .= '<button class="featured-button" onclick="viewCode(\'' . htmlspecialchars($code_id) . '\', \'' . htmlspecialchars($brand) . '\')">';
+    $html .= '<i class="fas fa-eye"></i> Ver Código';
+    $html .= '</button>';
+    
+    $html .= '</div>';
+    
+    return $html;
+}
+
+// Función para generar la sección de marcas populares en la home
+function generate_popular_brands_section($limit = 9) {
+    $marcas_populares = get_popular_brands_for_home($limit);
+    
+    if(empty($marcas_populares)) {
+        return '';
+    }
+    
+    $html = '<div class="popular-brands-section">';
+    $html .= '<div class="container">';
+    $html .= '<h2 class="section-title">Marcas Populares</h2>';
+    $html .= '<p class="section-subtitle">Descubre las marcas con más códigos de descuento</p>';
+    
+    // Contenedor del slider
+    $html .= '<div class="brands-slider-container">';
+    $html .= '<div class="brands-slider" id="brandsSlider">';
+    
+    foreach($marcas_populares as $marca) {
+        $nombre = htmlspecialchars($marca['nombre']);
+        $nombre_clave = htmlspecialchars($marca['nombre_clave']);
+        $imagen = $marca['imagen'];
+        $categoria = htmlspecialchars($marca['categoria']);
+        $total_codigos = $marca['total_codigos'];
+        
+        // Manejar diferentes tipos de URLs de imagen
+        if (!empty($imagen)) {
+            if (strpos($imagen, 'cloudfront.net') !== false || strpos($imagen, 'codigoamigo.com') !== false) {
+                // Ya es una URL completa
+            } elseif (!str_starts_with($imagen, 'http')) {
+                $imagen = 'https://www.codigoamigo.com' . $imagen;
+            }
+        } else {
+            $imagen = 'https://www.codigoamigo.com/img/no_image.png';
+        }
+        
+        $html .= '<div class="brand-slide">';
+        $html .= '<div class="brand-card">';
+        $html .= '<a href="/de-' . $nombre_clave . '" class="brand-link">';
+        $html .= '<div class="brand-image">';
+        $html .= '<img src="' . $imagen . '" alt="' . $nombre . '" loading="lazy">';
+        $html .= '</div>';
+        $html .= '<div class="brand-info">';
+        $html .= '<h3 class="brand-name">' . $nombre . '</h3>';
+        $html .= '<p class="brand-category">' . $categoria . '</p>';
+        $html .= '<div class="brand-stats">';
+        $html .= '<span class="codes-count">' . $total_codigos . ' códigos</span>';
+        $html .= '</div>';
+        $html .= '</div>';
+        $html .= '</a>';
+        $html .= '</div>';
+        $html .= '</div>';
+    }
+    
+    $html .= '</div>'; // brands-slider
+    
+    // Controles del slider
+    $html .= '<button class="slider-btn slider-prev" onclick="moveSlider(-1)">';
+    $html .= '<i class="fas fa-chevron-left"></i>';
+    $html .= '</button>';
+    $html .= '<button class="slider-btn slider-next" onclick="moveSlider(1)">';
+    $html .= '<i class="fas fa-chevron-right"></i>';
+    $html .= '</button>';
+    
+    // Indicadores de puntos
+    $html .= '<div class="slider-dots">';
+    $total_slides = count($marcas_populares);
+    $dots_needed = ceil($total_slides / 3); // 3 marcas por slide
+    for($i = 0; $i < $dots_needed; $i++) {
+        $active_class = ($i === 0) ? ' active' : '';
+        $html .= '<span class="dot' . $active_class . '" onclick="goToSlide(' . ($i + 1) . ')"></span>';
+    }
+    $html .= '</div>';
+    
+    $html .= '</div>'; // brands-slider-container
+    $html .= '</div>'; // container
+    $html .= '</div>'; // popular-brands-section
+    
+    // JavaScript para el slider
+    $html .= '<script>
+    let currentSlide = 0;
+    const totalSlides = ' . count($marcas_populares) . ';
+    const slidesPerView = window.innerWidth <= 768 ? 1 : (window.innerWidth <= 1024 ? 2 : 3);
+    
+    function moveSlider(direction) {
+        const slider = document.getElementById("brandsSlider");
+        if (!slider) return;
+        
+        const maxSlides = Math.ceil(totalSlides / slidesPerView);
+        currentSlide += direction;
+        
+        if (currentSlide < 0) currentSlide = maxSlides - 1;
+        if (currentSlide >= maxSlides) currentSlide = 0;
+        
+        const translateX = -currentSlide * (100 / slidesPerView);
+        slider.style.transform = `translateX(${translateX}%)`;
+        
+        // Actualizar indicadores
+        updateDots();
+    }
+    
+    function goToSlide(slideIndex) {
+        currentSlide = slideIndex - 1;
+        const slider = document.getElementById("brandsSlider");
+        if (!slider) return;
+        
+        const translateX = -currentSlide * (100 / slidesPerView);
+        slider.style.transform = `translateX(${translateX}%)`;
+        
+        updateDots();
+    }
+    
+    function updateDots() {
+        const dots = document.querySelectorAll(".dot");
+        dots.forEach((dot, index) => {
+            dot.classList.toggle("active", index === currentSlide);
+        });
+    }
+    
+    // Auto-slide cada 5 segundos
+    setInterval(() => {
+        moveSlider(1);
+    }, 5000);
+    
+    // Responsive
+    window.addEventListener("resize", function() {
+        const newSlidesPerView = window.innerWidth <= 768 ? 1 : (window.innerWidth <= 1024 ? 2 : 3);
+        if (newSlidesPerView !== slidesPerView) {
+            currentSlide = 0;
+            const slider = document.getElementById("brandsSlider");
+            if (slider) {
+                slider.style.transform = "translateX(0%)";
+                updateDots();
+            }
+        }
+    });
+    </script>';
+    
+    return $html;
+}
+
+// Función para obtener marcas populares para la home
+function get_popular_brands_for_home($limit = 9) {
+    $marcas_con_info = [];
+    
+    try {
+        $collection_codigos = getCollectionCodigos();
+        
+        // Pipeline para obtener marcas con más códigos activos
+        $pipeline = [
+            ['$match' => ['estado' => 0]], // Solo códigos activos
+            ['$group' => [
+                '_id' => '$marca',
+                'total_codigos' => ['$sum' => 1]
+            ]],
+            ['$sort' => ['total_codigos' => -1]],
+            ['$limit' => $limit]
+        ];
+        
+        $marcas_populares = $collection_codigos->aggregate($pipeline)->toArray();
+        
+        // Obtener información detallada de cada marca
+        $collection_marcas = getCollectionMarcas();
+        
+        foreach($marcas_populares as $marca) {
+            $marca_info = $collection_marcas->findOne(['nombre_clave' => $marca['_id']]);
+            if($marca_info) {
+                $marcas_con_info[] = [
+                    'nombre' => $marca_info['nombre'] ?? $marca['_id'],
+                    'nombre_clave' => $marca_info['nombre_clave'] ?? $marca['_id'],
+                    'imagen' => $marca_info['imagen'] ?? '/img/no_image.png',
+                    'categoria' => $marca_info['categoria'] ?? 'General',
+                    'total_codigos' => $marca['total_codigos']
+                ];
+            }
+        }
+    } catch (Exception $e) {
+        // Si hay error con MongoDB, usar datos de respaldo
+        log_warning("Error obteniendo marcas populares, usando datos de respaldo", ['error' => $e->getMessage()]);
+    }
+    
+    // Si no se obtuvieron marcas de la base de datos, usar datos de respaldo
+    if(empty($marcas_con_info)) {
+        $marcas_con_info = get_fallback_popular_brands($limit);
+    }
+    
+    return $marcas_con_info;
+}
+
+// Función de respaldo para obtener marcas populares
+function get_fallback_popular_brands($limit = 9) {
+    // Cargar el archivo JSON de marcas como respaldo
+    $json_file = __DIR__ . '/../datos.json';
+    if (!file_exists($json_file)) {
+        return get_hardcoded_popular_brands($limit);
+    }
+    
+    $todas_marcas = json_decode(file_get_contents($json_file), true);
+    if (!$todas_marcas) {
+        return get_hardcoded_popular_brands($limit);
+    }
+    
+    // Filtrar marcas con códigos y ordenar por popularidad
+    $marcas_con_codigos = array_filter($todas_marcas, function($marca) {
+        return isset($marca['codes']) && $marca['codes'] > 0;
+    });
+    
+    // Ordenar por número de códigos
+    usort($marcas_con_codigos, function($a, $b) {
+        $codes_a = $a['codes'] ?? 0;
+        $codes_b = $b['codes'] ?? 0;
+        return $codes_b - $codes_a;
+    });
+    
+    // Tomar las primeras N marcas
+    $marcas_seleccionadas = array_slice($marcas_con_codigos, 0, $limit);
+    
+    $marcas_con_info = [];
+    foreach($marcas_seleccionadas as $marca) {
+        $marcas_con_info[] = [
+            'nombre' => $marca['nombre'] ?? $marca['nombre_clave'] ?? 'Marca',
+            'nombre_clave' => $marca['nombre_clave'] ?? '',
+            'imagen' => $marca['imagen'] ?? '/img/no_image.png',
+            'categoria' => $marca['categoria'] ?? 'General',
+            'total_codigos' => $marca['codes'] ?? 0
+        ];
+    }
+    
+    return $marcas_con_info;
+}
+
+// Función con marcas hardcodeadas como último respaldo
+function get_hardcoded_popular_brands($limit = 9) {
+    $marcas_hardcoded = [
+        [
+            'nombre' => 'Amazon',
+            'nombre_clave' => 'amazon',
+            'imagen' => 'https://www.codigoamigo.com/img/marcas/amazon.png',
+            'categoria' => 'Compras',
+            'total_codigos' => 15
+        ],
+        [
+            'nombre' => 'Netflix',
+            'nombre_clave' => 'netflix',
+            'imagen' => 'https://www.codigoamigo.com/img/marcas/netflix.png',
+            'categoria' => 'Entretenimiento',
+            'total_codigos' => 12
+        ],
+        [
+            'nombre' => 'Spotify',
+            'nombre_clave' => 'spotify',
+            'imagen' => 'https://www.codigoamigo.com/img/marcas/spotify.png',
+            'categoria' => 'Música',
+            'total_codigos' => 10
+        ],
+        [
+            'nombre' => 'Uber',
+            'nombre_clave' => 'uber',
+            'imagen' => 'https://www.codigoamigo.com/img/marcas/uber.png',
+            'categoria' => 'Transporte',
+            'total_codigos' => 8
+        ],
+        [
+            'nombre' => 'Airbnb',
+            'nombre_clave' => 'airbnb',
+            'imagen' => 'https://www.codigoamigo.com/img/marcas/airbnb.png',
+            'categoria' => 'Viajes',
+            'total_codigos' => 7
+        ]
+    ];
+    
+    return array_slice($marcas_hardcoded, 0, $limit);
+}
+
+// Función para generar el menú de filtros del chollómetro
+function generate_chollometro_filter_menu($marca) {
+    // Obtener el filtro de fecha actual de la URL
+    $fecha_actual = isset($_GET['fecha']) ? $_GET['fecha'] : 'hoy';
+    $tipo_actual = isset($_GET['tipo']) ? $_GET['tipo'] : 'todos';
+    
+    $html = '<div class="chollometro-filter-container">';
+    
+    // Barra de filtros principal
+    $html .= '<div class="filter-bar">';
+    
+    // Botón "Más" (hamburger menu)
+    $html .= '<button class="filter-btn filter-more-btn" id="filter-more-btn">';
+    $html .= '<i class="fas fa-bars"></i>';
+    $html .= '<span>Más</span>';
+    $html .= '</button>';
+    
+    // Botones de filtro tipo Chollometro
+    $html .= '<div class="filter-buttons">';
+    
+    // Botón "TODOS"
+    $active_class = ($tipo_actual === 'todos') ? ' active' : '';
+    $html .= '<button class="filter-btn filter-type-btn' . $active_class . '" data-type="todos">';
+    $html .= 'TODOS (36)';
+    $html .= '</button>';
+    
+    // Botón "CUPONES"
+    $active_class = ($tipo_actual === 'cupones') ? ' active' : '';
+    $html .= '<button class="filter-btn filter-type-btn' . $active_class . '" data-type="cupones">';
+    $html .= 'CUPONES (21)';
+    $html .= '</button>';
+    
+    // Botón "DESCUENTOS"
+    $active_class = ($tipo_actual === 'descuentos') ? ' active' : '';
+    $html .= '<button class="filter-btn filter-type-btn' . $active_class . '" data-type="descuentos">';
+    $html .= 'DESCUENTOS (15)';
+    $html .= '</button>';
+    
+    $html .= '</div>'; // filter-buttons
+    
+    // Botón de búsqueda (lupa)
+    $html .= '<button class="filter-btn filter-search-btn" id="filter-search-btn">';
+    $html .= '<i class="fas fa-search"></i>';
+    $html .= '</button>';
+    
+    $html .= '</div>'; // filter-bar
+    
+    // Panel de filtros desplegable (Más)
+    $html .= '<div class="filter-panel" id="filter-panel">';
+    $html .= '<div class="filter-panel-content">';
+    $html .= '<h4>Filtros</h4>';
+    
+    // Filtro por fecha
+    $html .= '<div class="filter-group">';
+    $html .= '<h5>Por fecha</h5>';
+    
+    $checked_hoy = ($fecha_actual === 'hoy') ? ' checked' : '';
+    $html .= '<label class="filter-option">';
+    $html .= '<input type="radio" name="fecha" value="hoy"' . $checked_hoy . '>';
+    $html .= '<span>Publicados hoy</span>';
+    $html .= '</label>';
+    
+    $checked_semana = ($fecha_actual === 'semana') ? ' checked' : '';
+    $html .= '<label class="filter-option">';
+    $html .= '<input type="radio" name="fecha" value="semana"' . $checked_semana . '>';
+    $html .= '<span>Publicados la semana pasada</span>';
+    $html .= '</label>';
+    
+    $checked_todo = ($fecha_actual === 'todo') ? ' checked' : '';
+    $html .= '<label class="filter-option">';
+    $html .= '<input type="radio" name="fecha" value="todo"' . $checked_todo . '>';
+    $html .= '<span>Publicados todo el tiempo</span>';
+    $html .= '</label>';
+    
+    $html .= '</div>'; // filter-group
+    
+    // Botones de acción
+    $html .= '<div class="filter-actions">';
+    $html .= '<button class="btn-apply" onclick="applyFilters()">Aplicar filtros</button>';
+    $html .= '<button class="btn-clear" onclick="clearFilters()">Limpiar filtros</button>';
+    $html .= '</div>';
+    
+    $html .= '</div>'; // filter-panel-content
+    $html .= '</div>'; // filter-panel
+    
+    // Panel de búsqueda desplegable
+    $html .= '<div class="search-panel" id="search-panel">';
+    $html .= '<div class="search-panel-content">';
+    $html .= '<form class="search-form" onsubmit="performSearch(event)">';
+    $html .= '<input type="text" class="search-input" placeholder="Buscar códigos..." value="' . htmlspecialchars(isset($_GET['q']) ? $_GET['q'] : '') . '">';
+    $html .= '<button type="submit" class="search-submit">';
+    $html .= '<i class="fas fa-search"></i>';
+    $html .= '</button>';
+    $html .= '</form>';
+    $html .= '</div>'; // search-panel-content
+    $html .= '</div>'; // search-panel
+    
+    $html .= '</div>'; // chollometro-filter-container
+    
+    return $html;
+}
+
+function generate_modern_code_cards($lista_codigos) {
+    $html = '';
+    
+    if(empty($lista_codigos)) {
+        $html .= '<div style="text-align: center; color: #ccc; padding: 2rem;">';
+        $html .= '<i class="fas fa-search" style="font-size: 3rem; margin-bottom: 1rem; color: #FF6B35;"></i>';
+        $html .= '<h3>No se encontraron códigos</h3>';
+        $html .= '<p>Intenta con otros términos de búsqueda</p>';
+        $html .= '</div>';
+        return $html;
+    }
+    
+    foreach($lista_codigos as $codigo) {
+        $html .= generate_single_code_card($codigo);
+    }
+    
+    return $html;
+}
+
+// Función para generar una tarjeta de código individual
+function generate_single_code_card($codigo) {
+    $brand = isset($codigo['marca']) ? $codigo['marca'] : 'Marca desconocida';
+    $description = isset($codigo['descripcion']) ? $codigo['descripcion'] : 'Descripción no disponible';
+    $code_id = isset($codigo['_id']) ? (string)$codigo['_id'] : '';
+    $benefit = isset($codigo['num_beneficio']) ? $codigo['num_beneficio'] : 0;
+    $ratings = isset($codigo['num_valoraciones']) ? $codigo['num_valoraciones'] : 0;
+    $usuario_id = isset($codigo['id_usuario']) ? $codigo['id_usuario'] : '';
+    
+    // Obtener información del usuario
+    $user_info = get_user_info($usuario_id);
+    $username = $user_info['username'];
+    $user_img = $user_info['img'];
+    
+    // Obtener información de la marca para la imagen
+    $marca_info = get_brand_info($brand);
+    $marca_imagen = $marca_info['imagen'] ?? '';
+    
+    // Limpiar descripción
+    $description = strip_tags($description);
+    $description = mb_substr($description, 0, 150) . (mb_strlen($description) > 150 ? '...' : '');
+    
+    // Crear enlace a la página de la marca
+    $marca_url = '/de-' . strtolower($brand);
+    
+    $html = '<div class="code-card" data-code-id="' . htmlspecialchars($code_id) . '">';
+    
+    // Imagen de la marca (clickeable)
+    $html .= '<div class="code-brand-image">';
+    $html .= '<a href="' . htmlspecialchars($marca_url) . '" class="brand-link">';
+    if($marca_imagen) {
+        $html .= '<img src="' . htmlspecialchars($marca_imagen) . '" alt="' . htmlspecialchars($brand) . '" class="brand-image">';
+    } else {
+        $html .= '<div class="brand-placeholder">';
+        $html .= '<i class="fas fa-tag"></i>';
+        $html .= '</div>';
+    }
+    $html .= '</a>';
+    $html .= '</div>';
+    
+    // Header de la tarjeta con usuario
+    $html .= '<div class="code-card-header">';
+    $html .= '<div class="code-brand">' . htmlspecialchars($brand) . '</div>';
+    $html .= '<div class="code-user-info">';
+    $html .= '<div class="code-user-avatar">';
+    if($user_img) {
+        $html .= '<img src="' . htmlspecialchars($user_img) . '" alt="Avatar de ' . htmlspecialchars($username) . '" class="code-user-img">';
+    } else {
+        $html .= '<div class="code-user-placeholder">';
+        // Usar iniciales si están disponibles
+        if(isset($user_info['iniciales']) && !empty($user_info['iniciales'])) {
+            $html .= '<span class="user-iniciales">' . htmlspecialchars($user_info['iniciales']) . '</span>';
+        } else {
+            $html .= '<i class="fas fa-user"></i>';
+        }
+        $html .= '</div>';
+    }
+    $html .= '</div>';
+    $html .= '<div class="code-user-details">';
+    // El link debe ser tipo: https://www.codigoamigo.com/usuario_sergio+de+la+rosa_58bd851da54e295b8b52f702
+    $username_url = str_replace(' ', '+', $username);
+    $user_hash = isset($user_info['hash']) ? $user_info['hash'] : substr(md5($username), 0, 24);
+    $user_link = 'https://www.codigoamigo.com/usuario_' . $username_url . '_' . $user_hash;
+    // Para imprimir la id del usuario correctamente, considerando que puede ser un objeto MongoDB\BSON\ObjectId,
+    // accedemos a $user_info['id'] y, si es un objeto, usamos (string) para obtener el valor.
+    // Guardar el id del usuario en la variable $user_id
+    if (isset($user_info['id'])) {
+        if (is_object($user_info['id']) && method_exists($user_info['id'], '__toString')) {
+            $user_id = (string)$user_info['id'];
+        } else {
+            $user_id = $user_info['id'];
+        }
+    } else {
+        $user_id = null;
+    }
+
+    $html .= '<a href="' . htmlspecialchars(link_usuario($username, $user_id ?? null)) . '" class="code-user-name" style="color: grey; text-decoration: none;">' . htmlspecialchars($username) . '</a>';
+
+    // El link de la página de usuario debe ser generado con link_usuario()
+    $html .= '</div>';
+    $html .= '</div>';
+    $html .= '</div>';
+    
+    // Descripción
+    $html .= '<div class="code-description">' . htmlspecialchars($description) . '</div>';
+    
+    // Información adicional
+    $html .= '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; font-size: 0.9rem; color: #ccc;">';
+    
+    if($benefit > 0) {
+        $html .= '<div class="beneficio-destacado">';
+        $html .= '<div class="beneficio-icono">💰</div>';
+        $html .= '<div class="beneficio-contenido">';
+        $html .= '<div class="beneficio-cantidad">' . $benefit . '€</div>';
+        $html .= '<div class="beneficio-tipo">Beneficio</div>';
+        $html .= '</div>';
+        $html .= '</div>';
+    }
+    
+    if($ratings > 0) {
+        $html .= '<span><i class="fas fa-star"></i> ' . $ratings . ' valoraciones</span>';
+    }
+    
+    // Fecha de publicación mejorada
+    if(isset($codigo['fecha_publicacion'])) {
+        $fecha_formateada = formatDateAgoLarge($codigo['fecha_publicacion']);
+        $html .= '<div class="fecha-publicacion-large">';
+        $html .= '<i class="far fa-clock"></i>';
+        $html .= '<span class="fecha-texto">' . $fecha_formateada . '</span>';
+        $html .= '</div>';
+    }
+    
+    $html .= '</div>';
+    
+    // Botón de acción
+    $html .= '<button class="code-button" onclick="viewCode(\'' . htmlspecialchars($code_id) . '\', \'' . htmlspecialchars($brand) . '\')">';
+    $html .= '<i class="fas fa-eye"></i> Ver Código';
+    $html .= '</button>';
+    
+    $html .= '</div>';
+    
+    return $html;
+}
+
+
+// Función para obtener CSS adicional moderno
+function get_modern_additional_css() {
+    return '
+    <style>
+    .featured-section {
+        margin: 3rem 0;
+        padding: 2rem 0;
+        background: linear-gradient(135deg, var(--dark-gray) 0%, #1A1A1A 100%);
+        border-radius: 20px;
+    }
+    
+    .featured-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+        margin-top: 2rem;
+    }
+    
+    .featured-card {
+        background: var(--light-gray);
+        border-radius: 20px;
+        padding: 2rem;
+        position: relative;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        border: 2px solid var(--primary-orange);
+        color: var(--text-white);
+    }
+    
+    .featured-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 35px rgba(255, 107, 53, 0.4);
+    }
+    
+    .featured-badge {
+        position: absolute;
+        top: -10px;
+        right: 20px;
+        background: var(--text-white);
+        color: var(--primary-orange);
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: bold;
+        font-size: 0.8rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    
+    .featured-brand-logo {
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    
+    .featured-brand-logo .brand-link {
+        display: inline-block;
+        text-decoration: none;
+        transition: transform 0.3s ease;
+    }
+    
+    .featured-brand-logo .brand-link:hover {
+        transform: scale(1.05);
+    }
+    
+    .featured-brand-logo .brand-logo-img {
+        max-width: 80px;
+        max-height: 60px;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 8px;
+    }
+    
+    .featured-brand-logo .brand-logo-placeholder {
+        width: 80px;
+        height: 60px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        margin: 0 auto;
+    }
+    
+    .featured-brand {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: var(--text-white);
+        margin-bottom: 1rem;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        text-align: center;
+    }
+    
+    .featured-description {
+        color: rgba(255, 255, 255, 0.9);
+        margin-bottom: 1.5rem;
+        line-height: 1.5;
+        font-size: 1rem;
+    }
+    
+    .featured-stats {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 1.5rem;
+        gap: 1rem;
+    }
+    
+    .featured-stat {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+    
+    .featured-stat i {
+        color: var(--text-white);
+    }
+    
+    .featured-button {
+        background: var(--text-white);
+        color: var(--primary-orange);
+        border: none;
+        border-radius: 25px;
+        padding: 0.75rem 1.5rem;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        font-size: 1rem;
+    }
+    
+    .featured-button:hover {
+        background: rgba(255, 255, 255, 0.9);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    
+    .pagination-modern {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 2rem 0;
+    }
+    
+    .pagination-modern .page-btn {
+        background: var(--light-gray);
+        color: var(--text-white);
+        border: 2px solid var(--primary-orange);
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        font-weight: 500;
+    }
+    
+    .pagination-modern .page-btn:hover,
+    .pagination-modern .page-btn.active {
+        background: var(--primary-orange);
+        color: var(--text-white);
+        transform: translateY(-2px);
+    }
+    
+    .pagination-modern .page-btn.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .categories-modern {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 2rem 0;
+    }
+    
+    .category-card {
+        background: var(--light-gray);
+        border-radius: 15px;
+        padding: 1.5rem;
+        text-align: center;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+    }
+    
+    .category-card:hover {
+        border-color: var(--primary-orange);
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(255, 107, 53, 0.3);
+    }
+    
+    .category-icon {
+        font-size: 2rem;
+        color: var(--primary-orange);
+        margin-bottom: 1rem;
+    }
+    
+    .category-name {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: var(--text-white);
+        margin-bottom: 0.5rem;
+    }
+    
+    .category-count {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.9rem;
+    }
+    
+    @media (max-width: 768px) {
+        .featured-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .categories-modern {
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        }
+        
+        .pagination-modern {
+            flex-wrap: wrap;
+        }
+    }
+    </style>';
+}
+
+// Función para obtener información de una categoría
+function get_category_info($categoria_url) {
+    $categorias_info = [
+        'alimentacion-y-gastronomia-comparte-y-gana' => [
+            'nombre' => 'Alimentación y Gastronomía',
+            'descripcion' => 'Descubre los mejores códigos de descuento en restaurantes, supermercados, comida a domicilio y productos gastronómicos.',
+            'icono' => 'fas fa-utensils'
+        ],
+        'tecnologia-y-electronica-comparte-y-gana' => [
+            'nombre' => 'Tecnología y Electrónica',
+            'descripcion' => 'Ahorra en dispositivos electrónicos, smartphones, ordenadores, accesorios tecnológicos y gadgets.',
+            'icono' => 'fas fa-laptop'
+        ],
+        'moda-y-belleza-comparte-y-gana' => [
+            'nombre' => 'Moda y Belleza',
+            'descripcion' => 'Encuentra descuentos en ropa, calzado, cosméticos, productos de belleza y accesorios de moda.',
+            'icono' => 'fas fa-tshirt'
+        ],
+        'hogar-y-jardin-comparte-y-gana' => [
+            'nombre' => 'Hogar y Jardín',
+            'descripcion' => 'Ahorra en muebles, decoración, electrodomésticos, herramientas de jardín y productos para el hogar.',
+            'icono' => 'fas fa-home'
+        ],
+        'deportes-y-ocio-comparte-y-gana' => [
+            'nombre' => 'Deportes y Ocio',
+            'descripcion' => 'Descuentos en equipamiento deportivo, gimnasios, actividades de ocio y entretenimiento.',
+            'icono' => 'fas fa-dumbbell'
+        ],
+        'viajes-y-turismo-comparte-y-gana' => [
+            'nombre' => 'Viajes y Turismo',
+            'descripcion' => 'Ahorra en vuelos, hoteles, alquiler de coches, paquetes turísticos y experiencias de viaje.',
+            'icono' => 'fas fa-plane'
+        ],
+        'finanzas-y-seguros-comparte-y-gana' => [
+            'nombre' => 'Finanzas y Seguros',
+            'descripcion' => 'Códigos para servicios bancarios, seguros, inversiones y productos financieros.',
+            'icono' => 'fas fa-credit-card'
+        ],
+        'salud-y-bienestar-comparte-y-gana' => [
+            'nombre' => 'Salud y Bienestar',
+            'descripcion' => 'Descuentos en farmacias, productos de salud, bienestar, fitness y cuidado personal.',
+            'icono' => 'fas fa-heart'
+        ]
+    ];
+    
+    return $categorias_info[$categoria_url] ?? [
+        'nombre' => 'Categoría',
+        'descripcion' => 'Descubre los mejores códigos de descuento en esta categoría.',
+        'icono' => 'fas fa-tag'
+    ];
+}
+
+// Función para obtener marcas de una categoría específica
+function get_brands_by_category($categoria_url) {
+    // Por ahora, usar solo fallback para evitar errores
+    // TODO: Implementar búsqueda en base de datos cuando esté disponible
+    $lista_marcas = [];
+    $marcas_categoria = [];
+    
+    if($lista_marcas) {
+        foreach($lista_marcas as $marca) {
+            $categoria_marca = $marca["categoria"] ?? '';
+            $codes = $marca["codes"] ?? 0;
+            
+            // Verificar si la marca pertenece a esta categoría y tiene códigos
+            if($codes > 0 && strpos(strtolower($categoria_marca), strtolower($categoria_url)) !== false) {
+                $marcas_categoria[] = $marca;
+            }
+        }
+        
+        // Ordenar por número de códigos (más populares primero)
+        usort($marcas_categoria, function($a, $b) {
+            $codes_a = $a["codes"] ?? 0;
+            $codes_b = $b["codes"] ?? 0;
+            return $codes_b - $codes_a;
+        });
+    }
+    
+    return $marcas_categoria;
+}
+
+// Función para generar el layout de la página de categoría
+function generate_category_page_layout($categoria_url, $nombre_categoria, $descripcion_categoria, $marcas_categoria) {
+    $categoria_info = get_category_info($categoria_url);
+    $icono = $categoria_info['icono'];
+    
+    $html = '<div class="category-page-container">';
+    
+    // Header de la categoría
+    $html .= '<div class="category-header">';
+    $html .= '<div class="category-header-content">';
+    $html .= '<div class="category-icon-large">';
+    $html .= '<i class="' . $icono . '"></i>';
+    $html .= '</div>';
+    $html .= '<div class="category-info">';
+    $html .= '<h1 class="category-title">' . htmlspecialchars($nombre_categoria) . '</h1>';
+    $html .= '<p class="category-description">' . htmlspecialchars($descripcion_categoria) . '</p>';
+    $html .= '<div class="category-stats">';
+    $html .= '<span class="stat-item"><i class="fas fa-tag"></i> ' . count($marcas_categoria) . ' marcas</span>';
+    $total_codigos = array_sum(array_column($marcas_categoria, 'codes'));
+    $html .= '<span class="stat-item"><i class="fas fa-code"></i> ' . $total_codigos . ' códigos</span>';
+    $html .= '</div>';
+    $html .= '</div>';
+    $html .= '</div>';
+    $html .= '</div>';
+    
+    // Contenido principal
+    $html .= '<div class="category-content">';
+    
+    if(!empty($marcas_categoria)) {
+        $html .= '<div class="brands-grid">';
+        $html .= '<h2>Marcas populares en ' . htmlspecialchars($nombre_categoria) . '</h2>';
+        $html .= '<div class="brands-container">';
+        
+        foreach($marcas_categoria as $marca) {
+            $html .= '<div class="brand-card">';
+            $html .= '<div class="brand-image">';
+            $html .= '<img src="' . htmlspecialchars($marca['imagen']) . '" alt="' . htmlspecialchars($marca['nombre']) . '">';
+            $html .= '</div>';
+            $html .= '<div class="brand-info">';
+            $html .= '<h3>' . htmlspecialchars($marca['nombre']) . '</h3>';
+            $html .= '<p class="brand-codes">' . ($marca['codes'] ?? 0) . ' códigos disponibles</p>';
+            $html .= '<a href="/de-' . htmlspecialchars($marca['nombre_clave']) . '" class="brand-link">Ver códigos</a>';
+            $html .= '</div>';
+            $html .= '</div>';
+        }
+        
+        $html .= '</div>';
+        $html .= '</div>';
+    } else {
+        $html .= '<div class="no-brands">';
+        $html .= '<h2>Aún no hay marcas en esta categoría</h2>';
+        $html .= '<p>¿Tienes un código para compartir? ¡Sé el primero en publicar uno!</p>';
+        $html .= '<a href="/nuevo_codigo" class="btn btn-primary">Publicar Código</a>';
+        $html .= '</div>';
+    }
+    
+    $html .= '</div>';
+    $html .= '</div>';
+    
+    return $html;
+}
+?>

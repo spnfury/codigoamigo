@@ -1,8 +1,39 @@
-<?php 
+<?php
 
     /**************************************************
      * GENERAL
      *************************************************/
+
+    // Incluir la librería Mobile_Detect si no está incluida
+    if (!class_exists('Mobile_Detect')) {
+        $mobile_detect_path = __DIR__ . '/../librerias/Mobile_Detect.php';
+        if (file_exists($mobile_detect_path)) {
+            require_once $mobile_detect_path;
+        } else {
+            // Intentar rutas alternativas
+            $alternative_paths = [
+                dirname(__DIR__, 2) . '/myphp/librerias/Mobile_Detect.php',
+                dirname(__DIR__, 3) . '/myphp/librerias/Mobile_Detect.php',
+                __DIR__ . '/../../myphp/librerias/Mobile_Detect.php'
+            ];
+
+            foreach ($alternative_paths as $path) {
+                if (file_exists($path)) {
+                    require_once $path;
+                    break;
+                }
+            }
+
+            // Si ninguna ruta funciona, definir una clase vacía como fallback
+            if (!class_exists('Mobile_Detect')) {
+                class Mobile_Detect {
+                    public function isMobile() { return false; }
+                    public function isTablet() { return false; }
+                    public function __call($method, $args) { return false; }
+                }
+            }
+        }
+    }
 
     global $detect_device;
     $detect_device = new Mobile_Detect();

@@ -1,16 +1,16 @@
 <?php
+session_start();
 
+get_header_new($title, $description);
 
-    get_header_new($title, $description);
+$array_codigos_acceso[] = "58bd851da54e295b8b52f702"; //thevega82@gmail.com
+$array_codigos_acceso[] = "5e78170e6b68e6519b7c5df2"; //edna
+$array_codigos_acceso[] = "639899bc6321ee0d0e4010d2"; //aron
 
-    $array_codigos_acceso[] = "58bd851da54e295b8b52f702"; //thevega82@gmail.com
-    $array_codigos_acceso[] = "5e78170e6b68e6519b7c5df2"; //edna
-    $array_codigos_acceso[] = "639899bc6321ee0d0e4010d2"; //aron
-
-
-    if (!in_array($_SESSION["user_id"], $array_codigos_acceso)) {
-        header('Location: https://codigoamigo.com'); die();
-    }
+// Verificar que el usuario esté logueado y tenga permisos
+if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"]) || !in_array($_SESSION["user_id"], $array_codigos_acceso)) {
+    header('Location: https://codigoamigo.com'); die();
+}
 
 
     if($_GET["nuevas_0"]){

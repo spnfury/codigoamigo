@@ -242,31 +242,50 @@ function clearFilters() {
 function toggleMenu() {
     const menu = document.getElementById("menu");
     const hamburger = document.querySelector(".hamburger");
-    
+    const overlay = document.getElementById("menuOverlay");
+
     if (menu && hamburger) {
-        if (menu.style.display === "flex") {
+        const isOpen = menu.style.display === "block";
+
+        if (isOpen) {
+            // Cerrar menú
             menu.style.display = "none";
             hamburger.classList.remove("open");
+            overlay.classList.remove("show");
             document.body.style.overflow = "auto";
         } else {
-            menu.style.display = "flex";
+            // Abrir menú
+            menu.style.display = "block";
             hamburger.classList.add("open");
+            overlay.classList.add("show");
             document.body.style.overflow = "hidden";
         }
     }
 }
 
-
-// Cerrar menú al hacer clic fuera
+// Cerrar menú al hacer clic fuera o en el overlay
 document.addEventListener('click', function(event) {
     const menu = document.getElementById("menu");
     const hamburger = document.querySelector(".hamburger");
-    
-    if (menu && hamburger && 
-        !menu.contains(event.target) && 
-        !hamburger.contains(event.target)) {
-        menu.style.display = "none";
-        hamburger.classList.remove("open");
-        document.body.style.overflow = "auto";
+    const overlay = document.getElementById("menuOverlay");
+
+    if (menu && hamburger && overlay) {
+        const isMenuOpen = menu.style.display === "block";
+
+        if (isMenuOpen &&
+            !menu.contains(event.target) &&
+            !hamburger.contains(event.target)) {
+            toggleMenu();
+        }
+    }
+});
+
+// Cerrar menú con tecla Escape
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        const menu = document.getElementById("menu");
+        if (menu && menu.style.display === "block") {
+            toggleMenu();
+        }
     }
 });

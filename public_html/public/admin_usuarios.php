@@ -7,6 +7,7 @@ include_once __DIR__ . '/../myphp/funciones.php';
 include_once __DIR__ . '/../inc/funciones.php';
 include_once __DIR__ . '/../myphp/funciones_usuario.php';
 include_once __DIR__ . '/../myphp/funciones_email.php';
+include_once __DIR__ . '/admin_sidebar_menu.php';
 
 // Verificar permisos de administrador
 $array_codigos_acceso[] = "58bd851da54e295b8b52f702"; //thevega82@gmail.com
@@ -14,7 +15,8 @@ $array_codigos_acceso[] = "5e78170e6b68e6519b7c5df2"; //edna
 $array_codigos_acceso[] = "639899bc6321ee0d0e4010d2"; //aron
 $array_codigos_acceso[] = "5c8a10ce2f55c86d6e707d82"; //jose
 
-if (!in_array($_SESSION["user_id"], $array_codigos_acceso)) {
+// Verificar que el usuario esté logueado y tenga permisos
+if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"]) || !in_array($_SESSION["user_id"], $array_codigos_acceso)) {
     header('Location: https://www.codigoamigo.com');
     die();
 }
@@ -33,10 +35,10 @@ if ($_POST) {
             $nuevo_saldo = (float)$_POST['nuevo_saldo'];
             $motivo = $_POST['motivo'] ?? 'Ajuste manual por administrador';
             
-            // Obtener saldo actual
+            // Obtener saldo actual (saldo anterior)
             $usuario = $collection_usuarios->findOne(['_id' => new MongoDB\BSON\ObjectId($user_id)]);
-            $saldo_actual = $usuario['saldo'] ?? 0;
-            $diferencia = $nuevo_saldo - $saldo_actual;
+            $saldo_anterior = $usuario['saldo'] ?? 0;
+            $diferencia = $nuevo_saldo - $saldo_anterior;
             
             // Actualizar saldo
             $collection_usuarios->updateOne(
@@ -52,7 +54,9 @@ if ($_POST) {
                 'descripcion' => $motivo,
                 'fecha' => new MongoDB\BSON\UTCDateTime(),
                 'estado' => 'completada',
-                'admin_id' => $_SESSION["user_id"]
+                'admin_id' => $_SESSION["user_id"],
+                'saldo_anterior' => $saldo_anterior,
+                'saldo_nuevo' => $nuevo_saldo
             ];
             $collection_transacciones->insertOne($transaccion);
             
@@ -76,10 +80,10 @@ if ($_POST) {
             $cantidad = (float)$_POST['cantidad'];
             $motivo = $_POST['motivo'] ?? 'Recarga manual por administrador';
             
-            // Obtener saldo actual
+            // Obtener saldo actual (saldo anterior)
             $usuario = $collection_usuarios->findOne(['_id' => new MongoDB\BSON\ObjectId($user_id)]);
-            $saldo_actual = $usuario['saldo'] ?? 0;
-            $nuevo_saldo = $saldo_actual + $cantidad;
+            $saldo_anterior = $usuario['saldo'] ?? 0;
+            $nuevo_saldo = $saldo_anterior + $cantidad;
             
             // Actualizar saldo
             $collection_usuarios->updateOne(
@@ -95,12 +99,31 @@ if ($_POST) {
                 'descripcion' => $motivo,
                 'fecha' => new MongoDB\BSON\UTCDateTime(),
                 'estado' => 'completada',
-                'admin_id' => $_SESSION["user_id"]
+                'admin_id' => $_SESSION["user_id"],
+                'saldo_anterior' => $saldo_anterior,
+                'saldo_nuevo' => $nuevo_saldo
             ];
             $collection_transacciones->insertOne($transaccion);
             
-            // Enviar email de notificación
-            enviarEmailSaldoCargado($usuario, $cantidad, $nuevo_saldo, $motivo);
+            // Incluir funciones de email avanzadas
+            include_once __DIR__ . '/../myphp/funciones_email.php';
+            include_once __DIR__ . '/../myphp/email_helper.php';
+            
+            // Enviar email usando el método avanzado (Brevo con fallback) y registrar en el log
+            $to_email = $usuario['mail'] ?? '';
+            $to_name = $usuario['username'] ?? 'Usuario';
+            $subject = "¡Felicidades! Tu saldo ha sido incrementado - CodigoAmigo";
+            $html_content = crearPlantillaEmailSaldo($to_name, $cantidad, $nuevo_saldo, $motivo);
+            
+            $resultado_email = enviarEmailConBrevoYRegistrar(
+                $to_email, 
+                $to_name, 
+                $subject, 
+                $html_content, 
+                'recarga_saldo', 
+                $user_id, 
+                ['cantidad' => $cantidad, 'saldo_anterior' => $saldo_actual, 'saldo_nuevo' => $nuevo_saldo, 'motivo' => $motivo]
+            );
             
             $_SESSION['success_message'] = "Saldo añadido correctamente y email enviado al usuario";
             break;
@@ -115,6 +138,7 @@ $filtro_estado = $_GET['estado'] ?? '';
 $filtro_busqueda = $_GET['busqueda'] ?? '';
 $filtro_saldo_min = $_GET['saldo_min'] ?? '';
 $filtro_saldo_max = $_GET['saldo_max'] ?? '';
+$filtro_usuario_id = $_GET['usuario_id'] ?? '';
 
 // Obtener parámetros de ordenamiento
 $sort_by = $_GET['sort'] ?? 'fecha_registro';
@@ -122,22 +146,37 @@ $sort_order = $_GET['order'] ?? 'desc';
 
 // Construir filtros para la consulta
 $filtros = [];
-if ($filtro_estado !== '') {
-    $filtros['estado'] = (int)$filtro_estado;
-}
-if ($filtro_busqueda) {
-    $filtros['$or'] = [
-        ['username' => ['$regex' => $filtro_busqueda, '$options' => 'i']],
-        ['mail' => ['$regex' => $filtro_busqueda, '$options' => 'i']]
-    ];
-}
-if ($filtro_saldo_min !== '' || $filtro_saldo_max !== '') {
-    $filtros['saldo'] = [];
-    if ($filtro_saldo_min !== '') {
-        $filtros['saldo']['$gte'] = (float)$filtro_saldo_min;
+
+if ($filtro_usuario_id) {
+    // Si se busca por ID de usuario, buscar directamente por _id
+    try {
+        $filtros['_id'] = new MongoDB\BSON\ObjectId($filtro_usuario_id);
+    } catch (Exception $e) {
+        // Si el ID no es válido, no aplicar filtro (mostrar nada)
+        $filtros = ['_id' => new MongoDB\BSON\ObjectId('000000000000000000000000')]; // ID inválido para no mostrar nada
     }
-    if ($filtro_saldo_max !== '') {
-        $filtros['saldo']['$lte'] = (float)$filtro_saldo_max;
+} else {
+    // Solo aplicar otros filtros si no se está buscando por ID
+    if ($filtro_estado !== '') {
+        $filtros['estado'] = (int)$filtro_estado;
+    }
+    if ($filtro_busqueda) {
+        $filtros['$or'] = [
+            ['username' => ['$regex' => $filtro_busqueda, '$options' => 'i']],
+            ['mail' => ['$regex' => $filtro_busqueda, '$options' => 'i']]
+        ];
+    }
+}
+// Solo aplicar filtros de saldo si no se está buscando por ID
+if (!$filtro_usuario_id) {
+    if ($filtro_saldo_min !== '' || $filtro_saldo_max !== '') {
+        $filtros['saldo'] = [];
+        if ($filtro_saldo_min !== '') {
+            $filtros['saldo']['$gte'] = (float)$filtro_saldo_min;
+        }
+        if ($filtro_saldo_max !== '') {
+            $filtros['saldo']['$lte'] = (float)$filtro_saldo_max;
+        }
     }
 }
 
@@ -191,6 +230,7 @@ function generarEnlaceOrdenamiento($columna, $texto, $sort_by, $sort_order) {
     if (!empty($_GET['busqueda'])) $url .= '&busqueda=' . urlencode($_GET['busqueda']);
     if (!empty($_GET['saldo_min'])) $url .= '&saldo_min=' . $_GET['saldo_min'];
     if (!empty($_GET['saldo_max'])) $url .= '&saldo_max=' . $_GET['saldo_max'];
+    if (!empty($_GET['usuario_id'])) $url .= '&usuario_id=' . urlencode($_GET['usuario_id']);
     
     $icono = '';
     if ($sort_by === $columna) {
@@ -290,43 +330,7 @@ $title = "Gestión de Usuarios - Panel de Administración";
     <div class="container-fluid">
         <div class="row">
             <!-- Sidebar -->
-            <div class="col-md-3 col-lg-2 sidebar p-0">
-                <div class="p-3">
-                    <h4 class="text-white mb-4">
-                        <i class="fas fa-cogs me-2"></i>Admin Panel
-                    </h4>
-                    <nav class="nav flex-column">
-                        <a class="nav-link" href="admin_dashboard.php">
-                            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
-                        </a>
-                        <a class="nav-link active" href="admin_usuarios.php">
-                            <i class="fas fa-users me-2"></i>Usuarios
-                        </a>
-                        <a class="nav-link" href="admin_marcas.php">
-                            <i class="fas fa-tags me-2"></i>Marcas
-                        </a>
-                        <a class="nav-link" href="admin_codigos.php">
-                            <i class="fas fa-code me-2"></i>Códigos
-                        </a>
-                        <a class="nav-link" href="admin_transacciones.php">
-                            <i class="fas fa-credit-card me-2"></i>Transacciones
-                        </a>
-                        <a class="nav-link" href="admin_reportes.php">
-                            <i class="fas fa-chart-bar me-2"></i>Reportes
-                        </a>
-                        <a class="nav-link" href="admin_configuracion.php">
-                            <i class="fas fa-cog me-2"></i>Configuración
-                        </a>
-                        <a class="nav-link" href="admin_logs.php">
-                            <i class="fas fa-file-alt me-2"></i>Logs
-                        </a>
-                        <hr class="text-white">
-                        <a class="nav-link" href="https://www.codigoamigo.com">
-                            <i class="fas fa-home me-2"></i>Volver al sitio
-                        </a>
-                    </nav>
-                </div>
-            </div>
+            <?php echo get_admin_sidebar_menu('admin_usuarios.php'); ?>
 
             <!-- Main Content -->
             <div class="col-md-9 col-lg-10 main-content">
@@ -395,7 +399,13 @@ $title = "Gestión de Usuarios - Panel de Administración";
                         </div>
                         <div class="card-body">
                             <form method="GET" class="row g-3">
-                                <div class="col-md-3">
+                                <div class="col-md-2">
+                                    <label class="form-label">ID Usuario</label>
+                                    <input type="text" name="usuario_id" class="form-control" 
+                                           value="<?php echo htmlspecialchars($filtro_usuario_id); ?>"
+                                           placeholder="Buscar por ID">
+                                </div>
+                                <div class="col-md-2">
                                     <label class="form-label">Estado</label>
                                     <select name="estado" class="form-select">
                                         <option value="">Todos</option>
@@ -403,7 +413,7 @@ $title = "Gestión de Usuarios - Panel de Administración";
                                         <option value="0" <?php echo $filtro_estado === '0' ? 'selected' : ''; ?>>Inactivo</option>
                                     </select>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <label class="form-label">Buscar</label>
                                     <input type="text" name="busqueda" class="form-control" 
                                            placeholder="Usuario o email" value="<?php echo htmlspecialchars($filtro_busqueda); ?>">
@@ -427,6 +437,19 @@ $title = "Gestión de Usuarios - Panel de Administración";
                                     </div>
                                 </div>
                             </form>
+                            <?php if ($filtro_usuario_id): ?>
+                            <div class="row mt-2">
+                                <div class="col-12">
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        Buscando por ID de usuario. Los demás filtros están deshabilitados.
+                                        <a href="admin_usuarios.php" class="btn btn-sm btn-outline-secondary ms-2">
+                                            <i class="fas fa-times me-1"></i>Limpiar filtros
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -480,7 +503,7 @@ $title = "Gestión de Usuarios - Panel de Administración";
                                         <?php foreach ($usuarios as $usuario): ?>
                                         <tr>
                                             <td>
-                                                <small class="text-muted"><?php echo substr($usuario['_id'], 0, 8) . '...'; ?></small>
+                                                <small class="text-muted font-monospace"><?php echo $usuario['_id']; ?></small>
                                             </td>
                                             <td>
                                                 <div class="d-flex align-items-center">
@@ -534,25 +557,33 @@ $title = "Gestión de Usuarios - Panel de Administración";
                                             </td>
                                             <td>
                                                 <div class="btn-group" role="group">
-                                                    <button type="button" class="btn btn-sm btn-outline-primary" 
-                                                            data-bs-toggle="modal" data-bs-target="#modalSaldo" 
+                                                    <button type="button" class="btn btn-sm btn-outline-primary"
+                                                            data-bs-toggle="modal" data-bs-target="#modalSaldo"
                                                             data-user-id="<?php echo $usuario['_id']; ?>"
                                                             data-user-name="<?php echo htmlspecialchars($usuario['username'] ?? 'Usuario'); ?>"
                                                             data-current-saldo="<?php echo $saldo; ?>">
                                                         <i class="fas fa-euro-sign"></i>
                                                     </button>
-                                                    <button type="button" class="btn btn-sm btn-outline-success" 
-                                                            data-bs-toggle="modal" data-bs-target="#modalAddSaldo" 
+                                                    <button type="button" class="btn btn-sm btn-outline-success"
+                                                            data-bs-toggle="modal" data-bs-target="#modalAddSaldo"
                                                             data-user-id="<?php echo $usuario['_id']; ?>"
                                                             data-user-name="<?php echo htmlspecialchars($usuario['username'] ?? 'Usuario'); ?>">
                                                         <i class="fas fa-plus"></i>
                                                     </button>
-                                                    <button type="button" class="btn btn-sm btn-outline-warning" 
+                                                    <button type="button" class="btn btn-sm btn-outline-warning"
                                                             onclick="toggleEstado('<?php echo $usuario['_id']; ?>', <?php echo $usuario['estado'] ?? 0; ?>)">
                                                         <i class="fas fa-toggle-<?php echo ($usuario['estado'] ?? 0) == 1 ? 'on' : 'off'; ?>"></i>
                                                     </button>
-                                                    <a href="https://www.codigoamigo.com/usuario/<?php echo $usuario['username'] ?? $usuario['_id']; ?>" 
-                                                       class="btn btn-sm btn-outline-info" target="_blank">
+                                                    <a href="admin_usuario_detalle.php?id=<?php echo $usuario['_id']; ?>"
+                                                       class="btn btn-sm btn-outline-info" title="Ver detalle completo del usuario">
+                                                        <i class="fas fa-user"></i>
+                                                    </a>
+                                                    <a href="admin_codigos.php?usuario=<?php echo $usuario['_id']; ?>"
+                                                       class="btn btn-sm btn-outline-secondary" title="Ver códigos del usuario">
+                                                        <i class="fas fa-code"></i>
+                                                    </a>
+                                                    <a href="https://www.codigoamigo.com/usuario/<?php echo $usuario['username'] ?? $usuario['_id']; ?>"
+                                                       class="btn btn-sm btn-outline-dark" target="_blank">
                                                         <i class="fas fa-external-link-alt"></i>
                                                     </a>
                                                 </div>
@@ -569,7 +600,7 @@ $title = "Gestión de Usuarios - Panel de Administración";
                                 <ul class="pagination justify-content-center">
                                     <?php for ($i = 1; $i <= $total_pages; $i++): ?>
                                     <li class="page-item <?php echo $i == $page ? 'active' : ''; ?>">
-                                        <a class="page-link" href="?page=<?php echo $i; ?>&estado=<?php echo $filtro_estado; ?>&busqueda=<?php echo urlencode($filtro_busqueda); ?>&saldo_min=<?php echo $filtro_saldo_min; ?>&saldo_max=<?php echo $filtro_saldo_max; ?>">
+                                        <a class="page-link" href="?page=<?php echo $i; ?>&estado=<?php echo $filtro_estado; ?>&busqueda=<?php echo urlencode($filtro_busqueda); ?>&saldo_min=<?php echo $filtro_saldo_min; ?>&saldo_max=<?php echo $filtro_saldo_max; ?>&usuario_id=<?php echo urlencode($filtro_usuario_id); ?>">
                                             <?php echo $i; ?>
                                         </a>
                                     </li>
@@ -777,6 +808,17 @@ $title = "Gestión de Usuarios - Panel de Administración";
                 form.submit();
             }
         }
+
+        // Si hay un ID de usuario en la URL, hacer scroll al resultado
+        <?php if ($filtro_usuario_id && !empty($usuarios)): ?>
+        $(document).ready(function() {
+            setTimeout(function() {
+                $('html, body').animate({
+                    scrollTop: $('.table').offset().top - 100
+                }, 500);
+            }, 100);
+        });
+        <?php endif; ?>
     </script>
     
 <?php get_footer(); ?>

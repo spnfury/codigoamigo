@@ -89,10 +89,63 @@ class Logger {
     }
     
     /**
+     * Enviar notificación a Telegram
+     */
+    private static function sendTelegramNotification($message, $level = 'ERROR') {
+        if (!defined('TELEGRAM_BOT_TOKEN') || !defined('TELEGRAM_ADMIN_CHAT_ID')) {
+            return;
+        }
+
+        // Evitar bucles infinitos si hay error al enviar a Telegram
+        static $recursion_guard = false;
+        if ($recursion_guard) return;
+        $recursion_guard = true;
+
+        $icon = $level === 'CRITICAL' ? '🚨' : '⚠️';
+        $telegramMessage = "{$icon} *{$level} en CodigoAmigo*\n\n";
+        $telegramMessage .= strip_tags($message);
+        $telegramMessage .= "\n\n⏰ " . date('Y-m-d H:i:s');
+
+        try {
+            $url = "https://api.telegram.org/bot" . TELEGRAM_BOT_TOKEN . "/sendMessage";
+            $data = [
+                'chat_id' => TELEGRAM_ADMIN_CHAT_ID,
+                'text' => $telegramMessage,
+                'parse_mode' => 'Markdown'
+            ];
+
+            $options = [
+                'http' => [
+                    'header'  => "Content-type: application/x-www-form-urlencoded\r\n",
+                    'method'  => 'POST',
+                    'content' => http_build_query($data),
+                    'timeout' => 5
+                ]
+            ];
+            
+            $context  = stream_context_create($options);
+            @file_get_contents($url, false, $context);
+        } catch (Exception $e) {
+            // Silenciosamente fallar si no se puede enviar
+            error_log("No se pudo enviar notificación a Telegram: " . $e->getMessage());
+        }
+
+        $recursion_guard = false;
+    }
+    
+    /**
      * Log de error - errores que no detienen la aplicación
      */
     public static function error($message, $context = []) {
         self::writeLog(self::LEVEL_ERROR, $message, $context);
+        
+        // Enviar a Telegram si es un error 404 importante o 500
+        $is404 = strpos($message, '404') !== false;
+        $is500 = strpos($message, '500') !== false;
+        
+        if ($is500 || ($is404 && !empty($context))) {
+             self::sendTelegramNotification($message, 'ERROR');
+        }
     }
     
     /**
@@ -102,6 +155,9 @@ class Logger {
         self::writeLog(self::LEVEL_CRITICAL, $message, $context);
         // Los errores críticos también van al log de errores del sistema
         error_log("CRITICAL: " . $message . " | Context: " . json_encode($context));
+        
+        // Siempre notificar errores críticos
+        self::sendTelegramNotification($message, 'CRITICAL');
     }
     
     /**

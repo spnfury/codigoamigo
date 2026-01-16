@@ -1,4 +1,9 @@
-<?php get_header_new($title, $description); ?>
+<?php
+// Incluir funciones necesarias
+include_once __DIR__ . '/../myphp/_header_modern.php';
+
+get_header_new($title, $description);
+?>
 
 <div class="container">
 	<div class="row">

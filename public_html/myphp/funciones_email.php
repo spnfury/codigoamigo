@@ -1,6 +1,45 @@
 <?php
 // Funciones para envío de emails del sistema
 
+// Incluir funciones de usuario para acceder a getCollectionEmailLogs
+if (!function_exists('getCollectionEmailLogs')) {
+    include_once __DIR__ . '/funciones_usuario.php';
+}
+
+// Función para registrar un email en el log
+function registrarEmailLog($to_email, $to_name, $subject, $tipo, $usuario_id = null, $detalles = [], $enviado = true, $metodo = 'PHP mail()', $error = '', $html_body = '') {
+    try {
+        $collection_email_logs = getCollectionEmailLogs();
+        
+        $email_log = [
+            'to_email' => $to_email,
+            'to_name' => $to_name,
+            'subject' => $subject,
+            'tipo' => $tipo, // 'recarga_saldo', 'notificacion', 'activacion', etc.
+            'usuario_id' => $usuario_id,
+            'detalles' => $detalles,
+            'enviado' => $enviado,
+            'metodo' => $metodo,
+            'error' => $error,
+            'html_body' => $html_body, // Contenido HTML del email para visualización en admin
+            'fecha' => new MongoDB\BSON\UTCDateTime(),
+            'fecha_humana' => date('Y-m-d H:i:s')
+        ];
+        
+        $result = $collection_email_logs->insertOne($email_log);
+        
+        if ($result->getInsertedId()) {
+            error_log("Email log registrado: $tipo a $to_email - Método: $metodo");
+            return true;
+        }
+        
+        return false;
+    } catch (Exception $e) {
+        error_log("Error al registrar email log: " . $e->getMessage());
+        return false;
+    }
+}
+
 // Función para enviar email de notificación de saldo cargado
 function enviarEmailSaldoCargado($usuario, $cantidad, $nuevo_saldo, $motivo) {
     $to = $usuario['mail'];
@@ -58,7 +97,7 @@ function crearPlantillaEmailSaldo($username, $cantidad, $nuevo_saldo, $motivo) {
                 box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             }
             .header {
-                background: linear-gradient(135deg, #ff6b35, #e55a2b);
+                background: linear-gradient(135deg, #E30613, #C40510);
                 color: white;
                 padding: 30px 20px;
                 text-align: center;
@@ -82,12 +121,12 @@ function crearPlantillaEmailSaldo($username, $cantidad, $nuevo_saldo, $motivo) {
                 padding: 25px;
                 margin: 25px 0;
                 text-align: center;
-                border-left: 4px solid #ff6b35;
+                border-left: 4px solid #E30613;
             }
             .saldo-cantidad {
                 font-size: 36px;
                 font-weight: 800;
-                color: #ff6b35;
+                color: #E30613;
                 margin: 10px 0;
             }
             .saldo-total {
@@ -105,7 +144,7 @@ function crearPlantillaEmailSaldo($username, $cantidad, $nuevo_saldo, $motivo) {
             }
             .cta-button {
                 display: inline-block;
-                background: linear-gradient(135deg, #ff6b35, #e55a2b);
+                background: linear-gradient(135deg, #E30613, #C40510);
                 color: white;
                 padding: 15px 30px;
                 text-decoration: none;
@@ -117,7 +156,7 @@ function crearPlantillaEmailSaldo($username, $cantidad, $nuevo_saldo, $motivo) {
             }
             .cta-button:hover {
                 transform: translateY(-2px);
-                box-shadow: 0 5px 15px rgba(255, 107, 53, 0.3);
+                box-shadow: 0 5px 15px rgba(227, 6, 19, 0.3);
             }
             .features {
                 display: flex;
@@ -137,7 +176,7 @@ function crearPlantillaEmailSaldo($username, $cantidad, $nuevo_saldo, $motivo) {
             }
             .feature h3 {
                 margin: 10px 0 5px 0;
-                color: #ff6b35;
+                color: #E30613;
                 font-size: 18px;
             }
             .feature p {
@@ -156,7 +195,7 @@ function crearPlantillaEmailSaldo($username, $cantidad, $nuevo_saldo, $motivo) {
                 font-size: 14px;
             }
             .footer a {
-                color: #ff6b35;
+                color: #E30613;
                 text-decoration: none;
             }
             @media (max-width: 600px) {

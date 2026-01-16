@@ -1,0 +1,24 @@
+# Cloudflare Bypass Configuration
+# Este archivo desactiva temporalmente algunas protecciones
+
+# Permitir acceso directo sin validación de Cloudflare
+Header always set X-Frame-Options "SAMEORIGIN"
+Header always set X-Content-Type-Options "nosniff"
+
+# Desactivar algunas verificaciones de seguridad temporalmente
+Header unset CF-Ray
+Header unset CF-Cache-Status
+
+# Permitir acceso desde diferentes user agents
+RewriteEngine On
+RewriteCond %{HTTP_USER_AGENT} ^$ [OR]
+RewriteCond %{HTTP_USER_AGENT} "curl" [OR]
+RewriteCond %{HTTP_USER_AGENT} "wget" [OR]
+RewriteCond %{HTTP_USER_AGENT} "bot"
+RewriteRule ^(.*)$ - [E=CF_BYPASS:1]
+
+# Configuración para desarrollo
+<IfDefine CF_BYPASS>
+    Header set X-Development-Mode "true"
+    Header set X-CF-Bypass "enabled"
+</IfDefine>

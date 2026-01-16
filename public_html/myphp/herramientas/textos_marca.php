@@ -276,4 +276,35 @@ function texto_initiativeq() { ?>
 <p><a href="https://vimeo.com/271407506">Initiative Q</a> from <a href="https://vimeo.com/user85411445">Initiative Q</a> on <a href="https://vimeo.com">Vimeo</a>.</p>                              	                                    	        	
 </div>
 
+<?php } 
+
+function texto_lixsa() { ?>
+
+<div class="text-left">
+    <h2 class="title textos_xs" style="font-size: 16px;">¿Qué es Lixsa.ai?</h2>                                	        
+    <p>
+    	Lixsa.ai es una plataforma de inteligencia artificial que ayuda a empresas de eCommerce y otros negocios a automatizar 
+    	la atención al cliente mediante chatbots inteligentes y soluciones de IA conversacional. La plataforma permite crear 
+    	asistentes virtuales que pueden responder preguntas, procesar pedidos y brindar soporte 24/7.
+    </p><br>                                	        
+    <h2 class="title textos_xs" style="font-size: 16px;">¿Cómo ahorrar con códigos de descuento de Lixsa.ai?</h2>
+	<p>                                	        
+        Con los códigos de descuento de Lixsa.ai puedes obtener importantes ahorros en sus servicios de IA:
+        <ul>
+            <li><strong>Descuentos en suscripciones:</strong> Ahorra hasta 50€ en planes mensuales o anuales</li>
+            <li><strong>Créditos gratuitos:</strong> Obtén créditos adicionales para probar sus servicios</li>
+            <li><strong>Configuración gratuita:</strong> Servicios de implementación sin costo adicional</li>
+            <li><strong>Consultoría incluida:</strong> Asesoramiento personalizado para optimizar tu chatbot</li>
+        </ul>
+    </p><br>
+    <h2 class="title textos_xs" style="font-size: 16px;">¿Por qué elegir Lixsa.ai?</h2>
+    <ul>
+        <li>✅ <strong>Fácil de implementar:</strong> Configuración rápida sin conocimientos técnicos</li>
+        <li>✅ <strong>Integración completa:</strong> Compatible con las principales plataformas de eCommerce</li>
+        <li>✅ <strong>IA avanzada:</strong> Tecnología de procesamiento de lenguaje natural de última generación</li>
+        <li>✅ <strong>Soporte 24/7:</strong> Atención al cliente en español e inglés</li>
+        <li>✅ <strong>ROI comprobado:</strong> Reduce costos operativos hasta un 70%</li>
+    </ul>
+</div>
+
 <?php } ?>

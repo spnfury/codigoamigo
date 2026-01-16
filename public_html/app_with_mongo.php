@@ -4,11 +4,12 @@
 require_once __DIR__ . '/inc/logger.php';
 
 // Logear errores en lugar de mostrarlos en pantalla
-ini_set('display_errors', 0);
-ini_set('display_startup_errors', 0);
+// MODO DESARROLLADOR ACTIVADO
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
 ini_set('log_errors', 1);
 ini_set('error_log', '/home/admin/web/codigoamigo.com/public_html/php_errors.log');
-error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
+error_reporting(E_ALL);
 
 // Iniciar sesión ANTES de output buffering
 if (session_status() === PHP_SESSION_NONE) {
@@ -17,8 +18,16 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // Asegurar que la sesión persista con parámetros URL
 if (isset($_COOKIE['PHPSESSID']) && session_id() !== $_COOKIE['PHPSESSID']) {
+    // Verificar si la sesión de la cookie es válida antes de recuperarla
+    $old_session_id = session_id();
     session_id($_COOKIE['PHPSESSID']);
     session_start();
+
+    // Si la sesión recuperada no tiene datos de usuario válidos, restaurar la sesión anterior
+    if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
+        session_id($old_session_id);
+        session_start();
+    }
 }
 
 // Habilitar output buffering para evitar problemas con headers
@@ -26,6 +35,11 @@ ob_start();
 
 // Definir variables globales necesarias
 $GLOBALS["author"] = "CODIGOAMIGO.COM";
+
+// Función helper para validar ObjectId de MongoDB
+function isValidObjectId($id) {
+    return is_string($id) && preg_match('/^[a-f\d]{24}$/i', $id);
+}
 
 // Función auxiliar para validar sesión de usuario
 function validateUserSession() {
@@ -68,6 +82,28 @@ function validateUserSession() {
 // Cargar autoloader de Composer
 require __DIR__ . '/vendor/autoload.php';
 
+// Inicializar Sentry lo antes posible
+require_once __DIR__ . '/inc/sentry_bootstrap.php';
+codigoamigo_init_sentry();
+
+register_shutdown_function(function () {
+    if (function_exists('codigoamigo_sentry_capture_last_error')) {
+        codigoamigo_sentry_capture_last_error();
+    }
+    
+    // Capturar errores fatales para Telegram
+    $error = error_get_last();
+    if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR])) {
+        if (class_exists('Logger')) {
+            // Incluir el archivo de configuración si no está definido
+            if (!defined('TELEGRAM_ADMIN_CHAT_ID')) {
+                @include_once __DIR__ . '/config/ai_config.php';
+            }
+            Logger::critical("Fatal Error: " . $error['message'] . " in " . $error['file'] . " on line " . $error['line']);
+        }
+    }
+});
+
 // Crear aplicación Slim
 $app = new \Slim\App([
     'settings' => [
@@ -77,6 +113,41 @@ $app = new \Slim\App([
         'outputBuffering' => 'append',
     ]
 ]);
+
+$app->add(function ($request, $response, $next) {
+    try {
+        return $next($request, $response);
+    } catch (\Throwable $exception) {
+        if (function_exists('codigoamigo_sentry_capture_exception')) {
+            codigoamigo_sentry_capture_exception($exception);
+        }
+
+        // Notificar excepción crítica a Telegram
+        if (class_exists('Logger')) {
+             // Incluir el archivo de configuración si no está definido
+            if (!defined('TELEGRAM_ADMIN_CHAT_ID')) {
+                @include_once __DIR__ . '/config/ai_config.php';
+            }
+            
+            $code = $exception->getCode();
+            // Errores 500 o excepciones no manejadas
+            Logger::critical("Uncaught Exception ({$code}): " . $exception->getMessage() . "\nTrace: " . $exception->getTraceAsString());
+        }
+
+        throw $exception;
+    }
+});
+
+// Función helper para agregar footer automáticamente a rutas que usan header moderno
+function add_footer_to_modern_routes($response) {
+    // Incluir footer solo si se usó el header moderno en esta petición
+    if (isset($GLOBALS['header_modern_used']) && $GLOBALS['header_modern_used'] === true) {
+        // La función get_footer() ya detectará automáticamente si debe usar el footer moderno
+        get_footer();
+        unset($GLOBALS['header_modern_used']); // Limpiar la variable global
+    }
+    return $response;
+}
 
 // Ruta principal
 $app->get('/', function ($request, $response) {
@@ -105,6 +176,8 @@ $app->get('/', function ($request, $response) {
     include_once __DIR__ . '/myphp/funciones.php';
     include_once __DIR__ . '/myphp/funciones_utilidades.php';
     include_once __DIR__ . '/myphp/funciones_modern.php';
+    include_once __DIR__ . '/myphp/funciones_busqueda.php';
+    include_once __DIR__ . '/myphp/funciones_busqueda.php';
 
     // Inicializar detector de móviles DESPUÉS de incluir includes.php
     if (!isset($detect)) {
@@ -123,7 +196,7 @@ $app->get('/', function ($request, $response) {
         $limit = 97;
         $limit2 = 100;
     } else {
-        $limit = 1000; // Límite alto para mostrar todos los códigos destacados
+        $limit = 100; // Obtener los últimos 100 códigos destacados
         $limit2 = 16;
     }
 
@@ -132,7 +205,7 @@ $app->get('/', function ($request, $response) {
     $skip_patrocinados = get_skip_patrocinados_in_pagination();
 
     // Determinar el orden según el parámetro recibido
-    $sort_order = array('updated_at' => -1); // orden por defecto: más recientes primero por fecha
+    $sort_order = array('fecha_publicacion' => -1); // orden por defecto: más recientes primero por fecha
 
     $orden_param = filter_input(INPUT_GET, 'orden', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
     if ($orden_param !== null) {
@@ -154,36 +227,44 @@ $app->get('/', function ($request, $response) {
 
     
 
-    $sort_order_destacados = array('destacado' => -1);
+        $sort_order_destacados = array('prioridad_pago' => -1, 'destacado_social' => -1, 'destacado' => -1, 'fecha_publicacion' => -1);
 
         /* Listado PATROCINADOS/DESTACADOS */
-        $array_filtro = array("estado" => 0);
-        $array_filtro = array_merge($array_filtro, array("destacado" => array('$ne' => 0)));
+        // Filtrar solo códigos que tengan destacado_social > 0 o destacado > 0
+        $array_filtro = array(
+            "estado" => 0,
+            '$or' => array(
+                array("destacado_social" => array('$ne' => 0)),
+                array("destacado" => array('$ne' => 0))
+            )
+        );
 
-        $array_skip = array("limit" => $limit);
-        $array_skip = array_merge($array_skip, array("skip" => $skip_patrocinados));
+
+        $array_skip = array("limit" => 100); // Obtener los últimos 100 códigos destacados
+        //$array_skip = array_merge($array_skip, array("skip" => $skip_patrocinados));
         $array_skip = array_merge($array_skip, array("sort" => $sort_order_destacados)); // Aplicar orden
 
         //TOMO LOS CODIGOS
         $lista_codigos_patrocinados_pre = get_all_listado_codigos_array($array_filtro, $array_skip);
         $lista_codigos_patrocinados = isset($lista_codigos_patrocinados_pre["results"]) ? $lista_codigos_patrocinados_pre["results"] : [];
 
-    /* Listado NORMAL */
-    $array_filtro = array("estado" => 0);
-    $array_filtro = array_merge($array_filtro, array("estado" => 0));
-    $array_filtro = array_merge($array_filtro, array("destacado" => 0));
+    /* Listado TODOS LOS CODIGOS RECIENTES */
+    // Usar expresión regular para obtener códigos recientes correctamente
+    $array_filtro = array(
+        "estado" => 0,
+        "fecha_publicacion" => array('$regex' => '^202[4-9]-') // Códigos de 2024 en adelante
+    );
 
-    $array_skip = array("limit" => $limit2);
+    $array_skip = array("limit" => $limit2 * 2); // Duplicar límite ya que ahora obtenemos todos los códigos recientes
     $array_skip = array_merge($array_skip, array("skip" => $skip));
     $array_skip = array_merge($array_skip, array("sort" => $sort_order));
 
     //TOMO LOS CODIGOS
     $lista_codigos_pre = get_all_listado_codigos_array($array_filtro, $array_skip);
 
-   
+
     $lista_codigos = isset($lista_codigos_pre["results"]) && is_array($lista_codigos_pre["results"]) ? $lista_codigos_pre["results"] : [];
-  
-    
+        
 
     $numero_codigos = isset($lista_codigos_pre["total_number"]) ? $lista_codigos_pre["total_number"] : 0;
 
@@ -204,8 +285,13 @@ $app->get('/', function ($request, $response) {
     $GLOBALS['total_pag'] = $total_pag;
     $GLOBALS['codigos_restantes'] = $numero_codigos;
 
-    // Incluir funciones modernas
+    // Incluir funciones modernas (guardas defensivas por si algún include falló antes)
+    if (!function_exists('generate_modern_code_cards') || !function_exists('generate_modern_pagination')) {
+        include_once __DIR__ . '/myphp/funciones_modern.php';
+    }
     include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
 
     // Usar el nuevo header moderno
     
@@ -217,6 +303,20 @@ $app->get('/', function ($request, $response) {
         "Códigos de descuento verificados para ahorrar en tus compras",
         "https://www.codigoamigo.com/img/logo_codigoamigo_real4.png"
     );
+
+    // Widget de Chollos (movido desde header global)
+    if (!function_exists('renderCompactHotDealsWidget')) {
+        include_once __DIR__ . '/myphp/funciones_chollos.php';
+    }
+    echo renderCompactHotDealsWidget();
+
+    // Hero Section (movido desde header global)
+    ?>
+    <section class="hero-section">
+        <h1 class="hero-title">¡Encuentra los Mejores Descuentos!</h1>
+        <p class="hero-description">Códigos de descuento verificados y actualizados diariamente para que ahorres en tus compras favoritas</p>
+    </section>
+    <?php
 
     // Generar contenido principal con diseño moderno
     echo '<div class="main-content">';
@@ -230,35 +330,37 @@ $app->get('/', function ($request, $response) {
         
         // Mostrar marcas populares (solo en la primera página)
         echo generate_popular_brands_section(9);
+        
+        // Mostrar categorías populares (solo en la primera página)
+        echo generate_popular_categories_section();
     }
     
     // Mostrar información de códigos
     echo '<h2 class="section-title">Últimos Códigos Publicados</h2>';
-    
-    // Generar tarjetas de códigos modernas (solo códigos normales, no destacados)
+
+    // Generar tarjetas de códigos modernas (TODOS los códigos recientes ordenados por fecha)
     if(!empty($lista_codigos)) {
-        // Filtrar solo códigos normales (no destacados)
-        $codigos_normales = array_filter($lista_codigos, function($codigo) {
-            return !isset($codigo['destacado']) || $codigo['destacado'] == 0;
-        });
-        
-        if(!empty($codigos_normales)) {
-            echo '<div class="codes-grid">';
-            echo generate_modern_code_cards($codigos_normales);
-            echo '</div>';
-            
-            // Generar paginación moderna
-            echo generate_modern_pagination($numero_codigos, isset($_GET['page']) ? (int)$_GET['page'] : 1);
-        } else {
-            echo '<div style="text-align: center; color: #ccc; padding: 2rem;">';
-            echo '<i class="fas fa-search" style="font-size: 3rem; margin-bottom: 1rem; color: #FF6B35;"></i>';
-            echo '<h3>No se encontraron códigos</h3>';
-            echo '<p>Intenta con otros términos de búsqueda</p>';
-            echo '</div>';
-        }
+        // Los códigos ya vienen ordenados por fecha (más recientes primero)
+        // No necesitamos filtrar adicionales - ya obtenemos los más recientes independientemente del tipo
+
+        echo '<div class="codes-grid">';
+        // Limitar visualmente a 9 códigos para la home
+        $codigos_home = array_slice($lista_codigos, 0, 9);
+        echo generate_modern_code_cards($codigos_home);
+        echo '</div>';
+
+        // Botón "Ver todos" que lleva a la nueva ruta
+        echo '<div style="text-align: center; margin-top: 30px; margin-bottom: 20px;">';
+        echo '<a href="/ultimos-codigos" class="btn" style="background: transparent; border: 2px solid #E30613; color: #E30613; padding: 12px 30px; border-radius: 25px; text-decoration: none; font-weight: 600; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 8px;">';
+        echo 'Ver todos los códigos <i class="fas fa-arrow-right"></i>';
+        echo '</a>';
+        echo '<style>.btn:hover { background: #E30613 !important; color: white !important; }</style>';
+        echo '</div>';
+
+
     } else {
         echo '<div style="text-align: center; color: #ccc; padding: 2rem;">';
-        echo '<i class="fas fa-search" style="font-size: 3rem; margin-bottom: 1rem; color: #FF6B35;"></i>';
+        echo '<i class="fas fa-search" style="font-size: 3rem; margin-bottom: 1rem; color: #E30613;"></i>';
         echo '<h3>No se encontraron códigos</h3>';
         echo '<p>Intenta con otros términos de búsqueda</p>';
         echo '</div>';
@@ -267,7 +369,94 @@ $app->get('/', function ($request, $response) {
     echo '</div>';
     echo '</div>';
     
-    
+    // Bloque de tendencias de búsqueda (solo home principal)
+    if (!isset($_GET['page']) || (int)$_GET['page'] === 1) {
+        if (function_exists('get_search_statistics')) {
+            $search_stats = get_search_statistics();
+        } else {
+            $search_stats = [
+                'top_terms' => [],
+                'total_today' => 0,
+                'total_this_week' => 0,
+                'total_this_month' => 0
+            ];
+        }
+
+        echo '<div class="search-stats-section">';
+        echo '<div class="container">';
+        echo '<div class="search-stats-container">';
+
+        // Bloque de búsquedas populares
+        echo '<div class="popular-searches">';
+        echo '<h3><i class="fas fa-fire"></i> Búsquedas populares</h3>';
+        echo '<p class="popular-searches-subtitle">Descubre lo que la comunidad está buscando ahora mismo.</p>';
+
+        if (!empty($search_stats['top_terms'])) {
+            echo '<div class="popular-searches-list">';
+            foreach ($search_stats['top_terms'] as $index => $term) {
+                if ($index >= 8) {
+                    break;
+                }
+                $rank = $index + 1;
+                $term_text = isset($term['_id']) ? $term['_id'] : '';
+                $term_count = isset($term['count']) ? (int)$term['count'] : 0;
+                echo '<a class="popular-search-chip" href="/ofertas/' . urlencode($term_text) . '">';
+                echo '<span class="chip-rank">' . $rank . '</span>';
+                echo '<span class="chip-text">' . htmlspecialchars($term_text) . '</span>';
+                echo '<span class="chip-count">' . $term_count . '</span>';
+                echo '</a>';
+            }
+            echo '</div>';
+        } else {
+            echo '<div class="popular-searches-empty">';
+            echo '<p>Aún no hay suficientes búsquedas registradas. Prueba explorar términos como ';
+            echo '<a href="/ofertas/booking">Booking</a> o ';
+            echo '<a href="/ofertas/uber">Uber</a> y vuelve en unos minutos.</p>';
+            echo '</div>';
+        }
+        echo '</div>'; // popular-searches
+
+        // Resumen rápido
+        echo '<div class="stats-summary">';
+        echo '<div class="row">';
+
+        $summary_cards = [
+            [
+                'icon' => 'fas fa-search',
+                'label' => 'Búsquedas hoy',
+                'value' => isset($search_stats['total_today']) ? (int)$search_stats['total_today'] : 0
+            ],
+            [
+                'icon' => 'fas fa-calendar-week',
+                'label' => 'Esta semana',
+                'value' => isset($search_stats['total_this_week']) ? (int)$search_stats['total_this_week'] : 0
+            ],
+            [
+                'icon' => 'fas fa-calendar-alt',
+                'label' => 'Este mes',
+                'value' => isset($search_stats['total_this_month']) ? (int)$search_stats['total_this_month'] : 0
+            ]
+        ];
+
+        foreach ($summary_cards as $card) {
+            echo '<div class="col-md-4 col-sm-4 col-xs-12">';
+            echo '<div class="stat-card">';
+            echo '<div class="stat-icon"><i class="' . $card['icon'] . '"></i></div>';
+            echo '<div class="stat-content">';
+            echo '<div class="stat-number">' . number_format($card['value']) . '</div>';
+            echo '<div class="stat-label">' . htmlspecialchars($card['label']) . '</div>';
+            echo '</div>';
+            echo '</div>';
+            echo '</div>';
+        }
+        echo '</div>'; // row
+        echo '</div>'; // stats-summary
+
+        echo '</div>'; // search-stats-container
+        echo '</div>'; // container
+        echo '</div>'; // search-stats-section
+    }
+
     // CSS adicional
     echo get_modern_additional_css();
     
@@ -283,7 +472,7 @@ $app->get('/', function ($request, $response) {
     .loading-indicator i {
         font-size: 2rem;
         margin-bottom: 1rem;
-        color: #FF6B35;
+        color: #E30613;
     }
     
     .no-results {
@@ -295,22 +484,226 @@ $app->get('/', function ($request, $response) {
     .no-results i {
         font-size: 3rem;
         margin-bottom: 1rem;
-        color: #FF6B35;
+        color: #E30613;
     }
     
     .search-input-header:focus,
     .search-input-hero:focus {
         outline: none;
-        border-color: #FF6B35;
-        box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.2);
+        border-color: #E30613;
+        box-shadow: 0 0 0 2px rgba(227, 6, 19, 0.2);
+    }
+    
+    .search-stats-section {
+        background: #f8f9fa;
+        padding: 60px 0;
+        margin: 40px 0 0;
+    }
+
+    .search-stats-container {
+        background: #ffffff;
+        border-radius: 18px;
+        padding: 35px;
+        box-shadow: 0 15px 35px rgba(0,0,0,0.08);
+    }
+
+    .popular-searches {
+        margin-bottom: 35px;
+        text-align: left;
+    }
+
+    .popular-searches h3 {
+        font-size: 1.6rem;
+        color: #1f3c88;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .popular-searches-subtitle {
+        color: #5b6c94;
+        margin-bottom: 20px;
+    }
+
+    .popular-searches-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .popular-search-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 18px;
+        border-radius: 999px;
+        background: #eef2ff;
+        color: #1f3c88;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.2s ease-in-out;
+        border: 1px solid #d5ddff;
+    }
+
+    .popular-search-chip:hover {
+        background: #1f3c88;
+        color: #ffffff;
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(31, 60, 136, 0.25);
+    }
+
+    .popular-search-chip .chip-rank,
+    .popular-search-chip .chip-count {
+        background: rgba(255, 255, 255, 0.35);
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 0.75rem;
+    }
+
+    .popular-searches-empty {
+        background: #eef2ff;
+        border-radius: 12px;
+        padding: 18px;
+        color: #1f3c88;
+        font-weight: 500;
+    }
+
+    .popular-searches-empty a {
+        color: #1f3c88;
+        text-decoration: underline;
+        font-weight: 600;
+    }
+
+    .stats-summary {
+        margin-top: 25px;
+    }
+
+    .stat-card {
+        background: linear-gradient(135deg, #E30613, #ff8f56);
+        color: #ffffff;
+        padding: 28px;
+        border-radius: 18px;
+        text-align: center;
+        margin-bottom: 20px;
+        box-shadow: 0 12px 30px rgba(227, 6, 19, 0.25);
+        transition: transform 0.3s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .stat-card .stat-icon {
+        font-size: 2.4rem;
+        margin-bottom: 12px;
+        opacity: 0.9;
+    }
+
+    .stat-card .stat-number {
+        font-size: 2.2rem;
+        font-weight: 700;
+        margin-bottom: 6px;
+        letter-spacing: 1px;
+    }
+
+    .stat-card .stat-label {
+        font-size: 0.95rem;
+        text-transform: uppercase;
+        opacity: 0.85;
+        letter-spacing: 1.2px;
+    }
+
+    @media (max-width: 768px) {
+        .search-stats-container {
+            padding: 25px;
+        }
+
+        .popular-searches-list {
+            gap: 10px;
+        }
+
+        .popular-search-chip {
+            width: 100%;
+            justify-content: space-between;
+        }
     }
     </style>';
+
+    // Incluir footer
+    get_footer();
+
+    return $response;
+});
+
+// Ruta para Super Landings (Guías)
+$app->get('/guias/{slug}', function ($request, $response, $args) {
+    $slug = $args['slug'];
+    
+    // Incluir archivos necesarios
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/funciones_modern.php';
+    include_once __DIR__ . '/myphp/_header_modern.php';
+    include_once __DIR__ . '/myphp/_super_landing_functions.php';
+
+    // Obtener datos de la Super Landing
+    $landing = get_super_landing_by_slug($slug);
+    
+    if (!$landing) {
+        // Si no existe, 404
+        include_once __DIR__ . '/404.php';
+        return $response->withStatus(404);
+    }
+    
+    // Inicializar variables globales para SEO
+    $GLOBALS['website'] = 'https://www.codigoamigo.com/';
+    $GLOBALS['actual_url'] = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+    
+    // Preparar Schema
+    $faq_schema = '';
+    if (isset($landing['sections'])) {
+        foreach ($landing['sections'] as $section) {
+            if ($section['type'] === 'faq' && !empty($section['faqs'])) {
+                $faq_schema = render_faq_schema($section['faqs']);
+                break;
+            }
+        }
+    }
+    
+    // Preparar meta data adicional
+    $links_meta = [
+        'description' => $landing['meta_description'] ?? '',
+        'schema' => $faq_schema
+    ];
+    
+    // Llamar al header moderno
+    $GLOBALS['header_modern_used'] = true;
+    get_header_modern(
+        $landing['meta_title'] ?? $landing['title'],
+        $landing['meta_description'] ?? '',
+        $landing['title'],
+        $landing['meta_description'] ?? '',
+        $landing['hero_image'] ?? "https://www.codigoamigo.com/img/logo_codigoamigo_real4.png",
+        $links_meta
+    );
+    
+    // Renderizar la vista
+    // Pasamos $landing y otros datos necesarios a la vista
+    // Usamos include para que tenga acceso a las variables del scope actual si fuera necesario, 
+    // pero idealmente pasamos todo explícitamente o usamos globales si el framework lo requiere así.
+    // En este estilo procedural, incluimos el archivo.
+    include __DIR__ . '/myphp/views/super_landing.php';
+    
+    // Incluir footer
+    include_once __DIR__ . '/myphp/_footer.php';
+    get_footer_modern();
 
     return $response;
 });
 
 // Ruta de búsqueda simplificada
-$app->get('/buscar/{termino}', function ($request, $response, $args) {
+$app->get('/ofertas/{termino}', function ($request, $response, $args) {
     $termino = $args['termino'];
     $termino = htmlspecialchars(trim($termino), ENT_QUOTES, 'UTF-8');
 
@@ -318,58 +711,334 @@ $app->get('/buscar/{termino}', function ($request, $response, $args) {
     include_once __DIR__ . '/inc/includes.php';
     include_once __DIR__ . '/myphp/funciones.php';
     include_once __DIR__ . '/myphp/funciones_modern.php';
+    include_once __DIR__ . '/myphp/funciones_chollos.php';
+    include_once __DIR__ . '/myphp/funciones_busqueda.php';
+    include_once __DIR__ . '/myphp/funciones_usuario.php'; // Required for getCollectionLogs used in record_search_term
     include_once __DIR__ . '/myphp/_header_modern.php';
+    include_once __DIR__ . '/myphp/_footer.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
     
-    // Usar el header moderno
+    // Inicializar variables globales para SEO
+    $GLOBALS['website'] = 'https://www.codigoamigo.com/';
+    $GLOBALS['actual_url'] = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+    $GLOBALS['actual_url_limpia'] = 'https://www.codigoamigo.com/ofertas/' . urlencode($termino);
+    
+    // Preparar meta keywords para mejor targeting de AdSense
+    $year = date('Y');
+    $search_keywords = htmlspecialchars($termino, ENT_QUOTES, 'UTF-8');
+    $titulo_seo = 'Códigos descuento ' . $search_keywords . ', ofertas y cupones activos (' . $year . ')';
+    $meta_description = 'Encuentra los mejores códigos descuento, cupones y ofertas para ' . $search_keywords . ' actualizados en ' . $year . '. ¡Ahorra con CodigoAmigo.com!';
+    
+    $links_meta = array(
+        'keywords' => $search_keywords . ', códigos descuento, cupones, ofertas, promociones, chollos',
+        'description' => $meta_description
+    );
+
+    // Schema.org BreadcrumbList
+    $schema_breadcrumb = [
+        "@context" => "https://schema.org",
+        "@type" => "BreadcrumbList",
+        "itemListElement" => [
+            [
+                "@type" => "ListItem",
+                "position" => 1,
+                "name" => "Inicio",
+                "item" => "https://www.codigoamigo.com/"
+            ],
+            [
+                "@type" => "ListItem",
+                "position" => 2,
+                "name" => 'Descuentos ' . $search_keywords,
+                "item" => $GLOBALS['actual_url_limpia']
+            ]
+        ]
+    ];
+    $links_meta['schema'] = '<script type="application/ld+json">' . json_encode($schema_breadcrumb, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>';
     
     // Llamar a la función del header moderno
     get_header_modern(
-        "Resultados de búsqueda para: " . htmlspecialchars($termino),
-        "Búsqueda de códigos relacionados con " . htmlspecialchars($termino),
-        "Resultados de búsqueda para: " . htmlspecialchars($termino),
-        "Búsqueda de códigos relacionados con " . htmlspecialchars($termino),
-        "https://www.codigoamigo.com/img/logo_codigoamigo_real4.png"
+        $titulo_seo,
+        $titulo_seo . '. Encuentra las mejores ofertas, códigos descuento y cupones para ' . htmlspecialchars($termino),
+        $titulo_seo,
+        $titulo_seo . " - Cupones, descuentos y ofertas de " . htmlspecialchars($termino),
+        "https://www.codigoamigo.com/img/logo_codigoamigo_real4.png",
+        $links_meta
     );
 
-    // Búsqueda simple en códigos
-    $array_filtro = array("estado" => 0);
-    if (!empty($termino)) {
-        $array_filtro['$or'] = array(
-            array("marca" => new MongoDB\BSON\Regex($termino, 'i')),
-            array("descripcion" => new MongoDB\BSON\Regex($termino, 'i'))
-        );
+    // Registrar la búsqueda si aplica
+    $queryParams = $request->getQueryParams();
+    $fromTrends = isset($queryParams['from']) && $queryParams['from'] === 'trends';
+    if (!$fromTrends && function_exists('record_search_term') && !empty($termino)) {
+        try {
+            $record_result = record_search_term($termino);
+            if (!$record_result) {
+                error_log("Error registrando búsqueda (record_search_term devolvió false): " . $termino);
+            }
+        } catch (Throwable $e) {
+            error_log("Error registrando búsqueda simplificada: " . $e->getMessage());
+        }
+    } else {
+        if (!$fromTrends && !function_exists('record_search_term')) {
+            error_log("Error: record_search_term no existe al intentar registrar: " . $termino);
+        }
     }
 
-    // Ordenar por fecha de publicación descendente (más recientes primero)
-    $array_opciones = array(
-        'limit' => 20,
-        'sort' => array('updated_at' => -1)
+    // Preparar filtro base para la búsqueda
+    $base_filter = array("estado" => 0);
+    $regex_conditions = array();
+
+    if (!empty($termino)) {
+        $regex = new MongoDB\BSON\Regex($termino, 'i');
+        $regex_conditions[] = array("marca" => $regex);
+        $regex_conditions[] = array("descripcion" => $regex);
+    }
+
+    if (!empty($regex_conditions)) {
+        $base_filter['$or'] = $regex_conditions;
+    }
+
+    // Obtener códigos destacados coincidentes
+    $featured_filter = $base_filter;
+    $featured_conditions = array(
+        array(
+            '$or' => array(
+                array('destacado' => array('$gt' => 0)),
+                array('destacado_social' => array('$gt' => 0))
+            )
+        )
     );
 
-    $lista_codigos = get_all_listado_codigos_array($array_filtro, $array_opciones);
+    if (isset($featured_filter['$and']) && is_array($featured_filter['$and'])) {
+        $featured_filter['$and'] = array_merge($featured_filter['$and'], $featured_conditions);
+    } else {
+        $featured_filter['$and'] = $featured_conditions;
+    }
 
+    $featured_options = array(
+        'limit' => 30,
+        'sort' => array('destacado_social' => -1, 'destacado' => -1, '_id' => -1)
+    );
+
+    $lista_codigos_destacados = get_all_listado_codigos_array($featured_filter, $featured_options);
+    $codigos_destacados = isset($lista_codigos_destacados["results"]) && is_array($lista_codigos_destacados["results"])
+        ? $lista_codigos_destacados["results"]
+        : array();
+
+    // Obtener códigos generales (excluyendo los destacados)
+    $general_filter = $base_filter;
+    $general_conditions = array(
+        array(
+            '$or' => array(
+                array('destacado' => 0),
+                array('destacado' => array('$exists' => false))
+            )
+        ),
+        array(
+            '$or' => array(
+                array('destacado_social' => 0),
+                array('destacado_social' => array('$exists' => false))
+            )
+        )
+    );
+
+    if (!empty($general_conditions)) {
+        if (isset($general_filter['$and']) && is_array($general_filter['$and'])) {
+            $general_filter['$and'] = array_merge($general_filter['$and'], $general_conditions);
+        } else {
+            $general_filter['$and'] = $general_conditions;
+        }
+    }
+
+    if (!empty($codigos_destacados)) {
+        $destacados_ids = array();
+        foreach ($codigos_destacados as $codigo_destacado) {
+            if (isset($codigo_destacado['_id'])) {
+                $destacados_ids[] = $codigo_destacado['_id'];
+            }
+        }
+        if (!empty($destacados_ids)) {
+            $general_filter['_id'] = array('$nin' => $destacados_ids);
+        }
+    }
+
+    $general_options = array(
+        'limit' => 50,
+        'sort' => array('fecha_publicacion' => -1, '_id' => -1)
+    );
+
+    $lista_codigos_generales = get_all_listado_codigos_array($general_filter, $general_options);
+    $codigos_generales = isset($lista_codigos_generales["results"]) && is_array($lista_codigos_generales["results"])
+        ? $lista_codigos_generales["results"]
+        : array();
+
+    // Buscar chollos que coincidan con el término de búsqueda (con paginación)
+    $lista_chollos = array();
+    $total_chollos = 0;
+    $chollos_page = isset($queryParams['chollos_page']) ? max(1, intval($queryParams['chollos_page'])) : 1;
+    $chollos_per_page = 20; // Chollos por página
+    $chollos_skip = ($chollos_page - 1) * $chollos_per_page;
+    
+    if (!empty($termino) && function_exists('obtenerChollos')) {
+        // Obtener total de chollos para paginación
+        if (function_exists('contarChollos')) {
+            $filtros_count = array(
+                'estado' => 1,
+                'busqueda' => $termino
+            );
+            $total_chollos = contarChollos($filtros_count);
+        }
+        
+        // Obtener chollos con paginación
+        $filtros_chollos = array(
+            'estado' => 1,
+            'busqueda' => $termino,
+            'limite' => $chollos_per_page,
+            'skip' => $chollos_skip
+        );
+        $lista_chollos = obtenerChollos($filtros_chollos);
+    }
+    
+    $total_chollos_pages = $total_chollos > 0 ? ceil($total_chollos / $chollos_per_page) : 0;
+
+    // Incluir funciones de AdSense
+    if (!function_exists('get_adsense_search')) {
+        include_once __DIR__ . '/myphp/funciones_adsense.php';
+    }
+    
     // Mostrar resultados de búsqueda
     echo '<div class="main-content">';
-    echo '<div class="codes-section">';
-    echo '<h2 class="section-title">Resultados de búsqueda para: ' . htmlspecialchars($termino) . '</h2>';
     
-    if(!empty($lista_codigos["results"])) {
-        echo '<div class="codes-grid">';
-        echo generate_modern_code_cards($lista_codigos["results"]);
+    // Migas de pan visuales
+    echo '<div class="container" style="margin-top: 20px;">';
+    echo '<nav class="breadcrumb-nav" style="margin-bottom: 20px; font-size: 0.9rem; color: #888;">';
+    echo '<a href="/" style="color: #888; text-decoration: none;">Inicio</a> <i class="fas fa-chevron-right" style="font-size: 0.7rem; margin: 0 8px;"></i> ';
+    echo '<span style="color: #E30613; font-weight: 500;">Búsqueda: ' . htmlspecialchars($termino) . '</span>';
+    echo '</nav>';
+    echo '</div>';
+
+    echo '<div class="codes-section">';
+    echo '<div class="page-header glass-card animate-on-scroll" style="margin-bottom: 3rem;">';
+    echo '<h1 class="premium-h1" style="font-size: 2.5rem; font-weight: 800; color: #fff; margin-bottom: 10px;">Códigos descuento ' . htmlspecialchars($termino) . '</h1>';
+    echo '<p class="premium-subtitle" style="font-size: 1.1rem; color: rgba(255,255,255,0.7);">Cupones y ofertas verificadas en ' . date('Y') . '</p>';
+    echo '</div>';
+    
+    // Agregar contexto de búsqueda para AdSense (oculto pero presente en el DOM)
+    echo '<!-- Contexto para AdSense: búsqueda de ' . htmlspecialchars($termino) . ' -->';
+    echo '<div style="position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden;">';
+    echo '<p>Búsqueda de códigos descuento ' . htmlspecialchars($termino) . ', cupones ' . htmlspecialchars($termino) . ', ofertas ' . htmlspecialchars($termino) . ', promociones ' . htmlspecialchars($termino) . '</p>';
+    echo '</div>';
+    
+    // AdSense para búsqueda - Top
+    include __DIR__ . "/myphp/chollos_search_view.php";
+
+    
+    if (!empty($codigos_destacados)) {
+        $slider_title = 'Códigos destacados para "' . $termino . '"';
+        $slider_subtitle = 'Estos códigos destacados coinciden con tu búsqueda';
+        echo '<div class="search-featured-results">';
+        echo generate_featured_codes_slider($codigos_destacados, true, $slider_title, $slider_subtitle);
         echo '</div>';
-    } else {
+    }
+
+    if (!empty($codigos_generales)) {
+        $subtitle = !empty($codigos_destacados)
+            ? 'Más códigos que coinciden con tu búsqueda'
+            : 'Códigos encontrados para tu búsqueda';
+        echo '<h3 class="section-subtitle">' . htmlspecialchars($subtitle) . '</h3>';
+        echo '<div class="codes-grid">';
+        echo generate_modern_code_cards($codigos_generales);
+        echo '</div>';
+        
+        // AdSense para búsqueda - Bottom (cuando hay resultados)
+        if (!empty($termino) && function_exists('get_adsense_search')) {
+            echo '<div class="adsense-search-bottom mb-4 mt-4" style="text-align: center; margin: 30px 0; padding: 30px; background: #f8f9fa; border-radius: 12px; border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.05); width: 100%; max-width: 100%; overflow: hidden; display: block; position: relative;">';
+            echo '<div style="min-height: 250px; width: 100%; max-width: 100%; display: block; position: relative;">';
+            echo '<h4 style="color: #333; margin-bottom: 20px; font-size: 18px;">Anuncios relacionados con: <strong style="color: #6c5ce7;">' . htmlspecialchars($termino) . '</strong></h4>';
+            echo '<p style="font-size: 12px; color: #666; margin-bottom: 15px;">Cupones y ofertas de ' . htmlspecialchars($termino) . '</p>';
+            echo get_adsense_search($termino, null, 'bottom');
+            echo '</div>';
+            echo '</div>';
+        }
+    }
+
+    if (empty($codigos_destacados) && empty($codigos_generales) && empty($lista_chollos)) {
         echo '<div style="text-align: center; color: #ccc; padding: 2rem;">';
-        echo '<i class="fas fa-search" style="font-size: 3rem; margin-bottom: 1rem; color: #FF6B35;"></i>';
+        echo '<i class="fas fa-search" style="font-size: 3rem; margin-bottom: 1rem; color: #E30613;"></i>';
         echo '<h3>No se encontraron códigos</h3>';
         echo '<p>Intenta con otros términos de búsqueda</p>';
+        
+        // AdSense para búsqueda sin resultados - Middle
+        if (!empty($termino) && function_exists('get_adsense_search')) {
+            echo '<div class="adsense-search-no-results-middle mb-4 mt-4" style="text-align: center; margin: 30px 0; padding: 30px; background: #ffffff; border-radius: 12px; border: 2px solid #E30613; box-shadow: 0 2px 10px rgba(0,0,0,0.1); width: 100%; max-width: 100%; overflow: hidden; display: block; position: relative;">';
+            echo '<div style="min-height: 300px; width: 100%; max-width: 100%; display: block; position: relative;">';
+            echo '<h4 style="color: #333; margin-bottom: 20px; font-size: 18px;">Anuncios relacionados con: <strong style="color: #E30613;">' . htmlspecialchars($termino) . '</strong></h4>';
+            echo '<p style="font-size: 12px; color: #999; margin-bottom: 15px;">Cupones, ofertas y descuentos de ' . htmlspecialchars($termino) . '</p>';
+            echo get_adsense_search($termino, null, 'no-results-middle');
+            echo '</div>';
+            echo '</div>';
+        }
+        
+        echo '<div style="margin-top: 2rem; padding: 1.5rem; background: #fff; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: inline-block;">';
+        echo '<h4 style="color: #333; margin-bottom: 1rem;">¿Tienes un código para "' . htmlspecialchars($termino) . '"?</h4>';
+        echo '<p style="color: #666; margin-bottom: 1.5rem;">Sé el primero en publicar un código para esta marca o servicio</p>';
+        echo '<a href="/nuevo_codigo?marca=' . urlencode($termino) . '" class="btn" style="background: #E30613; color: white; padding: 12px 30px; border-radius: 25px; text-decoration: none; font-weight: 600; transition: all 0.3s ease; display: inline-block;">';
+        echo '<i class="fas fa-plus-circle" style="margin-right: 8px;"></i>';
+        echo 'Publicar Código</a>';
+        echo '</div>';
+        
+        // AdSense para búsqueda sin resultados - Bottom
+        if (!empty($termino) && function_exists('get_adsense_search')) {
+            echo '<div class="adsense-search-no-results-bottom mb-4 mt-4" style="text-align: center; margin: 30px 0; padding: 30px; background: #ffffff; border-radius: 12px; border: 2px solid #E30613; box-shadow: 0 2px 10px rgba(0,0,0,0.1); width: 100%; max-width: 100%; overflow: hidden; display: block; position: relative;">';
+            echo '<div style="min-height: 300px; width: 100%; max-width: 100%; display: block; position: relative;">';
+            echo '<h4 style="color: #333; margin-bottom: 20px; font-size: 18px;">Más anuncios sobre: <strong style="color: #E30613;">' . htmlspecialchars($termino) . '</strong></h4>';
+            echo '<p style="font-size: 12px; color: #999; margin-bottom: 15px;">Ofertas especiales de ' . htmlspecialchars($termino) . '</p>';
+            echo get_adsense_search($termino, null, 'no-results-bottom');
+            echo '</div>';
+            echo '</div>';
+        }
+        
         echo '</div>';
     }
     
+    // Mostrar chollos encontrados
+    
     echo '</div>';
     echo '</div>';
     
+    // Sección de búsquedas relacionadas
+    if (function_exists('get_related_searches')) {
+        $related_searches = get_related_searches($termino, 10);
+        
+        if (!empty($related_searches)) {
+            echo '<div class="related-searches-section animate-on-scroll" style="margin-top: 4rem; padding: 4rem 0;">';
+            echo '<div class="container">';
+            echo '<h3 class="section-title h2-style" style="text-align:center; margin-bottom: 30px; color:#fff;">También te puede interesar</h3>';
+            
+            echo '<div class="related-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px;">';
+            foreach ($related_searches as $related) {
+                $related_url = '/ofertas/' . urlencode($related['term']);
+                echo '<a href="' . $related_url . '" class="related-chip glass-card" style="padding: 15px; text-decoration: none; border-radius: 12px; text-align: center; display: flex; align-items: center; justify-content: center; gap: 8px;">';
+                echo '<i class="fas fa-search" style="font-size: 0.8rem; color: #E30613;"></i>';
+                echo '<span style="color: #ddd; font-weight: 500; font-size: 0.95rem;">' . htmlspecialchars($related['term']) . '</span>';
+                echo '</a>';
+            }
+            echo '</div>'; // related-grid
+            echo '</div>'; // container
+            echo '</div>'; // related-searches-section
+        }
+    }
+
+    // Interlacado de pie (Marcas y Categorías)
+    echo '<div class="search-footer-interlinking" style="padding: 4rem 0; background: #0a0a0a;">';
+    echo generate_popular_brands_section(9);
+    echo generate_popular_categories_section();
+    echo '</div>';
+
     // CSS adicional
     echo get_modern_additional_css();
+
+    // Incluir footer
+    get_footer();
 
     return $response;
 });
@@ -381,9 +1050,83 @@ $app->post('/myphp/ajax_actions.php', function ($request, $response) {
     return $response;
 });
 
+
+// Nueva ruta para ver todos los últimos códigos
+$app->get('/ultimos-codigos', function ($request, $response) {
+    // Inicializar variables globales
+    $GLOBALS['website'] = 'https://www.codigoamigo.com/';
+    $GLOBALS['actual_url'] = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+    $GLOBALS['header_modern_used'] = true;
+
+    // Incluir archivos necesarios
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/funciones_utilidades.php';
+    include_once __DIR__ . '/myphp/funciones_modern.php';
+    include_once __DIR__ . '/myphp/_header_modern.php';
+    include_once __DIR__ . '/myphp/_footer.php';
+
+    // Configuración de paginación
+    $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+    $limit = 20;
+    $skip = ($page - 1) * $limit;
+
+    // Filtros para códigos recientes
+    $array_filtro = array(
+        "estado" => 0,
+        "fecha_publicacion" => array('$regex' => '^202[4-5]-')
+    );
+    
+    $sort_order = array('fecha_publicacion' => -1);
+    
+    $array_options = array(
+        "limit" => $limit,
+        "skip" => $skip,
+        "sort" => $sort_order
+    );
+
+    // Obtener códigos
+    $lista_codigos_pre = get_all_listado_codigos_array($array_filtro, $array_options);
+    $lista_codigos = isset($lista_codigos_pre["results"]) ? $lista_codigos_pre["results"] : [];
+    $total_codes = isset($lista_codigos_pre["total_number"]) ? $lista_codigos_pre["total_number"] : 0;
+
+    // Renderizar cabecera
+    get_header_modern(
+        "Últimos Códigos Publicados - CodigoAmigo.com",
+        "Explora todos los últimos códigos de descuento y ofertas publicadas por nuestra comunidad.",
+        "Últimos Códigos",
+        "Lista completa de códigos de descuento recientes",
+        "https://www.codigoamigo.com/img/logo_codigoamigo_real4.png"
+    );
+
+    echo '<div class="main-content">';
+    echo '<div class="codes-section">';
+    echo '<h1 class="section-title">Todos los Últimos Códigos</h1>';
+    
+    if (!empty($lista_codigos)) {
+        echo '<div class="codes-grid">';
+        echo generate_modern_code_cards($lista_codigos);
+        echo '</div>';
+        echo generate_modern_pagination($total_codes, $page, $limit);
+    } else {
+        echo '<p class="text-center">No hay códigos disponibles en este momento.</p>';
+    }
+    
+    echo '</div>'; // codes-section
+    echo '</div>'; // main-content
+
+    get_footer();
+    return $response;
+});
+
 // Ruta de prueba
 $app->get('/test-slim', function ($request, $response) {
     $response->getBody()->write("Slim está funcionando");
+    return $response;
+});
+
+$app->get('/test-contacto-simple', function ($request, $response) {
+    $response->getBody()->write("Página de contacto funcionando");
     return $response;
 });
 
@@ -452,7 +1195,18 @@ $app->post('/logout', function ($request, $response) {
 $app->get('/de-{marca}', function ($request, $response, $args) {
     $marca = $args['marca'];
     $codigo_id = $request->getQueryParam('codigo');
-    
+
+    // Incluir funciones de marca para manejo de redirecciones
+    include_once __DIR__ . '/myphp/funciones_marca.php';
+
+    // Verificar si hay una redirección para esta marca
+    $redirect = get_brand_redirect($marca);
+    if ($redirect && isset($redirect['new_brand_key'])) {
+        // Crear URL completa para redirección
+        $new_url = 'https://www.codigoamigo.com' . $redirect['redirect_url'];
+        return $response->withRedirect($new_url, 301);
+    }
+
     // Inicializar variables globales
     $GLOBALS['website'] = 'https://www.codigoamigo.com/';
     $GLOBALS['actual_url'] = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
@@ -472,19 +1226,64 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
 
     // Incluir funciones modernas
     include_once __DIR__ . '/myphp/_header_modern.php';
-    
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
+
     // Incluir funciones de título de marca
     include_once __DIR__ . '/myphp/funciones_titulo_marca.php';
     
     if ($codigo_id) {
         // Mostrar detalle del código específico
-        $array_filtro = array("estado" => 0, "_id" => new MongoDB\BSON\ObjectId($codigo_id));
-        $array_opciones = array('limit' => 1);
-        
-        $lista_codigos = get_all_listado_codigos_array($array_filtro, $array_opciones);
-        $codigo = isset($lista_codigos["results"][0]) ? $lista_codigos["results"][0] : null;
+        $codigo = null;
+        try {
+            $objId = new MongoDB\BSON\ObjectId($codigo_id);
+            $array_filtro = array("estado" => 0, "_id" => $objId);
+            $array_opciones = array('limit' => 1);
+            $lista_codigos = get_all_listado_codigos_array($array_filtro, $array_opciones);
+            $codigo = isset($lista_codigos["results"][0]) ? $lista_codigos["results"][0] : null;
+        } catch (Exception $e) {
+            $codigo = null;
+        }
         
         if ($codigo) {
+            // Convertir código a array si es objeto
+            if (is_object($codigo)) {
+                $codigo_arr = (array)$codigo;
+            } else {
+                $codigo_arr = $codigo;
+            }
+            
+            // Asegurar que el código tenga _id
+            if (!isset($codigo_arr['_id'])) {
+                $codigo_arr['_id'] = $objId;
+            }
+            
+            // Registrar impresión: al mostrar el código en la página de detalle (1 impresión)
+            try {
+                if (function_exists('añadir_impresion_codigo')) {
+                    añadir_impresion_codigo($objId);
+                }
+            } catch (Exception $e) {
+                // Silencioso pero registrar para debug si es necesario
+            }
+            
+            // Registrar click: al entrar a la página de detalle se considera un click (1 click)
+            try {
+                if (function_exists('añadir_vista_codigo') && isset($codigo_arr['_id'])) {
+                    añadir_vista_codigo($codigo_arr);
+                    
+                    // Registrar visita identificada si el usuario está logueado y no es el dueño
+                    if (function_exists('addVista') && isset($_SESSION['user_id']) && !empty($_SESSION['user_id'])) {
+                        // Evitar registrar visitas del propio dueño del código
+                        $id_owner = isset($codigo_arr['id_usuario']) ? (string)$codigo_arr['id_usuario'] : '';
+                        if ($_SESSION['user_id'] != $id_owner) {
+                            addVista($codigo_arr);
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                // Silencioso pero registrar para debug si es necesario
+            }
             // Incluir el header moderno
             
             // Llamar a la función del header moderno
@@ -496,8 +1295,24 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
                 "https://www.codigoamigo.com/img/logo_codigoamigo_real4.png"
             );
             
+            // Asegurar que la sesión esté disponible antes de generar la página
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            if (!isset($_SESSION)) {
+                session_start();
+            }
+            
+            // Guardar user_id en GLOBALS para que esté disponible en la función
+            if (isset($_SESSION['user_id']) && !empty($_SESSION['user_id'])) {
+                $GLOBALS['current_user_id'] = $_SESSION['user_id'];
+            }
+            
             // Incluir la nueva función de detalle
             include_once __DIR__ . '/myphp/funciones_code_detail.php';
+            
+            // Desactivar AdSense en el detalle del código para evitar bloque confuso
+            $GLOBALS['anula_adsense'] = true;
             
             // Generar página de detalle
             echo generate_code_detail_page($codigo);
@@ -515,10 +1330,10 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
             
             echo '<div class="main-content">';
             echo '<div style="text-align: center; color: #ccc; padding: 4rem 2rem;">';
-            echo '<i class="fas fa-exclamation-triangle" style="font-size: 4rem; margin-bottom: 2rem; color: #FF6B35;"></i>';
+            echo '<i class="fas fa-exclamation-triangle" style="font-size: 4rem; margin-bottom: 2rem; color: #E30613;"></i>';
             echo '<h2>Código no encontrado</h2>';
             echo '<p>El código que buscas no existe o ha expirado.</p>';
-            echo '<a href="/de-' . $marca . '" class="btn_codigo_amigo" style="margin-top: 2rem; display: inline-block;">Ver todos los códigos de ' . ucfirst($marca) . '</a>';
+            echo '<a href="/de-' . $marca . '" class="btn_codigo_amigo" style="margin-top: 2rem; display: inline-block;" title="Códigos descuento ' . ucfirst($marca) . '">Ver todos los códigos de ' . ucfirst($marca) . '</a>';
             echo '</div>';
             echo '</div>';
         }
@@ -568,28 +1383,97 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
             }
         }
 
-        // Primero obtener códigos destacados de la marca
-        $array_filtro_destacados = array_merge($array_filtro, array("destacado" => array('$ne' => 0)));
+        // Primero obtener códigos destacados de la marca (incluyendo destacados sociales)
+        // Usar $gt (greater than) en lugar de $ne para asegurar que el campo existe y es mayor que 0
+        $array_filtro_destacados = array_merge(
+            $array_filtro,
+            array(
+                '$or' => array(
+                    array('destacado' => array('$gt' => 0)),
+                    array('destacado_social' => array('$gt' => 0))
+                )
+            )
+        );
         $array_opciones_destacados = array(
-            'limit' => 10,
-            'sort' => array('destacado' => -1, '_id' => -1)
+            'limit' => 50, // Aumentar límite para asegurar que todos los destacados aparezcan
+            'sort' => array('destacado' => -1, 'destacado_social' => -1, '_id' => -1) // En marcas, destacado prevalece sobre destacado_social
         );
         
         $lista_codigos_destacados = get_all_listado_codigos_array($array_filtro_destacados, $array_opciones_destacados);
         $codigos_destacados = isset($lista_codigos_destacados["results"]) ? $lista_codigos_destacados["results"] : [];
         
+        // Debug: Verificar ordenamiento de códigos destacados
+        if (!empty($codigos_destacados) && isset($_GET['debug_destacados'])) {
+            error_log("DEBUG DESTACADOS - Total: " . count($codigos_destacados));
+            foreach ($codigos_destacados as $idx => $cod) {
+                $destacado_val = isset($cod['destacado']) ? $cod['destacado'] : 'NO';
+                $destacado_social_val = isset($cod['destacado_social']) ? $cod['destacado_social'] : 'NO';
+                error_log("  [$idx] ID: " . (string)$cod['_id'] . " | destacado: $destacado_val | destacado_social: $destacado_social_val");
+            }
+        }
+        
         // Luego obtener códigos normales (excluyendo los destacados)
-        $array_filtro_normales = array_merge($array_filtro, array("destacado" => 0));
+        // Nota: No filtramos por visibilidad aquí, todos los códigos activos deben aparecer
+        // Usar $or para excluir códigos que tengan destacado > 0 o destacado_social > 0
+        $array_filtro_normales = array_merge(
+            $array_filtro, 
+            array(
+                '$and' => array(
+                    array('$or' => array(
+                        array('destacado' => array('$exists' => false)),
+                        array('destacado' => 0),
+                        array('destacado' => array('$lte' => 0))
+                    )),
+                    array('$or' => array(
+                        array('destacado_social' => array('$exists' => false)),
+                        array('destacado_social' => 0),
+                        array('destacado_social' => array('$lte' => 0))
+                    ))
+                )
+            )
+        );
         $array_opciones_normales = array(
-            'limit' => 20,
-            'sort' => array('_id' => -1)
+            'limit' => 50, // Aumentado para mostrar más códigos
+            'sort' => array('_id' => -1) // Ordenar por ID descendente (más recientes primero)
         );
 
-        $lista_codigos_normales = get_all_listado_codigos_array($array_filtro_normales, $array_opciones_normales);
-        $codigos_normales = isset($lista_codigos_normales["results"]) ? $lista_codigos_normales["results"] : [];
+        // Obtener el total de códigos normales para la paginación
+        $total_codigos_normales = count_all_listado_codigos_array($array_filtro_normales);
+        $total_codigos_destacados = count($codigos_destacados);
+        $total_codigos = $total_codigos_destacados + $total_codigos_normales;
+        
+        // Configurar paginación: 9 códigos por página
+        $items_per_page = 9;
+        $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+        
+        // Calcular cuántos códigos mostrar
+        $codigos_destacados_a_mostrar = [];
+        $codigos_normales_a_mostrar = [];
+        
+        if ($current_page == 1) {
+            // En la primera página, mostrar todos los destacados + los normales necesarios para completar 9
+            $codigos_destacados_a_mostrar = $codigos_destacados;
+            $espacios_disponibles = max(0, $items_per_page - count($codigos_destacados));
+            if ($espacios_disponibles > 0) {
+                $array_opciones_normales['limit'] = $espacios_disponibles;
+                $array_opciones_normales['skip'] = 0;
+                $lista_codigos_normales = get_all_listado_codigos_array($array_filtro_normales, $array_opciones_normales);
+                $codigos_normales_a_mostrar = isset($lista_codigos_normales["results"]) ? $lista_codigos_normales["results"] : [];
+            }
+        } else {
+            // En páginas siguientes, calcular skip considerando los destacados que ya se mostraron
+            $skip_normales = ($current_page - 1) * $items_per_page - $total_codigos_destacados;
+            if ($skip_normales < 0) {
+                $skip_normales = 0;
+            }
+            $array_opciones_normales['limit'] = $items_per_page;
+            $array_opciones_normales['skip'] = $skip_normales;
+            $lista_codigos_normales = get_all_listado_codigos_array($array_filtro_normales, $array_opciones_normales);
+            $codigos_normales_a_mostrar = isset($lista_codigos_normales["results"]) ? $lista_codigos_normales["results"] : [];
+        }
         
         // Combinar códigos destacados primero, luego normales
-        $codigos = array_merge($codigos_destacados, $codigos_normales);
+        $codigos = array_merge($codigos_destacados_a_mostrar, $codigos_normales_a_mostrar);
         
         // Obtener información de la marca
         $marca_info = get_brand_info($marca);
@@ -603,7 +1487,7 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
             ];
         }
         
-        $numero_codigos = count($codigos);
+        $numero_codigos = $total_codigos; // Total para la paginación
         
         // Generar título y descripción mejorados
         $titulo_mejorado = generate_titulo_marca_mejorado($marca_info, $codigos);
@@ -630,6 +1514,9 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
     // CSS adicional
     echo get_modern_additional_css();
 
+    // Adjuntar footer moderno si corresponde
+    $response = add_footer_to_modern_routes($response);
+
     return $response;
 });
 
@@ -644,6 +1531,7 @@ $app->get('/login', function ($request, $response, $args) {
     include_once __DIR__ . '/inc/includes.php';
     include_once __DIR__ . '/myphp/funciones.php';
     include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
     
     // Inicializar Mobile_Detect si no está definido
     if (!isset($detect)) {
@@ -713,12 +1601,12 @@ $app->get('/login', function ($request, $response, $args) {
     }
     
     .login-form .form-control:focus {
-        border-color: #ff6b35;
-        box-shadow: 0 0 0 0.2rem rgba(255, 107, 53, 0.25);
+        border-color: #E30613;
+        box-shadow: 0 0 0 0.2rem rgba(227, 6, 19, 0.25);
     }
     
     .btn-login {
-        background: #ff6b35;
+        background: #E30613;
         border: none;
         border-radius: 10px;
         padding: 15px 30px;
@@ -727,13 +1615,13 @@ $app->get('/login', function ($request, $response, $args) {
         color: white;
         width: 100%;
         transition: all 0.3s ease;
-        box-shadow: 0 5px 15px rgba(255, 107, 53, 0.3);
+        box-shadow: 0 5px 15px rgba(227, 6, 19, 0.3);
     }
     
     .btn-login:hover {
-        background: #e55a2b;
+        background: #C40510;
         transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(255, 107, 53, 0.4);
+        box-shadow: 0 8px 20px rgba(227, 6, 19, 0.4);
     }
     
     .login-links {
@@ -742,14 +1630,14 @@ $app->get('/login', function ($request, $response, $args) {
     }
     
     .login-links a {
-        color: #ff6b35;
+        color: #E30613;
         text-decoration: none;
         font-weight: 600;
         margin: 0 10px;
     }
     
     .login-links a:hover {
-        color: #e55a2b;
+        color: #C40510;
         text-decoration: underline;
     }
     
@@ -840,99 +1728,38 @@ $app->get('/login', function ($request, $response, $args) {
     
     <script>
     $(document).ready(function() {
-        // Variable para controlar si ya hay una petición en curso
-        var loginInProgress = false;
-        
-        // Manejar envío del formulario de login (mismo código que el modal)
-        $(document).on('submit', '#login', function(event) {
-            event.preventDefault();
-            event.stopPropagation();
-            
-            // Prevenir múltiples envíos simultáneos
-            if (loginInProgress) {
-                console.log('Login ya en progreso, ignorando envío');
-                return false;
-            }
-            
-            console.log('Formulario de login enviado');
-            loginInProgress = true;
 
-            // Deshabilitar el botón para evitar múltiples envíos
-            var $submitBtn = $(this).find('button[type="submit"]');
-            var originalText = $submitBtn.text();
-            $submitBtn.prop('disabled', true).text('Iniciando sesión...');
-
-            $.ajax({
-                type: "POST",
-                url: "/api/login.php",
-                data: {
-                    metodo: "login_user",
-                    mail: $("#mail_login").val(),
-                    pass: $("#pass_login").val(),
-                },
-                cache: false,
-                timeout: 10000, // 10 segundos de timeout
-                success: function(data){
-                    try {
-                        var response = data.trim();
-                        console.log('Respuesta del servidor:', response);
-
-                        if(response == "no_trobat") {
-                            alert("El usuario y contraseña introducidos no aparecen en nuestra base de datos");
-                        } else if(response == "no_verificado") {
-                            alert("Es necesario que actives tu usuario desde el correo que has recibido al registrarte para poder acceder a tu cuenta.");
-                        } else {
-                            // Login exitoso - redirigir a URL guardada o recargar
-                            var redirectUrl = localStorage.getItem('redirectAfterLogin');
-                            if (redirectUrl && redirectUrl !== window.location.href) {
-                                console.log('Redirigiendo a:', redirectUrl);
-                                localStorage.removeItem('redirectAfterLogin');
-                                window.location.href = redirectUrl;
-                            } else {
-                                location.reload();
-                            }
-                        }
-                    } catch (e) {
-                        console.error('Error procesando respuesta:', e);
-                        alert('Error al procesar la respuesta del servidor. Inténtalo de nuevo.');
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.log('Error en AJAX:', error);
-                    alert('Error al procesar el login. Inténtalo de nuevo.');
-                },
-                complete: function() {
-                    // Rehabilitar el botón en cualquier caso
-                    $submitBtn.prop('disabled', false).text(originalText);
-                    loginInProgress = false;
-                }
-            });
-        });
-        
         // Manejar login con Google (mismo código que el modal)
         $(document).on('click', '#google-login-btn', function() {
+            console.log('[GoogleLogin] Botón Google clicado');
             // Cargar Google Identity Services
             if (typeof google === 'undefined') {
+                console.warn('[GoogleLogin] google undefined, cargando script GSI');
                 $.getScript('https://accounts.google.com/gsi/client', function() {
+                    console.log('[GoogleLogin] Script GSI cargado, inicializando');
                     initializeGoogleLogin();
                 });
             } else {
+                console.log('[GoogleLogin] Google ya disponible, inicializando');
                 initializeGoogleLogin();
             }
         });
         
         function initializeGoogleLogin() {
+            console.log('[GoogleLogin] initializeGoogleLogin');
             google.accounts.id.initialize({
                 client_id: '298004995594-1qm1qpjok7lq4lo1kdd45406j9rarcqd.apps.googleusercontent.com',
                 callback: handleGoogleResponse
             });
             
+            console.log('[GoogleLogin] Lanzando prompt');
             google.accounts.id.prompt();
         }
         
         function handleGoogleResponse(response) {
             // Google response recibida
-            
+            console.log('[GoogleLogin] handleGoogleResponse', response);
+
             $.ajax({
                 type: "POST",
                 url: "/api/login.php",
@@ -940,37 +1767,58 @@ $app->get('/login', function ($request, $response, $args) {
                     metodo: "google_login",
                     credential: response.credential
                 },
-                cache: false,
-                success: function(data){
-                    // Respuesta del servidor Google login recibida
-                    var responseText = data.trim();
-                    
-                    if (responseText === "success") {
-                        // Login exitoso - redirigir
-                        var redirectUrl = localStorage.getItem('redirectAfterLogin');
-                        if (redirectUrl && redirectUrl !== window.location.href) {
-                            console.log('Redirigiendo a:', redirectUrl);
-                            localStorage.removeItem('redirectAfterLogin');
-                            window.location.href = redirectUrl;
-                        } else {
-                            location.reload();
-                        }
-                    } else if (responseText.includes('error')) {
-                        alert("Error en el login con Google: " + responseText);
-                    } else {
-                        // Intentar parsear como JSON si contiene datos del usuario
+                cache: false
+            }).done(function(data) {
+                // Respuesta del servidor Google login recibida
+                console.log('Respuesta Google login:', data);
+
+                var parsedResponse = null;
+
+                if (data === null || typeof data === 'undefined') {
+                    parsedResponse = null;
+                } else if (typeof data === 'string') {
+                    var trimmed = data.trim();
+                    if (trimmed) {
                         try {
-                            var userData = JSON.parse(responseText);
-                            alert("Error en el login con Google: " + JSON.stringify(userData));
+                            parsedResponse = JSON.parse(trimmed);
                         } catch (e) {
-                            alert("Error en el login con Google: " + responseText);
+                            parsedResponse = null;
                         }
                     }
-                },
-                error: function(xhr, status, error) {
-                    // Error en Google login
-                    alert('Error al procesar el login con Google. Inténtalo de nuevo.');
+                } else {
+                    parsedResponse = data;
                 }
+
+                if (parsedResponse && parsedResponse.success && parsedResponse.user) {
+                    console.log('[GoogleLogin] Éxito, aplicando sesión', parsedResponse.user);
+                    if (typeof window.applyUserSession === 'function') {
+                        window.applyUserSession(parsedResponse.user);
+                    }
+
+                    if (typeof updateMenuSession === 'function') {
+                        updateMenuSession();
+                    }
+
+                    var redirectUrl = localStorage.getItem('redirectAfterLogin');
+                    if (redirectUrl && redirectUrl !== window.location.href) {
+                        console.log('Redirigiendo a:', redirectUrl);
+                        localStorage.removeItem('redirectAfterLogin');
+                        window.location.href = redirectUrl;
+                    } else {
+                        console.log('[GoogleLogin] Recargando página');
+                        location.reload();
+                    }
+                } else if (parsedResponse && parsedResponse.error) {
+                    console.error('[GoogleLogin] Error recibido del backend:', parsedResponse.error);
+                    alert('Error en el login con Google: ' + parsedResponse.error);
+                } else {
+                    console.error('[GoogleLogin] Respuesta inesperada del backend:', parsedResponse);
+                    alert('No se pudo completar el login con Google. Inténtalo de nuevo.');
+                }
+            }).fail(function(jqXHR, textStatus, errorThrown) {
+                // Error en Google login
+                console.error('[GoogleLogin] AJAX fail', textStatus, errorThrown, jqXHR);
+                alert('Error al procesar el login con Google. Inténtalo de nuevo.');
             });
         }
     });
@@ -994,6 +1842,7 @@ $app->get('/registro', function ($request, $response, $args) {
     include_once __DIR__ . '/myphp/funciones.php';
     include_once __DIR__ . '/myphp/funciones_utilidades.php';
     include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
     
     $title = "Registrate en la web para acceder a cientos de códigos amigo y códigos descuento";
     $description = "Miles de códigos amigo te esperan en " . $author_web;
@@ -1011,6 +1860,7 @@ $app->get('/usuario', function ($request, $response, $args) {
     include_once __DIR__ . '/myphp/funciones.php';
     include_once __DIR__ . '/myphp/funciones_utilidades.php';
     include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
     
     // Inicializar Mobile_Detect si no está definido
     if (!isset($detect)) {
@@ -1037,6 +1887,16 @@ $app->get('/usuario', function ($request, $response, $args) {
     return $response;
 });
 
+$app->get('/chat', function ($request, $response, $args) {
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/chat_usuario.php';
+    return $response;
+});
+
+$app->get('/chat-usuario', function ($request, $response, $args) {
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/chat_usuario.php';
+    return $response;
+});
+
 $app->get('/perfil', function ($request, $response, $args) {
     global $data_usuario, $author_web;
     
@@ -1044,6 +1904,7 @@ $app->get('/perfil', function ($request, $response, $args) {
     include_once __DIR__ . '/inc/includes.php';
     include_once __DIR__ . '/myphp/funciones.php';
     include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
     
     // Inicializar Mobile_Detect si no está definido
     if (!isset($detect)) {
@@ -1070,6 +1931,40 @@ $app->get('/perfil', function ($request, $response, $args) {
     return $response;
 });
 
+$app->get('/invitar-amigos', function ($request, $response, $args) {
+    global $data_usuario, $author_web;
+    
+    // Incluir archivos necesarios
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
+    
+    // Inicializar Mobile_Detect si no está definido
+    if (!isset($detect)) {
+        $detect = new Mobile_Detect();
+    }
+    $GLOBALS['detect'] = $detect;
+    
+    // Validar sesión de usuario
+    validateUserSession();
+    
+    // Obtener datos del usuario si no están disponibles
+    if (!isset($data_usuario) || empty($data_usuario)) {
+        $data_usuario = getObjectUserWithSession('_id', new MongoDB\BSON\ObjectId($_SESSION["user_id"]));
+    }
+    
+    $username = isset($data_usuario["username"]) ? $data_usuario["username"] : "Usuario";
+    $author = isset($GLOBALS["author"]) ? $GLOBALS["author"] : "Código Amigo";
+    
+    $title = "Invita a tus amigos y gana dinero - Código Amigo";
+    $description = "Invita a tus amigos a Código Amigo y gana 5€ por cada amigo que se registre y verifique su perfil. ¡Comparte tu código de referido!";
+    
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/invitar-amigos.php';
+    
+    return $response;
+});
+
 $app->get('/mis-anuncios', function ($request, $response, $args) {
     global $data_usuario, $author_web;
     
@@ -1077,6 +1972,7 @@ $app->get('/mis-anuncios', function ($request, $response, $args) {
     include_once __DIR__ . '/inc/includes.php';
     include_once __DIR__ . '/myphp/funciones.php';
     include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
     
     // Inicializar Mobile_Detect si no está definido
     if (!isset($detect)) {
@@ -1098,7 +1994,7 @@ $app->get('/mis-anuncios', function ($request, $response, $args) {
 
     // Validar sesión de usuario
     if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"]) || $_SESSION["user_id"] == "") {
-        log_debug("Redirigiendo al login - user_id no válido", ['route' => 'mis-anuncios']);
+        // log_debug("Redirigiendo al login - user_id no válido", ['route' => 'mis-anuncios']);
         header("Location: https://www.codigoamigo.com/login");
         exit;
     }
@@ -1136,18 +2032,45 @@ $app->get('/mis-anuncios', function ($request, $response, $args) {
     // Desactivar AdSense en la página de mis anuncios
     $anula_adsense = true;
     
-    // Obtener códigos del usuario
+    // IMPORTANTE: Procesar destacado ANTES de obtener los códigos para que aparezcan actualizados
+    // Fallback: si venimos de un pago por saldo/stripe y hay señal de éxito en la URL,
+    // aseguramos el disparo de notificaciones de destacado (idempotente con guardado en sesión)
+    try {
+        if (isset($_GET['success']) && $_GET['success'] === 'destacado' && isset($_GET['codigo'])) {
+            $codigo_id_qs = $_GET['codigo'];
+            $tipo_qs = isset($_GET['tipo']) && in_array($_GET['tipo'], ['normal','super']) ? $_GET['tipo'] : 'normal';
+
+            if (!isset($_SESSION['last_destacado_notify']) || $_SESSION['last_destacado_notify'] !== $codigo_id_qs) {
+                include_once __DIR__ . '/myphp/funciones.php';
+                if (function_exists('destacar_codigo_moderno')) {
+                    $resultado = destacar_codigo_moderno($codigo_id_qs, $tipo_qs);
+                    if ($resultado) {
+                        error_log("Código destacado exitosamente: $codigo_id_qs, tipo: $tipo_qs");
+                    } else {
+                        error_log("Error al destacar código: $codigo_id_qs");
+                    }
+                }
+                $_SESSION['last_destacado_notify'] = $codigo_id_qs;
+            }
+        }
+    } catch (Exception $e) {
+        error_log("Error procesando destacado en app_with_mongo: " . $e->getMessage());
+    }
+    
+    // Obtener códigos del usuario (DESPUÉS de procesar el destacado)
     $array_filtro = array("id_usuario" => new MongoDB\BSON\ObjectId($_SESSION["user_id"]));
     $array_filtro = array_merge($array_filtro, array("estado" => 0)); // Solo códigos activos
+
 
     // Primero contar cuántos códigos tiene el usuario
     $total_codigos_usuario = count_all_listado_codigos_array($array_filtro);
     
     // Usar un límite más alto o sin límite para usuarios con muchos códigos
     $limite_codigos = $total_codigos_usuario > 5000 ? 10000 : 5000;
-    
+
+ 
     $array_skip = array("limit" => $limite_codigos);
-    $array_skip = array_merge($array_skip, array("sort" => array('updated_at' => -1)));
+    $array_skip = array_merge($array_skip, array("sort" => array('fecha_publicacion' => -1)));
 
 
 
@@ -1184,12 +2107,41 @@ $app->get('/mis-anuncios', function ($request, $response, $args) {
     return $response;
 });
 
+// Ruta para URLs de Afiliados
+$app->get('/afiliados', function ($request, $response, $args) {
+    global $data_usuario, $author_web;
+    
+    // Incluir archivos necesarios
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
+    
+    // Inicializar Mobile_Detect si no está definido
+    if (!isset($detect)) {
+        $detect = new Mobile_Detect();
+    }
+    $GLOBALS['detect'] = $detect;
+    
+    // Configurar variables globales
+    $author_web = "CODIGOAMIGO.COM";
+    $GLOBALS['author_web'] = $author_web;
+    $GLOBALS['name_page'] = "Mis URLs de Afiliados";
+    $GLOBALS['show_adsense'] = 0; // Deshabilitar ads en página de usuario
+    
+    // Incluir la página de afiliados
+    include_once __DIR__ . '/afiliados.php';
+    
+    return $response;
+});
+
 // Ruta para la página de felicidades de recarga de saldo
 $app->get('/felicidades_recarga', function ($request, $response, $args) {
     // Incluir archivos necesarios
     include_once __DIR__ . '/inc/includes.php';
     include_once __DIR__ . '/myphp/funciones.php';
     include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
     
     // Inicializar Mobile_Detect si no está definido
     if (!isset($detect)) {
@@ -1215,8 +2167,25 @@ $app->get('/felicidades_recarga', function ($request, $response, $args) {
 
 $app->get('/logout', function ($request, $response, $args) {
     session_destroy();
-    echo "<script> window.location.href = 'https://www.codigoamigo.com' </script>";
-    
+    echo "<script>
+        localStorage.setItem('user_session_changed', Date.now());
+        if (typeof updateMenuSession === 'function') updateMenuSession();
+        window.location.href = 'https://www.codigoamigo.com';
+    </script>";
+
+    return $response;
+});
+
+// Página de felicitaciones por publicar código
+$app->get('/codigo-publicado', function ($request, $response, $args) {
+    // Verificar que la sesión esté iniciada
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    // Incluir el archivo de felicitaciones
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/codigo_publicado.php';
+
     return $response;
 });
 
@@ -1277,14 +2246,33 @@ $app->get('/politica-de-cookies', function ($request, $response, $args) {
 
 $app->get('/aviso-legal', function ($request, $response, $args) {
     global $noindex;
-    
+
     $noindex = 1;
-    
+
     $title = "Aviso legal";
     $description = "Aviso legal de " . (isset($GLOBALS["author"]) ? $GLOBALS["author"] : "Código Amigo");
-    
+
     include_once $_SERVER['DOCUMENT_ROOT'] . '/public/aviso_legal.php';
-    
+
+    return $response;
+});
+
+// Rutas de contacto - redirigir a archivos independientes
+$app->get('/contacto', function ($request, $response, $args) {
+    // Incluir archivos necesarios para mantener consistencia
+    include_once __DIR__ . '/inc/includes.php';
+
+    // Redirigir a archivo independiente
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/contacto_independiente.php';
+    return $response;
+});
+
+$app->get('/contacto_empresa', function ($request, $response, $args) {
+    // Incluir archivos necesarios para mantener consistencia
+    include_once __DIR__ . '/inc/includes.php';
+
+    // Redirigir a archivo independiente
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/contacto_empresa_independiente.php';
     return $response;
 });
 
@@ -1298,6 +2286,7 @@ $app->get('/cambiar_password', function ($request, $response, $args) {
     include_once __DIR__ . '/inc/includes.php';
     include_once __DIR__ . '/myphp/funciones.php';
     include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
     
     // Inicializar Mobile_Detect si no está definido
     if (!isset($detect)) {
@@ -1324,9 +2313,9 @@ $app->post('/cambio_password', function ($request, $response, $args) {
     include_once __DIR__ . '/inc/funciones.php';  // Para enviarMailRecuerdoPass
     include_once __DIR__ . '/myphp/funciones_mail.php';  // Para enviar_mail_activacion
     
-    $mail_ = filter_input(INPUT_POST, "mail", FILTER_SANITIZE_STRING);
-    $pass_ = filter_input(INPUT_POST, "pass_login", FILTER_SANITIZE_STRING);
-    include __DIR__ . '/php/cambio_password.php';
+    $mail_ = filter_input(INPUT_POST, "mail", FILTER_SANITIZE_EMAIL);
+    $pass_ = filter_input(INPUT_POST, "pass_login", FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    return include __DIR__ . '/php/cambio_password.php';
     
     return $response;
 });
@@ -1340,6 +2329,7 @@ $app->get('/nuevo_password', function ($request, $response, $args) {
     include_once __DIR__ . '/inc/includes.php';
     include_once __DIR__ . '/myphp/funciones.php';
     include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
     
     // Inicializar Mobile_Detect si no está definido
     if (!isset($detect)) {
@@ -1350,8 +2340,8 @@ $app->get('/nuevo_password', function ($request, $response, $args) {
     $author = isset($GLOBALS["author"]) ? $GLOBALS["author"] : "Código Amigo";
     $title = "Cambio de contraseña";
     $description = "Cambia la contraseña de tu usuario de " . $author;
-    /* filter_input(INPUT_GET, "codigo", FILTER_SANITIZE_STRING) es el correo encriptado del usuario que quiere confirmar su mail.*/
-    $mail_encriptado = filter_input(INPUT_GET, "codigo", FILTER_SANITIZE_STRING);
+    /* filter_input(INPUT_GET, "codigo", FILTER_SANITIZE_FULL_SPECIAL_CHARS) es el correo encriptado del usuario que quiere confirmar su mail.*/
+    $mail_encriptado = filter_input(INPUT_GET, "codigo", FILTER_SANITIZE_FULL_SPECIAL_CHARS);
     /* Hay errores en la desencriptación al encontrar espacios y convertirlos en +. Por eso,
      * corregimos estos + por espacios para que la desencriptación sea correcta. */
     $cadena_encriptada_correcta = str_replace(" ", "+", $mail_encriptado);
@@ -1368,9 +2358,9 @@ $app->post('/actualizar_usuario', function ($request, $response, $args) {
     include_once __DIR__ . '/inc/includes.php';
     include_once __DIR__ . '/myphp/funciones.php';
     
-    $new_password = filter_input(INPUT_POST, "nueva_password", FILTER_SANITIZE_STRING);
-    $new_confirm_password = filter_input(INPUT_POST, "nueva_confirm_password", FILTER_SANITIZE_STRING);
-    $mail = filter_input(INPUT_POST, "mail", FILTER_SANITIZE_STRING);
+    $new_password = filter_input(INPUT_POST, "nueva_password", FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    $new_confirm_password = filter_input(INPUT_POST, "nueva_confirm_password", FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    $mail = filter_input(INPUT_POST, "mail", FILTER_SANITIZE_EMAIL);
     include __DIR__ . '/php/actualizar_usuario.php';
     
     return $response;
@@ -1378,7 +2368,7 @@ $app->post('/actualizar_usuario', function ($request, $response, $args) {
 
 // Rutas de categorías
 $app->get('/categoria', function ($request, $response, $args) {
-    $categoria = getObjectCategoria('nombre_clave', filter_input(INPUT_GET, "categoria", FILTER_SANITIZE_STRING));
+    $categoria = getObjectCategoria('nombre_clave', filter_input(INPUT_GET, "categoria", FILTER_SANITIZE_FULL_SPECIAL_CHARS));
     $title = "Códigos de amigo de " . $categoria["nombre"];
     $description = $categoria["descripcion"] . " - " . (isset($GLOBALS["author"]) ? $GLOBALS["author"] : "Código Amigo");
     include __DIR__ . '/public/categoria.php';
@@ -1409,7 +2399,9 @@ $app->get('/{categoria}-comparte-y-gana', function ($request, $response, $args) 
     // Incluir archivos necesarios
     include_once __DIR__ . '/inc/includes.php';
     include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/funciones_modern.php';
     include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
     
     // Inicializar Mobile_Detect si no está definido
     if (!isset($detect)) {
@@ -1418,15 +2410,34 @@ $app->get('/{categoria}-comparte-y-gana', function ($request, $response, $args) 
     $GLOBALS['detect'] = $detect;
     
     $categoria_url = $args['categoria'];
+
+    
     
     // Verificar si es una categoría válida
     $categorias_validas = [
         'alimentacion-y-gastronomia',
+        'banca-y-criptomonedas',
+        'deportes-y-nutricion',
+        'cursos',
+        'club-de-compras',
+        'telefonia-y-comunicaciones',
+        'vehiculos-y-movilidad',
+        'apuestas',
+        'herramientas',
+        'viajes-y-alojamiento',
+        'seguros',
+        'suministros-y-servicios',
+        'mascota',
+        'mensajeria',
+        'inteligencia-artificial',
+        'plataformas-y-suscripciones',
+        'ocio-y-entretenimiento',
+        'select',
+        // Categorías antiguas mantenidas por compatibilidad
         'tecnologia-y-electronica',
         'moda-y-belleza',
         'hogar-y-jardin',
         'deportes-y-ocio',
-        'deportes-y-nutricion',
         'viajes-y-turismo',
         'finanzas-y-seguros'
     ];
@@ -1444,13 +2455,38 @@ $app->get('/{categoria}-comparte-y-gana', function ($request, $response, $args) 
     // Obtener marcas de esta categoría
     $marcas_categoria = get_brands_by_category($categoria_url . '-comparte-y-gana');
     
+    // Construir prev/next SEO links para paginación de marcas
+    $per_page = 24;
+    $total_brands = is_array($marcas_categoria) ? count($marcas_categoria) : 0;
+    $current_page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+    $total_pages = $per_page > 0 ? max(1, (int)ceil($total_brands / $per_page)) : 1;
+    $qs_params = $_GET ?? [];
+    unset($qs_params['page']);
+    $buildUrl = function($page) use ($qs_params) {
+        $params = $qs_params;
+        if ($page > 1) { $params['page'] = $page; }
+        $qs = http_build_query($params);
+        $suffix = $qs ? ('?' . $qs) : '';
+        return $suffix;
+    };
+    $base_path = '/' . $categoria_url . '-comparte-y-gana';
+    $links_meta_html = '';
+    if ($current_page > 1) {
+        $links_meta_html .= '<link rel="prev" href="' . $base_path . $buildUrl($current_page - 1) . '" />';
+    }
+    if ($current_page < $total_pages) {
+        $links_meta_html .= '<link rel="next" href="' . $base_path . $buildUrl($current_page + 1) . '" />';
+    }
+    $links_meta = [ 'schema' => $links_meta_html ];
+
     // Llamar a la función del header moderno
     get_header_modern(
         "Códigos de descuento " . $nombre_categoria . " - CodigoAmigo.com",
         "Encuentra los mejores códigos de descuento en " . $nombre_categoria . " verificados y actualizados diariamente",
         "Códigos de descuento " . $nombre_categoria,
         "Códigos de descuento " . $nombre_categoria,
-        "https://www.codigoamigo.com/img/logo_codigoamigo_real4.png"
+        "https://www.codigoamigo.com/img/logo_codigoamigo_real4.png",
+        $links_meta
     );
 
     // Generar contenido de la página de categoría
@@ -1458,6 +2494,9 @@ $app->get('/{categoria}-comparte-y-gana', function ($request, $response, $args) 
     
     // CSS adicional
     echo get_modern_additional_css();
+    
+    // Footer
+    get_footer();
     
     return $response;
 });
@@ -1470,6 +2509,7 @@ $app->get('/nuevo_codigo', function ($request, $response, $args) {
     include_once __DIR__ . '/inc/includes.php';
     include_once __DIR__ . '/myphp/funciones.php';
     include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
     include_once __DIR__ . '/myphp/herramientas/var_globals.php';
     
     // Inicializar Mobile_Detect si no está definido
@@ -1507,6 +2547,7 @@ $app->get('/modificar_codigo/{codigo_id}', function ($request, $response, $args)
     include_once $_SERVER['DOCUMENT_ROOT'] . '/inc/includes.php';
     include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones.php';
     include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
     
     // Inicializar Mobile_Detect si no está definido
     if (!isset($GLOBALS['detect'])) {
@@ -1564,6 +2605,7 @@ $app->post('/modificar_codigo/{codigo_id}', function ($request, $response, $args
     include_once $_SERVER['DOCUMENT_ROOT'] . '/inc/includes.php';
     include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones.php';
     include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
     
     // Inicializar Mobile_Detect si no está definido
     if (!isset($GLOBALS['detect'])) {
@@ -1609,6 +2651,50 @@ $app->post('/modificar_codigo/{codigo_id}', function ($request, $response, $args
         ];
         
         $result = updateCodigo($codigo_id, $update_data);
+        
+        /* 
+        // Procesamiento de PDF temporalmente deshabilitado - pendiente de arreglar
+        // Procesar PDF si se subió uno
+        if (isset($_FILES['pdf_retencion']) && $_FILES['pdf_retencion']['error'] === UPLOAD_ERR_OK) {
+            include_once __DIR__ . '/myphp/funciones_pdf.php';
+            
+            $pdf_file = $_FILES['pdf_retencion'];
+            
+            // Validar que sea PDF
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            $mime_type = finfo_file($finfo, $pdf_file['tmp_name']);
+            finfo_close($finfo);
+            
+            if ($mime_type === 'application/pdf') {
+                // Directorio para guardar las imágenes del PDF
+                $uploads_dir = $_SERVER['DOCUMENT_ROOT'] . '/uploads/pdfs';
+                
+                // Mover el PDF a un directorio temporal
+                $pdf_temp_path = $uploads_dir . '/temp_' . $codigo_id . '.pdf';
+                if (!is_dir($uploads_dir)) {
+                    mkdir($uploads_dir, 0755, true);
+                }
+                
+                if (move_uploaded_file($pdf_file['tmp_name'], $pdf_temp_path)) {
+                    // Directorio para las imágenes
+                    $imagenes_dir = $uploads_dir . '/' . $codigo_id;
+                    
+                    // Procesar PDF y convertir a imágenes
+                    $paginas = procesarPDF($pdf_temp_path, $imagenes_dir, $codigo_id);
+                    
+                    if ($paginas && is_array($paginas) && count($paginas) > 0) {
+                        // Guardar las páginas en MongoDB
+                        guardarPaginasPDF($codigo_id, $paginas);
+                    }
+                    
+                    // Eliminar PDF temporal
+                    if (file_exists($pdf_temp_path)) {
+                        @unlink($pdf_temp_path);
+                    }
+                }
+            }
+        }
+        */
         
         if ($result) {
             $_SESSION['msg_success'] = '¡Código modificado exitosamente! 🎉';
@@ -1670,6 +2756,7 @@ $app->get('/listado-marcas', function ($request, $response, $args) {
     }
     
     include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
     
     $title = "Listado de marcas";
     $description = "Todas las marcas disponibles en " . (isset($GLOBALS["author"]) ? $GLOBALS["author"] : "Código Amigo");
@@ -1726,7 +2813,6 @@ $app->get('/bienvenido_de_nuevo', function ($request, $response, $args) {
             } else {
                 // Usuario no activado, intentar activarlo
                 $resultado_activacion = activeUserToLogin($usuario['_id']);
-                
                 if ($resultado_activacion) {
                     // Usuario activado correctamente, mostrar página de bienvenida
                     include_once __DIR__ . '/public/bienvenido_de_nuevo.php';
@@ -1821,6 +2907,17 @@ $app->get('/felicidades_splash', function ($request, $response, $args) {
     return $response;
 });
 
+$app->get('/felicidades_destacar', function ($request, $response, $args) {
+    global $author_web;
+    
+    $title = "¡Código destacado exitosamente!";
+    $description = "Tu código ha sido destacado correctamente en " . $author_web;
+    
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/felicidades_destacar.php';
+    
+    return $response;
+});
+
 $app->get('/destaca', function ($request, $response, $args) {
     global $author_web;
     
@@ -1843,11 +2940,241 @@ $app->get('/estadisticas', function ($request, $response, $args) {
     return $response;
 });
 
-// Rutas AJAX
-$app->post('/ajax', function ($request, $response, $args) {
-    votar_codigo($_POST);
+$app->get('/mis-favoritos', function ($request, $response, $args) {
+    global $data_usuario, $author_web;
+    
+    // Incluir archivos necesarios
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
+    
+    // Inicializar Mobile_Detect si no está definido
+    if (!isset($detect)) {
+        $detect = new Mobile_Detect();
+    }
+    $GLOBALS['detect'] = $detect;
+    
+    // Configurar variables globales
+    $author_web = "CODIGOAMIGO.COM";
+    $GLOBALS['author_web'] = $author_web;
+    $GLOBALS['name_page'] = "Mis Favoritos";
+    $GLOBALS['show_adsense'] = 0; // Deshabilitar ads en página de usuario
+    
+    // Verificar que el usuario esté logueado
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
+        header("Location: /login");
+        exit;
+    }
+    
+    // Incluir la página de favoritos
+    include_once __DIR__ . '/public/mis_favoritos.php';
     
     return $response;
+});
+
+// Rutas AJAX - Soporte para CORS preflight
+$app->options('/ajax_actions', function ($request, $response, $args) {
+    return $response->withHeader('Access-Control-Allow-Origin', '*')
+                    ->withHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+                    ->withHeader('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With')
+                    ->withHeader('Content-Type', 'application/json')
+                    ->withStatus(200);
+});
+
+$app->options('/ajax/', function ($request, $response, $args) {
+    return $response->withHeader('Access-Control-Allow-Origin', '*')
+                    ->withHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+                    ->withHeader('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With')
+                    ->withHeader('Content-Type', 'application/json')
+                    ->withStatus(200);
+});
+
+$app->post('/ajax_actions', function ($request, $response, $args) {
+    // Obtener datos del body si vienen como JSON
+    $parsedBody = $request->getParsedBody();
+    $postData = !empty($parsedBody) ? $parsedBody : $_POST;
+    
+    $action = $postData['metodo'] ?? $postData['action'] ?? '';
+    
+    // Configurar respuesta JSON
+    $response = $response->withHeader('Content-Type', 'application/json')
+                          ->withHeader('Access-Control-Allow-Origin', '*');
+    
+    if ($action === 'votar_codigo') {
+        if (function_exists('votar_codigo')) {
+            $result = votar_codigo($postData);
+            return $response->write(json_encode($result));
+        }
+    }
+    
+    // Sistema de favoritos
+    if ($action === 'añadir_favorito' || $action === 'eliminar_favorito') {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        
+        if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
+            return $response->write(json_encode(['success' => false, 'message' => 'Debes iniciar sesión']));
+        }
+        
+        include_once __DIR__ . '/myphp/funciones_favoritos.php';
+        
+        $usuario_id = $_SESSION["user_id"];
+        $codigo_id = $postData['codigo_id'] ?? '';
+        $tipo = $postData['tipo'] ?? 'codigo';
+        
+        if (empty($codigo_id)) {
+            return $response->write(json_encode(['success' => false, 'message' => 'ID no válido']));
+        }
+        
+        try {
+            if ($action === 'añadir_favorito') {
+                $result = añadir_favorito($usuario_id, $codigo_id, $tipo);
+            } else {
+                $result = eliminar_favorito($usuario_id, $codigo_id, $tipo);
+            }
+            
+            return $response->write(json_encode($result));
+        } catch (Exception $e) {
+            error_log('Error en favoritos: ' . $e->getMessage());
+            return $response->write(json_encode(['success' => false, 'message' => 'Error al procesar la solicitud']));
+        }
+    }
+    
+    // Mantener compatibilidad con código antiguo
+    if (function_exists('votar_codigo') && !empty($postData)) {
+        votar_codigo($postData);
+    }
+    
+    return $response->write(json_encode(['success' => false, 'message' => 'Acción no reconocida']));
+});
+
+// También permitir GET para debugging (aunque debería ser POST)
+$app->get('/ajax_actions', function ($request, $response, $args) {
+    return $response->withHeader('Content-Type', 'application/json')
+                    ->write(json_encode(['success' => false, 'message' => 'Esta ruta requiere método POST']));
+});
+
+// Manejar /ajax sin barra final (critico para llamadas desde JS)
+$app->post('/ajax', function ($request, $response, $args) {
+    $parsedBody = $request->getParsedBody();
+    $postData = !empty($parsedBody) ? $parsedBody : $_POST;
+    
+    $action = $postData['metodo'] ?? $postData['action'] ?? '';
+    
+    $response = $response->withHeader('Content-Type', 'application/json')
+                          ->withHeader('Access-Control-Allow-Origin', '*');
+    
+    if ($action === 'votar_codigo') {
+        if (function_exists('votar_codigo')) {
+            $result = votar_codigo($postData);
+            return $response->write(json_encode($result));
+        }
+    }
+    
+    if ($action === 'añadir_favorito' || $action === 'eliminar_favorito') {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        
+        if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
+            return $response->write(json_encode(['success' => false, 'message' => 'Debes iniciar sesión']));
+        }
+        
+        include_once __DIR__ . '/myphp/funciones_favoritos.php';
+        
+        $usuario_id = $_SESSION["user_id"];
+        $codigo_id = $postData['codigo_id'] ?? '';
+        
+        if (empty($codigo_id)) {
+            return $response->write(json_encode(['success' => false, 'message' => 'ID de código no válido']));
+        }
+        
+        try {
+            if ($action === 'añadir_favorito') {
+                $result = añadir_favorito($usuario_id, $codigo_id);
+            } else {
+                $result = eliminar_favorito($usuario_id, $codigo_id);
+            }
+            
+            return $response->write(json_encode($result));
+        } catch (Exception $e) {
+            error_log('Error en favoritos: ' . $e->getMessage());
+            return $response->write(json_encode(['success' => false, 'message' => 'Error al procesar la solicitud']));
+        }
+    }
+    
+    if (function_exists('votar_codigo') && !empty($postData)) {
+        votar_codigo($postData);
+    }
+    
+    return $response->write(json_encode(['success' => false, 'message' => 'Acción no reconocida']));
+});
+
+// Manejar /ajax/ con barra final también
+$app->post('/ajax/', function ($request, $response, $args) {
+    // Redirigir a /ajax sin barra o procesar igual
+    $parsedBody = $request->getParsedBody();
+    $postData = !empty($parsedBody) ? $parsedBody : $_POST;
+    
+    $action = $postData['metodo'] ?? $postData['action'] ?? '';
+    
+    $response = $response->withHeader('Content-Type', 'application/json')
+                          ->withHeader('Access-Control-Allow-Origin', '*');
+    
+    if ($action === 'votar_codigo') {
+        if (function_exists('votar_codigo')) {
+            $result = votar_codigo($postData);
+            return $response->write(json_encode($result));
+        }
+    }
+    
+    if ($action === 'añadir_favorito' || $action === 'eliminar_favorito') {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        
+        if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
+            return $response->write(json_encode(['success' => false, 'message' => 'Debes iniciar sesión']));
+        }
+        
+        include_once __DIR__ . '/myphp/funciones_favoritos.php';
+        
+        $usuario_id = $_SESSION["user_id"];
+        $codigo_id = $postData['codigo_id'] ?? '';
+        
+        if (empty($codigo_id)) {
+            return $response->write(json_encode(['success' => false, 'message' => 'ID de código no válido']));
+        }
+        
+        try {
+            if ($action === 'añadir_favorito') {
+                $result = añadir_favorito($usuario_id, $codigo_id);
+            } else {
+                $result = eliminar_favorito($usuario_id, $codigo_id);
+            }
+            
+            return $response->write(json_encode($result));
+        } catch (Exception $e) {
+            error_log('Error en favoritos: ' . $e->getMessage());
+            return $response->write(json_encode(['success' => false, 'message' => 'Error al procesar la solicitud']));
+        }
+    }
+    
+    if (function_exists('votar_codigo') && !empty($postData)) {
+        votar_codigo($postData);
+    }
+    
+    return $response->write(json_encode(['success' => false, 'message' => 'Acción no reconocida']));
+});
+
+$app->get('/ajax/', function ($request, $response, $args) {
+    return $response->withHeader('Content-Type', 'application/json')
+                    ->write(json_encode(['success' => false, 'message' => 'Esta ruta requiere método POST']));
 });
 
 $app->post('/list_elements_bd', function ($request, $response, $args) {
@@ -1985,7 +3312,16 @@ $app->post('/api_final/codes', function ($request, $response, $args) {
             'descripcion' => $data['descripcion'],
             'marca' => $data['marca'] ?? '',
             'beneficio' => $data['beneficio'] ?? 0,
-            'fecha_creacion' => new MongoDB\BSON\UTCDateTime()
+            'fecha_creacion' => new MongoDB\BSON\UTCDateTime(),
+            'fecha_publicacion' => date('Y-m-d H:i:s'),
+            'estado' => 0,
+            'destacado' => 0,
+            'destacado_social' => 0,
+            'clicks' => 0,
+            'totalclicks' => 0,
+            'ip' => $_SERVER['REMOTE_ADDR'] ?? '',
+            'fecha_modificacion' => date('Y-m-d H:i:s'),
+            'updated_at' => new MongoDB\BSON\UTCDateTime()
         ]);
         
         return $response->withJson([
@@ -2112,23 +3448,42 @@ $app->post('/procesar_destacado_saldo', function ($request, $response, $args) {
             }
         }
         
-        // Calcular duración según el tipo
-        $duracion_dias = $tipo === 'normal' ? 30 : 60;
-        $fecha_fin = new DateTime();
-        $fecha_fin->add(new DateInterval('P' . $duracion_dias . 'D'));
+        // Actualizar el código para destacarlo (prioridad sin fecha fin)
+        $update_data_codigo = [
+            'destacado' => time(),
+            'tipo_destacado' => $tipo,
+            'fecha_destacado' => new MongoDB\BSON\UTCDateTime(),
+            'fecha_fin_destacado' => null
+        ];
         
-        // Actualizar el código para destacarlo
+        // Para destacado "super", establecer también destacado_social (aparece en home y tiene prioridad)
+        if ($tipo === 'super') {
+            $update_data_codigo['destacado_social'] = time();
+        } elseif ($tipo === 'super_landing') {
+            // Lógica específica para Destacado Super (Guía Oficial) - 30 días
+            $update_data_codigo['tipo_destacado'] = 'super'; // Se guarda como 'super' en la DB
+            $update_data_codigo['destacado_social'] = time();
+            $update_data_codigo['super_destacado_fecha'] = new MongoDB\BSON\UTCDateTime();
+            $update_data_codigo['super_destacado_expira'] = new MongoDB\BSON\UTCDateTime((time() + (30 * 24 * 60 * 60)) * 1000); // 30 días
+        }
+        
         $resultado_codigo = $collection_codigos->updateOne(
             ['_id' => new MongoDB\BSON\ObjectId($codigo_id)],
-            [
-                '$set' => [
-                    'destacado' => true,
-                    'tipo_destacado' => $tipo,
-                    'fecha_destacado' => new MongoDB\BSON\UTCDateTime(),
-                    'fecha_fin_destacado' => new MongoDB\BSON\UTCDateTime($fecha_fin->getTimestamp() * 1000)
-                ]
-            ]
+            ['$set' => $update_data_codigo]
         );
+        
+        // Si es destacado super y se actualizó correctamente, notificar a usuarios del home
+        if ($resultado_codigo->getModifiedCount() > 0 && $tipo === 'super') {
+            if (function_exists('notificar_competencia_home_destacado_super')) {
+                $codigo_actualizado = $collection_codigos->findOne(['_id' => new MongoDB\BSON\ObjectId($codigo_id)]);
+                $emails_enviados = notificar_competencia_home_destacado_super(
+                    $codigo_id,
+                    $_SESSION["user_id"],
+                    $codigo_actualizado
+                );
+                error_log("Notificaciones de competencia home enviadas: $emails_enviados");
+            }
+        }
         
         if ($resultado_codigo->getModifiedCount() == 0) {
             if ($isAjax) {
@@ -2137,6 +3492,10 @@ $app->post('/procesar_destacado_saldo', function ($request, $response, $args) {
                 return $response->withRedirect('/mis-anuncios?error=error_destacar_codigo', 302);
             }
         }
+        
+        // Obtener saldo anterior antes de descontar
+        $usuario_actual = $collection_usuarios->findOne(['_id' => new MongoDB\BSON\ObjectId($_SESSION["user_id"])]);
+        $saldo_anterior = $usuario_actual['saldo'] ?? 0;
         
         // Descontar el saldo del usuario
         $resultado_saldo = $collection_usuarios->updateOne(
@@ -2170,12 +3529,19 @@ $app->post('/procesar_destacado_saldo', function ($request, $response, $args) {
         $transaccion = [
             'usuario_id' => $_SESSION["user_id"],
             'tipo' => 'destacado',
+            'subtipo' => $tipo,
             'cantidad' => -$precio_euros,
             'descripcion' => "Destacado de código - Tipo: {$tipo}",
             'fecha' => new MongoDB\BSON\UTCDateTime(),
             'estado' => 'completada',
             'codigo_id' => $codigo_id,
-            'tipo_destacado' => $tipo
+            'marca' => $codigo['marca'] ?? '',
+            'tipo_destacado' => $tipo,
+            'metodo_pago' => 'saldo',
+            'stripe_session_id' => null, // null para pagos con saldo
+            'stripe_payment_intent' => null,
+            'saldo_anterior' => $saldo_anterior,
+            'saldo_nuevo' => $saldo_anterior - $precio_euros
         ];
         $collection_transacciones->insertOne($transaccion);
         
@@ -2194,8 +3560,8 @@ $app->post('/procesar_destacado_saldo', function ($request, $response, $args) {
                 'saldo_restante' => $saldo_actual - $precio_euros
             ]));
         } else {
-            // Redirigir a página de éxito
-            return $response->withRedirect('/felicidades_destacar?codigo=' . $codigo_id . '&tipo=' . $tipo . '&metodo=saldo', 302);
+            // Redirigir a mis-anuncios con mensaje de éxito
+            return $response->withRedirect('/mis-anuncios?success=destacado&codigo=' . $codigo_id . '&tipo=' . $tipo, 302);
         }
         
     } catch (Exception $e) {
@@ -2243,14 +3609,44 @@ $app->get('/neobancos-que-no-informan-a-hacienda', function ($request, $response
     return $response;
 });
 
+$app->get('/bienvenida-login', function ($request, $response, $args) {
+    global $author_web;
+
+    if (empty($_SESSION["user_id"])) {
+        return $response->withRedirect('/', 302);
+    }
+
+    $title = '¡Bienvenido a Código Amigo!';
+    $description = 'Descubre las mejores oportunidades para compartir y ahorrar en nuestra comunidad - ' . $author_web;
+
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/bienvenida-login.php';
+
+    return $response;
+});
+
 // Rutas adicionales críticas
 $app->post('/google_sign', function ($request, $response, $args) {
     $response = $response->withHeader('Content-Type', 'application/json');
-    
+
     global $author_web, $detect, $num_inicio;
-    
+
+    ob_start();
     include_once $_SERVER['DOCUMENT_ROOT'] . '/public/google-sign-in.php';
-    
+    $payload = ob_get_clean();
+    $trimmedPayload = trim($payload);
+
+    if ($trimmedPayload === '') {
+        $trimmedPayload = json_encode([
+            'success' => false,
+            'error' => 'Respuesta vacía del servicio de autenticación'
+        ]);
+        error_log('[google_sign route] Respuesta vacía después de incluir google-sign-in.php');
+    } elseif ($trimmedPayload[0] !== '{' && $trimmedPayload[0] !== '[') {
+        error_log('[google_sign route] Respuesta inesperada: ' . substr($trimmedPayload, 0, 400));
+    }
+
+    $response->getBody()->write($trimmedPayload);
+
     return $response;
 });
 
@@ -2320,7 +3716,15 @@ $app->post('/codes', function ($request, $response, $args) {
             'beneficio' => $data['beneficio'] ?? 0,
             'id_usuario' => $data['user_id'] ?? '',
             'estado' => 0,
-            'fecha_creacion' => new MongoDB\BSON\UTCDateTime()
+            'fecha_creacion' => new MongoDB\BSON\UTCDateTime(),
+            'fecha_publicacion' => date('Y-m-d H:i:s'),
+            'destacado' => 0,
+            'destacado_social' => 0,
+            'clicks' => 0,
+            'totalclicks' => 0,
+            'ip' => $_SERVER['REMOTE_ADDR'] ?? '',
+            'fecha_modificacion' => date('Y-m-d H:i:s'),
+            'updated_at' => new MongoDB\BSON\UTCDateTime()
         ]);
         
         return $response->withJson([
@@ -2425,6 +3829,7 @@ $app->get('/destacar_codigo', function ($request, $response, $args) {
     include_once $_SERVER['DOCUMENT_ROOT'] . '/inc/includes.php';
     include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones.php';
     include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
     
     // Inicializar Mobile_Detect si no está definido
     if (!isset($detect)) {
@@ -2449,6 +3854,7 @@ $app->get('/usuario_{user_info:[^/]+}', function ($request, $response, $args) {
     include_once __DIR__ . '/inc/includes.php';
     include_once __DIR__ . '/myphp/funciones.php';
     include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
     
     // Inicializar Mobile_Detect si no está definido
     if (!isset($detect)) {
@@ -2473,12 +3879,23 @@ $app->get('/usuario_{user_info:[^/]+}', function ($request, $response, $args) {
     
     $username = str_replace('+', ' ', substr($user_info, 0, $last_underscore_pos));
     $user_id = substr($user_info, $last_underscore_pos + 1);
-    
+
     // log_debug("Username extraído: " . $username);
     // log_debug("User ID extraído: " . $user_id);
-    
+
+            // Validar que el user_id sea un ObjectId válido
+    if (!isValidObjectId($user_id)) {
+        log_warning("User ID inválido - no es un ObjectId válido", ['user_id' => $user_id, 'user_info' => $user_info]);
+        return $response->withRedirect('/', 301);
+    }
+
     // Obtener datos del usuario
-    $data_usuario = getObjectUser('_id', new MongoDB\BSON\ObjectId($user_id));
+    try {
+        $data_usuario = getObjectUser('_id', new MongoDB\BSON\ObjectId($user_id));
+    } catch (Exception $e) {
+        log_error("Error al obtener datos del usuario", ['user_id' => $user_id, 'error' => $e->getMessage()]);
+        return $response->withRedirect('/', 301);
+    }
     
     if (!$data_usuario) {
         return $response->withRedirect('/', 301);
@@ -2489,17 +3906,76 @@ $app->get('/usuario_{user_info:[^/]+}', function ($request, $response, $args) {
     $title = "Códigos de " . $username . " - " . $author;
     $description = "Descubre los códigos de descuento compartidos por " . $username . " en " . $author;
     
-    // Obtener códigos del usuario
-    $array_filtro = array("id_usuario" => new MongoDB\BSON\ObjectId($user_id));
-    $array_filtro = array_merge($array_filtro, array("estado" => 0)); // Solo códigos activos
+    // Obtener códigos del usuario - intentar diferentes enfoques
+    $array_skip = array("limit" => 1000);
+    $array_skip = array_merge($array_skip, array("sort" => array('fecha_publicacion' => -1)));
 
-    $array_skip = array("limit" => 100);
-    $array_skip = array_merge($array_skip, array("sort" => array('fecha' => -1)));
+    $listado_codigos = array();
 
-    $resultado_codigos = get_all_listado_codigos_array($array_filtro, $array_skip);
-    $listado_codigos = isset($resultado_codigos["results"]) ? $resultado_codigos["results"] : array();
+    // Método 1: Buscar por ObjectId
+    try {
+        $array_filtro = array("id_usuario" => new MongoDB\BSON\ObjectId($user_id));
+        $array_filtro_activos = array_merge($array_filtro, array("estado" => 0));
+        $resultado_codigos = get_all_listado_codigos_array($array_filtro_activos, $array_skip);
+        $listado_codigos = isset($resultado_codigos["results"]) ? $resultado_codigos["results"] : array();
+    } catch (Exception $e) {
+        // Si hay error con ObjectId, intentar con string
+        $array_filtro = array("id_usuario" => $user_id);
+        $array_filtro_activos = array_merge($array_filtro, array("estado" => 0));
+        $resultado_codigos = get_all_listado_codigos_array($array_filtro_activos, $array_skip);
+        $listado_codigos = isset($resultado_codigos["results"]) ? $resultado_codigos["results"] : array();
+    }
+
+    // Si no hay códigos activos, intentar con otros estados
+    if (empty($listado_codigos)) {
+        // Asegurar variables auxiliares inicializadas
+        $listado_codigos_inactivos = [];
+        $listado_codigos_desactivados = [];
+        // Intentar obtener códigos con estado -1 (inactivos)
+        $array_filtro_inactivos = array_merge($array_filtro, array("estado" => -1));
+        $resultado_codigos = get_all_listado_codigos_array($array_filtro_inactivos, $array_skip);
+        $listado_codigos_inactivos = isset($resultado_codigos["results"]) ? $resultado_codigos["results"] : array();
+
+        // Intentar obtener códigos con estado -2 (desactivados por usuario)
+        if (empty($listado_codigos_inactivos)) {
+            $array_filtro_desactivados = array_merge($array_filtro, array("estado" => -2));
+            $resultado_codigos = get_all_listado_codigos_array($array_filtro_desactivados, $array_skip);
+            $listado_codigos_desactivados = isset($resultado_codigos["results"]) ? $resultado_codigos["results"] : array();
+        }
+
+        // Combinar todos los códigos encontrados
+        $listado_codigos = array_merge($listado_codigos, $listado_codigos_inactivos, $listado_codigos_desactivados);
+
+        // Si aún no hay códigos, intentar sin filtro de estado (códigos sin campo estado)
+        if (empty($listado_codigos)) {
+            $resultado_codigos = get_all_listado_codigos_array($array_filtro, $array_skip);
+            $listado_codigos_sin_estado = isset($resultado_codigos["results"]) ? $resultado_codigos["results"] : array();
+            $listado_codigos = array_merge($listado_codigos, $listado_codigos_sin_estado);
+        }
+    }
+
     $num_codigos = count($listado_codigos);
-    
+
+    // Calcular total de clicks e impresiones sumando todos los códigos
+    $total_clicks_usuario = 0;
+    $total_impresiones_usuario = 0;
+    foreach($listado_codigos as $codigo) {
+        $total_clicks_usuario += isset($codigo['totalclicks']) ? (int)$codigo['totalclicks'] : 0;
+        $total_impresiones_usuario += isset($codigo['total_impressions']) ? (int)$codigo['total_impressions'] : 0;
+    }
+
+    // Debug: mostrar información sobre códigos encontrados
+    if (isset($_GET['debug']) && $_GET['debug'] == '1') {
+        echo "<!-- Debug: User ID: $user_id, ObjectId: " . new MongoDB\BSON\ObjectId($user_id) . ", Códigos encontrados: $num_codigos -->";
+        if (!empty($listado_codigos)) {
+            echo "<!-- Debug: Primeros códigos IDs: ";
+            foreach (array_slice($listado_codigos, 0, 3) as $codigo) {
+                echo $codigo['_id'] . ", ";
+            }
+            echo " -->";
+        }
+    }
+
     // Obtener categorías únicas de los códigos del usuario
     $categorias_usuario = array();
     foreach($listado_codigos as $codigo) {
@@ -2512,6 +3988,570 @@ $app->get('/usuario_{user_info:[^/]+}', function ($request, $response, $args) {
     include_once $_SERVER['DOCUMENT_ROOT'] . '/public/usuario_publico.php';
     
     return $response;
+});
+
+/********************************************************************
+ * AMAZON GRATIS - Servicios digitales Amazon
+ *******************************************************************/
+$app->get('/amazon', function ($request, $response) {
+    // Incluir la página de servicios Amazon
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/amazon_services.php';
+    return $response;
+});
+
+/********************************************************************
+ * CHOLLOS
+ *******************************************************************/
+
+// Incluir funciones de chollos
+include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_chollos.php';
+include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_chollos_amazon.php';
+include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_chollos_groq.php';
+
+// Ruta principal de chollos
+$app->get('/chollos', function ($request, $respon) {
+    global $panel, $detect;
+    
+    // Inicializar variables globales
+    $GLOBALS['website'] = 'https://www.codigoamigo.com/';
+    $GLOBALS['actual_url'] = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+    
+    // Incluir archivos necesarios
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    
+    // Inicializar detector de móviles
+    if (!isset($detect)) {
+        $detect = new Mobile_Detect();
+    }
+    $GLOBALS['detect'] = $detect;
+    
+    // Incluir funciones modernas
+    include_once __DIR__ . '/myphp/funciones_modern.php';
+    include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true;
+    
+    // Configurar paginación
+    $items_per_page = 24;
+    $current_page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+    $skip = ($current_page - 1) * $items_per_page;
+    
+    // Obtener chollos con filtros
+    $filtros = [
+        'estado' => 1,
+        'limite' => $items_per_page,
+        'skip' => $skip
+    ];
+    
+    if (isset($_GET['categoria']) && !empty($_GET['categoria'])) {
+        $filtros['categoria'] = $_GET['categoria'];
+    }
+    
+    if (isset($_GET['busqueda']) && !empty($_GET['busqueda'])) {
+        $filtros['busqueda'] = $_GET['busqueda'];
+    }
+    
+    // Obtener chollos y total
+    $chollos = obtenerChollos($filtros);
+    $total_chollos = contarChollos($filtros);
+    $categorias = obtenerCategoriasChollos();
+    
+    // Llamar a la función del header moderno
+    get_header_modern(
+        "Chollos y Ofertas - CodigoAmigo.com",
+        "Descubre los mejores chollos y ofertas de Amazon, electrónica, moda y más. Ahorra dinero con nuestras ofertas exclusivas.",
+        "chollos, ofertas, descuentos, amazon, electrónica, moda"
+    );
+    
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/chollos_listado.php';
+    
+    return $respon;
+});
+
+// Ruta del acortador de chollos /chollo/{id} - DEBE IR ANTES DE RUTAS GENÉRICAS
+$app->get('/chollo/{id}', function ($request, $respon, $args) {
+    // Incluir archivos necesarios
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/funciones_chollos.php';
+    
+    $chollo_id = $args['id'] ?? '';
+    
+    // Log para debugging
+    error_log("Acortador chollo - ID recibido: " . $chollo_id);
+    
+    if (empty($chollo_id)) {
+        error_log("Acortador chollo - ID vacío, redirigiendo a /chollos");
+        return $respon->withRedirect('/chollos', 301);
+    }
+    
+    // Obtener el chollo sin incrementar clicks (usaremos registrarClickChollo después)
+    $collection = getCollectionChollos();
+    if (!$collection) {
+        error_log("Acortador chollo - Error: No se pudo obtener colección");
+        return $respon->withRedirect('/chollos', 301);
+    }
+    
+    try {
+        $objectId = new MongoDB\BSON\ObjectId($chollo_id);
+        $doc = $collection->findOne(['_id' => $objectId]);
+        
+        if (!$doc) {
+            error_log("Acortador chollo - Chollo no encontrado con ID: " . $chollo_id);
+            return $respon->withRedirect('/chollos', 301);
+        }
+        
+        if (empty($doc['enlace'])) {
+            error_log("Acortador chollo - Chollo sin enlace, ID: " . $chollo_id);
+            return $respon->withRedirect('/chollos', 301);
+        }
+        
+        $enlace = $doc['enlace'];
+        error_log("Acortador chollo - Enlace encontrado: " . $enlace);
+        
+        // Redirigir a la URL original del chollo (absoluta)
+        if (!preg_match('/^https?:\/\//', $enlace)) {
+            // Si no tiene protocolo, añadir https://
+            $enlace = 'https://' . $enlace;
+        }
+        
+        // Preparar datos para tracking
+        $enlace_original = $enlace;
+        $es_amazon = esEnlaceAmazon($enlace);
+        $asin = null;
+        
+        // IMPORTANTE: Si es un enlace de Amazon, añadir/actualizar el tag de afiliado
+        if ($es_amazon) {
+            error_log("Acortador chollo - Es enlace de Amazon, aplicando tagging garantizado...");
+            
+            // Usamos la nueva función que maneja expansión y fallback automáticamente
+            $enlace = convertirEnlaceAmazonGarantizado($enlace, $chollo_id);
+            
+            // Intentar obtener ASIN para el click log (opcional)
+            $asin = extraerASIN($enlace);
+            
+            error_log("Acortador chollo - Enlace final procesado: " . $enlace);
+        }
+        
+        // Registrar el click con información detallada sobre Amazon
+        $datos_click = [
+            'enlace_original' => $enlace_original,
+            'enlace_final' => $enlace,
+            'es_amazon' => $es_amazon,
+            'tiene_tag_afiliado' => ($es_amazon && strpos($enlace, 'tag=spnfuryy-21') !== false)
+        ];
+        
+        if ($asin) {
+            $datos_click['asin'] = $asin;
+        }
+        
+        registrarClickChollo($chollo_id, $datos_click);
+        
+        error_log("Acortador chollo - Redirigiendo a: " . $enlace);
+        return $respon->withRedirect($enlace, 302);
+    } catch (Exception $e) {
+        error_log("Error en acortador de chollo: " . $e->getMessage() . " - ID: " . $chollo_id);
+        error_log("Stack trace: " . $e->getTraceAsString());
+        return $respon->withRedirect('/chollos', 301);
+    }
+});
+
+// Ruta de detalle individual - DEBE IR ANTES DE /chollos/{categoria} para que Slim la procese primero
+// Restringimos ID a 24 caracteres hexadecimales (ObjectId) para evitar colisión con subcategorías
+// Permitimos que la categoría tenga múltiples segmentos (.*) para estructura SILO
+$app->get('/chollos/{categoria:.*}/{id:[0-9a-fA-F]{24}}', function ($request, $respon, $args) {
+    global $panel, $detect;
+    
+    // Inicializar variables globales
+    $GLOBALS['website'] = 'https://www.codigoamigo.com/';
+    $GLOBALS['actual_url'] = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+    
+    // Incluir archivos necesarios
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/funciones_chollos.php';
+    
+    // Inicializar detector de móviles
+    if (!isset($detect)) {
+        $detect = new Mobile_Detect();
+    }
+    $GLOBALS['detect'] = $detect;
+    
+    // Incluir funciones modernas
+    include_once __DIR__ . '/myphp/funciones_modern.php';
+    include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true;
+    
+    $id = $args['id'] ?? '';
+    $categoria_url = $args['categoria'] ?? '';
+    
+    if (empty($id)) {
+        return $respon->withRedirect('/chollos', 301);
+    }
+    
+    // Obtener el chollo sin incrementar clicks (solo se incrementan cuando se hace click en el enlace directo)
+    $chollo = obtenerCholloPorId($id, false);
+    
+    if (!$chollo) {
+        return $respon->withRedirect('/chollos', 301);
+    }
+    
+    // Incluir helper para slugs
+    include_once __DIR__ . '/myphp/funciones_chollos_helpers.php';
+
+    // Verificar que la categoría coincida con la URL canónica (SEO)
+    // Extraer nombre de categoría de la BD de forma robusta
+    $categoria_db_raw = $chollo['categoria'];
+    if (is_object($categoria_db_raw) && method_exists($categoria_db_raw, 'getArrayCopy')) {
+        $categoria_db_raw = $categoria_db_raw->getArrayCopy();
+    }
+    
+    $categoria_db_nombre = 'general';
+    if (is_array($categoria_db_raw)) {
+        // Buscar la primera categoría válida (no general si es posible)
+        foreach ($categoria_db_raw as $cat) {
+            if ($cat !== 'general' && $cat !== 'black-friday') {
+                $categoria_db_nombre = $cat;
+                break;
+            }
+        }
+        if ($categoria_db_nombre === 'general' && !empty($categoria_db_raw)) {
+             $categoria_db_nombre = isset($categoria_db_raw[0]) ? $categoria_db_raw[0] : 'general';
+        }
+    } else {
+        $categoria_db_nombre = (string)$categoria_db_raw ?: 'general';
+    }
+
+    $categoria_slug_correcta = categoriaToSlug($categoria_db_nombre);
+    
+    // Comparar URL actual (decodificada) con slug correcto
+    $categoria_url_decoded = urldecode($categoria_url);
+    
+    // Si la URL no coincide con el slug (ej: mayúsculas vs minúsculas), redirigir
+    if (!empty($categoria_url) && $categoria_url_decoded !== $categoria_slug_correcta) {
+        return $respon->withRedirect('/chollos/' . $categoria_slug_correcta . '/' . $id, 301);
+    }
+    
+    // Preparar variables para la vista
+    // SEO TITLE OPTIMIZATION
+    $precio_chollo = isset($chollo['precio_descuento']) && $chollo['precio_descuento'] > 0 ? number_format($chollo['precio_descuento'], 2, ',', '.') . '€' : '';
+    
+    // Título más atractivo y rico en keywords
+    if ($precio_chollo) {
+        $title = htmlspecialchars($chollo['titulo']) . ' ' . $precio_chollo . ' - Chollo y Oferta';
+    } else {
+        $title = htmlspecialchars($chollo['titulo']) . ' - Chollo, Descuento y Oferta';
+    }
+    
+    // Si el título es muy largo, cortarlo de forma segura pero manteniendo lo importante
+    if (strlen($title) > 65) {
+        // Intentar mantener el titulo original + precio si cabe
+        $base_title = htmlspecialchars($chollo['titulo']);
+        if ($precio_chollo && (strlen($base_title) + strlen($precio_chollo) + 10) <= 65) {
+             $title = $base_title . ' ' . $precio_chollo . ' - Oferta';
+        } else {
+             // Si no, dejar solo el titulo del chollo y codigoamigo
+             $title = substr($base_title, 0, 50) . '... ' . ($precio_chollo ? $precio_chollo : '') . ' - Oferta';
+        }
+    }
+    
+    // SEO DESCRIPTION OPTIMIZATION
+    $description_text = !empty($chollo['descripcion']) ? strip_tags($chollo['descripcion']) : $chollo['titulo'];
+    // Limpiar saltos de línea múltiples
+    $description_text = preg_replace('/\s+/', ' ', $description_text);
+    
+    $cta = " ✅ ¡Aprovecha ahora!";
+    $desc_precio = $precio_chollo ? " por solo " . $precio_chollo : " al mejor precio";
+    
+    $description_start = "Aprovecha el chollo: " . htmlspecialchars($chollo['titulo']) . $desc_precio . ".";
+    // Calcular cuánto espacio nos queda para el extracto de la descripción
+    // Meta description ideal max 160 chars
+    $remaining_chars = 155 - strlen($description_start) - strlen($cta);
+    
+    if ($remaining_chars > 20) {
+        $extracto = substr($description_text, 0, $remaining_chars) . '...';
+        $description = $description_start . ' ' . $extracto . $cta;
+    } else {
+        $description = $description_start . $cta;
+    }
+
+    $keywords = 'chollo, oferta, descuento, ' . strtolower($chollo['titulo']) . ', comprar barato, mejor precio';
+    
+    // SCHEMA ORG - PRODUCT
+    $schema_data = [
+        "@context" => "https://schema.org/",
+        "@type" => "Product",
+        "name" => htmlspecialchars($chollo['titulo']),
+        "description" => htmlspecialchars(substr($description_text, 0, 300)), // Descripción más larga para schema
+    ];
+
+    if (!empty($chollo['imagen'])) {
+        $schema_data["image"] = $chollo['imagen'];
+    }
+    
+    // Marca logic
+    $marca_nombre = "Generico";
+    if (isset($chollo['marca']) && !empty($chollo['marca'])) {
+        $marca_nombre = $chollo['marca'];
+    } elseif (isset($chollo['categoria']) && !empty($chollo['categoria'])) {
+         $cat_for_brand = is_array($chollo['categoria']) ? ($chollo['categoria'][0] ?? '') : $chollo['categoria'];
+         if ($cat_for_brand) $marca_nombre = ucfirst($cat_for_brand);
+    }
+    $schema_data["brand"] = [
+        "@type" => "Brand",
+        "name" => htmlspecialchars($marca_nombre)
+    ];
+
+    // Offer logic
+    $offer = [
+        "@type" => "Offer",
+        "url" => $GLOBALS['actual_url'],
+        "priceCurrency" => "EUR",
+        "availability" => "https://schema.org/InStock"
+    ];
+
+    if (isset($chollo['precio_descuento']) && $chollo['precio_descuento'] > 0) {
+        $offer["price"] = $chollo['precio_descuento'];
+    } elseif (isset($chollo['precio_original']) && $chollo['precio_original'] > 0) {
+        $offer["price"] = $chollo['precio_original'];
+    } else {
+        $offer["price"] = "0.00"; // Fallback required
+    }
+    
+    // Valid until (default +30 days if not set)
+    if (isset($chollo['fecha_caducidad']) && !empty($chollo['fecha_caducidad'])) {
+         $caducidad = $chollo['fecha_caducidad'];
+         if ($caducidad instanceof MongoDB\BSON\UTCDateTime) {
+             $expire_date = $caducidad->toDateTime()->format('Y-m-d');
+         } else {
+             $expire_date = date('Y-m-d', strtotime($caducidad));
+         }
+    } else {
+         $expire_date = date('Y-m-d', strtotime('+30 days'));
+    }
+    $offer["priceValidUntil"] = $expire_date;
+
+    $schema_data["offers"] = $offer;
+    
+    // Rating logic (AggregateRating)
+    // Usamos temperatura y votos para simular un rating si no hay sistema de estrellas explícitas
+    $total_votos = isset($chollo['votos']) ? (int)$chollo['votos'] : 0;
+    $temperatura = isset($chollo['temperatura']) ? (int)$chollo['temperatura'] : 0;
+    
+    if ($total_votos > 0 || $temperatura > 0) {
+        // Normalizar temperatura a escala 5 estrellas
+        // Supongamos 0 grados = 2.5, 100+ grados = 5, -100 = 1
+        $rating_val = 2.5;
+        if ($temperatura > 0) {
+            $rating_val = min(5, 2.5 + ($temperatura / 40)); 
+        } else {
+            $rating_val = max(1, 2.5 + ($temperatura / 40));
+        }
+        $rating_val = round($rating_val, 1);
+        
+        $review_count = max(1, $total_votos); // Schema necesita al menos 1 review count si hay rating
+
+        $schema_data["aggregateRating"] = [
+            "@type" => "AggregateRating",
+            "ratingValue" => (string)$rating_val,
+            "reviewCount" => (string)$review_count,
+            "bestRating" => "5",
+            "worstRating" => "1"
+        ];
+    }
+
+    $schema_json = '<script type="application/ld+json">' . json_encode($schema_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>';
+
+    $links_meta = [
+        'schema' => $schema_json
+    ];
+    
+    // Llamar a la función del header moderno con los nuevos parámetros
+    get_header_modern($title, $description, $keywords, "", "", $links_meta);
+    
+    // Incluir la página de detalle
+    include_once __DIR__ . '/public/chollos_detalle.php';
+    
+    return $respon;
+});
+
+// Ruta por categoría - Captura rutas jerárquicas (SILO)
+$app->get('/chollos/{categoria:.*}', function ($request, $respon, $args) {
+    global $panel, $detect;
+    
+    $categoria_path = $args['categoria'];
+    
+    // Incluir funciones helper para slugs
+    include_once __DIR__ . '/myphp/funciones_chollos_helpers.php';
+    include_once __DIR__ . '/myphp/funciones_chollos.php';
+    
+    // Parsear la ruta de slugs a categorías legibles
+    $categorias_array = parseCategoriaPath($categoria_path);
+    $categoria_final = end($categorias_array);
+    
+    // Obtener el slug final para filtrar
+    $parts = explode('/', trim($categoria_path, '/'));
+    $categoria_slug = end($parts);
+    
+    // Normalizar para buscar en el mapa
+    $categorias_map = obtenerCategoriasChollos();
+    
+    // Nombre de la categoría para mostrar
+    $nombre_categoria = $categoria_final;
+    
+    // INTENTO DE RECUPERACIÓN DE CATEGORÍA REAL (Con tildes/mayúsculas)
+    // Esto es crucial para URLs profundas donde slugsPierdenTildes -> "inalambricos" vs "Inalámbricos"
+    $categoria_real_bd = obtenerCategoriaReal($categoria_slug);
+    if (!empty($categoria_real_bd) && is_string($categoria_real_bd) && strtolower($categoria_real_bd) !== strtolower($categoria_slug)) {
+        $categoria_final = $categoria_real_bd;
+        // Actualizar nombre para mostrar más bonito
+        $nombre_categoria = $categoria_real_bd;
+    }
+    
+    // Inicializar variables globales
+    $GLOBALS['website'] = 'https://www.codigoamigo.com/';
+    $GLOBALS['actual_url'] = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+    $GLOBALS['categoria_path'] = $categoria_path;
+    $GLOBALS['categorias_array'] = $categorias_array;
+    $GLOBALS['nombre_categoria'] = $nombre_categoria;
+    
+    // Incluir archivos necesarios
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    
+    // Inicializar detector de móviles
+    if (!isset($detect)) {
+        $detect = new Mobile_Detect();
+    }
+    $GLOBALS['detect'] = $detect;
+    
+    // Incluir funciones modernas
+    include_once __DIR__ . '/myphp/funciones_modern.php';
+    include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true;
+    
+    // Configurar paginación
+    $items_per_page = 24;
+    $current_page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+    $skip = ($current_page - 1) * $items_per_page;
+    
+    // Incluir helpers para manejo de categorías
+    include_once __DIR__ . '/myphp/funciones_chollos_helpers.php';
+    
+    // Generar regex flexible para tolerar acentos y mayúsculas (Fuzzy Match)
+    $regex_flexible = null;
+    if (!empty($categoria_slug)) {
+        $base = str_replace('-', ' ', $categoria_slug);
+        $patron = '';
+        for ($i = 0; $i < mb_strlen($base); $i++) {
+            $char = mb_substr($base, $i, 1);
+            switch ($char) {
+                case 'a': $patron .= '[aáAÁ]'; break;
+                case 'e': $patron .= '[eéEÉ]'; break;
+                case 'i': $patron .= '[iíIÍ]'; break;
+                case 'o': $patron .= '[oóOÓ]'; break;
+                case 'u': $patron .= '[uúüUÚÜ]'; break;
+                case 'n': $patron .= '[nñNÑ]'; break;
+                case ' ': $patron .= '[ -]'; break;
+                default: $patron .= preg_quote($char);
+            }
+        }
+        $regex_flexible = new \MongoDB\BSON\Regex('^' . $patron . '$', 'i');
+    }
+
+    // Obtener chollos de la categoría y sus hijos (SILO)
+    // Expandimos la búsqueda para incluir subcategorías y sinónimos
+    $categorias_strings = array_unique(array_filter(array_merge(
+        [$categoria_final], 
+        [$categoria_slug],  
+        [str_replace('-', ' ', $categoria_slug)],
+        // obtenerSubcategorias($categoria_final), // DESACTIVADO: Evitar contaminación cruzada
+        obtenerVariacionesCategoria($categoria_final)
+    )));
+    
+    // Limpiar valores vacíos y reindexar
+    $categorias_busqueda = array_values(array_filter($categorias_strings));
+    
+    // Añadir Regex al final (fuera de array_unique para evitar errores de conversión a string)
+    if ($regex_flexible) {
+        $categorias_busqueda[] = $regex_flexible;
+    }
+    
+    $filtros = [
+        'categoria' => $categorias_busqueda, // Pasamos el array expandido
+        'estado' => 1,
+        'limite' => $items_per_page,
+        'skip' => $skip
+    ];
+    
+    
+    
+    if (isset($_GET['min_price']) && is_numeric($_GET['min_price'])) {
+        $filtros['min_price'] = $_GET['min_price'];
+    }
+    if (isset($_GET['max_price']) && is_numeric($_GET['max_price'])) {
+        $filtros['max_price'] = $_GET['max_price'];
+    }
+    if (isset($_GET['sort'])) {
+        $filtros['sort'] = $_GET['sort'];
+    }
+    if (isset($_GET['marca'])) {
+        $filtros['marca'] = $_GET['marca'];
+    }
+    if (isset($_GET['min_discount']) && is_numeric($_GET['min_discount'])) {
+        $filtros['min_discount'] = $_GET['min_discount'];
+    }
+
+    if (isset($_GET['busqueda']) && !empty($_GET['busqueda'])) {
+        $filtros['busqueda'] = $_GET['busqueda'];
+    }
+    
+    // Exportar filtros a GLOBALS para usar en la vista
+    $GLOBALS['filtros_chollos'] = $filtros;
+
+    // Obtener chollos y total
+    $chollos = obtenerChollos($filtros);
+    $total_chollos = contarChollos($filtros);
+    
+    // INTENTAR OBTENER CONTENIDO SEO DINÁMICO (GROQ)
+    include_once __DIR__ . '/myphp/funciones_chollos_seo.php';
+    $contenido_seo = obtenerContenidoSeoCategoria($categoria_path, $categorias_array);
+    $GLOBALS['contenido_seo'] = $contenido_seo; // Pasar a la vista
+    
+    // Construir título SEO (usar el de Groq si existe, sino fallback)
+    $titulo_seo = ($contenido_seo && !empty($contenido_seo['h1'])) 
+        ? $contenido_seo['h1'] 
+        : "Chollos de " . $nombre_categoria;
+    
+    // Construir descripción SEO (usar la de Groq si existe, sino fallback)
+    if ($contenido_seo && !empty($contenido_seo['meta_description'])) {
+        $descripcion_seo = $contenido_seo['meta_description'];
+    } else {
+        $descripcion_seo = "Descubre los mejores chollos y ofertas de " . $nombre_categoria;
+        if (count($categorias_array) > 1) {
+            $ruta_completa = implode(' › ', $categorias_array);
+            $descripcion_seo .= " en " . $ruta_completa;
+        }
+        $descripcion_seo .= ". Ahorra dinero con nuestras ofertas exclusivas.";
+    }
+    
+    // Llamar a la función del header moderno
+    get_header_modern(
+        $titulo_seo . " - CodigoAmigo.com",
+        $descripcion_seo,
+        "chollos, ofertas, " . strtolower($nombre_categoria) . ", descuentos"
+    );
+    
+    include_once __DIR__ . '/public/chollos_categoria.php';
+    
+    return $respon;
+});
+
+// Webhook para Telegram
+$app->post('/webhook/telegram-chollos', function ($request, $respon) {
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/telegram_chollos_bot.php';
+    procesarMensajeTelegram($request->getBody());
+    return $respon->withJson(['success' => true]);
 });
 
 // Ruta para páginas de categoría (debe ir al final para evitar conflictos)
@@ -2550,7 +4590,9 @@ $app->get('/{categoria}', function ($request, $response, $args) {
     $GLOBALS['detect'] = $detect;
 
     // Incluir funciones modernas
+    include_once __DIR__ . '/myphp/funciones_modern.php';
     include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
 
     // Usar el header moderno
     
@@ -2583,6 +4625,11 @@ $app->get('/{categoria}', function ($request, $response, $args) {
 // Manejo de errores 404
 $app->get('/{path:.*}', function ($request, $response, $args) {
     $path = $args['path'];
+    
+    // Excluir rutas de chollos
+    if (strpos($path, 'chollos') === 0) {
+        return $response->withStatus(404);
+    }
     
     // Si la ruta empieza con 'usuario_', no redirigir (dejar que Slim maneje el error)
     if (strpos($path, 'usuario_') === 0) {
@@ -2710,8 +4757,24 @@ $app->get('/delete_code/{codigo_id}', function ($request, $response, $args) {
 $app->run();
 ?>
 
+<?php
+$shouldOutputFooterScript = true;
+
+if (function_exists('headers_list')) {
+    foreach (headers_list() as $headerLine) {
+        if (stripos($headerLine, 'Content-Type: application/json') !== false ||
+            stripos($headerLine, 'Content-Type: application/xml') !== false) {
+            $shouldOutputFooterScript = false;
+            break;
+        }
+    }
+}
+
+if ($shouldOutputFooterScript):
+?>
 <script>
 // JavaScript para el slider de marcas populares
+(function() {
 let currentSlide = 0;
 const slidesPerView = window.innerWidth <= 768 ? 1 : window.innerWidth <= 1024 ? 2 : 3;
 const totalSlides = Math.ceil(9 / slidesPerView); // 9 marcas totales
@@ -2720,12 +4783,16 @@ function moveSlider(direction) {
     const slider = document.getElementById('brandsSlider');
     if (!slider) return;
     
-    currentSlide += direction;
+    // En móvil, mover slide por slide. En desktop, mover por grupos
+    const moveAmount = window.innerWidth <= 768 ? 1 : slidesPerView;
+    const maxSlides = window.innerWidth <= 768 ? 9 - slidesPerView : Math.ceil(9 / slidesPerView);
+    
+    currentSlide += moveAmount * direction;
     
     // Limitar el rango
     if (currentSlide < 0) {
-        currentSlide = totalSlides - 1;
-    } else if (currentSlide >= totalSlides) {
+        currentSlide = maxSlides;
+    } else if (currentSlide > maxSlides) {
         currentSlide = 0;
     }
     
@@ -2760,35 +4827,10 @@ function updateDots() {
     });
 }
 
-// Auto-play del slider (opcional)
-let autoPlayInterval;
-
-function startAutoPlay() {
-    autoPlayInterval = setInterval(() => {
-        moveSlider(1);
-    }, 5000); // Cambiar slide cada 5 segundos
-}
-
-function stopAutoPlay() {
-    if (autoPlayInterval) {
-        clearInterval(autoPlayInterval);
-    }
-}
-
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', function() {
     // Inicializar indicadores
     updateDots();
-    
-    // Pausar auto-play al hacer hover
-    const sliderContainer = document.querySelector('.brands-slider-container');
-    if (sliderContainer) {
-        sliderContainer.addEventListener('mouseenter', stopAutoPlay);
-        sliderContainer.addEventListener('mouseleave', startAutoPlay);
-    }
-    
-    // Iniciar auto-play
-    startAutoPlay();
 });
 
 // Redimensionar ventana
@@ -2940,10 +4982,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+})(); // Cerrar IIFE
 </script>
 
-<?php
-// Incluir el footer
-include_once __DIR__ . '/myphp/_footer.php';
-die;
-?>
+<?php endif; ?>

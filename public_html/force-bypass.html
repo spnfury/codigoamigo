@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodigoAmigo - Bypass Forzado</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 600px;
+        }
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 4px solid white;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .btn {
+            background: #ff6b6b;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            background: #ff5252;
+            transform: translateY(-2px);
+        }
+        .status {
+            background: rgba(255,255,255,0.2);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 CodigoAmigo - Bypass Forzado</h1>
+        
+        <div class="spinner"></div>
+        
+        <div class="status">
+            <h2>🔄 Redirigiendo automáticamente...</h2>
+            <p>Si no eres redirigido automáticamente en <span id="countdown">5</span> segundos, usa los enlaces de abajo:</p>
+        </div>
+        
+        <a href="/force-bypass.php" class="btn">🔓 BYPASS FORZADO</a>
+        <a href="/?cf_bypass=1&force=1&ultra=1&direct=1" class="btn">⚡ ACCESO DIRECTO</a>
+        <a href="http://78.46.100.91/" class="btn">🌐 IP DIRECTA</a>
+        
+        <div class="status">
+            <h3>📊 Estado del Sistema:</h3>
+            <p>✅ <strong>Servidor:</strong> Funcionando perfectamente</p>
+            <p>✅ <strong>Bypass:</strong> Configurado ultra agresivo</p>
+            <p>✅ <strong>Cloudflare:</strong> Security Level cambiado a "Essentially Off"</p>
+            <p>⚠️ <strong>Tu navegador:</strong> Sigue siendo bloqueado específicamente</p>
+        </div>
+        
+        <div class="status">
+            <h3>🔧 Soluciones Adicionales:</h3>
+            <p><strong>1.</strong> Prueba en modo incógnito/privado</p>
+            <p><strong>2.</strong> Limpia cookies y caché del navegador</p>
+            <p><strong>3.</strong> Prueba desde otro navegador</p>
+            <p><strong>4.</strong> Usa la IP directa: <code>http://78.46.100.91/</code></p>
+        </div>
+    </div>
+    
+    <script>
+        // Countdown para redirección automática
+        let countdown = 5;
+        const countdownElement = document.getElementById('countdown');
+        
+        const timer = setInterval(function() {
+            countdown--;
+            countdownElement.textContent = countdown;
+            
+            if (countdown <= 0) {
+                clearInterval(timer);
+                // Intentar múltiples métodos de bypass
+                const bypassMethods = [
+                    '/force-bypass.php',
+                    '/?cf_bypass=1&force=1&ultra=1&direct=1',
+                    'http://78.46.100.91/'
+                ];
+                
+                // Probar el primer método
+                window.location.href = bypassMethods[0];
+            }
+        }, 1000);
+        
+        // Detectar si estamos en modo bypass
+        if (window.location.search.includes('cf_bypass=1') || 
+            window.location.search.includes('force=1') || 
+            window.location.search.includes('ultra=1')) {
+            document.body.style.background = 'linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%)';
+            document.querySelector('.container').style.border = '3px solid #4ecdc4';
+        }
+        
+        // Log para debugging
+        console.log('Force bypass page loaded');
+        console.log('User Agent:', navigator.userAgent);
+        console.log('Current URL:', window.location.href);
+        console.log('Timestamp:', new Date().toISOString());
+    </script>
+</body>
+</html>
+

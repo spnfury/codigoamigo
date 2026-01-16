@@ -426,7 +426,7 @@ function optimizeUrlPath($texto , $space=false,$espacios='',$junto=''){
     }
 }
 
-getObjectCode() {
+function getObjectCode() {
     
     // Obtener la lista de marcas revisadas
     $lista_marcas = getMarcasRevisadas(10);

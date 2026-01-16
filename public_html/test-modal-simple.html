@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Test Modal Login Simple</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/css/bootstrap.min.css">
+    <style>
+        body {
+            padding: 50px;
+            background: #f5f5f5;
+        }
+
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            background: white;
+            border-radius: 5px;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .error {
+            border-left-color: #f44336;
+        }
+
+        button {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Diagnóstico Modal de Login</h1>
+
+        <div id="status-log"></div>
+
+        <!-- Botón de prueba -->
+        <button class="btn btn-primary btn-lg open_modal_login" id="btn-login">
+            Acceder (Botón de Prueba)
+        </button>
+
+        <hr>
+
+        <h3>Pruebas Manuales:</h3>
+        <button class="btn btn-default" onclick="testModalElement()">1. ¿Existe #modal_login?</button>
+        <button class="btn btn-default" onclick="testjQuery()">2. ¿jQuery cargado?</button>
+        <button class="btn btn-default" onclick="testBootstrapModal()">3. ¿Bootstrap modal disponible?</button>
+        <button class="btn btn-default" onclick="forceShowModal()">4. Forzar mostrar modal</button>
+    </div>
+
+    <!-- Modal Login Simple -->
+    <div class="modal fade" id="modal_login" role="dialog">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    <h4 class="modal-title">Iniciar Sesión</h4>
+                </div>
+                <div class="modal-body">
+                    <p>Este es el modal de login de prueba.</p>
+                    <form>
+                        <div class="form-group">
+                            <input type="email" class="form-control" placeholder="Email">
+                        </div>
+                        <div class="form-group">
+                            <input type="password" class="form-control" placeholder="Contraseña">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Entrar</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/js/bootstrap.min.js"></script>
+    <script>
+        function log(msg, isOk = true) {
+            const div = document.createElement('div');
+            div.className = 'status' + (isOk ? '' : ' error');
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${msg}`;
+            document.getElementById('status-log').appendChild(div);
+            console.log(msg);
+        }
+
+        function testModalElement() {
+            const modal = document.getElementById('modal_login');
+            if (modal) {
+                log('✅ Modal #modal_login existe en el DOM');
+                log('Display: ' + window.getComputedStyle(modal).display);
+            } else {
+                log('❌ Modal #modal_login NO existe', false);
+            }
+        }
+
+        function testjQuery() {
+            if (typeof jQuery !== 'undefined') {
+                log('✅ jQuery ' + jQuery.fn.jquery + ' cargado');
+            } else {
+                log('❌ jQuery NO cargado', false);
+            }
+        }
+
+        function testBootstrapModal() {
+            if (typeof jQuery !== 'undefined' && typeof jQuery.fn.modal !== 'undefined') {
+                log('✅ Bootstrap Modal disponible');
+            } else {
+                log('❌ Bootstrap Modal NO disponible', false);
+            }
+        }
+
+        function forceShowModal() {
+            try {
+                const $modal = $('#modal_login');
+                if ($modal.length) {
+                    log('Intentando mostrar modal con .modal("show")...');
+                    $modal.modal('show');
+                    log('✅ Modal mostrado correctamente');
+                } else {
+                    log('❌ No se encontró #modal_login', false);
+                }
+            } catch (e) {
+                log('❌ Error: ' + e.message, false);
+            }
+        }
+
+        // Simular la función openLoginModalWithRedirect
+        window.openLoginModalWithRedirect = function (targetUrl) {
+            log('🔓 openLoginModalWithRedirect llamado con URL: ' + targetUrl);
+
+            // Intentar mostrar el modal
+            const $modal = $('#modal_login');
+            log('Modal encontrado: ' + ($modal.length > 0));
+
+            if ($modal.length) {
+                if (typeof $modal.modal === 'function') {
+                    log('Usando jQuery .modal("show")');
+                    $modal.modal('show');
+                } else {
+                    log('jQuery modal no disponible, usando método manual', false);
+                }
+            } else {
+                log('❌ Modal no encontrado', false);
+            }
+        };
+
+        // Event listener para el botón
+        $(document).ready(function () {
+            log('✅ Document ready');
+
+            $(document).on('click', '.open_modal_login', function (event) {
+                event.preventDefault();
+                log('🖱️ Click en .open_modal_login detectado');
+                log('Elemento: ' + this.id);
+                openLoginModalWithRedirect(window.location.href);
+            });
+
+            // Auto tests
+            testModalElement();
+            testjQuery();
+            testBootstrapModal();
+        });
+    </script>
+</body>
+
+</html>

@@ -34,14 +34,41 @@
     $container = $app->getContainer();
 
     //  Connect to the database with Eloquent
-    $capsule = new \Illuminate\Database\Capsule\Manager;
-    $capsule->addConnection($container['settings']['Database']);
-    $capsule->setAsGlobal();
-    $capsule->bootEloquent();
+    // Validar que las credenciales de la base de datos estén configuradas
+    $dbConfig = $container['settings']['Database'] ?? [];
+    $hasDbConfig = !empty($dbConfig['host']) && 
+                   !empty($dbConfig['database']) && 
+                   !empty($dbConfig['username']) && 
+                   $dbConfig['host'] !== ' ' && 
+                   $dbConfig['database'] !== ' ' && 
+                   $dbConfig['username'] !== ' ';
+    
+    if ($hasDbConfig) {
+        try {
+            $capsule = new \Illuminate\Database\Capsule\Manager;
+            $capsule->addConnection($container['settings']['Database']);
+            $capsule->setAsGlobal();
+            $capsule->bootEloquent();
 
-    $container['db'] = function($container) use ($capsule) {
-        return $capsule;
-    };
+            $container['db'] = function($container) use ($capsule) {
+                return $capsule;
+            };
+        } catch (\Exception $e) {
+            // Si falla la conexión, registrar pero no bloquear la aplicación
+            if (function_exists('codigoamigo_sentry_capture_exception')) {
+                codigoamigo_sentry_capture_exception($e);
+            }
+            // Crear un contenedor vacío para evitar errores de "prepare() on null"
+            $container['db'] = function($container) {
+                return null;
+            };
+        }
+    } else {
+        // Si no hay configuración de DB, crear un contenedor vacío para evitar errores
+        $container['db'] = function($container) {
+            return null;
+        };
+    }
 
     // Register Twig View helper
     $container['view'] = function ($c) {

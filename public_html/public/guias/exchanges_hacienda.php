@@ -1,4 +1,6 @@
-<!-- /public/guias/contenido/exchanges_hacienda_content.php -->
+<?php
+// /public/guias/contenido/exchanges_hacienda_content.php
+?>
 <div class="intro">
     <p>En este artículo analizamos qué exchanges de criptomonedas no informan automáticamente a Hacienda...</p>
 </div>

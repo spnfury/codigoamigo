@@ -647,7 +647,7 @@ body {
 
 <!-- Agregar justo antes del footer -->
 <a href="https://t.me/TuUsuarioDeTelegram" target="_blank" class="telegram-float">
-    <i class="fab fa-telegram-plane"></i>
+    <i class="fa-brands fa-telegram"></i>
     <span class="telegram-tooltip">¿Necesitas ayuda? ¡Escríbenos!</span>
 </a>
 

@@ -67,7 +67,7 @@ $(document).ready(function() {
             // No hay resultados
             $sectionTitle.text('Resultados de búsqueda');
             html = '<div class="no-results">';
-            html += '<i class="fas fa-search" style="font-size: 3rem; margin-bottom: 1rem; color: #FF6B35;"></i>';
+            html += '<i class="fas fa-search" style="font-size: 3rem; margin-bottom: 1rem; color: #E30613;"></i>';
             html += '<h3>No se encontraron códigos</h3>';
             html += '<p>Intenta con otros términos de búsqueda</p>';
             html += '</div>';
@@ -246,7 +246,7 @@ $('<style>')
         .loading-indicator i {
             font-size: 2rem;
             margin-bottom: 1rem;
-            color: #FF6B35;
+            color: #E30613;
         }
         
         .error-message {
@@ -270,14 +270,14 @@ $('<style>')
         .no-results i {
             font-size: 3rem;
             margin-bottom: 1rem;
-            color: #FF6B35;
+            color: #E30613;
         }
         
         .search-input-header:focus,
         .search-input-hero:focus {
             outline: none;
-            border-color: #FF6B35;
-            box-shadow: 0 0 0 2px rgba(255, 107, 53, 0.2);
+            border-color: #E30613;
+            box-shadow: 0 0 0 2px rgba(227, 6, 19, 0.2);
         }
     `)
     .appendTo('head');

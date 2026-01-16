@@ -237,7 +237,13 @@ $marcas_relacionadas = get_related_brands($marca, $config['max_related_brands'])
                             </div>
                             
                             <div class="benefit-display">
-                                <div class="benefit-amount"><?php echo $item["num_beneficio"]; ?>€</div>
+                                <?php 
+                                // Incluir funciones premium
+                                if (!function_exists('generarHTMLPrecioConPromocion')) {
+                                    include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_premium.php';
+                                }
+                                echo generarHTMLPrecioConPromocion($item["_id"], $item["num_beneficio"] ?? 0, $item["tipo_descuento"] ?? 'euros', true);
+                                ?>
                                 <div class="benefit-type"><?php echo $item["tipo_descuento"]; ?></div>
                             </div>
                             

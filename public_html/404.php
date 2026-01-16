@@ -1,3 +1,6 @@
+<?php
+header("HTTP/1.0 404 Not Found");
+?>
 <style>
 html {
   background: #f7f9ff;
@@ -224,7 +227,8 @@ html {
 </style>
 
 <?php 
-get_header_new($title, $description, $title_social, $description_social, $imagen_social, $links_meta);
+get_header_modern($title, $description, $title_social, $description_social, $imagen_social, $links_meta);
+$GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno para el footer correspondiente
 ?>
 
 
@@ -483,3 +487,7 @@ $(document).ready(function() {
 });
 
 </script>
+
+<?php get_footer(); ?>
+</body>
+</html>

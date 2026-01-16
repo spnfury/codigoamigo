@@ -72,10 +72,14 @@ try {
     //     exit;
     // }
     
+    // Obtener saldo anterior antes de actualizar
+    $collection_usuarios = getCollectionUsuarios();
+    $usuario_antes = $collection_usuarios->findOne(['_id' => new MongoDB\BSON\ObjectId($_SESSION["user_id"])]);
+    $saldo_anterior = $usuario_antes['saldo'] ?? 0;
+    
     // Actualizar el saldo del usuario en la base de datos
     error_log("Actualizando saldo para usuario: " . $_SESSION["user_id"] . " - cantidad: " . $saldo);
     
-    $collection_usuarios = getCollectionUsuarios();
     $resultado = $collection_usuarios->updateOne(
         ['_id' => new MongoDB\BSON\ObjectId($_SESSION["user_id"])],
         ['$inc' => ['saldo' => (int)$saldo]]
@@ -86,19 +90,29 @@ try {
     if ($resultado->getModifiedCount() > 0) {
         error_log("Saldo actualizado correctamente, procediendo con registro de transacción");
         
-        // Registrar la transacción en la base de datos
+        // Registrar la transacción en la base de datos (si no existe ya por webhook)
         $collection_transacciones = getCollectionTransacciones();
-        $transaccion = [
-            'usuario_id' => $_SESSION["user_id"],
-            'tipo' => 'recarga',
-            'cantidad' => (int)$saldo,
-            'descripcion' => "Recarga de saldo - Paquete {$paquete}€",
-            'fecha' => new MongoDB\BSON\UTCDateTime(),
-            'estado' => 'completada',
-            'session_id' => $session_id,
-            'paquete' => $paquete
-        ];
-        $collection_transacciones->insertOne($transaccion);
+        $existe = $collection_transacciones->findOne(['stripe_session_id' => $session_id]);
+        
+        if (!$existe) {
+            $transaccion = [
+                'usuario_id' => $_SESSION["user_id"],
+                'tipo' => 'recarga',
+                'cantidad' => (int)$saldo,
+                'descripcion' => "Recarga de saldo - Paquete {$paquete}€",
+                'fecha' => new MongoDB\BSON\UTCDateTime(),
+                'estado' => 'completada',
+                'stripe_session_id' => $session_id,
+                'stripe_payment_intent' => $session->payment_intent,
+                'stripe_customer_email' => $session->customer_details->email ?? null,
+                'metodo_pago' => 'tarjeta',
+                'paquete' => $paquete,
+                'saldo_anterior' => $saldo_anterior,
+                'saldo_nuevo' => $saldo_anterior + (int)$saldo
+            ];
+            $collection_transacciones->insertOne($transaccion);
+            error_log("Transacción de recarga registrada desde felicidades_recarga.php: " . $session_id);
+        }
         
         // Obtener el saldo actualizado
         $usuario_actualizado = $collection_usuarios->findOne(['_id' => new MongoDB\BSON\ObjectId($_SESSION["user_id"])]);

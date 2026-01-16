@@ -24,15 +24,14 @@ $array_codigos_acceso = [
     "5c8a10ce2f55c86d6e707d82"  //jose
 ];
 
-if (!isset($_SESSION["user_id"])) {
+// Verificar que el usuario esté logueado y tenga permisos
+if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"]) || !in_array($_SESSION["user_id"], $array_codigos_acceso)) {
     http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'No hay sesión activa. Debe iniciar sesión como administrador.']);
-    exit;
-}
-
-if (!in_array($_SESSION["user_id"], $array_codigos_acceso)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'error' => 'Usuario no autorizado. ID: ' . $_SESSION["user_id"]]);
+    if (!isset($_SESSION["user_id"])) {
+        echo json_encode(['success' => false, 'error' => 'No hay sesión activa. Debe iniciar sesión como administrador.']);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Usuario no autorizado. ID: ' . $_SESSION["user_id"]]);
+    }
     exit;
 }
 
@@ -118,11 +117,11 @@ function parseCompletePHPError($logLines, $source) {
     $currentError = '';
     $errorStart = false;
     $url = '';
-    
+
     foreach ($logLines as $line) {
         $line = trim($line);
         if (empty($line)) continue;
-        
+
         // Detectar inicio de error PHP (timestamp con formato más flexible)
         if (preg_match('/^\[(\d{2}-\w{3}-\d{4}\s+\d{2}:\d{2}:\d{2}[^\]]+)\]/', $line, $matches)) {
             // Si ya teníamos un error, guardarlo
@@ -139,12 +138,12 @@ function parseCompletePHPError($logLines, $source) {
                     'external_url' => !empty($url) ? 'https://www.codigoamigo.com' . $url : ''
                 ];
             }
-            
+
             // Iniciar nuevo error
             $currentError = $line;
             $errorStart = true;
             $url = '';
-            
+
             // Intentar extraer URL del error si está en el stack trace
             if (preg_match('/\/public_html\/([^\s\(]+)/', $line, $urlMatches)) {
                 $url = '/' . $urlMatches[1];
@@ -153,11 +152,32 @@ function parseCompletePHPError($logLines, $source) {
                     // Ya tenemos la URL correcta
                 }
             }
+
+        } elseif (strpos($lineLower, 'acortador chollo') !== false) {
+             // Es un log de actividad no un error
+             $level = 'info';
+             // ... logic ...
+             
+             $errors[] = [
+                'timestamp' => time(),
+                'level' => 'info',
+                'source' => 'activity',
+                'message' => $currentError ?: $line,
+                'raw' => $currentError ?: $line,
+                'type' => 'activity',
+                'file_path' => getLogFilePath($source),
+                'url' => '',
+                'external_url' => ''
+            ];
+            
+            $currentError = '';
+            $errorStart = false; 
+            continue;
             
         } elseif ($errorStart) {
             // Continuar construyendo el error
             $currentError .= "\n" . $line;
-            
+
             // Buscar URL en líneas del stack trace
             if (preg_match('/\/public_html\/([^\s\(]+)/', $line, $urlMatches)) {
                 $foundUrl = '/' . $urlMatches[1];
@@ -168,7 +188,7 @@ function parseCompletePHPError($logLines, $source) {
                     $url = $foundUrl;
                 }
             }
-            
+
             // Si encontramos el final del stack trace, terminar el error
             if (strpos($line, '{main}') !== false || strpos($line, 'View in rendered output') !== false) {
                 // Agregar este error
@@ -183,7 +203,7 @@ function parseCompletePHPError($logLines, $source) {
                     'url' => $url,
                     'external_url' => !empty($url) ? 'https://www.codigoamigo.com' . $url : ''
                 ];
-                
+
                 // Resetear para el siguiente error
                 $currentError = '';
                 $errorStart = false;
@@ -191,7 +211,7 @@ function parseCompletePHPError($logLines, $source) {
             }
         }
     }
-    
+
     // Agregar el último error si existe y no se procesó
     if ($errorStart && !empty($currentError)) {
         $errors[] = [
@@ -202,10 +222,101 @@ function parseCompletePHPError($logLines, $source) {
             'raw' => $currentError,
             'type' => 'php_error',
             'file_path' => getLogFilePath($source),
-            'url' => $url
+            'url' => $url,
+            'external_url' => !empty($url) ? 'https://www.codigoamigo.com' . $url : ''
         ];
     }
-    
+
+    return $errors;
+}
+
+// Función para parsear errores de Slim Framework
+function parseSlimFrameworkError($logLines, $source) {
+    $errors = [];
+    $currentError = '';
+    $errorStart = false;
+    $url = '';
+
+    foreach ($logLines as $line) {
+        $line = trim($line);
+        if (empty($line)) continue;
+
+        // Detectar inicio de error de Slim Framework
+        if (strpos($line, 'Slim Application Error:') === 0) {
+            // Si ya teníamos un error, guardarlo
+            if ($errorStart && !empty($currentError)) {
+                $errors[] = [
+                    'timestamp' => time(),
+                    'level' => 'error',
+                    'source' => $source,
+                    'message' => $currentError,
+                    'raw' => $currentError,
+                    'type' => 'php_error',
+                    'file_path' => getLogFilePath($source),
+                    'url' => $url,
+                    'external_url' => !empty($url) ? 'https://www.codigoamigo.com' . $url : ''
+                ];
+            }
+
+            // Iniciar nuevo error
+            $currentError = $line;
+            $errorStart = true;
+            $url = '';
+
+        } elseif ($errorStart) {
+            // Continuar construyendo el error
+            $currentError .= "\n" . $line;
+
+            // Buscar URL en el stack trace de Slim
+            if (preg_match('/\/public_html\/([^\s\(]+)/', $line, $urlMatches)) {
+                $foundUrl = '/' . $urlMatches[1];
+                // Priorizar archivos en /public/ sobre index.php y app_with_mongo.php
+                if (strpos($foundUrl, '/public/') !== false) {
+                    $url = $foundUrl;
+                } elseif (empty($url) && !strpos($foundUrl, '/vendor/')) {
+                    // Evitar archivos de vendor, pero tomar index.php o app_with_mongo.php si no hay mejor opción
+                    $url = $foundUrl;
+                }
+            }
+
+            // Si encontramos el final del stack trace (línea con {main})
+            if (strpos($line, '{main}') !== false) {
+                // Agregar este error
+                $errors[] = [
+                    'timestamp' => time(),
+                    'level' => 'error',
+                    'source' => $source,
+                    'message' => $currentError,
+                    'raw' => $currentError,
+                    'type' => 'php_error',
+                    'file_path' => getLogFilePath($source),
+                    'url' => $url,
+                    'external_url' => !empty($url) ? 'https://www.codigoamigo.com' . $url : ''
+                ];
+
+                // Resetear para el siguiente error
+                $currentError = '';
+                $errorStart = false;
+                $url = '';
+            }
+        }
+    }
+
+    // Agregar el último error si existe y no se procesó
+    if ($errorStart && !empty($currentError)) {
+        $errors[] = [
+            'timestamp' => time(),
+            'level' => 'error',
+            'source' => $source,
+            'message' => $currentError,
+            'raw' => $currentError,
+            'type' => 'php_error',
+            'file_path' => getLogFilePath($source),
+            'url' => $url,
+            'external_url' => !empty($url) ? 'https://www.codigoamigo.com' . $url : ''
+        ];
+    }
+
     return $errors;
 }
 
@@ -218,10 +329,25 @@ function parseLogLine($line, $logType, $source) {
     // Clasificar por tipo de log primero
     $level = 'info';
     $lineLower = strtolower($line);
+    $statusCode = null;
     
-    // Apache/Nginx Access logs son siempre INFO (no son errores)
+    // Apache/Nginx Access logs
     if ($logType === 'apache_access' || $logType === 'nginx_access') {
-        $level = 'info';
+        // Intentar extraer el código de estado
+        // Formato típico: "GET /path HTTP/1.1" 200 ...
+        if (preg_match('/"\s+(\d{3})\s+/', $line, $matches)) {
+            $statusCode = (int)$matches[1];
+            
+            if ($statusCode >= 500) {
+                $level = 'error';
+            } elseif ($statusCode >= 400) {
+                $level = 'warning';
+            } elseif ($statusCode >= 300 && $statusCode < 400) {
+                $level = 'info'; // Redirects are info, but we will filter them specifically
+            } else {
+                $level = 'info';
+            }
+        }
     }
     // Apache/Nginx Error logs son siempre ERROR
     elseif ($logType === 'apache_error' || $logType === 'nginx_error' || $logType === 'mysql_error') {
@@ -238,6 +364,9 @@ function parseLogLine($line, $logType, $source) {
         } elseif (strpos($lineLower, 'warning') !== false || strpos($lineLower, 'warn') !== false) {
             $level = 'warning';
         } elseif (strpos($lineLower, 'notice') !== false || strpos($lineLower, 'deprecated') !== false) {
+            $level = 'info';
+        } elseif (strpos($lineLower, 'acortador chollo') !== false) {
+            // Mensajes informativos de la aplicación
             $level = 'info';
         } else {
             $level = 'error'; // Por defecto, errores de PHP son error
@@ -273,6 +402,7 @@ function parseLogLine($line, $logType, $source) {
         'message' => $line,
         'raw' => $line,
         'type' => $logType,
+        'status_code' => $statusCode,
         'file_path' => getLogFilePath($source),
         'url' => $url,
         'external_url' => $external_url
@@ -349,7 +479,8 @@ try {
                 // Si es un log de PHP, usar parseo completo
                 if ($logSources[$source]['type'] === 'php_error') {
                     $completeErrors = parseCompletePHPError($logLines, $source);
-                    $allLogs = array_merge($allLogs, $completeErrors);
+                    $slimErrors = parseSlimFrameworkError($logLines, $source);
+                    $allLogs = array_merge($allLogs, $completeErrors, $slimErrors);
                 } else {
                     foreach ($logLines as $line) {
                         $parsed = parseLogLine($line, $logSources[$source]['type'], $source);
@@ -366,12 +497,37 @@ try {
                     // Si es un log de PHP, usar parseo completo
                     if ($sourceConfig['type'] === 'php_error') {
                         $completeErrors = parseCompletePHPError($logLines, $key);
-                        $allLogs = array_merge($allLogs, $completeErrors);
+                        $slimErrors = parseSlimFrameworkError($logLines, $key);
+                        $allLogs = array_merge($allLogs, $completeErrors, $slimErrors);
                     } else {
                         foreach ($logLines as $line) {
                             $parsed = parseLogLine($line, $sourceConfig['type'], $key);
                             if ($parsed) {
-                                $allLogs[] = $parsed;
+                                // FILTERING LOGIC: Keep only relevant logs
+                                $keepLog = false;
+                                
+                                // 1. Always keep PHP, Apache/Nginx Error, MySQL errors
+                                if (in_array($parsed['type'], ['apache_error', 'nginx_error', 'mysql_error', 'system'])) {
+                                    $keepLog = true;
+                                }
+                                // 2. For Access Logs (Apache/Nginx), ONLY keep 404, 500, 301
+                                elseif (in_array($parsed['type'], ['apache_access', 'nginx_access', 'hestia_access'])) {
+                                    if (isset($parsed['status_code'])) {
+                                        if ($parsed['status_code'] == 404 || 
+                                            $parsed['status_code'] >= 500 || 
+                                            $parsed['status_code'] == 301) {
+                                            $keepLog = true;
+                                        }
+                                    }
+                                }
+                                // 3. Keep anything already marked as 'error' or 'warning' by parseLogLine
+                                elseif ($parsed['level'] === 'error' || $parsed['level'] === 'warning') {
+                                    $keepLog = true;
+                                }
+                                
+                                if ($keepLog) {
+                                    $allLogs[] = $parsed;
+                                }
                             }
                         }
                     }
@@ -411,10 +567,18 @@ try {
             $allLogs = [];
             foreach ($logSources as $key => $sourceConfig) {
                 $logLines = readLogRealtime($sourceConfig['path'], 100);
-                foreach ($logLines as $line) {
-                    $parsed = parseLogLine($line, $sourceConfig['type'], $key);
-                    if ($parsed) {
-                        $allLogs[] = $parsed;
+
+                // Si es un log de PHP, usar parseo completo
+                if ($sourceConfig['type'] === 'php_error') {
+                    $completeErrors = parseCompletePHPError($logLines, $key);
+                    $slimErrors = parseSlimFrameworkError($logLines, $key);
+                    $allLogs = array_merge($allLogs, $completeErrors, $slimErrors);
+                } else {
+                    foreach ($logLines as $line) {
+                        $parsed = parseLogLine($line, $sourceConfig['type'], $key);
+                        if ($parsed) {
+                            $allLogs[] = $parsed;
+                        }
                     }
                 }
             }

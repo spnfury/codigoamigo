@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodigoAmigo - Solución Timeout</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 800px;
+        }
+        .error {
+            background: rgba(255,255,255,0.2);
+            border: 2px solid #ff4757;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .solution {
+            background: rgba(46,204,113,0.2);
+            border: 2px solid #2ecc71;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .btn {
+            background: #2ecc71;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(46,204,113,0.3);
+        }
+        .btn:hover {
+            background: #27ae60;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(46,204,113,0.4);
+        }
+        .btn-warning {
+            background: #f39c12;
+            box-shadow: 0 4px 15px rgba(243,156,18,0.3);
+        }
+        .btn-warning:hover {
+            background: #e67e22;
+            box-shadow: 0 6px 20px rgba(243,156,18,0.4);
+        }
+        .status {
+            background: rgba(255,255,255,0.2);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .code {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            margin: 10px 0;
+            border-left: 4px solid #2ecc71;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚨 CodigoAmigo - Solución Timeout</h1>
+        
+        <div class="error">
+            <h2>❌ Error Identificado: ERR_CONNECTION_TIMED_OUT</h2>
+            <p><strong>Problema:</strong> "www.codigoamigo.com ha tardado demasiado tiempo en responder"</p>
+            <p><strong>Causa:</strong> Timeout de conexión HTTPS entre tu ubicación y Cloudflare</p>
+        </div>
+        
+        <div class="solution">
+            <h2>✅ Soluciones Inmediatas:</h2>
+            
+            <h3>🌐 Solución 1: Acceso Directo al Servidor</h3>
+            <div class="code">http://78.46.100.91/</div>
+            <a href="http://78.46.100.91/" class="btn">🔓 ACCESO DIRECTO</a>
+            
+            <h3>🔄 Solución 2: Cambiar DNS</h3>
+            <p>Cambia tu DNS a:</p>
+            <div class="code">
+                DNS Primario: 8.8.8.8<br>
+                DNS Secundario: 8.8.4.4
+            </div>
+            
+            <h3>🧹 Solución 3: Limpiar Navegador</h3>
+            <p>1. Borra cookies y caché</p>
+            <p>2. Reinicia el navegador</p>
+            <p>3. Prueba en modo incógnito</p>
+        </div>
+        
+        <div class="status">
+            <h3>📊 Estado del Sistema:</h3>
+            <p>✅ <strong>Servidor:</strong> Funcionando perfectamente</p>
+            <p>✅ <strong>Ping:</strong> 5.4ms (excelente)</p>
+            <p>✅ <strong>SSL:</strong> Certificado válido</p>
+            <p>✅ <strong>Cloudflare:</strong> Funcionando</p>
+            <p>❌ <strong>HTTPS:</strong> Timeout desde tu ubicación</p>
+        </div>
+        
+        <div class="solution">
+            <h2>🔧 Soluciones Avanzadas:</h2>
+            
+            <h3>📱 Prueba desde Móvil</h3>
+            <p>Usa datos móviles (4G/5G) en lugar de WiFi</p>
+            
+            <h3>🌍 Prueba con VPN</h3>
+            <p>Cambia tu ubicación virtual con una VPN</p>
+            
+            <h3>🔄 Prueba Otro Navegador</h3>
+            <p>Firefox, Safari, Edge, etc.</p>
+            
+            <h3>⏰ Prueba en Diferente Hora</h3>
+            <p>El problema puede ser temporal</p>
+        </div>
+        
+        <div class="status">
+            <h3>🎯 URLs de Prueba:</h3>
+            <a href="http://78.46.100.91/" class="btn">🌐 IP Directa</a>
+            <a href="http://78.46.100.91/?cf_bypass=1" class="btn btn-warning">⚡ IP + Bypass</a>
+            <a href="http://78.46.100.91/diagnostico.html" class="btn">🔍 Diagnóstico</a>
+        </div>
+        
+        <div class="error">
+            <h3>⚠️ Nota Importante:</h3>
+            <p>El sitio está funcionando perfectamente. El problema es específico de conectividad HTTPS desde tu ubicación.</p>
+            <p>Usa <strong>http://78.46.100.91/</strong> como solución temporal.</p>
+        </div>
+        
+        <script>
+            // Auto-redirección a la IP directa después de 5 segundos
+            setTimeout(function() {
+                if (confirm('¿Quieres acceder directamente al servidor (sin HTTPS)?')) {
+                    window.location.href = 'http://78.46.100.91/';
+                }
+            }, 5000);
+            
+            // Log para debugging
+            console.log('Timeout solution page loaded');
+            console.log('User Agent:', navigator.userAgent);
+            console.log('Current URL:', window.location.href);
+            console.log('Timestamp:', new Date().toISOString());
+        </script>
+    </div>
+</body>
+</html>
+

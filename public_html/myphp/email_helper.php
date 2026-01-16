@@ -1,6 +1,11 @@
 <?php
 // Helper para envío de emails con Brevo SMTP como principal y SendGrid como fallback
 
+// Cargar autoloader de Composer si existe
+if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+}
+
 use SendGrid\Mail\Mail;
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
@@ -8,6 +13,11 @@ use PHPMailer\PHPMailer\Exception;
 
 // Incluir configuración
 include_once __DIR__ . '/../config/email_config.php';
+
+// Incluir funciones de usuario para acceso a getCollectionEmailLogs
+if (!function_exists('getCollectionEmailLogs')) {
+    include_once __DIR__ . '/funciones_usuario.php';
+}
 
 /**
  * Envía email usando SMTP de Brevo con PHPMailer
@@ -67,10 +77,47 @@ function enviarEmailSMTPBrevo($to_email, $to_name, $subject, $html_content, $tex
     return $resultado;
 }
 
+// Función wrapper que registra en el log después del envío
+function enviarEmailConBrevoYRegistrar($to_email, $to_name, $subject, $html_content, $tipo, $usuario_id = null, $detalles = [], $text_content = '', $from_email = 'noreply@codigoamigo.com', $from_name = 'Código Amigo') {
+    
+    // Enviar el email
+    $resultado = enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text_content, $from_email, $from_name);
+    
+    // Registrar en el log
+    if (!function_exists('registrarEmailLog')) {
+        include_once __DIR__ . '/funciones_email.php';
+    }
+    
+    registrarEmailLog(
+        $to_email,
+        $to_name,
+        $subject,
+        $tipo,
+        $usuario_id,
+        $detalles,
+        $resultado['success'],
+        $resultado['method'] ?? 'Desconocido',
+        $resultado['error'] ?? '',
+        $html_content // Pasar el HTML para poder visualizarlo en el admin
+    );
+    
+    return $resultado;
+}
+
 /**
  * Envía email usando Brevo SMTP como principal y SendGrid como fallback
  */
 function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text_content = '', $from_email = 'noreply@codigoamigo.com', $from_name = 'Código Amigo') {
+    
+    // Validar parámetros
+    if (empty($to_email) || empty($to_name) || empty($subject) || empty($html_content)) {
+        error_log("Error enviarEmailConBrevo: Parámetros inválidos - to_email: $to_email, to_name: $to_name");
+        return [
+            'success' => false,
+            'method' => '',
+            'error' => 'Parámetros inválidos'
+        ];
+    }
     
     $resultado = array(
         'success' => false,
@@ -159,10 +206,29 @@ function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text
         $resultado['error'] .= " | Elastic Email: " . $e->getMessage();
     }
     
+    // Último intento: PHP mail() nativo
+    try {
+        $headers  = 'From: ' . $from_name . ' <' . $from_email . ">\r\n";
+        $headers .= 'Reply-To: ' . $from_email . "\r\n";
+        $headers .= "MIME-Version: 1.0\r\n";
+        $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
+
+        $mail_ok = @mail($to_email, $subject, $html_content, $headers);
+        if ($mail_ok) {
+            $resultado['success'] = true;
+            $resultado['method'] = 'PHP mail()';
+            return $resultado;
+        } else {
+            $resultado['error'] .= ' | PHP mail() falló';
+        }
+    } catch (Exception $e) {
+        $resultado['error'] .= ' | PHP mail(): ' . $e->getMessage();
+    }
+
     // Si todos los métodos fallan
     error_log("Error: No se pudo enviar email a " . $to_email . " con ningún método. Errores: " . $resultado['error']);
     mandaBot("Error crítico: No se pudo enviar email a " . $to_email . " con ningún método. Errores: " . $resultado['error']);
-    
+
     return $resultado;
 }
 
@@ -186,7 +252,7 @@ function enviarEmailRecuperacionPassword($datos) {
                 <p>Estimado usuario <strong>' . htmlspecialchars($nombre) . '</strong>:</p>
                 <p>Te agradecemos que te pongas en contacto con nosotros. Hemos recuperado tu cuenta de usuario de <a href="https://www.codigoamigo.com">Código Amigo</a>.</p>
                 <p>Para cambiar tu contraseña, por favor, accede al siguiente enlace. Si el enlace no estuviera activo, por favor, copia y pega en el navegador.</p><br>
-                <p><a href="https://www.codigoamigo.com/nuevo_password?codigo=' . $email_encode . '" style="background-color: #ff6b35; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Cambiar contraseña</a></p>
+                <p><a href="https://www.codigoamigo.com/nuevo_password?codigo=' . $email_encode . '" style="background-color: #E30613; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Cambiar contraseña</a></p>
                 <p>O copia y pega este enlace en tu navegador:</p>
                 <p>https://www.codigoamigo.com/nuevo_password?codigo=' . $email_encode . '</p>
                 <br>
@@ -227,18 +293,29 @@ function enviarEmailContacto($datos, $url_logo_web) {
                    "<li><b>Teléfono: </b>" . htmlspecialchars($datos["telefono"]) . "</li><br>" .
                    "<li><b>Mensaje: </b>" . htmlspecialchars($datos["mensaje"]) . "</li><br>" .
                    "</ul>";
-    
+
     $text_content = "Nuevo contacto desde el formulario " . $datos["origin"] . ":\n\n" .
                    "Nombre: " . $datos["nombre"] . "\n" .
                    "Correo: " . $datos["correo"] . "\n" .
                    "Teléfono: " . $datos["telefono"] . "\n" .
                    "Mensaje: " . $datos["mensaje"];
-    
-    return enviarEmailConBrevo(
+
+    // Datos para logging
+    $usuario_id = $_SESSION['user_id'] ?? null;
+    $detalles = [
+        'origin' => $datos['origin'] ?? 'contacto',
+        'telefono' => $datos['telefono'] ?? '',
+        'from_email' => $datos['correo'] ?? ''
+    ];
+
+    return enviarEmailConBrevoYRegistrar(
         "thevega82@gmail.com",
         "Sergi",
         $datos["origin"],
         $html_content,
+        'contacto_form',
+        $usuario_id,
+        $detalles,
         $text_content,
         "info@codigoamigo.com",
         "Código Amigo"

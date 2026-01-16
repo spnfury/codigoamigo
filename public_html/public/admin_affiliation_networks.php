@@ -1,0 +1,160 @@
+<?php
+session_start();
+
+// Incluir archivos necesarios
+require_once __DIR__ . '/../inc/includes.php';
+require_once __DIR__ . '/../myphp/funciones.php';
+require_once __DIR__ . '/admin_sidebar_menu.php';
+
+// Verificar permisos de administrador (Reutilizando lógica de admin_dashboard.php)
+$array_codigos_acceso = ["58bd851da54e295b8b52f702", "5e78170e6b68e6519b7c5df2", "639899bc6321ee0d0e4010d2", "5c8a10ce2f55c86d6e707d82"];
+if (!isset($_SESSION["user_id"]) || !in_array($_SESSION["user_id"], $array_codigos_acceso)) {
+    header('Location: /');
+    die();
+}
+
+$col_networks = getCollectionAffiliationNetworks();
+
+// Manejar Acciones (Post)
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+    
+    if ($action === 'add') {
+        $new_net = [
+            'name' => $_POST['name'],
+            'type' => $_POST['type'],
+            'status' => 'active',
+            'api_key' => $_POST['api_key'] ?? '',
+            'api_secret' => $_POST['api_secret'] ?? '',
+            'account_id' => $_POST['account_id'] ?? '',
+            'created_at' => new MongoDB\BSON\UTCDateTime()
+        ];
+        $col_networks->insertOne($new_net);
+    } elseif ($action === 'toggle_status') {
+        $id = new MongoDB\BSON\ObjectId($_POST['id']);
+        $net = $col_networks->findOne(['_id' => $id]);
+        $new_status = ($net['status'] === 'active') ? 'inactive' : 'active';
+        $col_networks->updateOne(['_id' => $id], ['$set' => ['status' => $new_status]]);
+    }
+}
+
+$networks = $col_networks->find([], ['sort' => ['name' => 1]])->toArray();
+
+$title = "Gestión de Redes de Afiliación - Admin";
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title><?php echo $title; ?></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .sidebar { min-height: 100vh; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .sidebar .nav-link { color: rgba(255,255,255,0.8); padding: 12px 20px; border-radius: 8px; margin: 2px 0; transition: all 0.3s; }
+        .sidebar .nav-link:hover, .sidebar .nav-link.active { background: rgba(255,255,255,0.2); color: white; }
+        .main-content { background-color: #f8f9fa; min-height: 100vh; }
+        .card { border: none; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <?php echo get_admin_sidebar_menu('admin_affiliation_networks.php'); ?>
+            
+            <div class="col-md-9 col-lg-10 main-content p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2><i class="fas fa-network-wired me-2"></i>Redes de Afiliación</h2>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addNetworkModal">
+                        <i class="fas fa-plus me-2"></i>Nueva Red
+                    </button>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Tipo</th>
+                                    <th>Estado</th>
+                                    <th>ID Cuenta</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($networks as $net): ?>
+                                <tr>
+                                    <td><strong><?php echo htmlspecialchars($net['name']); ?></strong></td>
+                                    <td><span class="badge bg-secondary"><?php echo htmlspecialchars($net['type']); ?></span></td>
+                                    <td>
+                                        <span class="badge bg-<?php echo ($net['status'] === 'active') ? 'success' : 'danger'; ?>">
+                                            <?php echo ucfirst($net['status']); ?>
+                                        </span>
+                                    </td>
+                                    <td><code><?php echo htmlspecialchars($net['account_id'] ?? '-'); ?></code></td>
+                                    <td>
+                                        <form method="POST" style="display:inline;">
+                                            <input type="hidden" name="action" value="toggle_status">
+                                            <input type="hidden" name="id" value="<?php echo (string)$net['_id']; ?>">
+                                            <button type="submit" class="btn btn-sm btn-<?php echo ($net['status'] === 'active') ? 'warning' : 'success'; ?>">
+                                                <?php echo ($net['status'] === 'active') ? 'Desactivar' : 'Activar'; ?>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Nueva Red -->
+    <div class="modal fade" id="addNetworkModal" tabindex="-1">
+        <div class="modal-dialog">
+            <form class="modal-content" method="POST">
+                <input type="hidden" name="action" value="add">
+                <div class="modal-header">
+                    <h5 class="modal-title">Añadir Red de Afiliación</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" name="name" class="form-control" required placeholder="Impact, Awin, Manual...">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo</label>
+                        <select name="type" class="form-select">
+                            <option value="impact">Impact</option>
+                            <option value="awin">Awin</option>
+                            <option value="manual">Manual/Personalizado</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Account ID</label>
+                        <input type="text" name="account_id" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">API Key</label>
+                        <input type="text" name="api_key" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">API Secret</label>
+                        <input type="text" name="api_secret" class="form-control">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Red</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -34,6 +34,7 @@ function get_all_marcas_panel_control($limit = 9999,$aviso='',$solo='') {
 
     $array_final_marcas = array();
     $collection_marcas = getCollectionMarcas();
+    $array_skip = array(); // Inicializar variable $array_skip
 
     if($aviso=='Marca nueva estado 0'){
 
@@ -277,8 +278,7 @@ function sube_imagen_marca($datos){
 }
 
 function fusiona_marcas($data) {
-
-
+    $array_skip = array(); // Inicializar variable $array_skip
 
     /*
      *
@@ -358,11 +358,21 @@ function fusiona_marcas($data) {
 
         }
 
+        /* CREAR REDIRECCIÓN 301 ANTES DE BORRAR LA MARCA ORIGEN */
+        $redirect_created = create_brand_redirect(
+            $marca_obj_origen["nombre_clave"],
+            $marca_obj_destino["nombre_clave"],
+            'fusion'
+        );
+
         /* BORRO ORIGEN */
         $datos_a_borrar["id_marca"] = $data["id_marca"];
         borrar_marca($datos_a_borrar);
 
         echo "Movido y marca eliminada correctamente ".count($lista_codigos_patrocinados_origen)." codigos";
+        if ($redirect_created) {
+            echo ". Redirección 301 creada de /de-" . $marca_obj_origen["nombre_clave"] . " hacia /de-" . $marca_obj_destino["nombre_clave"];
+        }
 
     }else{
 
@@ -419,12 +429,304 @@ function borrar_marca($datos) {
 
 }
 
+/******************************************************
+ *  GESTIÓN DE REDIRECCIONES 301 PARA MARCAS
+ * ***************************************************/
+
+function getCollectionRedirects() {
+    $db = createConnection();
+    $collection_redirects = $db->selectCollection('redirects');
+    return $collection_redirects;
+}
+
+function create_brand_redirect($old_brand_key, $new_brand_key, $reason = 'fusion') {
+    $collection_redirects = getCollectionRedirects();
+
+    // Verificar si ya existe una redirección para esta marca antigua
+    $existing_redirect = $collection_redirects->findOne([
+        'old_brand_key' => $old_brand_key,
+        'type' => 'marca'
+    ]);
+
+    if (!$existing_redirect) {
+        $redirect_data = [
+            'type' => 'marca',
+            'old_brand_key' => $old_brand_key,
+            'new_brand_key' => $new_brand_key,
+            'reason' => $reason,
+            'redirect_url' => '/de-' . $new_brand_key,
+            'created_at' => date('Y-m-d H:i:s'),
+            'is_active' => true
+        ];
+
+        $result = $collection_redirects->insertOne($redirect_data);
+
+        if ($result->getInsertedId()) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function get_brand_redirect($brand_key) {
+    $collection_redirects = getCollectionRedirects();
+
+    $redirect = $collection_redirects->findOne([
+        'old_brand_key' => $brand_key,
+        'type' => 'marca',
+        'is_active' => true
+    ]);
+
+    return $redirect;
+}
+
+function get_all_redirects($limit = 100) {
+    $collection_redirects = getCollectionRedirects();
+
+    $redirects = $collection_redirects->find(
+        [],
+        [
+            'sort' => ['created_at' => -1],
+            'limit' => $limit
+        ]
+    )->toArray();
+
+    return $redirects;
+}
+
+function delete_redirect($redirect_id) {
+    $collection_redirects = getCollectionRedirects();
+
+    $result = $collection_redirects->deleteOne([
+        '_id' => new \MongoDB\BSON\ObjectId($redirect_id)
+    ]);
+
+    return $result->getDeletedCount() > 0;
+}
+
+function toggle_redirect_status($redirect_id) {
+    $collection_redirects = getCollectionRedirects();
+
+    // Primero obtener el estado actual
+    $redirect = $collection_redirects->findOne(['_id' => new \MongoDB\BSON\ObjectId($redirect_id)]);
+    $current_status = $redirect['is_active'] ?? true;
+
+    $result = $collection_redirects->updateOne(
+        ['_id' => new \MongoDB\BSON\ObjectId($redirect_id)],
+        ['$set' => ['is_active' => !$current_status]]
+    );
+
+    return $result->getModifiedCount() > 0;
+}
+
+function cleanup_orphan_redirects() {
+    $collection_redirects = getCollectionRedirects();
+    $collection_marcas = getCollectionMarcas();
+
+    // Obtener todas las marcas existentes
+    $existing_brands = [];
+    $marcas = $collection_marcas->find([], ['projection' => ['nombre_clave' => 1]])->toArray();
+    foreach ($marcas as $marca) {
+        $existing_brands[] = $marca['nombre_clave'];
+    }
+
+    // Obtener todas las redirecciones activas
+    $redirects = $collection_redirects->find(['is_active' => true])->toArray();
+
+    $cleaned_count = 0;
+    foreach ($redirects as $redirect) {
+        // Verificar si la marca destino existe
+        if (!in_array($redirect['new_brand_key'], $existing_brands)) {
+            // Desactivar la redirección huérfana
+            $collection_redirects->updateOne(
+                ['_id' => $redirect['_id']],
+                ['$set' => ['is_active' => false]]
+            );
+            $cleaned_count++;
+        }
+    }
+
+    return $cleaned_count;
+}
+
+/******************************************************
+ *  DETECCIÓN DE MARCAS DUPLICADAS
+ * ***************************************************/
+
+function detectar_marcas_duplicadas($umbral_similitud = 80) {
+    $collection_marcas = getCollectionMarcas();
+
+    // Obtener todas las marcas activas
+    $marcas = $collection_marcas->find(['estado' => 1], [
+        'sort' => ['nombre' => 1],
+        'projection' => ['nombre' => 1, 'nombre_clave' => 1, '_id' => 1]
+    ])->toArray();
+
+    $grupos_duplicados = [];
+    $procesadas = [];
+
+    foreach ($marcas as $marca_actual) {
+        if (in_array($marca_actual['_id'], $procesadas)) {
+            continue;
+        }
+
+        $grupo_actual = [$marca_actual];
+        $procesadas[] = $marca_actual['_id'];
+
+        foreach ($marcas as $marca_comparar) {
+            if (in_array($marca_comparar['_id'], $procesadas)) {
+                continue;
+            }
+
+            // Calcular similitud usando similar_text
+            similar_text(
+                strtolower($marca_actual['nombre']),
+                strtolower($marca_comparar['nombre']),
+                $porcentaje
+            );
+
+            // Si la similitud es mayor al umbral, considerar duplicadas
+            if ($porcentaje >= $umbral_similitud) {
+                $grupo_actual[] = $marca_comparar;
+                $procesadas[] = $marca_comparar['_id'];
+            }
+        }
+
+        // Solo incluir grupos con más de una marca
+        if (count($grupo_actual) > 1) {
+            $grupos_duplicados[] = $grupo_actual;
+        }
+    }
+
+    return $grupos_duplicados;
+}
+
+function obtener_marcas_duplicadas_para_panel($umbral_similitud = 80) {
+    $grupos_duplicados = detectar_marcas_duplicadas($umbral_similitud);
+
+    $resultado = [];
+    foreach ($grupos_duplicados as $grupo) {
+        $grupo_info = [
+            'grupo_id' => uniqid(),
+            'marcas' => [],
+            'similitud_promedio' => 0,
+            'total_codigos' => 0
+        ];
+
+        $similitudes = [];
+        foreach ($grupo as $marca) {
+            $codigos_count = getCollectionCodigos()->countDocuments(['marca' => $marca['nombre_clave']]);
+
+            $grupo_info['marcas'][] = [
+                'id' => (string)$marca['_id'],
+                'nombre' => $marca['nombre'],
+                'nombre_clave' => $marca['nombre_clave'],
+                'codigos_count' => $codigos_count
+            ];
+
+            $grupo_info['total_codigos'] += $codigos_count;
+
+            // Calcular similitudes entre esta marca y las demás del grupo
+            foreach ($grupo as $marca_comparar) {
+                if ($marca['_id'] != $marca_comparar['_id']) {
+                    similar_text(
+                        strtolower($marca['nombre']),
+                        strtolower($marca_comparar['nombre']),
+                        $porcentaje
+                    );
+                    $similitudes[] = $porcentaje;
+                }
+            }
+        }
+
+        if (!empty($similitudes)) {
+            $grupo_info['similitud_promedio'] = round(array_sum($similitudes) / count($similitudes), 1);
+        }
+
+        $resultado[] = $grupo_info;
+    }
+
+    // Ordenar grupos por similitud promedio (más similares primero)
+    usort($resultado, function($a, $b) {
+        return $b['similitud_promedio'] <=> $a['similitud_promedio'];
+    });
+
+    return $resultado;
+}
+
+function fusionar_marcas_masiva($marcas_origen_ids, $marca_destino_id) {
+    $collection_marcas = getCollectionMarcas();
+    $collection_codigos = getCollectionCodigos();
+
+    // Obtener información de la marca destino
+    $marca_destino = $collection_marcas->findOne(['_id' => new MongoDB\BSON\ObjectId($marca_destino_id)]);
+    if (!$marca_destino) {
+        return ['error' => 'Marca destino no encontrada'];
+    }
+
+    $resultados = [
+        'fusionadas' => 0,
+        'codigos_transferidos' => 0,
+        'redirecciones_creadas' => 0,
+        'errores' => []
+    ];
+
+    foreach ($marcas_origen_ids as $marca_origen_id) {
+        // Obtener información de la marca origen
+        $marca_origen = $collection_marcas->findOne(['_id' => new MongoDB\BSON\ObjectId($marca_origen_id)]);
+
+        if (!$marca_origen) {
+            $resultados['errores'][] = "Marca origen {$marca_origen_id} no encontrada";
+            continue;
+        }
+
+        if ($marca_origen_id === $marca_destino_id) {
+            $resultados['errores'][] = "No se puede fusionar una marca consigo misma: {$marca_origen['nombre']}";
+            continue;
+        }
+
+        try {
+            // Contar códigos antes de la transferencia
+            $codigos_count = $collection_codigos->countDocuments(['marca' => $marca_origen['nombre_clave']]);
+
+            // Transferir códigos
+            $update_result = $collection_codigos->updateMany(
+                ['marca' => $marca_origen['nombre_clave']],
+                ['$set' => ['marca' => $marca_destino['nombre_clave']]]
+            );
+
+            // Crear redirección 301
+            $redirect_created = create_brand_redirect(
+                $marca_origen['nombre_clave'],
+                $marca_destino['nombre_clave'],
+                'fusion_masiva'
+            );
+
+            // Eliminar marca origen
+            $collection_marcas->deleteOne(['_id' => new MongoDB\BSON\ObjectId($marca_origen_id)]);
+
+            $resultados['fusionadas']++;
+            $resultados['codigos_transferidos'] += $update_result->getModifiedCount();
+            if ($redirect_created) {
+                $resultados['redirecciones_creadas']++;
+            }
+
+        } catch (Exception $e) {
+            $resultados['errores'][] = "Error al fusionar {$marca_origen['nombre']}: " . $e->getMessage();
+        }
+    }
+
+    return $resultados;
+}
+
 /**
  * Obtiene todas las marcas activas para mostrar en el listado
  */
 function getMarcas($limit = null, $categoria = null, $excluye = null) {
     $array_final_marcas = array();
     $collection_marcas = getCollectionMarcas();
+    $array_skip = array(); // Inicializar variable $array_skip
 
     // Construir filtro de búsqueda
     $filtro = ['estado' => 1]; // Solo marcas activas
@@ -457,12 +759,9 @@ function getMarcas($limit = null, $categoria = null, $excluye = null) {
 
     // Opciones de consulta
     $opciones = [];
-    if ($limit) {
-        $opciones['limit'] = $limit;
-    }
+    // No aplicar límite aquí, lo haremos después de ordenar por códigos
     
-    // Ordenar por nombre
-    $opciones['sort'] = ['nombre' => 1];
+    // No ordenar por nombre aquí, lo haremos después por número de códigos
 
     $lista_marcas = $collection_marcas->find($filtro, $opciones);
     $array_marcas = iterator_to_array($lista_marcas);
@@ -482,12 +781,58 @@ function getMarcas($limit = null, $categoria = null, $excluye = null) {
             $item_auxiliar["nombre_clave"] = $item["nombre_clave"];
             $item_auxiliar["categoria"] = $item["categoria"];
             $item_auxiliar["categoria_clave"] = $item["categoria_clave"];
-            $item_auxiliar["imagen"] = $item["imagen"];
+            
+            // Procesar imagen como lo hace getObjectMarca
+            $imagen_procesada = $item["imagen"] ?? '';
+            if (isset($imagen_procesada) && is_string($imagen_procesada) && !empty($imagen_procesada) && $imagen_procesada != 'Sin imagen') {
+                // Convertir http a https
+                if(strpos($imagen_procesada, 'http://') !== false){
+                    $imagen_procesada = str_replace("http://", "https://", $imagen_procesada);
+                }
+                
+                // Convertir a CloudFront si es necesario (excepto panel_marcas)
+                if(strpos($imagen_procesada, 'https://www.codigoamigo.com/img/') !== false){
+                    if(strpos($imagen_procesada, 'https://www.codigoamigo.com/img/panel_marcas/') === false) {
+                        $imagen_procesada = str_replace("https://www.codigoamigo.com/img/","https://d3hcf0nbuqjt3g.cloudfront.net/",$imagen_procesada);
+                    }
+                } elseif(strpos($imagen_procesada, 'https://cdn-codigoamigo.s3-eu-west-1.amazonaws.com/') !== false){
+                    $imagen_procesada = str_replace("https://cdn-codigoamigo.s3-eu-west-1.amazonaws.com/","https://d3hcf0nbuqjt3g.cloudfront.net/",$imagen_procesada);
+                }
+                
+                // Si es ruta relativa, convertir a absoluta
+                $is_http = (strpos($imagen_procesada, 'http://') === 0 || strpos($imagen_procesada, 'https://') === 0);
+                if (!$is_http) {
+                    if (strpos($imagen_procesada, '/') === 0) {
+                        // Si es panel_marcas, usar directamente del servidor
+                        if (strpos($imagen_procesada, '/img/panel_marcas/') !== false) {
+                            $imagen_procesada = 'https://www.codigoamigo.com' . $imagen_procesada;
+                        } else {
+                            $imagen_procesada = 'https://www.codigoamigo.com' . $imagen_procesada;
+                        }
+                    } else {
+                        $imagen_procesada = 'https://www.codigoamigo.com/' . ltrim($imagen_procesada, '/');
+                    }
+                }
+            } else {
+                $imagen_procesada = '';
+            }
+            
+            $item_auxiliar["imagen"] = $imagen_procesada;
             $item_auxiliar["descripción"] = $item["descripción"];
             $item_auxiliar["descripción_larga"] = $item["descripción_larga"];
 
             $array_final_marcas[] = $item_auxiliar;
         }
+    }
+
+    // Ordenar por número de códigos de forma descendente (más códigos primero)
+    usort($array_final_marcas, function($a, $b) {
+        return $b['numero_codigos'] - $a['numero_codigos'];
+    });
+
+    // Aplicar el límite después del ordenamiento
+    if ($limit && $limit > 0) {
+        $array_final_marcas = array_slice($array_final_marcas, 0, $limit);
     }
 
     return $array_final_marcas;

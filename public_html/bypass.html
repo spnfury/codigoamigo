@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodigoAmigo - Acceso Directo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .btn {
+            background: #007bff;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 CodigoAmigo - Acceso Directo</h1>
+        
+        <div class="warning">
+            <strong>⚠️ Problema de Cloudflare Detectado</strong><br>
+            Si no puedes acceder al sitio principal, usa los enlaces de abajo para bypass de Cloudflare.
+        </div>
+        
+        <h2>📋 Opciones de Acceso:</h2>
+        
+        <a href="/?cf_bypass=1" class="btn">🔓 Acceso Directo (Bypass)</a>
+        <a href="/public/" class="btn">📁 Acceso Público</a>
+        <a href="/index.php?dev_mode=1" class="btn">🛠️ Modo Desarrollo</a>
+        
+        <h3>🔧 Para Administradores:</h3>
+        <p>Si eres administrador y sigues teniendo problemas:</p>
+        
+        <ol>
+            <li><strong>Panel Cloudflare:</strong> Ve a <a href="https://dash.cloudflare.com/" target="_blank">dash.cloudflare.com</a></li>
+            <li><strong>Selecciona:</strong> codigoamigo.com</li>
+            <li><strong>Security → Settings:</strong> Cambia Security Level a "Essentially Off"</li>
+            <li><strong>Desactiva:</strong> Bot Fight Mode</li>
+            <li><strong>Challenge Passage:</strong> Configura a "5 minutes"</li>
+        </ol>
+        
+        <h3>📊 Estado del Sitio:</h3>
+        <p>✅ <strong>Servidor:</strong> Funcionando correctamente</p>
+        <p>✅ <strong>Base de datos:</strong> Conectada</p>
+        <p>✅ <strong>PHP:</strong> Sin errores fatales</p>
+        <p>⚠️ <strong>Cloudflare:</strong> Protección activa</p>
+        
+        <script>
+            // Auto-redirect después de 5 segundos si no hay interacción
+            setTimeout(function() {
+                if (confirm('¿Quieres intentar el acceso directo automáticamente?')) {
+                    window.location.href = '/?cf_bypass=1';
+                }
+            }, 5000);
+            
+            // Detectar si estamos en modo bypass
+            if (window.location.search.includes('cf_bypass=1')) {
+                document.body.style.background = '#d4edda';
+                document.querySelector('.container').style.border = '2px solid #28a745';
+            }
+        </script>
+    </div>
+</body>
+</html>

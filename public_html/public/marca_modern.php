@@ -1,6 +1,7 @@
 <?php
 // Página de marca moderna y optimizada
 get_header_modern($title, $description, $title_social, $description_social, $imagen_social, $links_meta);
+$GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno para el footer correspondiente
 
 global $detect_device, $codigo_existente, $u;
 $numero_codigos_format = number_format($numero_codigos, 0, ',', '.');
@@ -22,7 +23,8 @@ function show_short_desc_modern($marca) {
             'yugo' => 'Yugo es la plataforma de carsharing urbano más innovadora.',
             'muving' => 'Muving es el servicio de motosharing eléctrico más sostenible.',
             'repsol-waylet' => 'Waylet es la app de Repsol para pagar combustible y obtener descuentos.',
-            'initiativeq' => 'InitiativeQ es la nueva moneda digital del futuro.'
+            'initiativeq' => 'InitiativeQ es la nueva moneda digital del futuro.',
+            'lixsaai' => 'Lixsa.ai es la plataforma de inteligencia artificial líder para automatizar la atención al cliente en eCommerce con chatbots inteligentes y soluciones de IA conversacional.'
         ];
         
         if (isset($textos_especificos[$marca["nombre_clave"]])) {
@@ -365,7 +367,7 @@ if ($_GET["nuevo_codigo"] == 1) { ?>
 <style>
 /* Estilos para la página de marca moderna */
 .brand-header {
-    background: linear-gradient(135deg, var(--primary-orange) 0%, #E55A2B 100%);
+    background: linear-gradient(135deg, var(--primary-orange) 0%, #C40510 100%);
     color: white;
     padding: 3rem 0;
     margin-bottom: 2rem;
@@ -500,7 +502,7 @@ if ($_GET["nuevo_codigo"] == 1) { ?>
     background: var(--primary-orange);
     color: white;
     transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+    box-shadow: 0 4px 15px rgba(227, 6, 19, 0.3);
 }
 
 .brand-navigation .nav-link.btn {
@@ -509,7 +511,7 @@ if ($_GET["nuevo_codigo"] == 1) { ?>
 }
 
 .brand-navigation .nav-link.btn:hover {
-    background: #E55A2B;
+    background: #C40510;
 }
 
 .codes-section {

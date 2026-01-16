@@ -1,6 +1,13 @@
 <?php
 
 get_header_new($title, $description, $title_social, $description_social, $imagen_social, $links_meta);
+
+// Incluir funciones modernas para el sistema de encabezados
+include_once __DIR__ . '/../myphp/funciones_modern.php';
+
+// Incluir funciones de FAQs
+include_once __DIR__ . '/../myphp/funciones_faq_frontend.php';
+
 global $detect_device,$codigo_existente,$u;
 
 $numero_codigos_format = number_format($numero_codigos, 0, ',', '.');
@@ -17,7 +24,7 @@ function show_short_desc($marca){
 		<p style="display:flex;" ><?php
 
 		     if($marca["descripción"]){
-		         echo $marca["descripción"];
+		         echo html_entity_decode($marca["descripción"]);
 		     }else{
 
 			    if($marca["nombre_clave"] == 'airbnb') { texto_airbnb(); }
@@ -29,6 +36,7 @@ function show_short_desc($marca){
 			    elseif($marca["nombre_clave"] == 'muving') { texto_muving(); }
 			    elseif($marca["nombre_clave"] == 'repsol-waylet') { texto_repsol(); }
 			    elseif($marca["nombre_clave"] == 'initiativeq') { texto_initiativeq(); }
+			    elseif($marca["nombre_clave"] == 'lixsaai') { texto_lixsa(); }
 			    elseif(muestra_texto($marca["nombre_clave"])){
 			        echo muestra_texto($marca["nombre_clave"]);
 			    }else {
@@ -67,6 +75,7 @@ function show_short_desc($marca){
 			    elseif($marca["nombre_clave"] == 'muving') { texto_muving(); }
 			    elseif($marca["nombre_clave"] == 'repsol-waylet') { texto_repsol(); }
 			    elseif($marca["nombre_clave"] == 'initiativeq') { texto_initiativeq(); }
+			    elseif($marca["nombre_clave"] == 'lixsaai') { texto_lixsa(); }
 			    elseif(muestra_texto($marca["nombre_clave"])){
 			        echo muestra_texto($marca["nombre_clave"]);
 			    }else {
@@ -344,13 +353,21 @@ function show_short_desc($marca){
 	<div class="container">
 		<div class="">
             <div class="col-md-12">
-            	<?php if($h1!=''){ ?>
-            		<h1><?php echo $h1; ?></h1>
-            	<?php }else{?>
-            		<h1>Código descuento <?php echo $marca["nombre"]; ?></h1>
-            	<?php } ?>
+            	<?php
+            	// Usar el nuevo sistema de encabezados jerárquicos
+            	HeaderManager::reset();
+
+            	$page_title = '';
+            	if($h1!=''){
+            		$page_title = $h1;
+            	}else{
+            		$page_title = 'Código descuento ' . $marca["nombre"];
+            	}
+
+            	echo generatePageHeader($page_title);
+            	?>
             </div>
-		</div>
+        </div>
 	</div>
 </section>
 
@@ -384,6 +401,13 @@ show_short_desc($marca);
             		<a href="<?php echo link_categoria($marca["categoria_clave"]); ?>"><?php echo ucfirst(str_replace("-"," ",$marca["categoria"])); ?></a> > <?php echo $marca["nombre"];?>
     			</div>
     		<?php }?>
+
+            <!-- Nuevo botón Publicar Código en Sidebar -->
+            <div class="col-lg-12 col-xs-12" style="margin-top: 20px; padding: 0;">
+                <a href="/nuevo_codigo?marca=<?php echo urlencode($marca['nombre_clave']); ?>" class="btn-sidebar-publish">
+                    <i class="fas fa-rocket"></i> Publicar mi código de <?php echo $marca['nombre']; ?>
+                </a>
+            </div>
 
     	</div>
 
@@ -523,8 +547,13 @@ show_short_desc($marca);
 <div class="container">
     <div class="row empieza_home">
     	<div class="col-md-12 columns small-12 slider">
-           		<div class="title">
-           			<h2>Códigos Promocionales para <?php echo $marca["nombre"]?></h2>
+           		<div class="title" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+           			<?php echo generateMainSection('Códigos Promocionales para ' . $marca["nombre"]); ?>
+                    
+                    <!-- Botón Publicar Código en Cabecera de Sección -->
+                    <a href="/nuevo_codigo?marca=<?php echo urlencode($marca['nombre_clave']); ?>" class="btn-header-publish">
+                        <i class="fas fa-plus-circle"></i> Publicar mi código
+                    </a>
            		</div>
            		<?php 
            		if($lista_codigos_patrocinados){
@@ -580,7 +609,7 @@ show_short_desc($marca);
     			
     			if($numero_codigos == 0) { ?>
     				<div class="text-center" >
-    					<h3>Aún no hay códigos de esta marca</h3>
+    					<?php echo generateMainSection('Aún no hay códigos de esta marca'); ?>
     				</div>
     			<?php } else {
 
@@ -594,18 +623,21 @@ show_short_desc($marca);
 
     			if($_GET["codigo"] == "") {
     			?>
-    					<?php if($marca["nombre_clave"] == 'airbnb') { ?>
-    						<h2 class="text-center ultimos_codigos_h2 cd-home-title titulo_zona_home"  id="codigos_promocionales_<?php echo $marca["nombre_clave"]; ?>"><?php echo $numero_codigos_format; ?> Créditos de viaje y Códigos amigo para AirBnb</h2>
-    					<?php } else { ?>
-    						<h2 class="text-center ultimos_codigos_h2 cd-home-title titulo_zona_home"  id="codigos_promocionales_<?php echo $marca["nombre_clave"]; ?>"><?php echo $numero_codigos_format; ?> Cupones y Códigos amigo para <?php echo $marca["nombre"]; ?></h2>
-    					<?php } ?>
+    					<?php
+    					// Título de códigos usando el sistema jerárquico
+    					$codes_title = '';
+    					if($marca["nombre_clave"] == 'airbnb') {
+    						$codes_title = $numero_codigos_format . ' Créditos de viaje y Códigos amigo para AirBnb';
+    					} else {
+    						$codes_title = $numero_codigos_format . ' Cupones y Códigos amigo para ' . $marca["nombre"];
+    					}
+    					echo generateMainSection($codes_title, '', 'class="text-center ultimos_codigos_h2 cd-home-title titulo_zona_home" id="codigos_promocionales_' . $marca["nombre_clave"] . '"');
+    					?>
 
 
 
     					<?php if($_GET["page"] != "") { ?>
-    						<h3 class="cd-home-title ">
-        							<p style="font-size: 15px;">Mostrando del <?php echo $num_inicio; ?> al <?php echo $num_fin; ?> de un total de <?php echo $numero_codigos_format; ?> códigos</p>
-    						</h3>
+    						<?php echo generateSubSection('Mostrando del ' . $num_inicio . ' al ' . $num_fin . ' de un total de ' . $numero_codigos_format . ' códigos'); ?>
     					<?php } ?>
 
     				<?php } ?>
@@ -660,7 +692,7 @@ show_short_desc($marca);
 
         					    ?>
 
-        					    <h3>Booking ya no ofrece Códigos de amigo, pero tenemos grandes ofertas para tí de booking!</h3>
+        					    <?php echo generateMainSection('Booking ya no ofrece Códigos de amigo, pero tenemos grandes ofertas para tí de booking!'); ?>
 
 
                                 <?php if($marca["nombre_clave"] == 'bookingcom'){ ?>
@@ -774,7 +806,7 @@ show_short_desc($marca);
         }
     </style>
 
-<h2 class="text-center ultimos_codigos_h2 cd-home-title titulo_zona_home">Preguntas Frecuentes - Código Invitación Trade Republic</h2>
+<?php echo generateMainSection('Preguntas Frecuentes - Código Invitación Trade Republic'); ?>
 
 <div class="faq-item">
     <button class="accordion">
@@ -875,11 +907,17 @@ for (i = 0; i < acc.length; i++) {
 
     			<?php } //END TRADEREPUBLIC ?>
     			
-    			
+    			<?php
+    			// Mostrar FAQs de la marca si existen
+    			$faqs_html = incluirFAQsEnMarca($marca["nombre_clave"], $marca["nombre"]);
+    			if (!empty($faqs_html)) {
+    			    echo $faqs_html;
+    			}
+    			?>
     			
     		
             
-            <div><h2 class="titulo_zona_home cd-home-title ultimos_codigos_h2">Cupones descuento para <?php echo $marca["nombre"];?></h2></div>
+            <div><?php echo generateMainSection('Cupones descuento para ' . $marca["nombre"]); ?></div>
             
             
            <?php 
@@ -889,7 +927,7 @@ for (i = 0; i < acc.length; i++) {
             ?>
             
             
-            <div><h2 class="titulo_zona_home cd-home-title ultimos_codigos_h2">Promociones para <?php echo $marca["nombre"];?></h2></div>
+            <div><?php echo generateMainSection('Promociones para ' . $marca["nombre"]); ?></div>
             
             <?php 
             
@@ -946,10 +984,10 @@ for (i = 0; i < acc.length; i++) {
 					
 					<?php show_long_desc(); ?>
 
-    					<h2 id="Que_es_<?php echo $marca["nombre_clave"]; ?>">📲  ¿ Qué es <?php echo $marca["nombre_clave"]; ?>?</h2>
+    					<?php echo generateMainSection('📲 ¿Qué es ' . $marca["nombre_clave"] . '?', '', 'id="Que_es_' . $marca["nombre_clave"] . '"'); ?>
 
                         <div class="col-md-12">
-						<h2>Relacionado con <?php echo $marca["nombre_clave"]; ?></h2>
+						<?php echo generateMainSection('Relacionado con ' . $marca["nombre_clave"]); ?>
 						<div id="wide_ad_unit2"></div>
 </div>
 </div>
@@ -1027,7 +1065,7 @@ if($quiza){
 	$marca["nombre"] = strtolower($marca["nombre"]);
 	?>
 
-	<div class="cd-home-title titulo_zona_home ultimos_codigos_h2">Quizá te interese <?php echo $marca["nombre"]; ?></div>
+	<?php echo generateMainSection('Quizá te interese ' . $marca["nombre"]); ?>
 
     <div class="col-md-12 panel panel-info menu-derecho">
         	<?php if($marca["nombre"] == "cabify" || $marca["nombre"] == "socialcar" || $marca["nombre"] == "ubeeqo" || $marca["nombre"] == "uber"){?>
@@ -1297,7 +1335,7 @@ if($quiza){
                     <a href="https://t.me/spnfury?text=<?php echo urlencode('Hola ' . $u['username'] . ', necesito ayuda con el código de ' . $marca['nombre']); ?>" 
                        target="_blank" 
                        class="btn btn-telegram">
-                        <i class="fab fa-telegram"></i> Chatear por Telegram
+                        <i class="fa-brands fa-telegram"></i> Chatear por Telegram
                     </a>
                     <button type="button" class="btn btn-default" data-dismiss="modal">Configurar solo</button>
 </div>

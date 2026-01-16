@@ -3,6 +3,22 @@
 // Obtener el criterio de ordenamiento
 $orden = isset($_GET['orden']) ? $_GET['orden'] : 'relevancia';
 
+// Inicializar variable de chollos si no está definida
+if (!isset($lista_chollos)) {
+    $lista_chollos = [];
+}
+
+// Incluir funciones de AdSense
+if (!function_exists('get_adsense_search')) {
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_adsense.php';
+}
+
+// Agregar meta keywords para mejor targeting de AdSense
+if (!isset($links_meta)) {
+    $links_meta = array();
+}
+$links_meta['keywords'] = htmlspecialchars($termino, ENT_QUOTES, 'UTF-8');
+
 get_header_new($title, $description, $title_social, $description_social, $imagen_social, $links_meta);
 
 include_once $_SERVER['DOCUMENT_ROOT'].'/public/header.php'; ?>
@@ -258,6 +274,39 @@ include_once $_SERVER['DOCUMENT_ROOT'].'/public/header.php'; ?>
         font-size: 11px;
     }
 }
+
+/* Estilos para códigos destacados */
+.card.featured {
+    border: 2px solid #FFC107;
+    box-shadow: 0 4px 15px rgba(255, 152, 0, 0.2) !important;
+    background: linear-gradient(to bottom, #fff 0%, #fffbf0 100%);
+}
+
+.card.featured:hover {
+    box-shadow: 0 6px 20px rgba(255, 152, 0, 0.3) !important;
+    transform: translateY(-3px);
+}
+
+.featured-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: linear-gradient(135deg, #FFC107 0%, #FF9800 100%);
+    color: white;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(255, 152, 0, 0.4);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.featured-badge i {
+    font-size: 0.9rem;
+}
 </style>
 <div class="container-fluid mt-4 search-results">
     <div class="row">
@@ -283,19 +332,82 @@ include_once $_SERVER['DOCUMENT_ROOT'].'/public/header.php'; ?>
 
         <!-- Contenido principal -->
         <div class="col-lg-9">
-            <h1 class="mb-4">Resultados de búsqueda para: "<?php echo htmlspecialchars($termino); ?>"</h1>
+            <h1 class="mb-4"><?php echo htmlspecialchars($termino); ?> ofertas y chollos</h1>
             
-            <?php if (empty($lista_marcas) && empty($lista_codigos['results'])): ?>
+
+            
+            <?php if (empty($lista_marcas) && empty($lista_codigos['results']) && empty($lista_chollos)): ?>
                 <div class="alert alert-info">
-                    <h4>No se encontraron resultados</h4>
-                    <p>Sugerencias:</p>
-                    <ul>
-                        <li>Revisa que las palabras estén bien escritas</li>
-                        <li>Prueba con palabras más generales</li>
-                        <li>Utiliza menos palabras o palabras diferentes</li>
-                    </ul>
+                    <h4>No se encontraron resultados para "<?php echo htmlspecialchars($termino); ?>"</h4>
+                    <p>¡Pero esto puede ser una gran oportunidad!</p>
+                    
+                    <!-- AdSense para búsqueda sin resultados - Middle -->
+                    <?php if (isset($termino) && !empty($termino)): ?>
+                        <div class="adsense-search-no-results-middle mb-4 mt-4" style="text-align: center; margin: 30px 0; padding: 30px; background: #ffffff; border-radius: 12px; border: 2px solid #E30613; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                            <div style="min-height: 300px; display: flex; align-items: center; justify-content: center;">
+                                <?php echo get_adsense_search($termino, null, 'no-results-middle'); ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-8">
+                            <h5>Sugerencias:</h5>
+                            <ul>
+                                <li>Revisa que las palabras estén bien escritas</li>
+                                <li>Prueba con palabras más generales</li>
+                                <li>Utiliza menos palabras o palabras diferentes</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <div class="bg-light p-4 rounded">
+                                <h5 class="text-primary mb-3">¿Tienes un código para "<?php echo htmlspecialchars($termino); ?>"?</h5>
+                                <p class="text-muted mb-3">Sé el primero en publicar un código para esta marca o servicio</p>
+                                <a href="/nuevo_codigo?marca=<?php echo urlencode($termino); ?>" 
+                                   class="btn btn-primary btn-lg">
+                                    <i class="fas fa-plus-circle me-2"></i>
+                                    Publicar Código
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- AdSense para búsqueda sin resultados - Bottom -->
+                    <?php if (isset($termino) && !empty($termino)): ?>
+                        <div class="adsense-search-no-results-bottom mb-4 mt-4" style="text-align: center; margin: 30px 0; padding: 30px; background: #ffffff; border-radius: 12px; border: 2px solid #E30613; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                            <div style="min-height: 300px; display: flex; align-items: center; justify-content: center;">
+                                <?php echo get_adsense_search($termino, null, 'no-results-bottom'); ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
                 </div>
             <?php else: ?>
+                
+                <?php if (!empty($lista_chollos)): ?>
+                    <section class="search-section">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h2>Chollos encontrados</h2>
+                        </div>
+                        <?php
+                        // Incluir funciones para mostrar chollos
+                        if (!function_exists('imprimir_grid_chollos')) {
+                            include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_modern.php';
+                        }
+                        if (function_exists('imprimir_grid_chollos')) {
+                            imprimir_grid_chollos($lista_chollos, 3);
+                        }
+                        ?>
+                    </section>
+                    
+                    <!-- AdSense para buscar - Bottom (Moved here as separator) -->
+                     <?php if (isset($termino) && !empty($termino)): ?>
+                        <div class="adsense-search-bottom mb-4 mt-4" style="text-align: center; margin: 30px 0; padding: 30px; background: #f8f9fa; border-radius: 12px; border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                            <div style="min-height: 250px; display: flex; align-items: center; justify-content: center;">
+                                <?php echo get_adsense_search($termino, null, 'bottom'); ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                <?php endif; ?>
                 
                 <?php if (!empty($lista_marcas)): ?>
                     <section class="search-section">
@@ -317,7 +429,8 @@ include_once $_SERVER['DOCUMENT_ROOT'].'/public/header.php'; ?>
                                         <div class="card-body">
                                             <h5 class="card-title">
                                                 <a href="/de-<?php echo htmlspecialchars($marca['nombre_clave']); ?>" 
-                                                   class="text-dark text-decoration-none stretched-link">
+                                                   class="text-dark text-decoration-none stretched-link"
+                                                   title="Códigos descuento <?php echo htmlspecialchars($marca['nombre']); ?>">
                                                     <?php echo htmlspecialchars($marca['nombre']); ?>
                                                 </a>
                                             </h5>
@@ -330,6 +443,15 @@ include_once $_SERVER['DOCUMENT_ROOT'].'/public/header.php'; ?>
                             <?php endforeach; ?>
                         </div>
                     </section>
+                    
+                    <!-- AdSense para búsqueda - Entre marcas y códigos -->
+                    <?php if (isset($termino) && !empty($termino)): ?>
+                        <div class="adsense-search-middle mb-4 mt-4" style="text-align: center; margin: 30px 0; padding: 30px; background: #f8f9fa; border-radius: 12px; border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                            <div style="min-height: 250px; display: flex; align-items: center; justify-content: center;">
+                                <?php echo get_adsense_search($termino, null, 'middle'); ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
                 <?php endif; ?>
                 
                 <?php if (!empty($lista_codigos['results'])): ?>
@@ -338,9 +460,18 @@ include_once $_SERVER['DOCUMENT_ROOT'].'/public/header.php'; ?>
                             <h2>Códigos encontrados</h2>
                         </div>
                         <div class="row row-cols-1 row-cols-md-2 g-4">
-                            <?php foreach ($lista_codigos['results'] as $codigo): ?>
+                            <?php foreach ($lista_codigos['results'] as $codigo): 
+                                // Verificar si el código está destacado (destacado o destacado_social)
+                                $is_destacado = (isset($codigo['destacado']) && $codigo['destacado'] > 0) || 
+                                                (isset($codigo['destacado_social']) && $codigo['destacado_social'] > 0);
+                            ?>
                                 <div class="col">
-                                    <div class="card h-100 shadow-sm">
+                                    <div class="card h-100 shadow-sm <?php echo $is_destacado ? 'featured' : ''; ?>" style="position: relative;">
+                                        <?php if($is_destacado): ?>
+                                            <div class="featured-badge" style="position: absolute; top: 10px; right: 10px; background: linear-gradient(135deg, #FFC107 0%, #FF9800 100%); color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; z-index: 10; box-shadow: 0 2px 8px rgba(255, 152, 0, 0.4);">
+                                                <i class="fas fa-star"></i> Destacado
+                                            </div>
+                                        <?php endif; ?>
                                         <div class="card-body d-flex">
                                             <!-- Logo de la marca -->
                                             <div class="me-3" style="min-width: 80px;">
@@ -372,7 +503,20 @@ include_once $_SERVER['DOCUMENT_ROOT'].'/public/header.php'; ?>
                             <?php endforeach; ?>
                         </div>
                     </section>
+                    
+                    <!-- AdSense para búsqueda - Entre códigos y chollos -->
+                    <?php if (isset($termino) && !empty($termino) && !empty($lista_chollos)): ?>
+                        <div class="adsense-search-middle mb-4 mt-4" style="text-align: center; margin: 30px 0; padding: 30px; background: #f8f9fa; border-radius: 12px; border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                            <div style="min-height: 250px; display: flex; align-items: center; justify-content: center;">
+                                <?php echo get_adsense_search($termino, null, 'middle'); ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
                 <?php endif; ?>
+                
+
+                    
+                    <!-- Chollos and bottom AdSense moved/removed -->
                 
             <?php endif; ?>
         </div>

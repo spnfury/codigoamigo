@@ -44,7 +44,7 @@ if (!in_array($_SESSION["user_id"], $array_codigos_acceso)) {
             }
             .access-icon {
                 font-size: 4rem;
-                color: #FF6B35;
+                color: #E30613;
                 margin-bottom: 1rem;
             }
             h1 {
@@ -58,7 +58,7 @@ if (!in_array($_SESSION["user_id"], $array_codigos_acceso)) {
                 line-height: 1.6;
             }
             .btn-access {
-                background: #FF6B35;
+                background: #E30613;
                 color: white;
                 padding: 15px 30px;
                 border: none;
@@ -72,7 +72,7 @@ if (!in_array($_SESSION["user_id"], $array_codigos_acceso)) {
                 margin: 10px;
             }
             .btn-access:hover {
-                background: #E55A2B;
+                background: #C40510;
                 transform: translateY(-2px);
             }
             .btn-secondary {
@@ -102,7 +102,7 @@ if (!in_array($_SESSION["user_id"], $array_codigos_acceso)) {
                 color: #666;
             }
             .admin-info li i {
-                color: #FF6B35;
+                color: #E30613;
                 margin-right: 0.5rem;
             }
         </style>

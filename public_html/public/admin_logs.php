@@ -9,6 +9,7 @@ include_once __DIR__ . '/../inc/funciones.php';
 // Incluir sistema de logging organizado
 require_once __DIR__ . '/../inc/logger.php';
 include_once __DIR__ . '/../inc/log_monitor.php';
+include_once __DIR__ . '/admin_sidebar_menu.php';
 
 // Verificar permisos de administrador
 $array_codigos_acceso[] = "58bd851da54e295b8b52f702"; //thevega82@gmail.com
@@ -16,7 +17,8 @@ $array_codigos_acceso[] = "5e78170e6b68e6519b7c5df2"; //edna
 $array_codigos_acceso[] = "639899bc6321ee0d0e4010d2"; //aron
 $array_codigos_acceso[] = "5c8a10ce2f55c86d6e707d82"; //jose
 
-if (!in_array($_SESSION["user_id"], $array_codigos_acceso)) {
+// Verificar que el usuario esté logueado y tenga permisos
+if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"]) || !in_array($_SESSION["user_id"], $array_codigos_acceso)) {
     header('Location: https://www.codigoamigo.com');
     die();
 }
@@ -271,42 +273,42 @@ function getSourceName($source, $sources) {
             color: #0d47a1;
             text-decoration: underline;
         }
-        .logs-container {
-            max-height: 600px;
+        .logs-scroll-container {
+            max-height: 70vh;
             overflow-y: auto;
-        }
-        .auto-refresh {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
-        }
-        .source-badge {
-            font-size: 0.75rem;
-        }
-        .copy-btn {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            background: #6c757d;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 4px 8px;
-            font-size: 0.75rem;
-            cursor: pointer;
-            opacity: 0.7;
-            transition: opacity 0.2s;
-        }
-        .copy-btn:hover {
-            opacity: 1;
-            background: #495057;
-        }
-        .copy-btn.copied {
-            background: #28a745;
-        }
-        .log-entry {
             position: relative;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+        .log-row-selected {
+            background-color: #e8f0fe !important;
+        }
+        .log-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        .sticky-thead th {
+            position: sticky;
+            top: 0;
+            background-color: #f8f9fa !important;
+            z-index: 10;
+            box-shadow: inset 0 -1px 0 #dee2e6;
+        }
+        .log-message-cell {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .copy-actions {
+            background: #fff;
+            padding: 10px;
+            border-bottom: 1px solid #dee2e6;
+            position: sticky;
+            top: 0;
+            z-index: 11;
         }
     </style>
 </head>
@@ -314,43 +316,7 @@ function getSourceName($source, $sources) {
     <div class="container-fluid">
         <div class="row">
             <!-- Sidebar -->
-            <div class="col-md-3 col-lg-2 sidebar p-0">
-                <div class="p-3">
-                    <h4 class="text-white mb-4">
-                        <i class="fas fa-cogs me-2"></i>Admin Panel
-                    </h4>
-                    <nav class="nav flex-column">
-                        <a class="nav-link" href="admin_dashboard.php">
-                            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
-                        </a>
-                        <a class="nav-link" href="admin_usuarios.php">
-                            <i class="fas fa-users me-2"></i>Usuarios
-                        </a>
-                        <a class="nav-link" href="admin_marcas.php">
-                            <i class="fas fa-tags me-2"></i>Marcas
-                        </a>
-                        <a class="nav-link" href="admin_codigos.php">
-                            <i class="fas fa-code me-2"></i>Códigos
-                        </a>
-                        <a class="nav-link" href="admin_transacciones.php">
-                            <i class="fas fa-credit-card me-2"></i>Transacciones
-                        </a>
-                        <a class="nav-link" href="admin_reportes.php">
-                            <i class="fas fa-chart-bar me-2"></i>Reportes
-                        </a>
-                        <a class="nav-link" href="admin_configuracion.php">
-                            <i class="fas fa-cog me-2"></i>Configuración
-                        </a>
-                        <a class="nav-link active" href="admin_logs.php">
-                            <i class="fas fa-file-alt me-2"></i>Logs
-                        </a>
-                        <hr class="text-white">
-                        <a class="nav-link" href="https://www.codigoamigo.com">
-                            <i class="fas fa-home me-2"></i>Volver al Sitio
-                        </a>
-                    </nav>
-                </div>
-            </div>
+            <?php echo get_admin_sidebar_menu('admin_logs.php'); ?>
 
             <!-- Main Content -->
             <div class="col-md-9 col-lg-10 main-content">
@@ -373,16 +339,20 @@ function getSourceName($source, $sources) {
                             <div class="btn-group">
                                 <button type="button" class="btn btn-outline-primary btn-sm" onclick="refreshLogs()" title="Actualizar logs del sistema">
                                     <i class="fas fa-sync-alt me-1"></i>
-                                    Actualizar Logs
-                            </button>
+                                    Actualizar
+                                </button>
+                                <button type="button" class="btn btn-outline-success btn-sm" onclick="copyLogs(false)" title="Copiar todos los logs visibles">
+                                    <i class="fas fa-copy me-1"></i>
+                                    Copiar Todos
+                                </button>
+                                <button type="button" class="btn btn-outline-info btn-sm" onclick="copyLogs(true)" title="Copiar solo los seleccionados">
+                                    <i class="fas fa-check-double me-1"></i>
+                                    Copiar Seleccionados
+                                </button>
                                 <button type="button" class="btn btn-outline-danger btn-sm" onclick="clearLogs()" title="Limpiar todos los logs del sistema">
                                     <i class="fas fa-trash-alt me-1"></i>
-                                    Limpiar Logs
-                            </button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="showUpdateInstructions()" title="Ver instrucciones de actualización">
-                                    <i class="fas fa-question-circle me-1"></i>
-                                    Ayuda
-                            </button>
+                                    Limpiar
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -556,7 +526,8 @@ function getSourceName($source, $sources) {
                         </h5>
                     </div>
                     <div class="card-body">
-                        <div class="logs-container">
+                        <div class="logs-scroll-container" style="max-height: 300px;">
+                            <div id="critical-logs-list">
                             <?php foreach (array_slice($criticalErrors, 0, 10) as $log): ?>
                             <div class="log-entry critical-error">
                                 <div class="d-flex justify-content-between align-items-start">
@@ -597,136 +568,137 @@ function getSourceName($source, $sources) {
                         </span>
                         </div>
                         <div class="card-body">
-                        <div class="logs-container" id="logs-container">
-                            <?php foreach ($logs as $log): ?>
-                            <div class="log-entry <?php echo $log['level']; ?>">
-                                <button class="copy-btn" onclick="copyLogToClipboard(this)" title="Copiar error completo">
-                                    <i class="fas fa-copy"></i>
-                                </button>
-                                <div class="d-flex justify-content-between align-items-start">
-                                    <div class="flex-grow-1">
-                                        <div class="d-flex align-items-center mb-2">
-                                            <i class="<?php echo getLogTypeIcon($log['level']); ?> me-2"></i>
-                                            <span class="badge bg-<?php echo getLogLevelColor($log['level']); ?> me-2">
-                                                <?php echo strtoupper($log['level']); ?>
-                                            </span>
-                                            <span class="badge bg-secondary me-2 source-badge">
-                                                <?php echo getSourceName($log['source'], $logSources); ?>
-                                            </span>
-                                            <small class="text-muted">
-                                                <?php echo date('d/m/Y H:i:s', $log['timestamp']); ?>
-                                            </small>
-                                        </div>
-                                        <div class="log-message mb-2">
-                                            <?php echo htmlspecialchars($log['message']); ?>
-                                        </div>
-                                        <?php if (isset($log['file']) && isset($log['line'])): ?>
-                                        <div class="log-details">
-                                            <small class="text-muted">
-                                                <i class="fas fa-file"></i>
-                                                <?php echo htmlspecialchars($log['file'] . ':' . $log['line']); ?>
-                                            </small>
-                                        </div>
-                                        <?php endif; ?>
-                                        <?php if (isset($log['url']) && !empty($log['url'])): ?>
-                                        <div class="log-details">
-                                            <small class="text-muted">
-                                                <i class="fas fa-link me-1"></i>
-                                                <strong>URL Interna:</strong> <span class="url-path"><?php echo htmlspecialchars($log['url']); ?></span>
-                                            </small>
-                                        </div>
-                                        <?php endif; ?>
-                                        <?php if (isset($log['external_url']) && !empty($log['external_url'])): ?>
-                                        <div class="log-details">
-                                            <small class="text-muted">
-                                                <i class="fas fa-external-link-alt me-1"></i>
-                                                <strong>URL Externa:</strong> <a href="<?php echo htmlspecialchars($log['external_url']); ?>" target="_blank" class="url-path"><?php echo htmlspecialchars($log['external_url']); ?></a>
-                                            </small>
-                                        </div>
-                                        <?php endif; ?>
-                                        <?php if (isset($log['ip'])): ?>
-                                        <div class="log-details">
-                                            <small class="text-muted">
-                                                <i class="fas fa-globe"></i>
-                                                <?php echo htmlspecialchars($log['ip']); ?>
-                                            </small>
-                                        </div>
-                                        <?php endif; ?>
+                        <div class="card-body p-0">
+                            <!-- Tabs de navegación -->
+                            <ul class="nav nav-tabs nav-fill" id="logTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="system-tab" data-bs-toggle="tab" data-bs-target="#system-logs" type="button" role="tab" aria-controls="system-logs" aria-selected="true">
+                                        <i class="fas fa-server me-2"></i>Logs del Sistema
+                                        <span class="badge bg-danger ms-2" id="system-logs-count">0</span>
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="activity-tab" data-bs-toggle="tab" data-bs-target="#activity-logs" type="button" role="tab" aria-controls="activity-logs" aria-selected="false">
+                                        <i class="fas fa-history me-2"></i>Actividad
+                                        <span class="badge bg-info ms-2" id="activity-logs-count">0</span>
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="security-tab" data-bs-toggle="tab" data-bs-target="#security-logs" type="button" role="tab" aria-controls="security-logs" aria-selected="false">
+                                        <i class="fas fa-shield-alt me-2"></i>Seguridad / Ruido
+                                        <span class="badge bg-secondary ms-2" id="security-logs-count">0</span>
+                                    </button>
+                                </li>
+                            </ul>
+                            
+                            <div class="tab-content" id="logTabsContent">
+                                <!-- Tab: Logs del Sistema -->
+                                <div class="tab-pane fade show active" id="system-logs" role="tabpanel" aria-labelledby="system-tab">
+                                    <div class="logs-scroll-container">
+                                        <table class="table table-hover mb-0" id="logs-table">
+                                            <thead class="sticky-thead">
+                                                <tr>
+                                                    <th style="width: 40px;"><input type="checkbox" id="select-all-system" onchange="toggleSelectAll('system')"></th>
+                                                    <th style="width: 50px;">Nivel</th>
+                                                    <th style="width: 150px;">Fecha</th>
+                                                    <th style="width: 120px;">Fuente</th>
+                                                    <th>Mensaje</th>
+                                                    <th style="width: 80px;">Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="logs-table-body">
+                                                <!-- System logs loaded here -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                
+                                <!-- Tab: Logs de Actividad -->
+                                <div class="tab-pane fade" id="activity-logs" role="tabpanel" aria-labelledby="activity-tab">
+                                    <div class="logs-scroll-container">
+                                        <table class="table table-hover mb-0" id="activity-table">
+                                            <thead class="sticky-thead">
+                                                <tr>
+                                                    <th style="width: 40px;"><input type="checkbox" id="select-all-activity" onchange="toggleSelectAll('activity')"></th>
+                                                    <th style="width: 50px;">Nivel</th>
+                                                    <th style="width: 150px;">Fecha</th>
+                                                    <th>Mensaje</th>
+                                                    <th style="width: 80px;">Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="activity-table-body">
+                                                 <!-- Activity logs loaded here -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Tab: Seguridad / Ruido -->
+                                <div class="tab-pane fade" id="security-logs" role="tabpanel" aria-labelledby="security-tab">
+                                    <div class="logs-scroll-container">
+                                        <table class="table table-hover mb-0" id="security-table">
+                                            <thead class="sticky-thead">
+                                                <tr>
+                                                    <th style="width: 40px;"><input type="checkbox" id="select-all-security" onchange="toggleSelectAll('security')"></th>
+                                                    <th style="width: 50px;">Nivel</th>
+                                                    <th style="width: 150px;">Fecha</th>
+                                                    <th style="width: 120px;">Fuente</th>
+                                                    <th>Mensaje</th>
+                                                    <th style="width: 80px;">Acciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="security-table-body">
+                                                 <!-- Security logs loaded here -->
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             </div>
-                            <?php endforeach; ?>
+
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Logs de MongoDB (si están disponibles) -->
-        <?php if (!empty($mongoLogs)): ?>
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fas fa-database"></i>
-                            Logs de MongoDB
-                        </h5>
+    </div>
+
+    <!-- Modal de Detalles del Log -->
+    <div class="modal fade" id="logDetailsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-info-circle me-2"></i>Detalles del Log
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <span id="modal-level-badge" class="badge me-2"></span>
+                        <span id="modal-source-badge" class="badge bg-secondary me-2"></span>
+                        <span id="modal-time" class="text-muted"></span>
                     </div>
-                    <div class="card-body">
-                                <div class="logs-container">
-                            <?php foreach ($mongoLogs as $log): ?>
-                                    <div class="log-entry <?php echo $log['nivel'] ?? 'info'; ?>">
-                                        <div class="d-flex justify-content-between align-items-start">
-                                            <div class="flex-grow-1">
-                                                <div class="d-flex align-items-center mb-2">
-                                                    <i class="<?php echo getLogTypeIcon($log['tipo'] ?? 'info'); ?> me-2"></i>
-                                                    <span class="badge bg-<?php echo getLogLevelColor($log['nivel'] ?? 'info'); ?> me-2">
-                                                        <?php echo strtoupper($log['nivel'] ?? 'INFO'); ?>
-                                                    </span>
-                                                    <span class="badge bg-secondary me-2">
-                                                        <?php echo ucfirst(str_replace('_', ' ', $log['tipo'] ?? 'info')); ?>
-                                                    </span>
-                                                    <small class="text-muted">
-                                                <?php 
-                                                if (isset($log['fecha']) && $log['fecha'] !== null) {
-                                                    echo date('d/m/Y H:i:s', $log['fecha']->toDateTime()->getTimestamp());
-                                                } else {
-                                                    echo 'Fecha no disponible';
-                                                }
-                                                ?>
-                                                    </small>
-                                                </div>
-                                                <div class="log-message mb-2">
-                                                    <?php echo htmlspecialchars($log['mensaje'] ?? ''); ?>
-                                                </div>
-                                                <div class="log-details">
-                                                    <?php if (isset($log['usuario_id']) && $log['usuario_id']): ?>
-                                                        <span class="me-3">
-                                                            <i class="fas fa-user me-1"></i>
-                                                            <?php echo htmlspecialchars($usuarios_info[$log['usuario_id']] ?? 'Usuario desconocido'); ?>
-                                                        </span>
-                                                    <?php endif; ?>
-                                                    <?php if (isset($log['ip'])): ?>
-                                                        <span class="me-3">
-                                                            <i class="fas fa-globe me-1"></i>
-                                                            <?php echo htmlspecialchars($log['ip']); ?>
-                                                        </span>
-                                                    <?php endif; ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <?php endforeach; ?>
+                    
+                    <div class="mb-3">
+                        <h6>Mensaje:</h6>
+                        <div class="p-3 bg-light rounded border" style="max-height: 300px; overflow-y: auto;">
+                            <pre class="mb-0" id="modal-message" style="white-space: pre-wrap; word-wrap: break-word;"></pre>
                         </div>
-                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                <?php endif; ?>
-                                            </div>
-                                        </div>
-                                    </div>
+                    </div>
+
+                    <div id="modal-extra-details">
+                        <!-- Extra details injected by JS -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    <button type="button" class="btn btn-primary" onclick="copyModalContent()">
+                        <i class="fas fa-copy me-1"></i> Copiar
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Modal de Instrucciones de Actualización -->
@@ -794,6 +766,63 @@ function getSourceName($source, $sources) {
         let refreshInterval = 5000; // 5 segundos
         let refreshTimer = null;
         let isConnected = true;
+        let currentLogs = []; // Almacenar logs para copia masiva
+
+        function toggleSelectAll(type) {
+            const master = document.getElementById(`select-all-${type}`);
+            const tabId = type === 'system' ? 'system-logs' : 'activity-logs';
+            const checkboxes = document.querySelectorAll(`#${tabId} .log-checkbox`);
+            checkboxes.forEach(cb => {
+                cb.checked = master.checked;
+                const row = cb.closest('tr');
+                if (master.checked) row.classList.add('log-row-selected');
+                else row.classList.remove('log-row-selected');
+            });
+        }
+
+        function toggleRowSelection(checkbox) {
+            const row = checkbox.closest('tr');
+            if (checkbox.checked) row.classList.add('log-row-selected');
+            else row.classList.remove('log-row-selected');
+        }
+
+        function copyLogs(selectedOnly = false) {
+            const activeTab = document.querySelector('.tab-pane.active');
+            const checkboxes = activeTab.querySelectorAll('.log-checkbox');
+            let logsToCopy = [];
+
+            checkboxes.forEach((cb, index) => {
+                if (!selectedOnly || cb.checked) {
+                    const row = cb.closest('tr');
+                    const date = row.cells[2].innerText;
+                    const source = activeTab.id === 'system-logs' ? row.cells[3].innerText : 'Activity';
+                    const message = row.cells[activeTab.id === 'system-logs' ? 4 : 3].innerText;
+                    const level = row.cells[1].querySelector('i').title;
+
+                    logsToCopy.push(`[${date}] [${level.toUpperCase()}] [${source}] ${message}`);
+                }
+            });
+
+            if (logsToCopy.length === 0) {
+                alert(selectedOnly ? 'No hay logs seleccionados' : 'No hay logs para copiar');
+                return;
+            }
+
+            const textToCopy = logsToCopy.join('\n');
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                alert(`¡${logsToCopy.length} logs copiados al portapapeles!`);
+            }).catch(err => {
+                console.error('Error al copiar:', err);
+                // Fallback para navegadores antiguos o sin SSL
+                const textArea = document.createElement("textarea");
+                textArea.value = textToCopy;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                alert('Logs copiados (fallback)');
+            });
+        }
         
         // Función para obtener logs en tiempo real
         async function fetchLogs() {
@@ -817,7 +846,14 @@ function getSourceName($source, $sources) {
                 
                 if (data.success) {
                     console.log('Logs recibidos:', data.logs.length, 'logs');
-                    updateLogsDisplay(data.logs);
+                    
+                    // Si hay nuevos logs, reconstruir la tabla
+                    if (data.logs.length > 0) {
+                         // Combinar con los existentes o reemplazar según la lógica (aquí reemplazamos para simplificar la vista de tabla)
+                         // Nota: En una implementación ideal, añadiríamos al principio, pero para simplificar el DOM reemplazamos
+                        updateLogsDisplay(data.logs);
+                    }
+                    
                     lastTimestamp = data.timestamp;
                     updateConnectionStatus(true);
                     updateLastUpdateTime();
@@ -834,361 +870,317 @@ function getSourceName($source, $sources) {
         // Función para obtener estadísticas
         async function fetchStats() {
             try {
+               // ... mantener igual ...
                 const response = await fetch('logs_simple.php?action=get_stats');
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
                 const data = await response.json();
                 
                 if (data.success) {
-                    console.log('Estadísticas recibidas:', data.stats);
-                    updateStats(data.stats);
-                } else {
-                    console.error('Error fetching stats:', data.error);
+                    updateStatsDisplay(data.stats);
                 }
             } catch (error) {
                 console.error('Error fetching stats:', error);
             }
         }
-        
+
         // Función para actualizar la visualización de logs
         function updateLogsDisplay(logs) {
-            const container = document.getElementById('logs-container');
+            const systemContainer = document.getElementById('logs-table-body');
+            const activityContainer = document.getElementById('activity-table-body');
+            const securityContainer = document.getElementById('security-table-body');
+            
+            // 1. Identificar logs de Actividad (Acortador)
+            const activityLogs = logs.filter(log => 
+                log.source === 'activity' || 
+                log.message.toLowerCase().includes('acortador chollo')
+            );
+
+            // 2. Identificar logs de Seguridad / Ruido (Bots, Forbidden, etc.)
+            const securityKeywords = ['directory index of', 'is forbidden', '.well-known', 'favicon.ico'];
+            const securityLogs = logs.filter(log => 
+                !activityLogs.includes(log) && 
+                (securityKeywords.some(kw => log.message.toLowerCase().includes(kw)) || 
+                 log.status_code === 403 || log.status_code === 404)
+            );
+
+            // 3. El resto son Logs del Sistema (Errores PHP, Fatal, etc.)
+            const systemLogs = logs.filter(log => 
+                !activityLogs.includes(log) && !securityLogs.includes(log)
+            );
+            
+            // Actualizar contadores de tabs
+            document.getElementById('system-logs-count').textContent = systemLogs.length;
+            document.getElementById('activity-logs-count').textContent = activityLogs.length;
+            document.getElementById('security-logs-count').textContent = securityLogs.length;
+            
+            // Renderizar tablas
+            renderLogTable(systemContainer, systemLogs, true);
+            renderLogTable(activityContainer, activityLogs, false);
+            renderLogTable(securityContainer, securityLogs, true);
+            
+            // Actualizar contador total (cabecera)
             const countElement = document.getElementById('logs-count-number');
+            if (countElement) {
+                countElement.textContent = logs.length;
+            }
+        }
+        
+        function renderLogTable(container, logs, showSource) {
+            if (logs.length === 0) {
+                const colspan = showSource ? 5 : 4;
+                container.innerHTML = `<tr><td colspan="${colspan}" class="text-center p-4 text-muted">No hay logs para mostrar</td></tr>`;
+                return;
+            }
             
-            console.log('Actualizando display con', logs.length, 'logs');
-            
-            if (logs.length > 0) {
-                // Agregar nuevos logs al principio
-                logs.forEach(log => {
-                    const logElement = createLogElement(log);
-                    container.insertBefore(logElement, container.firstChild);
-                });
+            const html = logs.map(log => {
+                const date = new Date(log.timestamp * 1000);
+                const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
                 
-                // Limitar a 200 logs para evitar problemas de rendimiento
-                const allLogs = container.querySelectorAll('.log-entry');
-                if (allLogs.length > 200) {
-                    for (let i = 200; i < allLogs.length; i++) {
-                        allLogs[i].remove();
-                    }
+                const icon = getLogTypeIcon(log.level);
+                // Si es activity, usar azul info, si es error sistema usar rojo
+                const rowClass = (log.level === 'error' && log.source !== 'activity') ? 'table-danger' : '';
+                
+                // Truncar mensaje
+                let shortMessage = log.message;
+                if (shortMessage.length > 150) {
+                    shortMessage = shortMessage.substring(0, 150) + '...';
                 }
-            }
-            
-            // Actualizar contador
-            const totalLogs = container.querySelectorAll('.log-entry').length;
-            countElement.textContent = totalLogs;
-            
-            console.log('Total logs en pantalla:', totalLogs);
-            
-            // Scroll automático si está en la parte inferior
-            const isScrolledToBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 10;
-            if (isScrolledToBottom) {
-                container.scrollTop = container.scrollHeight;
-            }
-        }
-        
-        // Función para crear elemento de log
-        function createLogElement(log) {
-            const div = document.createElement('div');
-            div.className = `log-entry log-${log.level}`;
-            
-                // Determinar color del badge de nivel
-                let levelBadgeClass = 'bg-secondary';
-                if (log.level === 'error') levelBadgeClass = 'bg-danger';
-                else if (log.level === 'warning') levelBadgeClass = 'bg-warning text-dark';
-                else if (log.level === 'info') levelBadgeClass = 'bg-info';
-            
-            // Determinar color del badge de fuente
-            let sourceBadgeClass = 'bg-secondary';
-            if (log.source.includes('php')) sourceBadgeClass = 'bg-primary';
-            else if (log.source.includes('apache')) sourceBadgeClass = 'bg-success';
-            else if (log.source.includes('nginx')) sourceBadgeClass = 'bg-warning text-dark';
-            else if (log.source.includes('mysql')) sourceBadgeClass = 'bg-danger';
-            
-            div.innerHTML = `
-                <button class="copy-btn" onclick="copyLogToClipboard(this)" title="Copiar error completo">
-                    <i class="fas fa-copy"></i>
-                </button>
-                <div class="d-flex justify-content-between align-items-start">
-                    <div class="flex-grow-1">
-                        <div class="d-flex align-items-center mb-2 flex-wrap">
-                            <span class="log-level-badge ${levelBadgeClass} me-2">
-                                ${log.level.toUpperCase()}
-                            </span>
-                            <span class="log-source-badge ${sourceBadgeClass} me-2">
-                                ${getSourceName(log.source)}
-                            </span>
-                            <small class="text-muted">
-                                <i class="fas fa-clock me-1"></i>${formatTimestamp(log.timestamp)}
-                            </small>
-                        </div>
-                        <div class="log-message mb-2">
-                            <code class="text-dark">${escapeHtml(log.message)}</code>
-                        </div>
-                            <div class="log-details mb-1">
-                                <small class="text-muted">
-                                    <i class="fas fa-file-alt me-1"></i> 
-                                    <strong>Archivo:</strong> <span class="file-path">${escapeHtml(log.file_path || 'unknown')}</span>
-                                </small>
-                            </div>
-                            ${log.url ? `<div class="log-details mb-1"><small class="text-muted"><i class="fas fa-link me-1"></i> <strong>URL Interna:</strong> <span class="url-path">${escapeHtml(log.url)}</span></small></div>` : ''}
-                            ${log.external_url ? `<div class="log-details mb-1"><small class="text-muted"><i class="fas fa-external-link-alt me-1"></i> <strong>URL Externa:</strong> <a href="${escapeHtml(log.external_url)}" target="_blank" class="url-path">${escapeHtml(log.external_url)}</a></small></div>` : ''}
-                            ${log.ip ? `<div class="log-details"><small class="text-muted"><i class="fas fa-globe me-1"></i> IP: ${escapeHtml(log.ip)}</small></div>` : ''}
-                            ${log.file ? `<div class="log-details"><small class="text-muted"><i class="fas fa-code me-1"></i> ${escapeHtml(log.file)}:${log.line}</small></div>` : ''}
-                    </div>
-                </div>
-            `;
-            return div;
-        }
-        
-        // Función para actualizar estadísticas
-        function updateStats(stats) {
-            console.log('Actualizando estadísticas:', stats);
-            if (stats) {
-                document.getElementById('error-count').textContent = stats.error_logs || 0;
-                document.getElementById('warning-count').textContent = stats.warning_logs || 0;
-                document.getElementById('info-count').textContent = stats.info_logs || 0;
-                document.getElementById('total-count').textContent = stats.total_logs || 0;
                 
-                const recentErrorsDiv = document.getElementById('recent-errors');
-                const recentErrorsCount = document.getElementById('recent-errors-count');
-                
-                if (stats.recent_errors > 0) {
-                    recentErrorsCount.textContent = stats.recent_errors;
-                    recentErrorsDiv.style.display = 'block';
-                } else {
-                    recentErrorsDiv.style.display = 'none';
+                const logJson = JSON.stringify(log).replace(/'/g, "&#39;");
+
+                let sourceCell = '';
+                if (showSource) {
+                     sourceCell = `
+                        <td>
+                            <span class="badge bg-secondary source-badge">
+                                ${formatSourceName(log.source)}
+                            </span>
+                        </td>`;
                 }
-            }
-        }
-        
-        // Función para actualizar estado de conexión
-        function updateConnectionStatus(connected) {
-            const statusElement = document.getElementById('connection-status');
-            isConnected = connected;
+
+                return `
+                    <tr class="${rowClass}">
+                        <td class="text-center">
+                            <input type="checkbox" class="log-checkbox" onchange="toggleRowSelection(this)">
+                        </td>
+                        <td class="text-center">
+                            <i class="${icon}" title="${log.level}"></i>
+                        </td>
+                        <td>
+                            <small>${formattedDate}</small>
+                        </td>
+                        ${sourceCell}
+                        <td class="log-message-cell">
+                            ${escapeHtml(log.message)}
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick='viewLogDetails(${logJson})'>
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
             
-            if (connected) {
-                statusElement.className = 'badge bg-success';
-                statusElement.innerHTML = '<i class="fas fa-wifi me-1"></i>Conectado';
-            } else {
-                statusElement.className = 'badge bg-danger';
-                statusElement.innerHTML = '<i class="fas fa-wifi-slash me-1"></i>Desconectado';
+            container.innerHTML = html;
+        }
+        
+        // Ver detalles en Modal
+        function viewLogDetails(log) {
+            // Set basic info
+            const date = new Date(log.timestamp * 1000);
+            document.getElementById('modal-time').textContent = date.toLocaleString();
+            document.getElementById('modal-message').textContent = log.message;
+            
+            // Set badges
+            const levelBadge = document.getElementById('modal-level-badge');
+            levelBadge.textContent = log.level.toUpperCase();
+            levelBadge.className = 'badge me-2 bg-' + getLogLevelColor(log.level);
+            
+            const sourceBadge = document.getElementById('modal-source-badge');
+            sourceBadge.textContent = formatSourceName(log.source);
+            
+            // Extra details
+            const extraContainer = document.getElementById('modal-extra-details');
+            let extraHtml = '';
+            
+            if (log.file_path) {
+                extraHtml += `<div class="mb-2"><strong>Archivo Log:</strong> <code>${log.file_path}</code></div>`;
             }
+            
+            if (log.url) {
+                extraHtml += `<div class="mb-2"><strong>URL:</strong> <a href="https://www.codigoamigo.com${log.url}" target="_blank">${log.url}</a></div>`;
+            }
+            
+            if (log.status_code) {
+                 extraHtml += `<div class="mb-2"><strong>Status Code:</strong> <span class="badge bg-dark">${log.status_code}</span></div>`;
+            }
+
+            extraContainer.innerHTML = extraHtml;
+            
+            // Show Modal
+            const modal = new bootstrap.Modal(document.getElementById('logDetailsModal'));
+            modal.show();
         }
-        
-        // Función para actualizar tiempo de última actualización
-        function updateLastUpdateTime() {
-            const now = new Date();
-            const timeString = now.toLocaleTimeString();
-            document.getElementById('last-update-time').textContent = `Última actualización: ${timeString}`;
+
+        function copyModalContent() {
+            const text = document.getElementById('modal-message').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Log copiado al portapapeles');
+            });
         }
-        
-        // Funciones auxiliares
+
+        function formatSourceName(source) {
+            return source.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+
         function getLogTypeIcon(level) {
             const icons = {
                 'error': 'fas fa-exclamation-triangle text-danger',
                 'warning': 'fas fa-exclamation-circle text-warning',
-                'info': 'fas fa-info-circle text-info'
+                'info': 'fas fa-info-circle text-info',
+                'access': 'fas fa-globe text-primary',
+                'system': 'fas fa-cog text-secondary'
             };
             return icons[level] || 'fas fa-info-circle';
         }
-        
+
         function getLogLevelColor(level) {
             const colors = {
                 'error': 'danger',
                 'warning': 'warning',
-                'info': 'info'
+                'info': 'info',
+                'access': 'primary',
+                'system': 'secondary'
             };
             return colors[level] || 'secondary';
         }
         
-        function getSourceName(source) {
-            const names = {
-                'apache_error': 'Apache Error',
-                'apache_access': 'Apache Access',
-                'php_error': 'PHP Error',
-                'php_fpm': 'PHP-FPM',
-                'nginx_error': 'Nginx Error',
-                'nginx_access': 'Nginx Access',
-                'mysql_error': 'MySQL Error',
-                'system': 'System'
-            };
-            return names[source] || source;
-        }
-        
-        function formatTimestamp(timestamp) {
-            const date = new Date(timestamp * 1000);
-            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-        }
-        
         function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+             if (!text) return text;
+             return text
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
         }
-        
-        // Función para copiar el contenido del log al portapapeles
-        function copyLogToClipboard(button) {
-            const logEntry = button.closest('.log-entry');
-            const logContent = extractLogContent(logEntry);
+
+        function updateStatsDisplay(stats) {
+            animateNumber('total-count', stats.total_logs);
+            animateNumber('error-count', stats.error_logs);
+            animateNumber('warning-count', stats.warning_logs);
+            animateNumber('info-count', stats.info_logs);
             
-            // Usar la API del portapapeles si está disponible
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(logContent).then(() => {
-                    showCopyFeedback(button);
-                }).catch(err => {
-                    console.error('Error al copiar al portapapeles:', err);
-                    fallbackCopyToClipboard(logContent, button);
-                });
+            // Mostrar alerta de errores recientes si hay
+            if (stats.recent_errors > 0) {
+                document.getElementById('recent-errors').style.display = 'block';
+                document.getElementById('recent-errors-count').textContent = stats.recent_errors;
+                
+                // Si es la primera vez que detectamos errores recientes, mostrar notificación
+                if (stats.recent_errors > 0 && document.title.indexOf('(!)') === -1) {
+                    document.title = '(!) ' + document.title;
+                }
             } else {
-                // Fallback para navegadores más antiguos o contextos no seguros
-                fallbackCopyToClipboard(logContent, button);
+                document.getElementById('recent-errors').style.display = 'none';
+                document.title = document.title.replace('(!) ', '');
             }
         }
         
-        // Función para extraer el contenido completo del log
-        function extractLogContent(logEntry) {
-            const content = [];
+        function animateNumber(elementId, target) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
             
-            // Extraer nivel y fuente
-            const levelBadge = logEntry.querySelector('.log-level-badge');
-            const sourceBadge = logEntry.querySelector('.log-source-badge');
-            const timestamp = logEntry.querySelector('.text-muted');
+            const current = parseInt(element.textContent);
+            if (current === target) return;
             
-            if (levelBadge) content.push(`Nivel: ${levelBadge.textContent.trim()}`);
-            if (sourceBadge) content.push(`Fuente: ${sourceBadge.textContent.trim()}`);
-            if (timestamp) content.push(`Timestamp: ${timestamp.textContent.trim()}`);
-            
-            // Extraer mensaje principal
-            const message = logEntry.querySelector('.log-message code');
-            if (message) {
-                content.push(`\nMensaje:`);
-                content.push(message.textContent);
-            }
-            
-            // Extraer detalles adicionales
-            const details = logEntry.querySelectorAll('.log-details');
-            details.forEach(detail => {
-                const text = detail.textContent.trim();
-                if (text) {
-                    content.push(`\n${text}`);
-                }
-            });
-            
-            return content.join('\n');
+            // Animación simple
+            element.classList.add('text-primary'); // Highlight effect
+            element.textContent = target;
+            setTimeout(() => element.classList.remove('text-primary'), 500);
         }
         
-        // Función de respaldo para copiar al portapapeles
-        function fallbackCopyToClipboard(text, button) {
-            const textArea = document.createElement('textarea');
-            textArea.value = text;
-            textArea.style.position = 'fixed';
-            textArea.style.left = '-999999px';
-            textArea.style.top = '-999999px';
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
+        function updateConnectionStatus(connected) {
+            const statusEl = document.getElementById('connection-status');
+            isConnected = connected;
             
-            try {
-                const successful = document.execCommand('copy');
-                if (successful) {
-                    showCopyFeedback(button);
-                } else {
-                    console.error('No se pudo copiar al portapapeles');
-                }
-            } catch (err) {
-                console.error('Error al copiar al portapapeles:', err);
-            } finally {
-                document.body.removeChild(textArea);
+            if (connected) {
+                statusEl.className = 'badge bg-success';
+                statusEl.innerHTML = '<i class="fas fa-wifi me-1"></i>Conectado';
+            } else {
+                statusEl.className = 'badge bg-danger';
+                statusEl.innerHTML = '<i class="fas fa-wifi-slash me-1"></i>Desconectado';
             }
         }
         
-        // Función para mostrar feedback visual de copia exitosa
-        function showCopyFeedback(button) {
-            const originalIcon = button.innerHTML;
-            const originalClass = button.className;
-            
-            // Cambiar a estado "copiado"
-            button.innerHTML = '<i class="fas fa-check"></i>';
-            button.className = originalClass + ' copied';
-            button.title = '¡Copiado!';
-            
-            // Restaurar después de 2 segundos
-            setTimeout(() => {
-                button.innerHTML = originalIcon;
-                button.className = originalClass;
-                button.title = 'Copiar error completo';
-            }, 2000);
+        function updateLastUpdateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString();
+            document.getElementById('last-update-time').textContent = 'Actualizado: ' + timeString;
         }
-        
-        // Función para iniciar actualización automática
-        function startAutoRefresh() {
-            if (refreshTimer) {
-                clearInterval(refreshTimer);
-            }
-            
-            refreshTimer = setInterval(() => {
-                fetchLogs();
-                fetchStats();
-            }, refreshInterval);
-        }
-        
-        // Función para detener actualización automática
-        function stopAutoRefresh() {
-            if (refreshTimer) {
-                clearInterval(refreshTimer);
-                refreshTimer = null;
-            }
-        }
-        
-        // Función para actualizar logs manualmente
+
         function refreshLogs() {
             fetchLogs();
             fetchStats();
         }
         
-        // Función para mostrar instrucciones
-        function showUpdateInstructions() {
-            const modal = new bootstrap.Modal(document.getElementById('updateInstructionsModal'));
-            modal.show();
-        }
-        
-        // Función para cambiar modo tiempo real
-        function toggleAutoRefresh() {
-            const checkbox = document.getElementById('tiempo_real');
-            
-            if (checkbox.checked) {
-                startAutoRefresh();
-                document.getElementById('refresh-interval').textContent = '5';
-            } else {
-                stopAutoRefresh();
-                document.getElementById('refresh-interval').textContent = 'manual';
+        function clearLogs() {
+            if(confirm('¿Estás seguro de que deseas limpiar la vista actual?')) {
+                document.getElementById('logs-table-body').innerHTML = '';
+                document.getElementById('logs-count-number').textContent = '0';
             }
         }
         
-        // Inicialización cuando se carga la página
-        document.addEventListener('DOMContentLoaded', function() {
-            // Cargar datos iniciales
-            fetchLogs();
-            fetchStats();
-            
-            // Iniciar actualización automática
-            startAutoRefresh();
-            
-            // Configurar eventos
-            document.getElementById('tiempo_real').addEventListener('change', toggleAutoRefresh);
-            
-            // Actualizar tiempo de última actualización cada segundo
-            setInterval(updateLastUpdateTime, 1000);
-        });
+        function showUpdateInstructions() {
+            new bootstrap.Modal(document.getElementById('updateInstructionsModal')).show();
+        }
         
-        // Limpiar timer cuando se cierra la página
-        window.addEventListener('beforeunload', function() {
-            stopAutoRefresh();
-        });
+        function toggleAutoRefresh() {
+            const checkbox = document.getElementById('tiempo_real');
+            const isActive = checkbox.checked;
+            
+            const alert = document.querySelector('.alert-success');
+            if (alert) alert.style.display = isActive ? 'block' : 'none';
+            
+            if (isActive) {
+                // Iniciar timer
+                fetchLogs(); // Primera carga inmediata
+                fetchStats();
+                refreshTimer = setInterval(() => {
+                    fetchLogs();
+                    fetchStats();
+                }, refreshInterval);
+                
+                // Actualizar URL sin recargar
+                const url = new URL(window.location);
+                url.searchParams.set('tiempo_real', '1');
+                window.history.pushState({}, '', url);
+                
+                // Mostrar indicador
+                document.querySelector('.alert-info').style.display = 'block';
+            } else {
+                // Detener timer
+                if (refreshTimer) clearInterval(refreshTimer);
+                refreshTimer = null;
+                
+                // Actualizar URL
+                const url = new URL(window.location);
+                url.searchParams.delete('tiempo_real');
+                window.history.pushState({}, '', url);
+                
+                // Ocultar indicador
+                document.querySelector('.alert-info').style.display = 'none';
+            }
+        }
 
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', () => {
+             // Cargar logs al inicio
+            refreshLogs();
+            
+            // Configurar auto-refresh si está activo
+            if (document.getElementById('tiempo_real').checked) {
+                toggleAutoRefresh();
+            }
+        });
     </script>
 </body>
-</html>

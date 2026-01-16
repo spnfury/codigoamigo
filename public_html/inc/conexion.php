@@ -5,6 +5,12 @@ if (!function_exists('log_warning')) {
     require_once __DIR__ . '/logger.php';
 }
 
+// Solo incluir funciones.php si createConnection no está definido Y no estamos en un contexto web
+// (para evitar circular dependency en contexto web donde funciones.php ya incluye conexion.php)
+if (!function_exists('createConnection') && php_sapi_name() === 'cli') {
+    require_once __DIR__ . '/../myphp/funciones.php';
+}
+
 if (!function_exists("manda_mensaje_bot_fatal")) {
     function manda_mensaje_bot_fatal($mensaje='') {
         
@@ -182,6 +188,21 @@ register_shutdown_function( "fatal_handler" );
 	    $db = createConnection();
 	    $collection_vistas = $db->selectCollection('vistas');
 	    return $collection_vistas;
+	}
+
+	function getCollectionAffiliationNetworks() {
+	    $db = createConnection();
+	    return $db->selectCollection('affiliation_networks');
+	}
+
+	function getCollectionAffiliationPrograms() {
+	    $db = createConnection();
+	    return $db->selectCollection('affiliation_programs');
+	}
+
+	function getCollectionAffiliationRules() {
+	    $db = createConnection();
+	    return $db->selectCollection('affiliation_rules');
 	}
 
 	/*************** CURSORS - ELEMENTS ACTIVE *****************/
@@ -365,16 +386,6 @@ register_shutdown_function( "fatal_handler" );
 	    return $codigo;
 	}
 
-	function getCodeByID ($id_codigo) {
-
-	    if(isset($id_codigo) && is_object($id_codigo)) {
-	        $collection_codigos = getCollectionCodigos();
-	        $codigo = $collection_codigos->findOne(['_id' => $id_codigo]);
-	        return $codigo;
-	    } else {
-	        return;
-	    }
-	}
 
 // 	function getHistorialCodeByID ($id_codigo) {
 
@@ -491,12 +502,18 @@ register_shutdown_function( "fatal_handler" );
 
 	/************************ USUARIOS ***************************/
 
-	function activeUserToLogin ($mail) {
+	// Consejo: El parámetro que recibes en esta función no es el mail, sino el _id (hash) del usuario.
+	// Te recomiendo cambiar el nombre del parámetro a $user_id para mayor claridad y usarlo como ObjectId en la consulta.
+	// ¿Quieres que haga este cambio ahora? Si estás de acuerdo, lo implemento en el siguiente paso.
+
+	function activeUserToLogin($user_id) {
 	    $collection_usuarios = getCollectionUsuarios();
 	    $updateResult = $collection_usuarios->updateOne(
-	        ['mail' => $mail],
+	        ['_id' => new MongoDB\BSON\ObjectId($user_id)],
 	        ['$set' => ['estado' => 1]]
-	        );
+	    );
+		echo $updateResult;die;	
+	    return $updateResult;
 	}
 
 	/******************** PHOTO PROFILE USER ***********************/
@@ -778,13 +795,19 @@ register_shutdown_function( "fatal_handler" );
 
 		
 	    
-	    if (!$existing_code || $existing_code["id_usuario"] != $user_id) {
+	    if (!$existing_code || (string)$existing_code["id_usuario"] != (string)$user_id) {
 	        return false;
 	    }
 
-	    // Normalizar nombre de marca y buscar marca existente
-	    $marca_normalizada = normalizeMarcaName($data['marca']);
-	    $marca_existente = findOrCreateMarca($data['marca'], $marca_normalizada);
+    // Normalizar nombre de marca y buscar marca existente
+    $marca_normalizada = normalizeMarcaName($data['marca']);
+    $marca_existente = findOrCreateMarca(
+        $data['marca'],
+        $marca_normalizada,
+        $data['url_imagen'] ?? null,
+        $data['categoria_valor'] ?? null,
+        $data['categoria_clave'] ?? null
+    );
 
 	    // Prepare update data
 	    $update_data = array(
@@ -814,7 +837,15 @@ register_shutdown_function( "fatal_handler" );
 	        ['$set' => $update_data]
 	    );
 
-	    return $result->getModifiedCount() > 0;
+	    if ($result->getModifiedCount() > 0) {
+	        // Recalcular visibilidad tras modificar el código
+	        $codigo_id_string = (string)$codigo_id;
+	        updateCodeVisibilityByPosition($codigo_id_string, $marca_existente['nombre_clave']);
+	        updateAllCodesVisibilityInBrand($marca_existente['nombre_clave']);
+	        return true;
+	    }
+
+	    return false;
 	}
 
 	// Las funciones normalizeMarcaName() y findOrCreateMarca() están definidas en myphp/funciones.php
@@ -853,9 +884,16 @@ register_shutdown_function( "fatal_handler" );
 
 	        $collection_codigos = getCollectionCodigos();
 	        
-	        // Normalizar marca y buscar/crear marca existente
-	        $marca_normalizada = normalizeMarcaName($datos['marca']);
-	        $marca_existente = findOrCreateMarca($datos['marca'], $marca_normalizada);
+        // Normalizar marca y buscar/crear marca existente
+        $marca_normalizada = normalizeMarcaName($datos['marca']);
+        error_log("createNewCode - Datos recibidos: marca=" . $datos['marca'] . ", url_imagen=" . ($datos['url_imagen'] ?? 'null') . ", categoria_valor=" . ($datos['categoria_valor'] ?? 'null') . ", categoria_clave=" . ($datos['categoria_clave'] ?? 'null'));
+        $marca_existente = findOrCreateMarca(
+            $datos['marca'],
+            $marca_normalizada,
+            $datos['url_imagen'] ?? null,
+            $datos['categoria_valor'] ?? null,
+            $datos['categoria_clave'] ?? null
+        );
 	        
 	        // Verificar si ya existe un código de esta marca para este usuario
 	        $codigo_existente = $collection_codigos->findOne([
@@ -894,7 +932,7 @@ register_shutdown_function( "fatal_handler" );
 	            
 	            // Estado y visibilidad
 	            'estado' => 0, // 0 = activo, -1 = pendiente, -2 = eliminado
-	            'visibilidad' => $datos['visibilidad'] ?? 'media',
+	            'visibilidad' => $datos['visibilidad'] ?? 'baja', // Los códigos nuevos empiezan con baja visibilidad
 	            
 	            // Destacados (nuevos campos unificados)
 	            'destacado' => 0, // Destacado normal
@@ -917,8 +955,16 @@ register_shutdown_function( "fatal_handler" );
 	        $result = $collection_codigos->insertOne($codigo_data);
 	        
 	        if ($result->getInsertedId()) {
-	            $codigo_data['_id'] = $result->getInsertedId();
-	            return $codigo_data;
+	            // Actualizar la visibilidad basada en la posición real
+	            $codigo_id = (string)$result->getInsertedId();
+	            updateCodeVisibilityByPosition($codigo_id, $marca_existente['nombre_clave']);
+	            
+	            // Actualizar la visibilidad de todos los códigos de la marca para mantener consistencia
+	            updateAllCodesVisibilityInBrand($marca_existente['nombre_clave']);
+	            
+	            // Obtener el código actualizado para devolverlo
+	            $codigo_actualizado = $collection_codigos->findOne(['_id' => $result->getInsertedId()]);
+	            return iterator_to_array($codigo_actualizado);
 	        } else {
 	            log_error("Error al insertar código en createNewCode", ['user_id' => $user_id, 'marca' => $datos['marca']]);
 	            return false;

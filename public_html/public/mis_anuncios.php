@@ -1,4 +1,4 @@
-<?php 
+<?php
 // Verificar que la sesión esté iniciada y que el usuario esté logueado
 if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"]) || $_SESSION["user_id"] == "") {
     header("Location: https://www.codigoamigo.com/login");
@@ -7,31 +7,46 @@ if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"]) || $_SESSION["us
 
 // Verificar que las variables de sesión necesarias existan
 if (!isset($_SESSION["username"]) || empty($_SESSION["username"])) {
-    // Si no existe username en la sesión, obtenerlo de la base de datos
     if (isset($data_usuario) && isset($data_usuario["username"])) {
         $_SESSION["username"] = $data_usuario["username"];
     } else {
-        // Intentar obtener el usuario de la base de datos
         try {
             $usuario_temp = getObjectUserWithSession('_id', new MongoDB\BSON\ObjectId($_SESSION["user_id"]));
             if ($usuario_temp && isset($usuario_temp["username"])) {
                 $_SESSION["username"] = $usuario_temp["username"];
             } else {
-                // Redirigir al login si no se puede obtener el username
                 header("Location: https://www.codigoamigo.com/login");
                 exit;
             }
         } catch (Exception $e) {
-            // Si hay error al obtener el usuario, redirigir al login
             header("Location: https://www.codigoamigo.com/login");
             exit;
         }
     }
 }
 
-get_header_modern($title, $description); 
+// Desactivar AdSense para esta página
+$anula_adsense = true;
+$GLOBALS['anula_adsense'] = true; // Asegurar que esté disponible globalmente
 
-$link_usuario = enlace_usuario($_SESSION["username"], $_SESSION["user_id"]);
+// Stripe config (evitar notices si no está seteado previamente)
+if (!isset($stripe_live_publishable_key)) {
+    if (isset($_SESSION["user_id"]) && in_array($_SESSION["user_id"], [
+        '639899bc6321ee0d0e4010d2', // admins con modo test
+        '58bd851da54e295b8b52f702',
+        '5db1af3a2f55c82b47342172'
+    ])) {
+        $stripe_live_publishable_key = "pk_test_yU61XXQMBvqVt4Ah9XD5uk6V";
+    } else {
+        $stripe_live_publishable_key = "pk_live_HvgqlImI22optTnSvHKFKDiG00VQ0EZdE9";
+    }
+}
+if (!isset($sku_patrocinado_splash)) {
+    // Precio de Stripe para destacar todos (splash)
+    $sku_patrocinado_splash = 'sku_H6ViM4K361ELMH';
+}
+
+get_header_modern("Mis Códigos - CodigoAmigo.com", "Administra todos tus códigos descuento publicados. Gestiona tu visibilidad, estadísticas y saldo para destacar tus ofertas.");
 
 // Definir variables globales necesarias
 if (!isset($GLOBALS['website'])) {
@@ -41,1707 +56,412 @@ if (!isset($GLOBALS['actual_url'])) {
     $GLOBALS['actual_url'] = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
 }
 
-// Configuración de Stripe
-if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58bd851da54e295b8b52f702' || $_SESSION["user_id"]=='5db1af3a2f55c82b47342172'){ //SI ES USUARIO ADMIN PATROCINO GRATIS
-    $stripe_live_publishable_key = "pk_test_yU61XXQMBvqVt4Ah9XD5uk6V";
-    $stripe_live_secret_key = "sk_test_ML0vGPIQHfl4iQYVHeflQTZt";
-    $sku_patrocinado_splash = 'sku_GjZv74bm3tOhSU';
-}else{ //PRODUCCION 
-    $stripe_live_publishable_key = "pk_live_HvgqlImI22optTnSvHKFKDiG00VQ0EZdE9";
-    $stripe_live_secret_key = "sk_live_dfMwJTC7REoMy76Bp2PzVoZV00U5KaNCcv";
-    $sku_patrocinado_splash = 'sku_H6ViM4K361ELMH';
+// Fallback: si venimos de un pago por saldo/stripe y hay señal de éxito en la URL,
+// aseguramos el disparo de notificaciones de destacado (idempotente con guardado en sesión)
+try {
+    if (isset($_GET['success']) && $_GET['success'] === 'destacado' && isset($_GET['codigo'])) {
+        $codigo_id_qs = $_GET['codigo'];
+        $tipo_qs = isset($_GET['tipo']) && in_array($_GET['tipo'], ['normal','super']) ? $_GET['tipo'] : 'normal';
+
+        if (!isset($_SESSION['last_destacado_notify']) || $_SESSION['last_destacado_notify'] !== $codigo_id_qs) {
+            include_once __DIR__ . '/../myphp/funciones.php';
+            if (function_exists('destacar_codigo_moderno')) {
+                destacar_codigo_moderno($codigo_id_qs, $tipo_qs);
+            }
+            $_SESSION['last_destacado_notify'] = $codigo_id_qs;
+        }
+    }
+} catch (Exception $e) {
+    // silencioso
 }
 
 // Los códigos del usuario ya están disponibles desde app_with_mongo.php
 ?>
 
-<style>
-/* Animación para mensaje de cuenta activada */
-@keyframes slideInDown {
-    from {
-        transform: translateY(-100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
-}
-
-/* Estilos base - solo para móvil por defecto */
-.dashboard-container {
-    background: #222222;
-    min-height: 100vh;
-    padding: 0;
-    width: 100%;
-    overflow-x: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-
-.main-content {
-    width: 100%;
-    margin-left: 0;
-    padding: 0;
-    background: #333333;
-    min-height: calc(100vh - 80px);
-    position: relative;
-    z-index: 1;
-}
-
-.content-wrapper {
-    display: block;
-    width: 100%;
-    min-height: calc(100vh - 80px);
-}
-
-.codes-section {
-    width: 100%;
-    padding: 30px;
-    margin: 0;
-    box-sizing: border-box;
-}
-
-.sidebar-header {
-    margin-bottom: 30px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid #444444;
-}
-
-.sidebar-title {
-    font-size: 2rem;
-    font-weight: 800;
-    color: #ffffff;
-    margin: 0;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-    text-align: center;
-    padding: 20px 0;
-    background: linear-gradient(135deg, #ff6b35, #e55a2b);
-    border-radius: 10px;
-    margin-bottom: 25px;
-}
-
-.filter-section {
-    margin-bottom: 25px;
-}
-
-.filter-title {
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: #ffffff;
-    margin-bottom: 25px;
-    display: block;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
-    padding-bottom: 8px;
-    border-bottom: 2px solid rgba(255, 107, 53, 0.3);
-}
-
-.filter-options {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.filter-option {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 15px 12px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-size: 1.2rem;
-    color: #ffffff;
-    border-radius: 8px;
-    margin-bottom: 6px;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
-}
-
-.filter-option:hover {
-    color: #ff6b35;
-    background: rgba(255, 107, 53, 0.1);
-    transform: translateX(5px);
-}
-
-.filter-option input[type="radio"] {
-    margin: 0;
-    width: 16px;
-    height: 16px;
-    accent-color: #ff6b35;
-    cursor: pointer;
-}
-
-.filter-option input[type="checkbox"] {
-    margin: 0;
-    width: 16px;
-    height: 16px;
-    accent-color: #ff6b35;
-    cursor: pointer;
-}
-
-.filter-option input[type="date"] {
-    border: 1px solid #555;
-    background: #444;
-    color: white;
-    font-size: 0.9rem;
-    padding: 8px 12px;
-    border-radius: 6px;
-    width: 100%;
-}
-
-.filter-option input[type="date"]:focus {
-    outline: none;
-    border-color: #ff6b35;
-}
-
-.filter-option label {
-    margin: 0;
-    cursor: pointer;
-    flex: 1;
-    font-weight: 400;
-    color: white;
-}
-
-.filter-count {
-    background: #ff6b35;
-    color: white;
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    min-width: 20px;
-    text-align: center;
-}
-
-.apply-filters {
-    background: #ff6b35;
-    color: white;
-    border: none;
-    padding: 16px 24px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 1.2rem;
-    font-weight: 600;
-    width: 100%;
-    margin: 25px 0 15px 0;
-    transition: all 0.3s ease;
-}
-
-.apply-filters:hover {
-    background: #e55a2b;
-    transform: translateY(-1px);
-}
-
-.clear-filters {
-    background: #444444;
-    color: white;
-    border: none;
-    padding: 16px 24px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 1.2rem;
-    font-weight: 600;
-    width: 100%;
-    margin-top: 15px;
-    transition: all 0.3s ease;
-}
-
-.clear-filters:hover {
-    background: #555555;
-    transform: translateY(-1px);
-}
-
-/* Estilos específicos para escritorio */
-@media (min-width: 769px) {
-    .dashboard-container {
-        display: flex;
-        min-height: 100vh;
-    }
-    
-    
-    .main-content {
-        width: 100% !important;
-        margin-left: 0 !important;
-        padding: 0;
-        background: #333333;
-        min-height: calc(100vh - 80px);
-        position: relative;
-        z-index: 1;
-        flex: 1;
-        box-sizing: border-box;
-        display: flex;
-        justify-content: center;
-    }
-    
-    .content-wrapper {
-        width: 100%;
-        max-width: 1200px;
-        min-height: calc(100vh - 80px);
-        margin: 0 auto;
-    }
-    
-    .codes-section {
-        width: 100%;
-        padding: 20px;
-        margin: 0;
-        box-sizing: border-box;
-        margin-left: 0;
-    }
-    
-    /* Ocultar filtros móviles en escritorio */
-    .filter-section-mobile {
-        display: none !important;
-    }
-}
-
-@media (max-width: 768px) {
-    /* Reset general para móvil */
-    * {
-        box-sizing: border-box;
-    }
-    
-    body {
-        background: #f8f9fa;
-        overflow-x: hidden;
-        margin: 0;
-        padding: 0;
-    }
-    
-    .dashboard-container {
-        flex-direction: column;
-        padding: 0;
-        margin: 0;
-        background: #f8f9fa;
-    }
-    
-    /* Header simplificado */
-    .dashboard-header {
-        background: white;
-        margin: 0;
-        padding: 20px;
-        border-bottom: 1px solid #e9ecef;
-    }
-    
-    .user-info h1 {
-        font-size: 1.8rem;
-        color: #333;
-        margin: 0 0 10px 0;
-    }
-    
-    .user-info p {
-        color: #666;
-        font-size: 1rem;
-    }
-    
-    .action-buttons {
-        flex-direction: column;
-        gap: 10px;
-        margin-top: 20px;
-    }
-    
-    .btn-modern {
-        width: 100%;
-        text-align: center;
-        padding: 12px 20px;
-        border-radius: 8px;
-        border: 2px solid #ff6b35;
-        background: white;
-        color: #ff6b35;
-        font-weight: 600;
-    }
-    
-    .btn-modern:hover {
-        background: #ff6b35;
-        color: white;
-    }
-    
-    
-    .main-content {
-        width: 100% !important;
-        margin-left: 0 !important;
-        padding: 0;
-        flex: none;
-    }
-    
-    .content-wrapper {
-        padding: 0;
-        margin: 0;
-        background: #f8f9fa;
-    }
-    
-    
-    .visibility-tabs {
-        display: flex;
-        gap: 8px;
-        overflow-x: auto;
-        padding: 0;
-        margin: 0;
-        -webkit-overflow-scrolling: touch;
-    }
-    
-    .tab-button {
-        background: white;
-        border: 2px solid #ff6b35;
-        color: #ff6b35;
-        padding: 10px 16px;
-        border-radius: 20px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        font-weight: 600;
-        font-size: 0.85rem;
-        white-space: nowrap;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        min-width: fit-content;
-    }
-    
-    .tab-button:hover {
-        background: #ff6b35;
-        color: white;
-    }
-    
-    .tab-button.active {
-        background: #ff6b35;
-        color: white;
-    }
-    
-    .tab-text {
-        font-weight: 600;
-    }
-    
-    .tab-count {
-        font-weight: 500;
-        opacity: 0.9;
-    }
-    
-    /* Sección de códigos simplificada */
-    .codes-section {
-        background: #f8f9fa;
-        padding: 20px;
-        margin: 0;
-        border-radius: 0;
-    }
-    
-    .codes-title {
-        font-size: 1.4rem;
-        color: #333;
-        margin: 0 0 20px 0;
-        font-weight: 700;
-    }
-    
-    /* Tarjetas de código simplificadas */
-    .code-item {
-        background: white;
-        border: 1px solid #e9ecef;
-        border-radius: 12px;
-        padding: 20px;
-        margin-bottom: 16px;
-        box-shadow: none;
-        transition: all 0.2s ease;
-    }
-    
-    .code-item:hover {
-        transform: none;
-        box-shadow: none;
-        border-color: #ff6b35;
-    }
-    
-    .code-item.featured {
-        border-color: #ff6b35;
-        background: white;
-        box-shadow: none;
-    }
-    
-    .featured-badge {
-        position: absolute;
-        top: 15px;
-        right: 15px;
-        background: #ff6b35;
-        color: white;
-        padding: 6px 12px;
-        border-radius: 15px;
-        font-size: 0.75rem;
-        font-weight: 700;
-    }
-    
-    .code-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 15px;
-    }
-    
-    .code-brand h4 {
-        color: #333;
-        font-size: 1.2rem;
-        font-weight: 700;
-        margin: 0 0 8px 0;
-    }
-    
-    .code-brand p {
-        color: #666;
-        font-size: 0.95rem;
-        margin: 0;
-        line-height: 1.4;
-    }
-    
-    .code-reward {
-        background: #ff6b35;
-        color: white;
-        padding: 8px 16px;
-        border-radius: 20px;
-        font-weight: 700;
-        font-size: 0.9rem;
-        
-    }
-    
-    .code-details {
-        margin: 15px 0;
-    }
-    
-    .code-details p {
-        margin: 8px 0;
-        color: #666;
-        font-size: 0.9rem;
-    }
-    
-    .code-code {
-        background: #f8f9fa;
-        padding: 12px 16px;
-        border-radius: 8px;
-        font-family: 'Courier New', monospace;
-        font-weight: 600;
-        color: #333;
-        border: 1px solid #e9ecef;
-        margin: 10px 0;
-        word-break: break-all;
-        font-size: 0.85rem;
-    }
-    
-    .code-position {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-weight: 600;
-        font-size: 0.8rem;
-        margin: 2px 4px 2px 0;
-    }
-    
-    .code-position.alta {
-        background: #d4edda;
-        color: #155724;
-    }
-    
-    .code-position.media {
-        background: #fff3cd;
-        color: #856404;
-    }
-    
-    .code-position.baja {
-        background: #f8d7da;
-        color: #721c24;
-    }
-    
-    .visibility-badge {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-weight: 600;
-        font-size: 0.8rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .visibility-badge.visibility-alta {
-        background: #d4edda;
-        color: #155724;
-    }
-    
-    .visibility-badge.visibility-media {
-        background: #fff3cd;
-        color: #856404;
-    }
-    
-    .visibility-badge.visibility-baja {
-        background: #f8d7da;
-        color: #721c24;
-    }
-    
-    /* Botones de acción simplificados */
-    .code-actions {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 8px;
-        margin-top: 20px;
-        padding-top: 15px;
-        border-top: 1px solid #e9ecef;
-    }
-    
-    .btn-action {
-        padding: 12px 20px;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 0.9rem;
-        font-weight: 600;
-        transition: all 0.2s ease;
-        text-decoration: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        min-height: 44px;
-        text-align: center;
-    }
-    
-    .btn-destacar {
-        background: #ff6b35;
-        color: white;
-    }
-    
-    .btn-destacar:hover {
-        background: #e55a2b;
-        color: white;
-        text-decoration: none;
-    }
-    
-    .btn-modificar {
-        background: #28a745;
-        color: white;
-    }
-    
-    .btn-modificar:hover {
-        background: #218838;
-        color: white;
-        text-decoration: none;
-    }
-    
-    .btn-estadisticas {
-        background: #17a2b8;
-        color: white;
-    }
-    
-    .btn-estadisticas:hover {
-        background: #138496;
-        color: white;
-        text-decoration: none;
-    }
-    
-    .btn-compartir {
-        background: #6f42c1;
-        color: white;
-    }
-    
-    .btn-compartir:hover {
-        background: #5a32a3;
-        color: white;
-    }
-    
-    .btn-destacado-disabled {
-        background: #6c757d !important;
-        color: #fff !important;
-        cursor: not-allowed !important;
-        opacity: 0.6;
-    }
-    
-    /* Estadísticas simplificadas */
-    .stats-grid {
-        display: none; /* Ocultar en móvil */
-    }
-    
-    .filter-controls {
-        display: none; /* Ocultar en móvil */
-    }
-    
-    /* Sin códigos */
-    .no-codes {
-        text-align: center;
-        padding: 40px 20px;
-        color: #666;
-        background: white;
-        border-radius: 12px;
-        margin: 20px 0;
-    }
-    
-    .no-codes i {
-        font-size: 3rem;
-        color: #ddd;
-        margin-bottom: 15px;
-        display: block;
-    }
-    
-    .no-codes h3 {
-        color: #333;
-        font-size: 1.2rem;
-        margin: 0 0 10px 0;
-    }
-    
-    .no-codes p {
-        color: #666;
-        font-size: 0.9rem;
-        margin: 0 0 20px 0;
-    }
-    
-    /* Ocultar elementos no necesarios en móvil */
-    .mobile-filter-toggle {
-        display: none;
-    }
-    
-    .sidebar-overlay {
-        display: none;
-    }
-    
-    /* Mejorar las tarjetas de código en móvil */
-    .code-item {
-        width: 100%;
-        margin: 20px 0;
-        padding: 25px 20px;
-        box-sizing: border-box;
-        min-height: auto;
-        border-radius: 20px;
-    }
-    
-    .code-actions {
-        grid-template-columns: 1fr;
-        gap: 12px;
-        margin-top: 25px;
-        padding-top: 20px;
-    }
-    
-.btn-action {
-    padding: 20px 28px;
-    font-size: 1.3rem;
-    min-height: 60px;
-    border-radius: 12px;
-    font-weight: 700;
-}
-    
-    .code-header {
-        flex-direction: column;
-        gap: 20px;
-        margin-bottom: 20px;
-    }
-    
-    .code-brand h4 {
-        font-size: 1.5rem;
-        margin-bottom: 12px;
-        line-height: 1.3;
-    }
-    
-    .code-brand p {
-        font-size: 1.2rem;
-        line-height: 1.7;
-        margin-bottom: 15px;
-    }
-    
-    .code-details p {
-        font-size: 1.1rem;
-        margin: 15px 0;
-        line-height: 1.5;
-    }
-    
-    .code-code {
-        font-size: 1rem;
-        padding: 15px 20px;
-        margin: 15px 0;
-        word-break: break-all;
-        line-height: 1.4;
-    }
-    
-    .featured-badge {
-        top: 20px;
-        right: 20px;
-        padding: 10px 18px;
-        font-size: 0.9rem;
-    }
-    
-    .code-reward {
-        padding: 12px 24px;
-        font-size: 1rem;
-        margin-top: 10px;
-    }
-    
-    /* Mejorar visualización de URLs largas */
-    .code-code {
-        word-break: break-all;
-        overflow-wrap: break-word;
-        hyphens: auto;
-        white-space: pre-wrap;
-    }
-    
-    /* Mejorar espaciado general */
-    .codes-section {
-        padding: 20px 15px;
-        margin: 15px 10px;
-    }
-    
-    .codes-title {
-        font-size: 1.6rem;
-        margin-bottom: 25px;
-    }
-    
-    /* Mejorar el sidebar en móvil */
-    .sidebar {
-        padding: 20px 15px;
-        display: none; /* Ocultar en móvil */
-    }
-    
-    .sidebar-title {
-        font-size: 1.3rem;
-        padding: 12px 0;
-        margin-bottom: 25px;
-    }
-    
-    .filter-title {
-        font-size: 1rem;
-        margin-bottom: 15px;
-    }
-    
-    .filter-option {
-        padding: 15px 12px;
-        font-size: 1.1rem;
-        margin-bottom: 8px;
-    }
-    
-    /* Pestañas de visibilidad en móvil */
-    .visibility-tabs {
-        margin-bottom: 20px;
-        padding: 0 5px;
-    }
-    
-    .tab-button {
-        padding: 10px 16px;
-        font-size: 0.8rem;
-        border-radius: 20px;
-        min-width: auto;
-    }
-    
-    .tab-text {
-        font-size: 0.8rem;
-    }
-    
-    .tab-count {
-        font-size: 0.75rem;
-    }
-    
-    /* Ajustar el header del dashboard */
-    .dashboard-header {
-        margin: 10px;
-        padding: 20px;
-        border-radius: 10px;
-    }
-    
-    .user-profile {
-        flex-direction: column;
-        text-align: center;
-        gap: 15px;
-    }
-    
-    .action-buttons {
-        flex-direction: column;
-        gap: 10px;
-    }
-    
-    .btn-modern {
-        width: 100%;
-        justify-content: center;
-    }
-}
-
-/* Estilos para pantallas muy pequeñas */
-@media (max-width: 480px) {
-    .mobile-filter-toggle {
-        top: 15px;
-        left: 15px;
-        padding: 10px 15px;
-        font-size: 13px;
-    }
-    
-    .codes-section {
-        padding: 10px;
-    }
-    
-    .dashboard-header {
-        margin: 5px;
-        padding: 15px;
-    }
-    
-    .sidebar {
-        max-width: 100%;
-        width: 100%;
-    }
-    
-    .filter-section {
-        margin-bottom: 20px;
-    }
-    
-    .filter-option {
-        padding: 10px 0;
-        font-size: 1rem;
-    }
-    
-    .apply-filters, .clear-filters {
-        padding: 15px 20px;
-        font-size: 1rem;
-    }
-}
-
-.mobile-filter-toggle {
-    display: none;
-}
-
-.dashboard-header {
-    background: #2c2c2c;
-    border-radius: 15px;
-    margin: 20px;
-    padding: 30px;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-    color: white;
-}
-
-.user-profile {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    margin-bottom: 30px;
-}
-
-.user-avatar-large {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background: #ff6b35;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2rem;
-    font-weight: bold;
-    box-shadow: 0 5px 15px rgba(255, 107, 53, 0.3);
-    overflow: hidden;
-}
-
-.user-avatar-img-large {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center;
-    border-radius: 50%;
-}
-
-.user-info h1 {
-    color: #333;
-    font-size: 2.5rem;
-    margin: 0;
-    font-weight: 700;
-}
-
-.user-info p {
-    color: #666;
-    font-size: 1.1rem;
-    margin: 5px 0 0 0;
-}
-
-.action-buttons {
-    display: flex;
-    gap: 15px;
-    margin-bottom: 30px;
-}
-
-.btn-modern {
-    padding: 12px 25px;
-    border: none;
-    border-radius: 8px;
-    font-weight: 600;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    transition: all 0.3s ease;
-    font-size: 1rem;
-}
-
-.btn-primary-modern {
-    background: #ff6b35;
-    color: white;
-    box-shadow: 0 3px 10px rgba(255, 107, 53, 0.3);
-}
-
-.btn-primary-modern:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(255, 107, 53, 0.4);
-    color: white;
-    text-decoration: none;
-}
-
-.btn-success-modern {
-    background: #28a745;
-    color: white;
-    box-shadow: 0 3px 10px rgba(40, 167, 69, 0.3);
-}
-
-.btn-success-modern:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
-    color: white;
-    text-decoration: none;
-}
-
-/* Pestañas de visibilidad */
-.visibility-tabs {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 30px;
-    overflow-x: auto;
-    padding: 5px 0;
-    -webkit-overflow-scrolling: touch;
-}
-
-.tab-button {
-    background: transparent;
-    border: 2px solid #ff6b35;
-    color: #ff6b35;
-    padding: 15px 25px;
-    border-radius: 25px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-weight: 700;
-    font-size: 1.1rem;
-    white-space: nowrap;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-width: fit-content;
-}
-
-.tab-button:hover {
-    background: rgba(255, 107, 53, 0.1);
-    transform: translateY(-2px);
-}
-
-.tab-button.active {
-    background: #ff6b35;
-    color: white;
-    box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
-}
-
-.tab-text {
-    font-weight: 700;
-}
-
-.tab-count {
-    font-weight: 600;
-    opacity: 0.8;
-}
-
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 20px;
-    margin-bottom: 40px;
-}
-
-.stat-card {
-    background: #444444;
-    border-radius: 15px;
-    padding: 25px;
-    text-align: center;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-    transition: all 0.3s ease;
-    cursor: pointer;
-    border: 3px solid transparent;
-    color: white;
-}
-
-.stat-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-}
-
-.stat-card.active {
-    border-color: #ff6b35;
-    background: #fff;
-}
-
-.stat-badge {
-    padding: 8px 20px;
-    border-radius: 20px;
-    font-weight: 700;
-    font-size: 0.9rem;
-    margin-bottom: 15px;
-    display: inline-block;
-}
-
-.stat-badge.high {
-    background: #ff6b35;
-    color: white;
-}
-
-.stat-badge.medium {
-    background: #ff6b35;
-    color: white;
-}
-
-.stat-badge.low {
-    background: #ff6b35;
-    color: white;
-}
-
-.stat-number {
-    font-size: 3rem;
-    font-weight: 800;
-    color: #ffffff;
-    margin: 10px 0;
-    line-height: 1;
-}
-
-.stat-description {
-    color: #cccccc;
-    font-size: 1rem;
-    margin: 0;
-}
-
-.filter-controls {
-    text-align: center;
-    margin: 30px 0;
-}
-
-.btn-show-all {
-    background: #ff6b35;
-    color: white;
-    border: none;
-    padding: 12px 30px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 1rem;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    box-shadow: 0 3px 10px rgba(255, 107, 53, 0.3);
-}
-
-.btn-show-all:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(255, 107, 53, 0.4);
-}
-
-.codes-section {
-    background: #f8f8f8;
-    border-radius: 15px;
-    padding: 30px;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-    margin: 20px;
-}
-
-.codes-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 30px;
-    padding-bottom: 20px;
-    border-bottom: 2px solid #e0e0e0;
-}
-
-.codes-title {
-    color: #ff6b35;
-    font-size: 2.2rem;
-    font-weight: 700;
-    margin: 0;
-}
-
-/* Estilos para el desplegable de ordenación */
-.sort-dropdown {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.sort-dropdown label {
-    color: #666;
-    font-size: 0.9rem;
-    font-weight: 500;
-    margin: 0;
-}
-
-.sort-select {
-    padding: 8px 12px;
-    border: 2px solid #e0e0e0;
-    border-radius: 8px;
-    background: white;
-    color: #333;
-    font-size: 0.9rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    min-width: 180px;
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: right 10px center;
-    background-size: 16px;
-    padding-right: 35px;
-}
-
-.sort-select:focus {
-    outline: none;
-    border-color: #ff6b35;
-    box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
-}
-
-.sort-select:hover {
-    border-color: #ff6b35;
-}
-
-/* Responsive para móvil */
-@media (max-width: 768px) {
-    .codes-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 15px;
-    }
-    
-    .sort-dropdown {
-        width: 100%;
-        justify-content: space-between;
-    }
-    
-    .sort-select {
-        min-width: 150px;
-        flex: 1;
-    }
-}
-
-.code-item {
-    background: #ffffff;
-    border-radius: 20px;
-    padding: 35px;
-    margin-bottom: 30px;
-    box-shadow: 0 6px 25px rgba(0,0,0,0.08);
-    border: 1px solid #e5e7eb;
-    transition: all 0.3s ease;
-    color: #1f2937;
-    position: relative;
-    min-height: 200px;
-    display: flex;
-    flex-direction: column;
-}
-
-.code-item:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
-    border-color: #ff6b35;
-}
-
-.code-item.featured {
-    border-left: 4px solid #ff6b35;
-    background: #ffffff;
-    box-shadow: 0 8px 30px rgba(255, 107, 53, 0.15);
-}
-
-.featured-badge {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    background: linear-gradient(135deg, #ff6b35, #e55a2b);
-    color: white;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.code-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 25px;
-    gap: 25px;
-}
-
-.code-brand {
-    flex: 1;
-}
-
-.code-brand h4 {
-    color: #ffffff;
-    font-size: 1.8rem;
-    font-weight: 700;
-    margin: 0 0 12px 0;
-    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
-}
-
-.code-brand p {
-    font-size: 1.2rem;
-    margin: 0;
-    line-height: 1.6;
-}
-
-.code-reward {
-    background: #ff6b35;
-    color: white;
-    padding: 10px 20px;
-    border-radius: 20px;
-    font-weight: 700;
-    font-size: 0.9rem;
-    box-shadow: 0 3px 10px rgba(255, 107, 53, 0.3);
-    margin-top: 50px !important;
-    position: absolute;
-}
-
-.code-details {
-    margin: 20px 0;
-}
-
-.code-details p {
-    margin: 12px 0;
-    font-size: 1.2rem;
-    line-height: 1.6;
-}
-
-.code-id {
-    font-family: 'Courier New', monospace;
-    background: #f3f4f6;
-    padding: 4px 8px;
-    border-radius: 6px;
-    border: 1px solid #e5e7eb;
-    font-size: 0.85rem;
-    color: #ff6b35;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: inline-block;
-    user-select: all;
-}
-
-.code-id:hover {
-    background: #ff6b35;
-    color: white;
-    border-color: #e55a2b;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(255, 107, 53, 0.3);
-}
-
-/* Filtros de visibilidad */
-.visibility-filters {
-    margin: 20px 0 30px 0;
-    padding: 0;
-}
-
-.filter-tabs {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    justify-content: center;
-    margin-bottom: 20px;
-}
-
-.filter-tab {
-    background: #f8f9fa;
-    border: 2px solid #e9ecef;
-    color: #6c757d;
-    padding: 12px 20px;
-    border-radius: 25px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 140px;
-    justify-content: center;
-    position: relative;
-    overflow: hidden;
-}
-
-.filter-tab:hover {
-    background: #ff6b35;
-    color: white;
-    border-color: #ff6b35;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
-}
-
-.filter-tab.active {
-    background: #ff6b35;
-    color: white;
-    border-color: #ff6b35;
-    box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4);
-}
-
-.filter-tab i {
-    font-size: 1rem;
-}
-
-.filter-tab span {
-    font-weight: 600;
-}
-
-.filter-count {
-    background: rgba(255, 255, 255, 0.2);
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.8rem;
-    font-weight: 700;
-}
-
-.filter-tab:not(.active) .filter-count {
-    background: #e9ecef;
-    color: #6c757d;
-}
-
-/* Responsive para filtros */
-@media (max-width: 768px) {
-    .filter-tabs {
-        flex-direction: column;
-        gap: 8px;
-        align-items: center;
-    }
-    
-    .filter-tab {
-        width: 100%;
-        max-width: 280px;
-        min-width: auto;
-    }
-}
-
-.code-code {
-    background: #f8f9fa;
-    padding: 16px 20px;
-    border-radius: 8px;
-    font-family: 'Courier New', monospace;
-    font-weight: 600;
-    color: #2c3e50;
-    border: 2px dashed #ff6b35;
-    margin: 15px 0;
-    word-break: break-all;
-    font-size: 1.1rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.code-position {
-    display: inline-block;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-weight: 700;
-    font-size: 0.9rem;
-    margin: 5px 5px 5px 0;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
-
-.code-position.alta {
-    background: #d4edda;
-    color: #155724;
-}
-
-.code-position.media {
-    background: #fff3cd;
-    color: #856404;
-}
-
-.code-position.baja {
-    background: #f8d7da;
-    color: #721c24;
-}
-
-.visibility-badge {
-    display: inline-block;
-    padding: 6px 12px;
-    border-radius: 15px;
-    font-weight: 700;
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.visibility-badge.visibility-alta {
-    background: #d4edda;
-    color: #155724;
-    border: 2px solid #28a745;
-}
-
-.visibility-badge.visibility-media {
-    background: #fff3cd;
-    color: #856404;
-    border: 2px solid #ffc107;
-}
-
-.visibility-badge.visibility-baja {
-    background: #f8d7da;
-    color: #721c24;
-    border: 2px solid #dc3545;
-}
-
-.code-actions {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 15px;
-    margin-top: 30px;
-    padding-top: 25px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.btn-action {
-    padding: 12px 16px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    text-decoration: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    min-height: 44px;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.btn-destacar {
-    background: #ff6b35;
-    color: white;
-    box-shadow: 0 3px 10px rgba(255, 107, 53, 0.3);
-}
-
-.btn-destacar:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(255, 107, 53, 0.4);
-    color: white;
-    text-decoration: none;
-}
-
-.btn-modificar {
-    background: #28a745;
-    color: white;
-    box-shadow: 0 3px 10px rgba(40, 167, 69, 0.3);
-}
-
-.btn-modificar:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
-    color: white;
-    text-decoration: none;
-}
-
-.btn-estadisticas {
-    background: #17a2b8;
-    color: white;
-    box-shadow: 0 3px 10px rgba(23, 162, 184, 0.3);
-}
-
-.btn-estadisticas:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(23, 162, 184, 0.4);
-    color: white;
-    text-decoration: none;
-}
-
-.btn-compartir {
-    background: #6f42c1;
-    color: white;
-    box-shadow: 0 3px 10px rgba(111, 66, 193, 0.3);
-}
-
-.btn-compartir:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(111, 66, 193, 0.4);
-    color: white;
-    text-decoration: none;
-}
-
-.btn-eliminar {
-    background: #dc3545;
-    color: white;
-    box-shadow: 0 3px 10px rgba(220, 53, 69, 0.3);
-}
-
-.btn-eliminar:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(220, 53, 69, 0.4);
-    color: white;
-    text-decoration: none;
-    background: #c82333;
-}
-
-.btn-destacado-disabled {
-    background: #666666 !important;
-    color: #999999 !important;
-    cursor: not-allowed !important;
-    opacity: 0.6;
-}
-
-.btn-destacado-disabled:hover {
-    transform: none !important;
-    box-shadow: none !important;
-    color: #999999 !important;
-}
-
-.no-codes {
-    text-align: center;
-    padding: 60px 20px;
-    color: #666;
-}
-
-.no-codes i {
-    font-size: 4rem;
-    color: #ddd;
-    margin-bottom: 20px;
-    display: block;
-}
-
-.no-codes h3 {
-    color: #333;
-    margin-bottom: 15px;
-}
-
-.no-codes p {
-    font-size: 1.1rem;
-    margin-bottom: 30px;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .dashboard-header {
-        margin: 10px;
-        padding: 20px;
-    }
-    
-    .user-profile {
-        flex-direction: column;
-        text-align: center;
-    }
-    
-    .action-buttons {
-        flex-direction: column;
-        align-items: center;
-    }
-    
-    .stats-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .codes-section {
-        margin: 0px;
-        padding: 5px;
-    }
-    
-    .code-actions {
-        justify-content: center;
-    }
-}
-</style>
-
-<div class="dashboard-container">
-    
-    <div class="content-wrapper">
-        <!-- Contenido principal -->
-        
-        <!-- Contenido principal -->
-        <div class="codes-section">
-        
-        <div class="dashboard-header">
-            <?php if(isset($_SESSION['msg_success']) && $_SESSION['msg_success'] != "") { ?>
-                <div class="alert alert-success" style="background: #4CAF50; color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: none; font-size: 1.6rem; text-align: center; box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);">
-                    <i class="fas fa-check-circle" style="margin-right: 10px;"></i>
-                    <?php echo $_SESSION['msg_success']; ?>
-                </div>
-            <?php } ?>
-            
-            <?php if(isset($_SESSION['msg_error']) && $_SESSION['msg_error'] != "") { ?>
-                <div class="alert alert-danger" style="background: #f44336; color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: none; font-size: 1.6rem; text-align: center; box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);">
-                    <i class="fas fa-exclamation-triangle" style="margin-right: 10px;"></i>
-                    <?php echo $_SESSION['msg_error']; ?>
-                </div>
-            <?php } ?>
-            
-            <?php if(isset($_GET['msg']) && $_GET['msg'] == 'password_updated') { ?>
-                <div class="alert alert-success" style="background: #4CAF50; color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: none; font-size: 1.6rem; text-align: center; box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);">
-                    <i class="fas fa-check-circle" style="margin-right: 10px;"></i>
-                    ¡Tu contraseña se ha actualizado correctamente!
-                </div>
-            <?php } ?>
-            
-            <?php if(isset($_GET['msg']) && $_GET['msg'] == 'account_activated') { ?>
-                <div class="alert alert-success" style="background: #4CAF50; color: white; padding: 20px; border-radius: 12px; margin-bottom: 30px; border: none; font-size: 1.8rem; text-align: center; box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4); animation: slideInDown 0.6s ease-out;">
-                    <i class="fas fa-check-circle" style="margin-right: 15px; font-size: 2rem;"></i>
-                    ¡Cuenta activada correctamente! Bienvenido a Código Amigo 🎉
-                </div>
-            <?php } ?>
+<!-- Incluir archivos CSS y JavaScript externos -->
+<link rel="stylesheet" href="/assets/css/mis-anuncios.css">
+<script src="/assets/js/mis-anuncios.js?<?php echo time(); ?>" defer></script>
+<script>
+// Wrapper defensivo: asegura que exista la función global para los onclick inline
+function filterByVisibility(visibility){
+    if (window.filterByVisibility) { return window.filterByVisibility(visibility); }
+    document.addEventListener('DOMContentLoaded', function(){
+        if (window.filterByVisibility) window.filterByVisibility(visibility);
+    });
+}
+</script>
+
+
+            <?php if(isset($_SESSION['msg_error']) && $_SESSION['msg_error'] != ""): ?>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        mostrarModalError('Error', '<?php echo addslashes($_SESSION['msg_error']); ?>');
+                    });
+                </script>
+            <?php endif; ?>
+
+            <?php if(isset($_GET['msg']) && $_GET['msg'] == 'password_updated'): ?>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        mostrarModalExito('¡Contraseña Actualizada!', 'Tu contraseña se ha actualizado correctamente.');
+                    });
+                </script>
+            <?php endif; ?>
+
+            <?php if(isset($_GET['msg']) && $_GET['msg'] == 'account_activated'): ?>
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        mostrarModalExito('¡Cuenta Activada!', '¡Cuenta activada correctamente! Bienvenido a Código Amigo 🎉');
+                    });
+                </script>
+            <?php endif; ?>
             
             <?php unset($_SESSION['msg_success']); ?>
             <?php unset($_SESSION['msg_error']); ?>
-            
-            <div class="user-profile">
-                <div class="user-avatar-large">
-                    <?php if (!empty($data_usuario["img"])): ?>
-                        <img src="<?php echo htmlspecialchars($data_usuario["img"]); ?>" 
-                             alt="Avatar de <?php echo htmlspecialchars($data_usuario["username"] ?? "Usuario"); ?>" 
-                             class="user-avatar-img-large">
-                    <?php else: ?>
-                        <?php echo strtoupper(substr($data_usuario["username"] ?? "U", 0, 2)); ?>
-                    <?php endif; ?>
-                </div>
-                <div class="user-info">
-                    <h1><?php echo $data_usuario["username"] ?? "Usuario"; ?></h1>
-                    <p>
-                        <?php 
-                        if(isset($data_usuario["fecha_registro"])) {
-                            $fecha_registro = new DateTime($data_usuario["fecha_registro"]);
-                            $hoy = new DateTime();
-                            $dias = $hoy->diff($fecha_registro)->days;
-                            echo "Miembro desde hace " . $dias . " días";
-                        } else {
-                            echo "Usuario registrado";
-                        }
-                        ?>
-                    </p>
-                </div>
-            </div>
-            
-            <!-- Saldo del usuario -->
-            <div class="balance-section" style="background: linear-gradient(135deg, #ff6b35, #e55a2b); padding: 20px; border-radius: 15px; margin-bottom: 20px; color: white; text-align: center;">
-                <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 15px;">
-                    <i class="fas fa-wallet" style="font-size: 2rem;"></i>
-                    <div>
-                        <h3 style="margin: 0; font-size: 1.8rem; font-weight: bold;">Saldo Disponible</h3>
-                        <p style="margin: 5px 0 0 0; font-size: 1.2rem; opacity: 0.9;">Para patrocinar tus códigos</p>
+            <!-- Welcome Section -->
+            <div style="background: linear-gradient(135deg, #E30613, #667eea); color: white; padding: 30px; border-radius: 15px; margin-bottom: 30px; box-shadow: 0 8px 25px rgba(227, 6, 19, 0.3);">
+                <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div style="background: rgba(255, 255, 255, 0.2); padding: 12px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.3);">
+                            <i class="fas fa-user" style="font-size: 1.5rem;"></i>
+                        </div>
+                        <div>
+                            <h2 style="margin: 0 0 5px 0; font-size: 1.8rem; font-weight: 700;">
+                                ¡Hola <?php echo htmlspecialchars($data_usuario["username"] ?? "Usuario"); ?>! 👋
+                            </h2>
+                            <p style="margin: 0; opacity: 0.9; font-size: 1rem;">
+                                Gestiona todos tus códigos de descuento
+                                <?php if(isset($data_usuario["fecha_registro"])): ?>
+                                    <?php
+                                    $dias = null;
+                                    $raw = $data_usuario["fecha_registro"]; 
+                                    try {
+                                        if ($raw instanceof MongoDB\BSON\UTCDateTime) {
+                                            $fecha_registro_dt = $raw->toDateTime();
+                                        } elseif (is_numeric($raw)) {
+                                            $fecha_registro_dt = (new DateTime())->setTimestamp((int)$raw);
+                                        } elseif (is_string($raw) && strtotime($raw)) {
+                                            $fecha_registro_dt = new DateTime($raw);
+                                        } else {
+                                            $fecha_registro_dt = null;
+                                        }
+                                        if ($fecha_registro_dt) {
+                                            $hoy = new DateTime();
+                                            $dias = $hoy->diff($fecha_registro_dt)->days;
+                                        }
+                                    } catch (Throwable $e) {
+                                        $dias = null;
+                                    }
+                                    ?>
+                                    <?php if($dias !== null): ?>• <?php echo (int)$dias; ?> días en la plataforma<?php endif; ?>
+                                <?php endif; ?>
+                            </p>
+                        </div>
                     </div>
-                </div>
-                <div style="font-size: 3rem; font-weight: bold; margin-bottom: 20px;">
-                    <?php 
-                    $saldo_usuario = isset($data_usuario['saldo']) ? $data_usuario['saldo'] : 0;
-                    echo number_format($saldo_usuario, 2) . '€';
-                    ?>
-                </div>
-                <div class="d-flex gap-2">
-                    <button onclick="mostrarRecargarSaldo()" class="btn-modern" style="background: white; color: #ff6b35; padding: 12px 25px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">
-                        <i class="fas fa-plus"></i> Recargar Saldo
-                    </button>
-                    <a href="/public/historial_recargas.php" class="btn-modern" style="background: #667eea; color: white; padding: 12px 25px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; text-decoration: none;">
-                        <i class="fas fa-history"></i> Ver Historial
-                    </a>
                 </div>
             </div>
 
-            <div class="action-buttons">
-                <a href="<?php echo $link_usuario; ?>" class="btn-modern btn-primary-modern">
-                    <i class="fas fa-eye"></i> Ver mi página
-                </a>
-                <a href="/nuevo_codigo" class="btn-modern btn-success-modern">
-                    <i class="fas fa-plus"></i> Nuevo código
-                </a>
-                <button onclick="destacarTodosSplash()" class="btn-modern" style="background: #9c27b0; color: white; padding: 12px 25px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">
-                    <i class="fas fa-rocket"></i> Destacar Todos (Splash)
-                </button>
+            <!-- Compact Actions Bar (Inspirado en Chollometro) -->
+            <div style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #e9ecef;">
+                <div class="compact-actions-bar" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; align-items: center;">
+                    
+                    <!-- Mi Página Pública -->
+                    <a href="<?php echo link_usuario($_SESSION["username"], $_SESSION["user_id"]); ?>" target="_blank" class="action-card-purple" style="display: flex; align-items: center; gap: 15px; padding: 15px; background: linear-gradient(135deg, #667eea, #764ba2); color: white !important; border-radius: 10px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3); text-decoration: none; cursor: pointer; transition: all 0.3s ease;">
+                        <div style="background: rgba(255, 255, 255, 0.2); padding: 10px; border-radius: 50%;">
+                            <i class="fas fa-external-link-alt" style="font-size: 1.2rem; color: white !important;"></i>
+                        </div>
+                        <div style="flex: 1; color: white !important;">
+                            <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 2px; color: white !important;">Mi página pública</div>
+                            <div style="font-size: 0.8rem; opacity: 0.9; color: white !important;">Comparte tu perfil</div>
+                        </div>
+                        <div style="background: rgba(255, 255, 255, 0.2); color: white !important; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;">
+                            <i class="fas fa-link" style="margin-right: 4px; color: white !important;"></i>Ver
+                        </div>
+                    </a>
+
+                    <!-- Saldo -->
+                    <div class="action-card-green" style="display: flex; align-items: center; gap: 15px; padding: 15px; background: linear-gradient(135deg, #4CAF50, #45a049); color: white !important; border-radius: 10px; box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3); cursor: pointer; transition: all 0.3s ease;" onclick="document.getElementById('btn-recargar-saldo').click();">
+                        <div style="background: rgba(255, 255, 255, 0.2); padding: 10px; border-radius: 50%;">
+                            <i class="fas fa-piggy-bank" style="font-size: 1.2rem; color: white !important;"></i>
+                        </div>
+                        <div style="flex: 1; color: white !important;">
+                            <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 2px; color: white !important;">Tu saldo</div>
+                            <div style="font-size: 1.2rem; font-weight: 700; color: white !important;">
+                                <?php
+                                // Obtener saldo actualizado directamente de la base de datos
+                                $collection_usuarios = getCollectionUsuarios();
+                                $usuario_actualizado = $collection_usuarios->findOne(['_id' => new MongoDB\BSON\ObjectId($_SESSION["user_id"])]);
+                                $saldo_usuario = $usuario_actualizado['saldo'] ?? 0;
+                                echo number_format($saldo_usuario, 2) . '€';
+                                ?>
+                            </div>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 4px;" onclick="event.stopPropagation();">
+                            <button style="background: rgba(255, 255, 255, 0.2); color: white !important; padding: 6px 10px; border: none; border-radius: 4px; font-size: 0.7rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease;" id="btn-recargar-saldo" onmouseover="this.style.background='rgba(255, 255, 255, 0.3)'; this.style.color='white';" onmouseout="this.style.background='rgba(255, 255, 255, 0.2)'; this.style.color='white';">
+                                <i class="fas fa-plus" style="margin-right: 2px;"></i>Añadir
+                            </button>
+                            <a href="/public/historial_recargas.php" style="background: rgba(255, 255, 255, 0.2); color: white !important; padding: 6px 10px; border-radius: 4px; text-decoration: none; font-size: 0.7rem; font-weight: 600; text-align: center; transition: all 0.3s ease;" onmouseover="this.style.background='rgba(255, 255, 255, 0.3)'; this.style.color='white';" onmouseout="this.style.background='rgba(255, 255, 255, 0.2)'; this.style.color='white';">
+                                <i class="fas fa-history" style="margin-right: 2px;"></i>Historial
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Publicar -->
+                    <a href="/nuevo_codigo" onclick="return confirmPublish();" class="action-card-orange" style="display: flex; align-items: center; gap: 15px; padding: 15px; background: linear-gradient(135deg, #FF9800, #F57C00); color: white !important; border-radius: 10px; box-shadow: 0 4px 15px rgba(255, 152, 0, 0.3); text-decoration: none; cursor: pointer; transition: all 0.3s ease;">
+                        <div style="background: rgba(255, 255, 255, 0.2); padding: 10px; border-radius: 50%;">
+                            <i class="fas fa-plus-circle" style="font-size: 1.2rem; color: white !important;"></i>
+                        </div>
+                        <div style="flex: 1; color: white !important;">
+                            <div style="font-weight: 600; font-size: 0.9rem; margin-bottom: 2px; color: white !important;">Publicar código</div>
+                            <div style="font-size: 0.8rem; opacity: 0.9; color: white !important;">Crea una nueva oferta</div>
+                        </div>
+                        <div style="background: rgba(255, 255, 255, 0.2); color: white !important; padding: 8px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;">
+                            <i class="fas fa-plus" style="margin-right: 4px; color: white !important;"></i>Crear
+                        </div>
+                    </a>
+
+                </div>
             </div>
+
+            <?php if (isset($_GET['success']) && $_GET['success'] === 'destacado'): 
+                // Obtener información del código destacado
+                $codigo_id_modal = isset($_GET['codigo']) ? $_GET['codigo'] : '';
+                $tipo_modal = isset($_GET['tipo']) && in_array($_GET['tipo'], ['normal','super']) ? $_GET['tipo'] : 'normal';
+                
+                $marca_nombre_modal = '';
+                $marca_clave_modal = '';
+                $enlaces_modal = '';
+                
+                try {
+                    if ($codigo_id_modal) {
+                        // Asegurar que las funciones estén disponibles
+                        if (!function_exists('getObjectCodigo')) {
+                            include_once __DIR__ . '/../myphp/funciones.php';
+                        }
+                        if (!function_exists('getObjectMarca')) {
+                            include_once __DIR__ . '/../myphp/funciones.php';
+                        }
+                        
+                        $codigo_modal = getObjectCodigo($codigo_id_modal);
+                        
+                        if ($codigo_modal && isset($codigo_modal['marca'])) {
+                            $marca_clave_modal = $codigo_modal['marca'];
+                            $marca_obj = getObjectMarca('nombre_clave', $marca_clave_modal);
+                            
+                            if ($marca_obj) {
+                                $marca_nombre_modal = $marca_obj['nombre'] ?? $marca_clave_modal;
+                                $marca_url_modal = '/de-' . $marca_clave_modal;
+                                
+                                if ($tipo_modal === 'normal') {
+                                    $enlaces_modal = '<a href="' . htmlspecialchars($marca_url_modal) . '" style="color: #4CAF50; text-decoration: underline; font-weight: 600;">Ver en la página de ' . htmlspecialchars($marca_nombre_modal) . '</a>';
+                                } else {
+                                    $enlaces_modal = '<div style="margin-top: 15px; display: flex; flex-direction: column; gap: 10px; align-items: center;">';
+                                    $enlaces_modal .= '<a href="' . htmlspecialchars($marca_url_modal) . '" style="color: #4CAF50; text-decoration: underline; font-weight: 600;">Ver en la página de ' . htmlspecialchars($marca_nombre_modal) . '</a>';
+                                    $enlaces_modal .= '<a href="/" style="color: #4CAF50; text-decoration: underline; font-weight: 600;">Ver en la página principal</a>';
+                                    $enlaces_modal .= '</div>';
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception $e) {
+                    // Si hay error, usar valores por defecto
+                    error_log("Error obteniendo información del código destacado: " . $e->getMessage());
+                }
+                
+                // Mensaje por defecto si no se encontró la marca
+                if (empty($marca_nombre_modal)) {
+                    $mensaje_modal = 'Tu código ha sido destacado y aparecerá en primera posición con el badge "Destacado".';
+                    if ($tipo_modal === 'super') {
+                        $mensaje_modal = 'Tu código ha sido destacado y aparecerá en primera posición con badge dorado, en la página de la marca y en la página principal.';
+                    }
+                } else {
+                    $mensaje_modal = 'Tu código de <strong>' . htmlspecialchars($marca_nombre_modal) . '</strong> ha sido destacado y aparecerá en primera posición con el badge "Destacado".';
+                    if ($tipo_modal === 'super') {
+                        $mensaje_modal = 'Tu código de <strong>' . htmlspecialchars($marca_nombre_modal) . '</strong> ha sido destacado y aparecerá en primera posición con badge dorado, en la página de ' . htmlspecialchars($marca_nombre_modal) . ' y en la página principal.';
+                    }
+                }
+            ?>
+                <script>
+                    // Verificar si ya se mostró el modal para este código (usando localStorage)
+                    var codigoDestacadoId = <?php echo json_encode($codigo_id_modal); ?>;
+                    var modalKey = 'destacado_modal_' + codigoDestacadoId;
+                    var yaMostrado = localStorage.getItem(modalKey);
+                    
+                    // Solo mostrar si no se ha mostrado antes o si han pasado más de 5 minutos
+                    var mostrarModal = true;
+                    if (yaMostrado) {
+                        var timestamp = parseInt(yaMostrado);
+                        var ahora = Date.now();
+                        // Si pasaron menos de 5 minutos, no mostrar
+                        if (ahora - timestamp < 300000) {
+                            mostrarModal = false;
+                        }
+                    }
+                    
+                    if (mostrarModal) {
+                        // Guardar timestamp en localStorage
+                        localStorage.setItem(modalKey, Date.now().toString());
+                        
+                        // Guardar los datos en variables globales para usarlas después
+                        window.destacadoModalData = {
+                            titulo: '¡Código Destacado!',
+                            mensaje: <?php echo json_encode($mensaje_modal); ?>,
+                            enlaces: <?php echo json_encode($enlaces_modal); ?>
+                        };
+                        
+                        // Función para mostrar el modal cuando esté listo
+                        function mostrarModalDestacadoCuandoListo() {
+                            if (typeof mostrarModalExitoDestacado === 'function') {
+                                mostrarModalExitoDestacado(
+                                    window.destacadoModalData.titulo,
+                                    window.destacadoModalData.mensaje,
+                                    window.destacadoModalData.enlaces
+                                );
+                                
+                                // Limpiar la URL después de mostrar el modal (sin recargar)
+                                if (window.history && window.history.replaceState) {
+                                    var nuevaUrl = window.location.pathname;
+                                    window.history.replaceState({}, document.title, nuevaUrl);
+                                }
+                            } else if (typeof mostrarModalExito === 'function') {
+                                // Fallback a la función original
+                                mostrarModalExito(
+                                    window.destacadoModalData.titulo,
+                                    window.destacadoModalData.mensaje.replace(/<[^>]*>/g, '')
+                                );
+                                
+                                // Limpiar la URL después de mostrar el modal
+                                if (window.history && window.history.replaceState) {
+                                    var nuevaUrl = window.location.pathname;
+                                    window.history.replaceState({}, document.title, nuevaUrl);
+                                }
+                            } else {
+                                // Si aún no está disponible, intentar de nuevo después de un breve delay
+                                setTimeout(mostrarModalDestacadoCuandoListo, 100);
+                            }
+                        }
+                        
+                        // Intentar mostrar el modal cuando el DOM esté listo
+                        if (document.readyState === 'loading') {
+                            document.addEventListener('DOMContentLoaded', mostrarModalDestacadoCuandoListo);
+                        } else {
+                            // Si el DOM ya está cargado, esperar un poco más para que las funciones estén definidas
+                            setTimeout(mostrarModalDestacadoCuandoListo, 500);
+                        }
+                    } else {
+                        // Si ya se mostró, limpiar la URL de todos modos
+                        if (window.history && window.history.replaceState) {
+                            var nuevaUrl = window.location.pathname;
+                            window.history.replaceState({}, document.title, nuevaUrl);
+                        }
+                    }
+                </script>
+            <?php endif; ?>
+
+            <!-- Close dashboard cards container and start codes section -->
+            <div style="clear: both;"></div>
+
+            <style>
+            /* Estilos para la barra compacta inspirada en Chollometro */
+            .compact-actions-bar > div > div {
+                transition: all 0.3s ease;
+                cursor: pointer;
+            }
+            
+            .compact-actions-bar > div > div:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+            }
+            
+            .compact-actions-bar a:hover {
+                background: rgba(255, 255, 255, 0.3) !important;
+                transform: scale(1.05);
+            }
+            
+            .compact-actions-bar button:hover {
+                background: rgba(255, 255, 255, 0.3) !important;
+                transform: scale(1.05);
+            }
+            
+            /* Responsive para móviles */
+            @media (max-width: 768px) {
+                .compact-actions-bar {
+                    grid-template-columns: 1fr !important;
+                }
+                
+                .compact-actions-bar > div > div {
+                    padding: 12px !important;
+                }
+                
+                .compact-actions-bar > div > div > div:first-child {
+                    padding: 8px !important;
+                }
+                
+                .compact-actions-bar > div > div > div:first-child i {
+                    font-size: 1rem !important;
+                }
+            }
+            
+            @media (max-width: 480px) {
+                .compact-actions-bar > div > div {
+                    flex-direction: column;
+                    text-align: center;
+                    gap: 10px !important;
+                }
+                
+                .compact-actions-bar > div > div > div:last-child {
+                    flex-direction: row !important;
+                    justify-content: center;
+                }
+            /* Animaciones para eliminación de códigos */
+            .code-card.code-item {
+                transition: all 0.3s ease;
+            }
+            
+            .code-card.code-item.eliminando {
+                opacity: 0;
+                transform: translateX(-100%);
+                pointer-events: none;
+            }
+            
+            .no-codes-message {
+                text-align: center;
+                padding: 40px;
+                color: #666;
+                font-size: 1.2rem;
+                background: #f8f9fa;
+                border-radius: 10px;
+                margin: 20px 0;
+            }
+            
+            .no-codes-message a {
+                color: #2196F3;
+                text-decoration: none;
+                font-weight: bold;
+            }
+            
+            .no-codes-message a:hover {
+                text-decoration: underline;
+            }
+            
+            /* Mejorar la animación de fadeIn para códigos */
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            
+            .code-card.code-item {
+                animation: fadeIn 0.3s ease-in;
+            }
+            </style>
+
+            
             
         </div>
         
@@ -1749,7 +469,11 @@ if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58
         <!-- Lista de códigos -->
         <div class="codes-section">
             <div class="codes-header">
-                <h3 class="codes-title" id="codesTitle">Tus códigos (<?php echo $num_codigos; ?>)</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; margin-bottom: 30px;">
+                    
+
+                    
+                </div>
                 
                 <?php if (!$mostrando_todos && $codigos_ocultos > 0): ?>
                 <div class="alert alert-info" style="margin-top: 10px; padding: 10px; background: #e3f2fd; border: 1px solid #2196f3; border-radius: 4px; color: #1976d2;">
@@ -1761,50 +485,122 @@ if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58
                     <?php endif; ?>
                 </div>
                 <?php endif; ?>
-                
-                <!-- Desplegable de ordenación -->
-                <div class="sort-dropdown">
-                    <label for="sortSelect">Ordenar por:</label>
-                    <select id="sortSelect" class="sort-select" onchange="sortCodes(this.value)">
-                        <option value="fecha_desc" selected>Más recientes</option>
-                        <option value="fecha_asc">Más antiguos</option>
-                        <option value="marca_asc">Marca A-Z</option>
-                        <option value="marca_desc">Marca Z-A</option>
-                        <option value="clicks_desc">Más clicks</option>
-                        <option value="clicks_asc">Menos clicks</option>
-                        <option value="beneficio_desc">Mayor beneficio</option>
-                        <option value="beneficio_asc">Menor beneficio</option>
-                    </select>
-                </div>
             </div>
             
-            <!-- Filtros de visibilidad -->
-            <div class="visibility-filters">
-                <div class="filter-tabs">
-                    <button class="filter-tab active" data-visibility="all" onclick="filterByVisibility('all')">
-                        <i class="fas fa-list"></i>
-                        <span>Todos</span>
-                        <span class="filter-count">(<?php echo $num_codigos; ?>)</span>
-                    </button>
-                    <button class="filter-tab" data-visibility="alta" onclick="filterByVisibility('alta')">
-                        <i class="fas fa-star"></i>
-                        <span>Alta Visibilidad</span>
-                        <span class="filter-count">(<?php echo $num_1_codes; ?>)</span>
-                    </button>
-                    <button class="filter-tab" data-visibility="media" onclick="filterByVisibility('media')">
-                        <i class="fas fa-eye"></i>
-                        <span>Media Visibilidad</span>
-                        <span class="filter-count">(<?php echo $num_2_codes; ?>)</span>
-                    </button>
-                    <button class="filter-tab" data-visibility="baja" onclick="filterByVisibility('baja')">
-                        <i class="fas fa-eye-slash"></i>
-                        <span>Baja Visibilidad</span>
-                        <span class="filter-count">(<?php echo $num_3_codes; ?>)</span>
-                    </button>
+            <!-- Filtros de visibilidad - Diseño simplificado -->
+            <div style="background: white; padding: 25px; border-radius: 15px; margin-bottom: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h3 style="margin: 0 0 10px 0; color: #333; font-size: 1.5rem;">
+                        🔍 Filtrar mis códigos
+                    </h3>
+                    <p style="margin: 0; color: #666; font-size: 1rem;">
+                        Busca por texto o filtra por visibilidad
+                    </p>
                 </div>
+
+                <!-- Filtro de texto -->
+                <div style="margin-bottom: 25px;">
+                    <div style="position: relative; max-width: 500px; margin: 0 auto;">
+                        <input type="text" id="textFilter" placeholder="Buscar códigos por marca, descripción o código..." 
+                               style="color:grey;width: 100%; padding: 15px 20px 15px 50px; border: 2px solid #e9ecef; border-radius: 25px; font-size: 1rem; background: #f8f9fa; transition: all 0.3s ease; box-sizing: border-box;"
+                               onkeyup="filterByText(this.value)">
+                        <i class="fas fa-search" style="position: absolute; left: 18px; top: 50%; transform: translateY(-50%); color: #6c757d; font-size: 1.1rem;"></i>
+                        <button id="clearTextFilter" onclick="clearTextFilter()" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #6c757d; cursor: pointer; font-size: 1.1rem; display: none;" title="Limpiar búsqueda">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <button class="filter-button active" data-visibility="all" onclick="filterByVisibility('all')" style="background: #E3F2FD; color: #1976D2; padding: 15px; border: 2px solid #2196F3; border-radius: 10px; font-weight: bold; font-size: 1.1rem; cursor: pointer; transition: all 0.3s ease;">
+                        <i class="fas fa-list" style="margin-right: 8px;"></i>
+                        📋 Todos mis códigos (<?php echo count($listado_codigos); ?>)
+                    </button>
+
+                    <button class="filter-button" data-visibility="alta" onclick="filterByVisibility('alta')" style="background: #E8F5E8; color: #2E7D32; padding: 15px; border: 2px solid #4CAF50; border-radius: 10px; font-weight: bold; font-size: 1.1rem; cursor: pointer; transition: all 0.3s ease;">
+                        <i class="fas fa-star" style="margin-right: 8px;"></i>
+                        ⭐ Más visibles (<?php echo count(array_filter($listado_codigos, function($c) { return get_posicion_codigo_en_marca($c['_id'], $c['marca']) == 1; })); ?>)
+                    </button>
+
+                    <button class="filter-button" data-visibility="media" onclick="filterByVisibility('media')" style="background: #FFF3E0; color: #E65100; padding: 15px; border: 2px solid #FF9800; border-radius: 10px; font-weight: bold; font-size: 1.1rem; cursor: pointer; transition: all 0.3s ease;">
+                        <i class="fas fa-eye" style="margin-right: 8px;"></i>
+                        👁️ Visibles (<?php echo count(array_filter($listado_codigos, function($c) { return get_posicion_codigo_en_marca($c['_id'], $c['marca']) == 2; })); ?>)
+                    </button>
+
+                    <button class="filter-button" data-visibility="baja" onclick="filterByVisibility('baja')" style="background: #FFEBEE; color: #C62828; padding: 15px; border: 2px solid #F44336; border-radius: 10px; font-weight: bold; font-size: 1.1rem; cursor: pointer; transition: all 0.3s ease;">
+                        <i class="fas fa-eye-slash" style="margin-right: 8px;"></i>
+                        😴 Poco visibles (<?php echo count(array_filter($listado_codigos, function($c) { return get_posicion_codigo_en_marca($c['_id'], $c['marca']) > 2; })); ?>)
+                    </button>
+
+                    <button class="filter-button" data-visibility="destacados" onclick="filterByVisibility('destacados')" style="background: #FFF8E1; color: #F57C00; padding: 15px; border: 2px solid #FFC107; border-radius: 10px; font-weight: bold; font-size: 1.1rem; cursor: pointer; transition: all 0.3s ease;">
+                        <i class="fas fa-star" style="margin-right: 8px;"></i>
+                        🌟 Destacados (<?php echo count(array_filter($listado_codigos, function($c) { return isset($c['destacado']) && $c['destacado'] > 0; })); ?>)
+                    </button>
+
+                    <button class="filter-button" data-visibility="no_destacados" onclick="filterByVisibility('no_destacados')" style="background: #F3E5F5; color: #7B1FA2; padding: 15px; border: 2px solid #9C27B0; border-radius: 10px; font-weight: bold; font-size: 1.1rem; cursor: pointer; transition: all 0.3s ease;">
+                        <i class="fas fa-star-o" style="margin-right: 8px;"></i>
+                        ⭐ No destacados (<?php echo count(array_filter($listado_codigos, function($c) { return !isset($c['destacado']) || $c['destacado'] <= 0; })); ?>)
+                    </button>
+
+                    
+                </div>
+
+                <div style="margin-top: 15px; text-align: center;">
+                    <p style="font-size: 0.9rem; color: #666; margin: 0;">
+                        💡 <strong>Consejos:</strong> Los códigos "⭐ Más visibles" aparecen en primer lugar. Los "🌟 Destacados" tienen badge dorado y mayor visibilidad.
+                    </p>
+                </div>
+                <?/*<br>
+
+                <button onclick="destacarTodosCodigos()" style="width: 100%;background: linear-gradient(135deg, #FF9800, #F57C00); color: white; padding: 24px 30px; border: none; border-radius: 18px; font-weight: 700; font-size: 1.15rem; text-align: center; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 8px 25px rgba(255, 152, 0, 0.3); border: 2px solid transparent; position: relative; overflow: hidden;">
+                    <div style="position: absolute; top: 0; left: -100%;  height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); transition: left 0.5s;"></div>
+                    <div style="margin-bottom: 8px;">
+                        <i class="fas fa-star" style="font-size: 2.2rem; color: rgba(255,255,255,0.9);"></i>
+                    </div>
+                    <div>
+                        <span style="display: block; line-height: 1.2; font-size: 1.1rem;">⭐ Destacar todos mis códigos</span>
+                        <span style="display: block; font-size: 0.9rem; opacity: 0.9; margin-top: 4px;">9,99€ - Ahorra vs individual</span>
+                    </div>
+                </button>
+
+
+                <!-- Explicación de la función destacar -->
+            <div style="background: linear-gradient(135deg, #FFF3E0, #FFE0B2); padding: 25px; border-radius: 18px; margin-bottom: 40px; border-left: 6px solid #FF9800; box-shadow: 0 4px 15px rgba(255, 152, 0, 0.1);">
+                <div style="display: flex; align-items: flex-start; gap: 18px;">
+                    <div style="background: #FF9800; color: white; padding: 12px; border-radius: 50%; flex-shrink: 0;">
+                        <i class="fas fa-lightbulb" style="font-size: 1.4rem;"></i>
+                    </div>
+                    <div>
+                        <h3 style="margin: 0 0 12px 0; color: #E65100; font-size: 1.25rem; font-weight: 700; line-height: 1.3;">💡 ¿Qué hace "Destacar todos mis códigos"?</h3>
+                        <p style="margin: 0 0 15px 0; color: #BF360C; font-size: 1.05rem; line-height: 1.6;">
+                            Con un solo click, todos tus códigos aparecerán en las <strong style="color: #D84315;">primeras posiciones</strong> de cada marca. Así serán mucho más visibles para los usuarios que buscan códigos de descuento.
+                        </p>
+                        <p style="margin: 0; font-size: 0.95rem; color: #E65100; font-weight: 600; background: rgba(255, 152, 0, 0.1); padding: 8px 12px; border-radius: 8px; display: inline-block;">
+                            💰 Costo: 9,99€ <span style="font-weight: 400; color: #2E7D32;">(¡Ahorra vs destacar individual!)</span>
+                        </p>
+                    </div>
+                </div>
+            </div>*/?>
+              
+
+                
             </div>
         
         <?php if($listado_codigos && count($listado_codigos) > 0): ?>
+            <div class="sort-controls" style="display: flex; align-items: center; gap: 12px;">
+                        <label for="sortSelect" style="color: #495057; font-weight: 600; font-size: 1rem; white-space: nowrap;">Ordenar por:</label>
+                        <select id="sortSelect" onchange="sortCodes(this.value)" style="padding: 12px 16px; border: 2px solid #e9ecef; border-radius: 10px; background: white; color: #495057; font-weight: 500; cursor: pointer; transition: all 0.3s ease; min-width: 160px; font-size: 1rem;">
+                            <option value="fecha_desc" selected>Más recientes</option>
+                            <option value="fecha_asc">Más antiguos</option>
+                            <option value="marca_asc">Marca A-Z</option>
+                            <option value="marca_desc">Marca Z-A</option>
+                            <option value="clicks_desc">Más visitados</option>
+                            <option value="clicks_asc">Menos visitados</option>
+                            <option value="beneficio_desc">Mayor beneficio</option>
+                            <option value="beneficio_asc">Menor beneficio</option>
+                        </select>
+                    </div>
+            <div class="codes-grid">
             <?php foreach($listado_codigos as $codigo): ?>
                 <?php
                 // Verificar que $codigo['marca'] existe y no es null
@@ -1818,7 +614,22 @@ if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58
                 }
                 
                 $posicion = get_posicion_codigo_en_marca($codigo['_id'], $codigo['marca']);
-                $is_destacado = isset($codigo['destacado']) && $codigo['destacado'] > 0;
+                // Verificar si está destacado: puede ser timestamp (número) o boolean
+                $is_destacado = false;
+                if (isset($codigo['destacado'])) {
+                    // Convertir a array si es un objeto MongoDB
+                    if (is_object($codigo['destacado'])) {
+                        $codigo['destacado'] = (string)$codigo['destacado'];
+                    }
+                    
+                    if (is_numeric($codigo['destacado'])) {
+                        $is_destacado = (float)$codigo['destacado'] > 0;
+                    } elseif (is_bool($codigo['destacado'])) {
+                        $is_destacado = $codigo['destacado'];
+                    } elseif (is_string($codigo['destacado']) && $codigo['destacado'] !== '' && $codigo['destacado'] !== '0') {
+                        $is_destacado = true;
+                    }
+                }
                 
                 // Determinar clase de visibilidad
                 $visibilidad_class = '';
@@ -1850,73 +661,243 @@ if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58
                 }
                 ?>
                 
-                <div class="code-item <?php echo $is_destacado ? 'featured' : ''; ?>" 
-                     data-codigo-id="<?php echo $codigo['_id']; ?>"
-                     data-position="<?php echo $posicion; ?>"
-                     data-visibilidad="<?php echo $visibilidad_class; ?>"
-                     data-categoria="<?php echo htmlspecialchars($categoria_nombre); ?>"
-                     data-fecha="<?php echo $fecha_publicacion; ?>"
-                     data-marca="<?php echo htmlspecialchars($marca['nombre']); ?>"
-                     data-clicks="<?php echo $codigo['totalclicks'] ?? 0; ?>"
-                     data-beneficio="<?php echo $codigo['num_beneficio'] ?? 0; ?>">
+                <?php 
+                // Sistema mejorado de búsqueda de imágenes
+                $imagen_url = '';
+                $marca_nombre_clave = strtolower($codigo['marca']);
+                
+                // 1. Buscar en los campos de la marca
+                if (isset($marca['url_imagen']) && !empty($marca['url_imagen'])) {
+                    $imagen_url = $marca['url_imagen'];
+                } elseif (isset($marca['imagen']) && !empty($marca['imagen'])) {
+                    $imagen_url = $marca['imagen'];
+                } elseif (isset($marca['logo']) && !empty($marca['logo'])) {
+                    $imagen_url = $marca['logo'];
+                }
+                
+                // 2. Si no hay imagen específica, buscar en el directorio de marcas
+                if (empty($imagen_url)) {
+                    $formatos = ['png', 'jpg', 'jpeg', 'gif', 'svg'];
+                    $imagen_encontrada = false;
+                    
+                    foreach ($formatos as $formato) {
+                        $ruta_imagen = "/img/marcas/{$marca_nombre_clave}.{$formato}";
+                        $ruta_fisica = $_SERVER['DOCUMENT_ROOT'] . $ruta_imagen;
+                        
+                        if (file_exists($ruta_fisica)) {
+                            $imagen_url = $ruta_imagen;
+                            $imagen_encontrada = true;
+                            break;
+                        }
+                    }
+                    
+                    // 3. Si no se encuentra, usar imagen por defecto
+                    if (!$imagen_encontrada) {
+                        $imagen_url = '/img/no_image.png';
+                    }
+                }
+                
+                // Procesar URL de imagen
+                if (!empty($imagen_url)) {
+                    // Convertir URLs de cdn.codigoamigo.com a URLs directas del servidor
+                    if (strpos($imagen_url, 'cdn.codigoamigo.com') !== false) {
+                        // Extraer el path de la URL del CDN
+                        $path = parse_url($imagen_url, PHP_URL_PATH);
+                        if ($path) {
+                            // Convertir a URL directa del servidor
+                            // Si es panel_marcas, necesita /img/ antes
+                            if (strpos($path, '/panel_marcas/') !== false) {
+                                $imagen_url = 'https://www.codigoamigo.com/img' . $path;
+                            } else {
+                                $imagen_url = 'https://www.codigoamigo.com' . $path;
+                            }
+                        }
+                    }
+                    // Si no empieza con http/https/data:, convertir a URL relativa y luego absoluta
+                    elseif (!str_starts_with($imagen_url, 'http') && !str_starts_with($imagen_url, 'data:')) {
+                        if (!str_starts_with($imagen_url, '/')) {
+                            $imagen_url = '/' . $imagen_url;
+                        }
+                        $imagen_url = 'https://www.codigoamigo.com' . $imagen_url;
+                    }
+                    // Convertir http a https si es necesario
+                    if (strpos($imagen_url, 'http://') !== false) {
+                        $imagen_url = str_replace('http://', 'https://', $imagen_url);
+                    }
+                }
+                
+                $marca_url = '/de-' . strtolower($codigo['marca']);
+                
+                // Formatear fecha
+                $fecha_formateada = '';
+                if(isset($codigo['fecha_publicacion']) && !empty($codigo['fecha_publicacion'])) {
+                    $timestamp = strtotime($codigo['fecha_publicacion']);
+                    $diferencia = time() - $timestamp;
+                    if($diferencia < 86400) { // Menos de un día
+                        $fecha_formateada = 'Hoy';
+                    } elseif($diferencia < 172800) { // Menos de 2 días
+                        $fecha_formateada = 'Ayer';
+                    } elseif($diferencia < 604800) { // Menos de una semana
+                        $fecha_formateada = 'Hace ' . floor($diferencia / 86400) . ' días';
+                    } else {
+                        $fecha_formateada = date('d/m/Y', $timestamp);
+                    }
+                }
+                
+                $descripcion = $codigo['descripcion'] ?? 'Código de descuento válido';
+                ?>
+                
+                <div class="code-card code-item mis-anuncios-card" data-visibilidad="<?php echo $visibilidad_class; ?>" data-categoria="<?php echo htmlspecialchars($categoria_nombre); ?>" data-fecha="<?php echo $fecha_publicacion; ?>" data-marca="<?php echo htmlspecialchars($marca['nombre'] ?? $codigo['marca']); ?>" data-clicks="<?php echo $codigo['totalclicks'] ?? 0; ?>" data-beneficio="<?php echo $codigo['num_beneficio'] ?? 10; ?>" data-destacado="<?php echo $is_destacado ? 'si' : 'no'; ?>" data-codigo-id="<?php echo $codigo['_id']; ?>">
+
+                    <!-- Badge de destacado -->
                     <?php if($is_destacado): ?>
-                        <div class="featured-badge">
-                            <i class="fas fa-star"></i> Destacado
+                        <div class="featured-badge"><i class="fas fa-star"></i> Destacado</div>
+                    <?php endif; ?>
+
+                    <!-- Imagen de la marca (clickeable) - Estilo moderno -->
+                    <div class="code-brand-image">
+                        <a href="/de-<?php echo $codigo['marca']; ?>?codigo=<?php echo $codigo['_id']; ?>" class="brand-link">
+                            <?php if(!empty($imagen_url)): ?>
+                                <img loading="lazy" src="<?php echo htmlspecialchars($imagen_url); ?>" alt="<?php echo htmlspecialchars($marca['nombre'] ?? $codigo['marca']); ?>" class="brand-image">
+                            <?php else: ?>
+                                <div class="brand-placeholder"><i class="fas fa-tag"></i></div>
+                            <?php endif; ?>
+                        </a>
+                        <!-- Badge flotante con nombre de marca -->
+                        <div class="brand-name-badge">
+                            <?php echo htmlspecialchars($marca['nombre'] ?? $codigo['marca']); ?>
+                        </div>
+                        <!-- Badge flotante con fecha -->
+                        <?php if(!empty($fecha_formateada)): ?>
+                            <div class="brand-date-badge">
+                                <i class="far fa-clock"></i>
+                                <span><?php echo htmlspecialchars($fecha_formateada); ?></span>
+                            </div>
+                        <?php endif; ?>
+                        <!-- Badge flotante con visitas (izquierda, abajo) -->
+                        <div class="visits-badge">
+                            <i class="far fa-eye"></i>
+                            <span>Visitas <?php echo number_format($codigo['totalclicks'] ?? 0); ?></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Badge de visibilidad con posición (fuera del contenedor de imagen para evitar z-index) -->
+                    <div class="top-left-badges">
+                        <div class="visibility-badge visibility-<?php echo $visibilidad_class; ?>">
+                            <span class="position-in-badge">Posición #<?php echo $posicion; ?></span>
+                            <?php echo $visibilidad_text; ?>
+                        </div>
+                    </div>
+
+                    <!-- Descripción -->
+                    <div class="code-description">
+                        <div class="code-description-text">
+                            <?php 
+                            $descripcion_corta = mb_strlen($descripcion) > 120 ? mb_substr($descripcion, 0, 120) . '...' : $descripcion;
+                            echo htmlspecialchars($descripcion_corta); 
+                            if(mb_strlen($descripcion) > 120): ?>
+                                <span class="read-more-link" onclick="toggleDescripcion('<?php echo $codigo['_id']; ?>')">ver más</span>
+                            <?php endif; ?>
+                            <p id="desc-full-<?php echo $codigo['_id']; ?>" style="display: none; margin-top: 0.5rem;">
+                                <?php echo htmlspecialchars($descripcion); ?>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Beneficio -->
+                    <?php if(isset($codigo['num_beneficio']) && $codigo['num_beneficio'] > 0): ?>
+                        <div class="code-meta-info">
+                            <div class="beneficio-destacado">
+                                <div class="beneficio-icono">💰</div>
+                                <div class="beneficio-contenido">
+                                    <div class="beneficio-cantidad"><?php echo $codigo['num_beneficio']; ?>€</div>
+                                    <div class="beneficio-tipo">BENEFICIO</div>
+                                </div>
+                            </div>
                         </div>
                     <?php endif; ?>
-                    
-                    <div class="code-header">
-                        <div class="code-brand">
-                            <h4>
-                                <a href="/de-<?php echo strtolower($codigo['marca']); ?>" 
-                                   target="_blank"
-                                   style="color: #ff6b35; text-decoration: none; font-weight: 600;"
-                                   onmouseover="this.style.textDecoration='underline'"
-                                   onmouseout="this.style.textDecoration='none'">
-                                    <?php echo htmlspecialchars($marca['nombre'] ?? $codigo['marca']); ?>
-                                </a>
-                            </h4>
-                            <p><?php echo htmlspecialchars($codigo['descripcion'] ?? 'Código de descuento válido'); ?></p>
-                        </div>
+
+                    <!-- Código de descuento -->
+                    <div class="code-code-display">
+                        <span class="code-label">Código:</span>
+                        <span class="code-value"><?php echo htmlspecialchars($codigo['codigo'] ?? 'N/A'); ?></span>
                     </div>
-                    
-                    <div class="code-details">
-                        <p><strong>Beneficio:</strong> <?php echo $codigo['num_beneficio'] ?? '10'; ?>€</p>
-                        <p><strong>Código:</strong> <span class="code-code"><?php echo htmlspecialchars($codigo['codigo'] ?? ''); ?></span></p>
-                        <p><strong>Posición:</strong> <span class="code-position <?php echo $visibilidad_class; ?>">#<?php echo $posicion; ?></span></p>
-                        <p><strong>Visibilidad:</strong> <span class="visibility-badge visibility-<?php echo $visibilidad_class; ?>"><?php echo $visibilidad_text; ?></span></p>
-                        <p><strong>Fecha:</strong> <?php echo isset($codigo['fecha_publicacion']) ? $codigo['fecha_publicacion'] : 'N/A'; ?></p>
-                        <p><strong>Clicks:</strong> <?php echo $codigo['totalclicks'] ?? '0'; ?></p>
-                        <p><strong>ID:</strong> <span class="code-id" onclick="copyToClipboard('<?php echo $codigo['_id']; ?>')" style="cursor: pointer; color: #ff6b35; font-family: monospace; background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 0.9rem;" title="Haz clic para copiar"><?php echo $codigo['_id']; ?></span></p>
-                    </div>
-                    
-                     <div class="code-actions">
-                         <a href="/destacar_codigo?codigo=<?php echo $codigo['_id']; ?>" class="btn-action btn-destacar">
-                             <i class="fas fa-star"></i> Destacar
-                         </a>
-                        <a href="/modificar_codigo/<?php echo $codigo['_id']; ?>" class="btn-action btn-modificar">
-                            <i class="fas fa-edit"></i> Modificar
+
+                    <!-- Botones de acción -->
+                    <div class="code-actions">
+                        <a href="/destacar_codigo?codigo=<?php echo $codigo['_id']; ?>" class="btn-action btn-destacar">
+                            <i class="fas fa-star"></i> Destacar
                         </a>
-                        <button onclick="mostrarEstadisticas('<?php echo $codigo['_id']; ?>', '<?php echo htmlspecialchars($codigo['marca'] ?? ''); ?>')" class="btn-action btn-estadisticas">
-                            <i class="fas fa-chart-bar"></i> Estadísticas
+                        <?php 
+                        // Check if brand has Super Landing
+                        $has_super_landing = false;
+                        if (!function_exists('get_active_super_landings')) {
+    // Ensure createConnection is available
+    require_once __DIR__ . '/../myphp/funciones.php';
+    include_once __DIR__ . '/../myphp/_super_landing_functions.php';
+}
+                        if (function_exists('get_active_super_landings')) {
+                            $all_sl = get_active_super_landings(50);
+                            foreach ($all_sl as $sl) {
+                                // Convert MongoDB BSON Array to PHP array
+                                $linked_slugs = isset($sl['linked_brand_slugs']) ? 
+                                    (is_array($sl['linked_brand_slugs']) ? $sl['linked_brand_slugs'] : iterator_to_array($sl['linked_brand_slugs'])) : 
+                                    [];
+                                    
+                                if (in_array($codigo['marca'], $linked_slugs)) {
+                                    $has_super_landing = true;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if ($has_super_landing): 
+                            $is_super = isset($codigo['tipo_destacado']) && $codigo['tipo_destacado'] === 'super';
+                        ?>
+                            <a href="/destacar_super.php?codigo_id=<?php echo $codigo['_id']; ?>" 
+                               class="btn-action btn-super <?php echo $is_super ? 'super-active' : ''; ?>" 
+                               title="Destacar en la Guía Oficial">
+                                <i class="fas fa-trophy"></i> Super
+                                <?php if ($is_super): ?><i class="fas fa-check-circle" style="margin-left: 4px;"></i><?php endif; ?>
+                            </a>
+                        <?php endif; ?>
+                        
+                        <a href="/modificar_codigo/<?php echo $codigo['_id']; ?>" class="btn-action btn-modificar">
+                            <i class="fas fa-edit"></i> Editar
+                        </a>
+                        
+                        <button onclick="mostrarEstadisticas('<?php echo $codigo['_id']; ?>', '<?php echo addslashes($codigo['marca'] ?? ''); ?>')" class="btn-action btn-estadisticas">
+                            <i class="fas fa-chart-bar"></i> Stats
                         </button>
-                        <button class="btn-action btn-compartir" onclick="compartirCodigo('<?php echo $codigo['_id']; ?>', '<?php echo htmlspecialchars($codigo['marca'] ?? ''); ?>')">
-                            <i class="fas fa-share"></i> Compartir
-                        </button>
-                        <button class="btn-action btn-eliminar" onclick="confirmarEliminarCodigo('<?php echo $codigo['_id']; ?>', '<?php echo htmlspecialchars($marca['nombre'] ?? $codigo['marca']); ?>')">
-                            <i class="fas fa-trash"></i> Eliminar
+                        <button onclick="confirmarEliminarCodigo('<?php echo $codigo['_id']; ?>', '<?php echo addslashes($marca['nombre'] ?? $codigo['marca']); ?>')" class="btn-action btn-eliminar">
+                            <i class="fas fa-trash"></i> Borrar
                         </button>
                     </div>
                 </div>
             <?php endforeach; ?>
+            </div>
         <?php else: ?>
-            <div class="no-codes">
-                <i class="fas fa-code"></i>
-                <h3>No tienes códigos publicados</h3>
-                <p>Comienza a publicar códigos de descuento para ayudar a otros usuarios a ahorrar.</p>
-                <a href="/nuevo_codigo" class="btn-modern btn-success-modern">
-                    <i class="fas fa-plus"></i> Publicar mi primer código
+            <div style="background: white; border-radius: 20px; padding: 50px; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,0.1); margin: 40px 0;">
+                <div style="font-size: 5rem; margin-bottom: 20px;">🎯</div>
+                <h2 style="margin: 0 0 20px 0; color: #333; font-size: 2rem;">¡Aún no tienes códigos publicados!</h2>
+                <p style="margin: 0 0 30px 0; color: #666; font-size: 1.2rem; line-height: 1.6;">
+                    Comienza a publicar tus códigos de descuento para ayudar a otros usuarios a ahorrar dinero.
+                    <br><br>
+                    <strong>¿Por qué publicar códigos?</strong><br>
+                    • Otras personas usarán tus códigos y te darán una comisión<br>
+                    • Ayudas a la comunidad a encontrar las mejores ofertas<br>
+                    • Ganas dinero por cada compra que generes
+                </p>
+                <a href="/nuevo_codigo" style="background: #4CAF50; color: white; padding: 15px 30px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 1.1rem; display: inline-flex; align-items: center; gap: 8px; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);">
+                    <i class="fas fa-plus-circle"></i>
+                    Publicar mi primer código
                 </a>
+
+                <div style="margin-top: 30px; padding: 20px; background: #E8F5E8; border-radius: 10px; border-left: 5px solid #4CAF50;">
+                    <p style="margin: 0; color: #2E7D32; font-size: 1rem;">
+                        💡 <strong>Consejo:</strong> Empieza con códigos de tiendas que conozcas bien. ¡Es muy fácil y puedes empezar a ganar dinero desde el primer día!
+                    </p>
+                </div>
             </div>
         <?php endif; ?>
         </div>
@@ -1924,57 +905,80 @@ if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58
 </div>
 
 
-<!-- Modal para recargar saldo -->
-<div class="modal fade" id="modal_recargar_saldo" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content simple-recharge-modal">
-            <div class="modal-header">
-                <h5 class="modal-title">💳 Recargar Saldo</h5>
-                <button type="button" class="close" data-dismiss="modal">
-                    <span>&times;</span>
+<!-- Modal para recargar saldo - Diseño simplificado -->
+<div class="modal fade" id="modal_recargar_saldo" tabindex="-1" role="dialog" aria-labelledby="modalRecargarSaldoLabel">
+    <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+        <div class="modal-content" style="border-radius: 20px; border: none; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 100%;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #4CAF50, #45a049); color: white; border-radius: 20px 20px 0 0; padding: 30px;">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar" style="color: white; font-size: 2rem; opacity: 0.8; margin: 0; position: absolute; right: 20px; top: 15px;">
+                    <span aria-hidden="true">&times;</span>
                 </button>
+                <h4 class="modal-title" id="modalRecargarSaldoLabel" style="font-size: 2rem; margin: 0; display: flex; align-items: center; gap: 15px; width: 100%;">
+                    <i class="fas fa-piggy-bank" style="font-size: 2.5rem;"></i>
+                    💳 Recargar Saldo
+                </h4>
             </div>
-            
-            <div class="modal-body">
-                <div class="simple-packages">
+
+            <div class="modal-body" style="padding: 40px;">
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <h5 style="color: #FFFFFF !important; font-size: 1.5rem; margin-bottom: 10px; font-weight: 700 !important;">¿Cuánto dinero quieres añadir?</h5>
+                    <p style="color: #E0E0E0 !important; margin: 0; font-size: 1rem; font-weight: 500;">Elige un paquete y obtén saldo extra gratis</p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px;">
                     <!-- Paquete 20€ -->
-                    <div class="simple-package" data-package="20" data-amount="25">
-                        <div class="package-badge">+25%</div>
-                        <div class="package-price">
-                            <div class="pay">20€</div>
-                            <div class="get">25€</div>
+                    <div class="package-card" data-package="20" data-amount="25" style="background: #ffffff; border: 3px solid #4CAF50; border-radius: 15px; padding: 25px; text-align: center; cursor: pointer; transition: all 0.3s ease; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <div style="position: absolute; top: -12px; right: -12px; background: #4CAF50; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; box-shadow: 0 2px 6px rgba(76, 175, 80, 0.3); z-index: 10;">+25%</div>
+                        <div style="margin-bottom: 15px; margin-top: 10px;">
+                            <div style="font-size: 2.2rem; font-weight: 800; color: #212529; line-height: 1.2;">20€</div>
+                            <div style="font-size: 1.3rem; color: #4CAF50; font-weight: 700; margin-top: 5px;">→ 25€</div>
                         </div>
-                        <div class="package-savings">+5€ gratis</div>
+                        <div style="color: #2E7D32; font-weight: 700; font-size: 1.1rem; background: #E8F5E9; padding: 8px; border-radius: 8px;">+5€ GRATIS</div>
                     </div>
-                    
-                    <!-- Paquete 40€ -->
-                    <div class="simple-package popular" data-package="40" data-amount="50">
-                        <div class="popular-label">MÁS POPULAR</div>
-                        <div class="package-badge">+25%</div>
-                        <div class="package-price">
-                            <div class="pay">40€</div>
-                            <div class="get">50€</div>
+
+                    <!-- Paquete 40€ - POPULAR -->
+                    <div class="package-card popular" data-package="40" data-amount="50" style="background: linear-gradient(135deg, #FFF8E1, #FFE082); border: 3px solid #FF9800; border-radius: 15px; padding: 25px; text-align: center; cursor: pointer; transition: all 0.3s ease; position: relative; transform: scale(1.05); box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);">
+                        <div style="position: absolute; top: -15px; left: 50%; transform: translateX(-50%); background: #FF9800; color: white; padding: 8px 20px; border-radius: 20px; font-size: 0.9rem; font-weight: bold; box-shadow: 0 2px 8px rgba(255, 152, 0, 0.4); z-index: 10; white-space: nowrap;">★ MÁS POPULAR ★</div>
+                        <div style="margin: 25px 0 15px 0;">
+                            <div style="font-size: 2.8rem; font-weight: 800; color: #212529; line-height: 1.2;">40€</div>
+                            <div style="font-size: 1.6rem; color: #FF9800; font-weight: 700; margin-top: 5px;">→ 50€</div>
                         </div>
-                        <div class="package-savings">+10€ gratis</div>
+                        <div style="color: #E65100; font-weight: 700; font-size: 1.2rem; background: #FFF3E0; padding: 8px; border-radius: 8px;">+10€ GRATIS</div>
                     </div>
-                    
+
                     <!-- Paquete 100€ -->
-                    <div class="simple-package" data-package="100" data-amount="150">
-                        <div class="package-badge">+50%</div>
-                        <div class="package-price">
-                            <div class="pay">100€</div>
-                            <div class="get">150€</div>
+                    <div class="package-card" data-package="100" data-amount="150" style="background: #ffffff; border: 3px solid #9C27B0; border-radius: 15px; padding: 25px; text-align: center; cursor: pointer; transition: all 0.3s ease; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <div style="position: absolute; top: -12px; right: -12px; background: #9C27B0; color: white; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; box-shadow: 0 2px 6px rgba(156, 39, 176, 0.3); z-index: 10;">+50%</div>
+                        <div style="margin-bottom: 15px; margin-top: 10px;">
+                            <div style="font-size: 2.2rem; font-weight: 800; color: #212529; line-height: 1.2;">100€</div>
+                            <div style="font-size: 1.3rem; color: #9C27B0; font-weight: 700; margin-top: 5px;">→ 150€</div>
                         </div>
-                        <div class="package-savings">+50€ gratis</div>
+                        <div style="color: #7B1FA2; font-weight: 700; font-size: 1.1rem; background: #F3E5F5; padding: 8px; border-radius: 8px;">+50€ GRATIS</div>
                     </div>
                 </div>
-                
-                <div class="security-note">
-                    <i class="fas fa-shield-alt"></i>
-                    <span>Pago seguro con Stripe</span>
+
+                <div style="background: rgba(76, 175, 80, 0.2); padding: 20px; border-radius: 10px; border-left: 5px solid #4CAF50; margin-bottom: 20px;">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <i class="fas fa-shield-alt" style="color: #4CAF50; font-size: 1.8rem;"></i>
+                        <div>
+                            <h6 style="margin: 0 0 5px 0; color: #4CAF50 !important; font-size: 1.15rem; font-weight: 700;">🔒 Pago 100% Seguro</h6>
+                            <p style="margin: 0; color: #E0E0E0 !important; font-size: 0.95rem; font-weight: 500;">Procesamos tu pago con Stripe, líder mundial en pagos online</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" style="background: #6c757d; color: #ffffff; padding: 12px 30px; border: none; border-radius: 8px; font-weight: 600; font-size: 1rem; cursor: pointer; transition: all 0.3s ease;" onmouseover="this.style.background='#5a6268';" onmouseout="this.style.background='#6c757d';">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
                 </div>
             </div>
-            
+
+            <div class="modal-footer" style="border: none; padding: 20px 40px 30px; text-align: center; border-radius: 0 0 20px 20px;">
+                <small style="color: #E0E0E0 !important; font-size: 0.9rem; font-weight: 500;">
+                    🔒 Tus pagos están protegidos por Stripe. Nunca almacenamos tus datos de tarjeta.
+                </small>
+            </div>
         </div>
     </div>
 </div>
@@ -2008,23 +1012,145 @@ if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58
 <script type="text/javascript">
 var stripe = Stripe('<?php echo $stripe_live_publishable_key; ?>');
 
+// Función global para filtrar por texto
+window.filterByText = function(searchText) {
+    const textFilter = document.getElementById('textFilter');
+    const clearButton = document.getElementById('clearTextFilter');
+    
+    // Mostrar/ocultar botón de limpiar
+    if (searchText.length > 0) {
+        clearButton.style.display = 'block';
+    } else {
+        clearButton.style.display = 'none';
+    }
+    
+    // Obtener todas las tarjetas de código
+    const codeItems = document.querySelectorAll('.code-item');
+    let visibleCount = 0;
+    
+    codeItems.forEach(function(item) {
+        const marca = item.getAttribute('data-marca') || '';
+        const descElement = item.querySelector('p[id^="desc"]');
+        const descripcion = descElement ? descElement.textContent : '';
+        const codigoElement = item.querySelector('p[style*="monospace"]');
+        const codigo = codigoElement ? codigoElement.textContent : '';
+        
+        const searchLower = searchText.toLowerCase();
+        const marcaLower = marca.toLowerCase();
+        const descripcionLower = descripcion.toLowerCase();
+        const codigoLower = codigo.toLowerCase();
+        
+        const shouldShow = searchText === '' || 
+                         marcaLower.includes(searchLower) || 
+                         descripcionLower.includes(searchLower) || 
+                         codigoLower.includes(searchLower);
+        
+        if (shouldShow) {
+            item.style.display = 'block';
+            item.style.animation = 'fadeIn 0.3s ease-in';
+            visibleCount++;
+        } else {
+            item.style.display = 'none';
+        }
+    });
+    
+    // Actualizar contadores en los botones de filtro
+    updateFilterCounts();
+    
+    // Mostrar mensaje si no hay resultados
+    showNoResultsMessage(visibleCount === 0 && searchText.length > 0, 'No se encontraron códigos que coincidan con "' + searchText + '"');
+};
+
+// Función para limpiar el filtro de texto
+window.clearTextFilter = function() {
+    const textFilter = document.getElementById('textFilter');
+    const clearButton = document.getElementById('clearTextFilter');
+    
+    textFilter.value = '';
+    clearButton.style.display = 'none';
+    
+    // Mostrar todos los códigos
+    const codeItems = document.querySelectorAll('.code-item');
+    codeItems.forEach(function(item) {
+        item.style.display = 'block';
+    });
+    
+    updateFilterCounts();
+    showNoResultsMessage(false);
+};
+
+// Función para actualizar contadores de filtros
+function updateFilterCounts() {
+    const codeItems = document.querySelectorAll('.code-item');
+    const visibleItems = document.querySelectorAll('.code-item:not([style*="display: none"])');
+    
+    // Actualizar contador de "Todos"
+    const allButton = document.querySelector('[data-visibility="all"]');
+    if (allButton) {
+        allButton.innerHTML = `<i class="fas fa-list" style="margin-right: 8px;"></i>📋 Todos mis códigos (${visibleItems.length})`;
+    }
+    
+    // Contar por visibilidad solo de los elementos visibles
+    let altaCount = 0, mediaCount = 0, bajaCount = 0;
+    visibleItems.forEach(function(item) {
+        const visibilidad = item.getAttribute('data-visibilidad');
+        if (visibilidad === 'alta') altaCount++;
+        else if (visibilidad === 'media') mediaCount++;
+        else if (visibilidad === 'baja') bajaCount++;
+    });
+    
+    // Actualizar botones de visibilidad
+    const altaButton = document.querySelector('[data-visibility="alta"]');
+    const mediaButton = document.querySelector('[data-visibility="media"]');
+    const bajaButton = document.querySelector('[data-visibility="baja"]');
+    
+    if (altaButton) altaButton.innerHTML = `<i class="fas fa-star" style="margin-right: 8px;"></i>⭐ Más visibles (${altaCount})`;
+    if (mediaButton) mediaButton.innerHTML = `<i class="fas fa-eye" style="margin-right: 8px;"></i>👁️ Visibles (${mediaCount})`;
+    if (bajaButton) bajaButton.innerHTML = `<i class="fas fa-eye-slash" style="margin-right: 8px;"></i>😴 Poco visibles (${bajaCount})`;
+}
+
+// Función para mostrar mensaje de no resultados
+function showNoResultsMessage(show, message = '') {
+    let noResultsMessage = document.getElementById('no-results-message');
+    
+    if (show && !noResultsMessage) {
+        noResultsMessage = document.createElement('div');
+        noResultsMessage.id = 'no-results-message';
+        noResultsMessage.className = 'no-results';
+        noResultsMessage.innerHTML = `
+            <i class="fas fa-search"></i>
+            <h3>No se encontraron códigos</h3>
+            <p>${message}</p>
+        `;
+        document.querySelector('.codes-section').appendChild(noResultsMessage);
+    } else if (noResultsMessage) {
+        noResultsMessage.style.display = show ? 'block' : 'none';
+        if (show && message) {
+            noResultsMessage.querySelector('p').textContent = message;
+        }
+    }
+}
+
 // Función global para filtrar por visibilidad
 window.filterByVisibility = function(visibility) {
     // Actualizar botones activos
-    document.querySelectorAll('.filter-tab').forEach(tab => {
-        tab.classList.remove('active');
+    document.querySelectorAll('.filter-button').forEach(button => {
+        button.classList.remove('active');
     });
     
     // Marcar el botón seleccionado como activo
-    document.querySelector(`[data-visibility="${visibility}"]`).classList.add('active');
+    const selectedButton = document.querySelector(`[data-visibility="${visibility}"]`);
+    if (selectedButton) {
+        selectedButton.classList.add('active');
+    }
     
     // Obtener todas las tarjetas de código
-    var codeItems = document.querySelectorAll('.code-item');
-    var visibleCount = 0;
+    const codeItems = document.querySelectorAll('.code-item');
+    let visibleCount = 0;
     
     codeItems.forEach(function(item) {
-        var itemVisibility = item.getAttribute('data-visibilidad');
-        var shouldShow = false;
+        const itemVisibility = item.getAttribute('data-visibilidad');
+        let shouldShow = false;
         
         if (visibility === 'all') {
             shouldShow = true;
@@ -2045,40 +1171,110 @@ window.filterByVisibility = function(visibility) {
         }
     });
     
-    // Actualizar el título con el número de códigos visibles
-    var titleElement = document.getElementById('codesTitle');
-    if (titleElement) {
-        if (visibility === 'all') {
-            titleElement.textContent = 'Tus códigos (' + codeItems.length + ')';
-        } else {
-            titleElement.textContent = 'Tus códigos (' + visibleCount + ')';
-        }
-    }
+    // Actualizar contadores
+    updateFilterCounts();
     
     // Mostrar mensaje si no hay resultados
-    var noResultsMessage = document.getElementById('no-results-message');
-    if (visibleCount === 0 && visibility !== 'all') {
-        if (!noResultsMessage) {
-            noResultsMessage = document.createElement('div');
-            noResultsMessage.id = 'no-results-message';
-            noResultsMessage.className = 'no-results';
-            noResultsMessage.innerHTML = `
-                <i class="fas fa-search"></i>
-                <h3>No hay códigos con ${visibility} visibilidad</h3>
-                <p>Intenta con otro filtro o publica más códigos.</p>
-            `;
-            document.querySelector('.codes-section').appendChild(noResultsMessage);
-        }
-        noResultsMessage.style.display = 'block';
-    } else if (noResultsMessage) {
-        noResultsMessage.style.display = 'none';
-    }
+    const visibilityNames = {
+        'alta': 'alta visibilidad',
+        'media': 'media visibilidad', 
+        'baja': 'baja visibilidad'
+    };
+    const message = visibility !== 'all' ? `No hay códigos con ${visibilityNames[visibility] || visibility} visibilidad` : '';
+    showNoResultsMessage(visibleCount === 0 && visibility !== 'all', message);
 };
 
-// Función para mostrar modal de recargar saldo
-function mostrarRecargarSaldo() {
-    $('#modal_recargar_saldo').modal('show');
+
+/* Estilos adicionales para el diseño mejorado */
+.filter-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
 }
+
+.code-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+/* Animación suave para los filtros */
+.filter-button {
+    animation: fadeInUp 0.3s ease-out;
+}
+
+/* Mejorar accesibilidad */
+.filter-button:focus,
+.code-card button:focus,
+.code-card a:focus {
+    outline: 2px solid #2196F3;
+    outline-offset: 2px;
+}
+
+/* Responsive mejorado */
+@media (max-width: 768px) {
+    .main-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .balance-section .d-flex {
+        flex-direction: column;
+    }
+
+    .code-card {
+        padding: 20px;
+    }
+
+    .code-card .main-actions {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .package-card {
+        padding: 20px 15px;
+    }
+
+    .package-card.popular {
+        transform: none;
+    }
+}
+
+/* Estilos para los paquetes de saldo */
+.package-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+
+.package-card:not(.popular):hover {
+    border-color: #2196F3;
+}
+
+.package-card.popular:hover {
+    transform: translateY(-5px) scale(1.05);
+}
+
+/* Animación para seleccionar paquete */
+.package-card.selected {
+    border-color: #4CAF50;
+    background: #E8F5E8;
+    animation: pulse 0.3s ease-in-out;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+}
+
+/* Mejorar el header principal */
+.dashboard-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 20px;
+    padding: 40px;
+    margin-bottom: 30px;
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+    color: white;
+    text-align: center;
+}
+
+/* Content wrapper styles moved to CSS file */
 
 // Función para destacar todos los códigos (splash)
 function destacarTodosSplash() {
@@ -2108,7 +1304,6 @@ $(document).on('click', '.simple-package', function() {
                   '&saldo=' + encodeURIComponent(saldo) +
                   '&usuario_id=' + encodeURIComponent('<?php echo $_SESSION["user_id"]; ?>');
         
-        console.log('Redirigiendo a:', url);
         window.location.href = url;
     }
 });
@@ -2131,7 +1326,6 @@ function getPriceId(paquete) {
 }
 
 // Verificar que la función esté disponible
-console.log('filterByVisibility function available:', typeof window.filterByVisibility);
 
 // Variables globales para el sistema de saldo
 var paqueteSeleccionado = null;
@@ -2205,15 +1399,12 @@ function toggleCheckbox(checkboxId) {
 
 // Función para aplicar todos los filtros
 function applyFilters() {
-    console.log('Aplicando filtros...');
-    
     // Obtener filtro de fecha seleccionado
     var fechaFiltro = 'todo'; // Valor por defecto
     var fechaRadio = document.querySelector('input[name="fecha_filtro"]:checked');
     if(fechaRadio) {
         fechaFiltro = fechaRadio.value;
     }
-    console.log('Filtro de fecha:', fechaFiltro);
     
     // Obtener categorías seleccionadas
     var categoriasSeleccionadas = [];
@@ -2223,7 +1414,6 @@ function applyFilters() {
             categoriasSeleccionadas.push(categoria);
         }
     });
-    console.log('Categorías seleccionadas:', categoriasSeleccionadas);
     
     // Obtener visibilidades seleccionadas
     var visibilidadesSeleccionadas = [];
@@ -2233,7 +1423,6 @@ function applyFilters() {
             visibilidadesSeleccionadas.push(visibilidad);
         }
     });
-    console.log('Visibilidades seleccionadas:', visibilidadesSeleccionadas);
     
     // Obtener ordenamiento seleccionado
     var ordenamiento = 'fecha_desc'; // Valor por defecto
@@ -2241,10 +1430,8 @@ function applyFilters() {
     if(ordenRadio) {
         ordenamiento = ordenRadio.value;
     }
-    console.log('Ordenamiento:', ordenamiento);
     
     // Filtrar códigos
-    console.log('Total códigos a filtrar:', $('.code-item').length);
     var visibleCount = 0;
     
     $('.code-item').each(function() {
@@ -2300,8 +1487,6 @@ function applyFilters() {
             $item.hide();
         }
     });
-    
-    console.log('Códigos visibles después del filtrado:', visibleCount);
     
     // Aplicar ordenamiento a los elementos visibles usando la misma lógica que sortCodes()
     var $visibleItems = $('.code-item:visible');
@@ -2452,7 +1637,6 @@ function compartirCodigo(codigoId, marca) {
             text: shareText,
             url: shareUrl
         }).catch(function(err) {
-            console.log('Error al compartir:', err);
             // Fallback a copiar al portapapeles
             copiarEnlace(shareUrl);
         });
@@ -2468,7 +1652,6 @@ function copiarEnlace(url) {
         // Mostrar notificación de éxito
         mostrarNotificacion('Enlace copiado al portapapeles', 'success');
     }).catch(function(err) {
-        console.error('Error al copiar:', err);
         // Fallback manual
         const textArea = document.createElement('textarea');
         textArea.value = url;
@@ -2536,21 +1719,70 @@ function mostrarNotificacion(mensaje, tipo = 'info') {
     }, 3000);
 }
 
+// Variable global para rastrear si hay un modal abierto
+let modalAbierto = false;
+
 // Función global para cerrar todos los modales
 function cerrarTodosLosModales() {
-    const modales = document.querySelectorAll('[id*="Modal"], .modal');
+    // Resetear la variable de control
+    modalAbierto = false;
+    
+    // Cerrar todos los modales (incluyendo el modal de estadísticas)
+    const modales = document.querySelectorAll('[id*="Modal"], .modal, #estadisticasModal');
     modales.forEach(modal => {
         if (modal.parentNode) {
             modal.parentNode.removeChild(modal);
         }
     });
+    
+    // También eliminar cualquier modal que pueda estar dentro de un iframe
+    try {
+        const iframes = document.querySelectorAll('iframe');
+        iframes.forEach(iframe => {
+            try {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                const iframeModals = iframeDoc.querySelectorAll('[id*="Modal"], .modal');
+                iframeModals.forEach(modal => {
+                    if (modal.parentNode) {
+                        modal.parentNode.removeChild(modal);
+                    }
+                });
+            } catch (e) {
+                // Ignorar errores de cross-origin
+            }
+        });
+    } catch (e) {
+        // Ignorar errores de cross-origin
+    }
+    
     document.body.style.overflow = 'auto';
 }
 
 // Función para mostrar estadísticas en modal
 function mostrarEstadisticas(codigoId, marca) {
-    // Cerrar cualquier modal existente antes de abrir uno nuevo
-    cerrarTodosLosModales();
+    // Si ya hay un modal abierto, no abrir otro
+    if (modalAbierto) {
+        return;
+    }
+    
+    // Verificar que el DOM esté listo
+    if (document.readyState !== 'loading') {
+        // Cerrar cualquier modal existente antes de abrir uno nuevo
+        cerrarTodosLosModales();
+    } else {
+        document.addEventListener('DOMContentLoaded', function() {
+            cerrarTodosLosModales();
+        });
+    }
+    
+    // Verificar si ya existe un modal de estadísticas
+    const modalExistente = document.getElementById('estadisticasModal');
+    if (modalExistente) {
+        modalExistente.remove();
+    }
+    
+    // Marcar que hay un modal abierto
+    modalAbierto = true;
     
     // Crear iframe para cargar las estadísticas
     const modal = document.createElement('div');
@@ -2587,7 +1819,7 @@ function mostrarEstadisticas(codigoId, marca) {
         position: absolute;
         top: 20px;
         right: 20px;
-        background: #ff6b35;
+        background: #E30613;
         color: white;
         border: none;
         border-radius: 50%;
@@ -2598,6 +1830,7 @@ function mostrarEstadisticas(codigoId, marca) {
         z-index: 10001;
     `;
     closeButton.onclick = () => {
+        modalAbierto = false;
         cerrarTodosLosModales();
     };
     
@@ -2609,6 +1842,7 @@ function mostrarEstadisticas(codigoId, marca) {
     // Cerrar modal al hacer click fuera del iframe
     modal.addEventListener('click', function(e) {
         if (e.target === modal) {
+            modalAbierto = false;
             cerrarTodosLosModales();
         }
     });
@@ -2616,6 +1850,7 @@ function mostrarEstadisticas(codigoId, marca) {
     // Cerrar modal con tecla Escape
     const handleEscape = (e) => {
         if (e.key === 'Escape') {
+            modalAbierto = false;
             cerrarTodosLosModales();
             document.removeEventListener('keydown', handleEscape);
         }
@@ -2630,7 +1865,6 @@ function copyToClipboard(text) {
         navigator.clipboard.writeText(text).then(function() {
             showCopyNotification('ID copiado al portapapeles');
         }).catch(function(err) {
-            console.error('Error al copiar: ', err);
             fallbackCopyTextToClipboard(text);
         });
     } else {
@@ -2660,7 +1894,6 @@ function fallbackCopyTextToClipboard(text) {
             showCopyNotification('Error al copiar', 'error');
         }
     } catch (err) {
-        console.error('Error al copiar: ', err);
         showCopyNotification('Error al copiar', 'error');
     }
     
@@ -2743,7 +1976,143 @@ style.textContent = `
         margin-bottom: 10px;
     }
     
-    /* Estilos simples para modal de recargar saldo */
+    /* Estilos para tarjetas de acción superior */
+    .action-card-purple {
+        background: linear-gradient(135deg, #667eea, #764ba2) !important;
+        color: white !important;
+    }
+    
+    .action-card-purple:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4) !important;
+        background: linear-gradient(135deg, #667eea, #764ba2) !important;
+        color: white !important;
+    }
+    
+    .action-card-purple:hover * {
+        color: white !important;
+    }
+    
+    .action-card-green {
+        background: linear-gradient(135deg, #4CAF50, #45a049) !important;
+        color: white !important;
+    }
+    
+    .action-card-green:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4) !important;
+        background: linear-gradient(135deg, #4CAF50, #45a049) !important;
+        color: white !important;
+    }
+    
+    .action-card-green:hover * {
+        color: white !important;
+    }
+    
+    .action-card-orange {
+        background: linear-gradient(135deg, #FF9800, #F57C00) !important;
+        color: white !important;
+    }
+    
+    .action-card-orange:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 20px rgba(255, 152, 0, 0.4) !important;
+        background: linear-gradient(135deg, #FF9800, #F57C00) !important;
+        color: white !important;
+    }
+    
+    .action-card-orange:hover * {
+        color: white !important;
+    }
+    
+    /* Estilos para modal de recargar saldo */
+    #modal_recargar_saldo.modal {
+        display: flex !important;
+        align-items: flex-start !important;
+        justify-content: center !important;
+        padding: 0 !important;
+        padding-top: 10vh !important;
+    }
+    
+    #modal_recargar_saldo.modal.show {
+        display: flex !important;
+    }
+    
+    #modal_recargar_saldo.modal.fade .modal-dialog {
+        transition: transform 0.3s ease-out;
+        transform: translate(0, 0) !important;
+    }
+    
+    #modal_recargar_saldo.modal.show .modal-dialog {
+        transform: translate(0, 0) !important;
+    }
+    
+    #modal_recargar_saldo .modal-dialog {
+        margin: 0 auto !important;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        min-height: auto;
+        max-height: 90vh;
+        padding: 20px;
+        position: relative;
+        top: 0 !important;
+        transform: translate(0, 0) !important;
+        max-width: 900px;
+        margin-top: 10vh !important;
+    }
+    
+    #modal_recargar_saldo .modal-dialog-centered {
+        display: flex;
+        align-items: flex-start;
+        min-height: auto;
+    }
+    
+    #modal_recargar_saldo .modal-content {
+        width: 100%;
+        max-width: 900px;
+    }
+    
+    #modal_recargar_saldo .modal-body {
+        background-color: #2C2C2C !important;
+        color: #FFFFFF !important;
+    }
+    
+    #modal_recargar_saldo .modal-body h5 {
+        color: #FFFFFF !important;
+    }
+    
+    #modal_recargar_saldo .modal-body p {
+        color: #E0E0E0 !important;
+    }
+    
+    #modal_recargar_saldo .modal-content {
+        background-color: #2C2C2C !important;
+    }
+    
+    #modal_recargar_saldo .modal-footer {
+        background-color: #2C2C2C !important;
+        color: #E0E0E0 !important;
+    }
+    
+    #modal_recargar_saldo .modal-footer small {
+        color: #E0E0E0 !important;
+    }
+    
+    #modal_recargar_saldo .package-card {
+        min-height: 200px;
+    }
+    
+    #modal_recargar_saldo .package-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15) !important;
+    }
+    
+    #modal_recargar_saldo .package-card.popular:hover {
+        transform: scale(1.05) translateY(-5px);
+        box-shadow: 0 8px 25px rgba(255, 152, 0, 0.4) !important;
+    }
+    
     .simple-recharge-modal {
         border-radius: 15px;
         overflow: hidden;
@@ -2878,7 +2247,7 @@ style.textContent = `
         position: absolute;
         top: -2px;
         right: -2px;
-        background: linear-gradient(135deg, #ff6b35, #e55a2b);
+        background: linear-gradient(135deg, #E30613, #C40510);
         color: white;
         padding: 8px 20px;
         border-radius: 0 20px 0 20px;
@@ -2886,7 +2255,7 @@ style.textContent = `
         font-weight: bold;
         text-transform: uppercase;
         letter-spacing: 1px;
-        box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4);
+        box-shadow: 0 4px 12px rgba(227, 6, 19, 0.4);
     }
     
     .package-badge.popular {
@@ -2913,7 +2282,7 @@ style.textContent = `
     .package-icon {
         font-size: 3rem;
         margin: 15px 0;
-        color: #ff6b35;
+        color: #E30613;
     }
     
     .package-popular .package-icon {
@@ -2937,7 +2306,7 @@ style.textContent = `
     .get-amount {
         font-size: 1.8rem;
         font-weight: bold;
-        color: #ff6b35;
+        color: #E30613;
         margin-bottom: 15px;
     }
     
@@ -3007,12 +2376,18 @@ window.sortCodes = function(sortBy) {
     codes.forEach(code => codesContainer.appendChild(code));
     
     // Mostrar mensaje de ordenación
-    console.log('Códigos ordenados por:', sortBy);
 };
 
 // Función para confirmar eliminación de código
 function confirmarEliminarCodigo(codigoId, marcaNombre) {
-    // Crear modal de confirmación
+    // Verificar que el DOM esté listo
+    if (document.readyState !== 'loading') {
+        crearModalEliminar();
+    } else {
+        document.addEventListener('DOMContentLoaded', crearModalEliminar);
+    }
+
+    function crearModalEliminar() {
     const modal = document.createElement('div');
     modal.id = 'modalEliminarCodigo';
     modal.style.cssText = `
@@ -3101,6 +2476,7 @@ function confirmarEliminarCodigo(codigoId, marcaNombre) {
             document.body.style.overflow = 'auto';
         }
     };
+    }
 }
 
 // Función para eliminar el código usando formulario tradicional (evita bloqueo de Cloudflare)
@@ -3123,6 +2499,25 @@ function eliminarCodigo(codigoId, marcaNombre) {
     form.submit();
 }
 
+// Función para toggle de descripción
+function toggleDescripcion(codigoId) {
+    const descFull = document.getElementById('desc-full-' + codigoId);
+    const descText = descFull ? descFull.parentElement.querySelector('.code-description-text') : null;
+    const readMoreLink = descText ? descText.querySelector('.read-more-link') : null;
+
+    if (descFull && descFull.style.display === 'none') {
+        descFull.style.display = 'block';
+        if (readMoreLink) {
+            readMoreLink.textContent = 'ver menos';
+        }
+    } else if (descFull) {
+        descFull.style.display = 'none';
+        if (readMoreLink) {
+            readMoreLink.textContent = 'ver más';
+        }
+    }
+}
+
 // Función para actualizar el contador de códigos
 function actualizarContadorCodigos() {
     const codigosVisibles = document.querySelectorAll('.code-item:not([style*="display: none"])').length;
@@ -3131,21 +2526,372 @@ function actualizarContadorCodigos() {
         titulo.textContent = `Tus códigos (${codigosVisibles})`;
     }
 }
+
+// Función para mostrar modal de éxito
+function mostrarModalExito(titulo, mensaje, autoCerrar = true) {
+    // Cerrar cualquier modal existente
+    cerrarTodosLosModales();
+
+    const modal = document.createElement('div');
+    modal.id = 'modalExito';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        box-sizing: border-box;
+        animation: fadeIn 0.3s ease-out;
+    `;
+
+    modal.innerHTML = `
+        <div style="
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            animation: slideInUp 0.4s ease-out;
+            position: relative;
+        ">
+            <button id="cerrarModalExito" style="
+                position: absolute;
+                top: 15px;
+                right: 15px;
+                background: #f0f0f0;
+                border: none;
+                border-radius: 50%;
+                width: 35px;
+                height: 35px;
+                font-size: 1.2rem;
+                cursor: pointer;
+                transition: background 0.3s ease;
+            ">&times;</button>
+
+            <div style="color: #4CAF50; font-size: 4rem; margin-bottom: 20px;">
+                <i class="fas fa-check-circle"></i>
+            </div>
+
+            <h2 style="color: #333; margin: 0 0 20px 0; font-size: 2rem; font-weight: bold;">
+                ${titulo}
+            </h2>
+
+            <p style="color: #666; font-size: 1.2rem; line-height: 1.5; margin: 0 0 30px 0;">
+                ${mensaje}
+            </p>
+
+            <button id="aceptarModalExito" style="
+                background: linear-gradient(135deg, #4CAF50, #45a049);
+                color: white;
+                border: none;
+                padding: 15px 30px;
+                border-radius: 12px;
+                font-weight: bold;
+                font-size: 1.1rem;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+            ">
+                <i class="fas fa-check" style="margin-right: 8px;"></i>
+                ¡Perfecto!
+            </button>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
+
+    // Event listeners
+    const cerrarBtn = document.getElementById('cerrarModalExito');
+    const aceptarBtn = document.getElementById('aceptarModalExito');
+
+    const cerrarModal = () => {
+        document.body.removeChild(modal);
+        document.body.style.overflow = 'auto';
+    };
+
+    cerrarBtn.onclick = cerrarModal;
+    aceptarBtn.onclick = cerrarModal;
+
+    // Cerrar modal al hacer click fuera
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            cerrarModal();
+        }
+    };
+
+    // Cerrar modal con tecla Escape
+    const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+            cerrarModal();
+            document.removeEventListener('keydown', handleEscape);
+        }
+    };
+    document.addEventListener('keydown', handleEscape);
+
+    // Auto-cerrar después de 5 segundos si está habilitado
+    if (autoCerrar) {
+        setTimeout(cerrarModal, 5000);
+    }
+}
+
+// Función para mostrar modal de éxito con enlaces (para destacados)
+function mostrarModalExitoDestacado(titulo, mensaje, enlaces = '', autoCerrar = false) {
+    // Cerrar cualquier modal existente
+    cerrarTodosLosModales();
+
+    const modal = document.createElement('div');
+    modal.id = 'modalExito';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        box-sizing: border-box;
+        animation: fadeIn 0.3s ease-out;
+    `;
+
+    modal.innerHTML = `
+        <div style="
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            animation: slideInUp 0.4s ease-out;
+            position: relative;
+        ">
+            <button id="cerrarModalExito" style="
+                position: absolute;
+                top: 15px;
+                right: 15px;
+                background: #f0f0f0;
+                border: none;
+                border-radius: 50%;
+                width: 35px;
+                height: 35px;
+                font-size: 1.2rem;
+                cursor: pointer;
+                transition: background 0.3s ease;
+            ">&times;</button>
+
+            <div style="color: #4CAF50; font-size: 4rem; margin-bottom: 20px;">
+                <i class="fas fa-check-circle"></i>
+            </div>
+
+            <h2 style="color: #333; margin: 0 0 20px 0; font-size: 2rem; font-weight: bold;">
+                ${titulo}
+            </h2>
+
+            <div style="color: #666; font-size: 1.2rem; line-height: 1.5; margin: 0 0 30px 0;">
+                ${mensaje}
+            </div>
+
+            ${enlaces ? '<div style="margin: 20px 0;">' + enlaces + '</div>' : ''}
+
+            <button id="aceptarModalExito" style="
+                background: linear-gradient(135deg, #4CAF50, #45a049);
+                color: white;
+                border: none;
+                padding: 15px 30px;
+                border-radius: 12px;
+                font-weight: bold;
+                font-size: 1.1rem;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+                margin-top: 20px;
+            ">
+                <i class="fas fa-check" style="margin-right: 8px;"></i>
+                ¡Perfecto!
+            </button>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
+
+    // Event listeners
+    const cerrarBtn = document.getElementById('cerrarModalExito');
+    const aceptarBtn = document.getElementById('aceptarModalExito');
+
+    const cerrarModal = () => {
+        document.body.removeChild(modal);
+        document.body.style.overflow = 'auto';
+    };
+
+    cerrarBtn.onclick = cerrarModal;
+    aceptarBtn.onclick = cerrarModal;
+
+    // Cerrar modal al hacer click fuera
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            cerrarModal();
+        }
+    };
+
+    // Cerrar modal con tecla Escape
+    const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+            cerrarModal();
+            document.removeEventListener('keydown', handleEscape);
+        }
+    };
+    document.addEventListener('keydown', handleEscape);
+}
+
+// Función para confirmar publicación de código
+function confirmPublish() {
+    return confirm('¿Estás seguro de que quieres publicar un nuevo código? Serás redirigido al formulario de publicación.');
+}
+
+// Función para mostrar modal de error
+function mostrarModalError(titulo, mensaje, autoCerrar = false) {
+    // Cerrar cualquier modal existente
+    cerrarTodosLosModales();
+
+    const modal = document.createElement('div');
+    modal.id = 'modalError';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        box-sizing: border-box;
+        animation: fadeIn 0.3s ease-out;
+    `;
+
+    modal.innerHTML = `
+        <div style="
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            animation: slideInUp 0.4s ease-out;
+            position: relative;
+        ">
+            <button id="cerrarModalError" style="
+                position: absolute;
+                top: 15px;
+                right: 15px;
+                background: #f0f0f0;
+                border: none;
+                border-radius: 50%;
+                width: 35px;
+                height: 35px;
+                font-size: 1.2rem;
+                cursor: pointer;
+                transition: background 0.3s ease;
+            ">&times;</button>
+
+            <div style="color: #f44336; font-size: 4rem; margin-bottom: 20px;">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+
+            <h2 style="color: #333; margin: 0 0 20px 0; font-size: 2rem; font-weight: bold;">
+                ${titulo}
+            </h2>
+
+            <p style="color: #666; font-size: 1.2rem; line-height: 1.5; margin: 0 0 30px 0;">
+                ${mensaje}
+            </p>
+
+            <button id="aceptarModalError" style="
+                background: linear-gradient(135deg, #f44336, #d32f2f);
+                color: white;
+                border: none;
+                padding: 15px 30px;
+                border-radius: 12px;
+                font-weight: bold;
+                font-size: 1.1rem;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
+            ">
+                <i class="fas fa-check" style="margin-right: 8px;"></i>
+                Entendido
+            </button>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
+
+    // Event listeners
+    const cerrarBtn = document.getElementById('cerrarModalError');
+    const aceptarBtn = document.getElementById('aceptarModalError');
+
+    const cerrarModal = () => {
+        document.body.removeChild(modal);
+        document.body.style.overflow = 'auto';
+    };
+
+    cerrarBtn.onclick = cerrarModal;
+    aceptarBtn.onclick = cerrarModal;
+
+    // Cerrar modal al hacer click fuera
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            cerrarModal();
+        }
+    };
+
+    // Cerrar modal con tecla Escape
+    const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+            cerrarModal();
+            document.removeEventListener('keydown', handleEscape);
+        }
+    };
+    document.addEventListener('keydown', handleEscape);
+
+    // Auto-cerrar después de 7 segundos si está habilitado (errores no se auto-cierran por defecto)
+    if (autoCerrar) {
+        setTimeout(cerrarModal, 7000);
+    }
+}
 </script>
 
 <!-- Footer con sección de ayuda -->
 <footer class="footer-modern" style="background: #2c2c2c; padding: 40px 20px; margin-top: auto; text-align: center; position: relative; bottom: 0; left: 0; right: 0; width: 100%;">
     <div class="container" style="max-width: 1200px; margin: 0 auto;">
-        <div class="help-section" style="background: linear-gradient(135deg, #ff6b35, #e55a2b); padding: 30px; border-radius: 15px; margin-bottom: 30px; box-shadow: 0 5px 20px rgba(255, 107, 53, 0.3);">
+        <div class="help-section" style="background: linear-gradient(135deg, #E30613, #C40510); padding: 30px; border-radius: 15px; margin-bottom: 30px; box-shadow: 0 5px 20px rgba(227, 6, 19, 0.3);">
             <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 15px;">
-                <i class="fab fa-telegram-plane" style="font-size: 2.5rem; color: white;"></i>
+                <i class="fa-brands fa-telegram" style="font-size: 2.5rem; color: white;"></i>
                 <div>
                     <h3 style="color: white; margin: 0; font-size: 1.8rem; font-weight: bold;">¿Necesitas ayuda?</h3>
                     <p style="color: white; margin: 5px 0 0 0; font-size: 1.2rem; opacity: 0.9;">¡Escríbenos!</p>
                 </div>
             </div>
-            <a href="https://t.me/spnfury" target="_blank" style="display: inline-block; background: white; color: #ff6b35; padding: 15px 30px; border-radius: 25px; text-decoration: none; font-weight: bold; font-size: 1.1rem; transition: all 0.3s ease; box-shadow: 0 3px 10px rgba(0,0,0,0.2);">
-                <i class="fab fa-telegram" style="margin-right: 8px;"></i>
+            <a href="https://t.me/spnfury" target="_blank" style="display: inline-block; background: white; color: #E30613; padding: 15px 30px; border-radius: 25px; text-decoration: none; font-weight: bold; font-size: 1.1rem; transition: all 0.3s ease; box-shadow: 0 3px 10px rgba(0,0,0,0.2);">
+                <i class="fa-brands fa-telegram" style="margin-right: 8px;"></i>
                 Contactar por Telegram
             </a>
         </div>
@@ -3163,37 +2909,7 @@ function actualizarContadorCodigos() {
     </div>
 </footer>
 
-<style>
-.footer-modern a:hover {
-    color: #ff6b35 !important;
-    transform: translateY(-2px);
-}
 
-.help-section a:hover {
-    background: #ff6b35 !important;
-    color: white !important;
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3) !important;
-}
-
-@media (max-width: 768px) {
-    .footer-links {
-        flex-direction: column;
-        gap: 15px;
-    }
-    
-    .help-section {
-        padding: 20px !important;
-    }
-    
-    .help-section h3 {
-        font-size: 1.5rem !important;
-    }
-    
-    .help-section p {
-        font-size: 1rem !important;
-    }
-}
-</style>
-
-<?php get_footer(); ?>
+<!-- Cerrar el HTML correctamente -->
+</body>
+</html>

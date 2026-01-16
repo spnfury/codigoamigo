@@ -1,0 +1,248 @@
+/* Chollos Layout Grid */
+.chollos-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.chollos-layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 30px;
+    margin-top: 30px;
+    align-items: start;
+}
+
+.chollos-main {
+    flex: 1;
+    min-width: 0;
+    /* Prevent flex/grid overflow issues */
+}
+
+/* Sidebar Styles */
+.chollos-sidebar {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    position: sticky;
+    top: 90px;
+    /* Adjusted for sticky header */
+    border: 1px solid #eee;
+    transition: transform 0.3s ease-in-out;
+    z-index: 100;
+}
+
+.chollos-sidebar input,
+.chollos-sidebar select {
+    color: #333 !important;
+    background-color: #fff !important;
+    border-color: #ddd !important;
+}
+
+.filter-section {
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.filter-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.filter-title {
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: #333;
+    font-size: 1em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.filter-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.filter-list li {
+    margin-bottom: 8px;
+}
+
+.filter-link {
+    text-decoration: none;
+    color: #555;
+    font-size: 0.95em;
+    transition: color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.filter-link:hover,
+.filter-link.active {
+    color: #E30613;
+    font-weight: 500;
+}
+
+/* Price Filter */
+.price-inputs {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.price-input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    /* Lighter border for clean look */
+    background: #fff;
+    color: #333;
+    border-radius: 6px;
+    font-size: 0.9em;
+}
+
+.price-btn {
+    margin-top: 10px;
+    width: 100%;
+    padding: 8px;
+    background: white;
+    border: 1px solid #E30613;
+    color: #E30613;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9em;
+    transition: all 0.3s;
+}
+
+.price-btn:hover {
+    background: #E30613;
+    color: white;
+}
+
+/* Sort Options */
+.sort-select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #fff;
+    color: #333;
+    font-size: 0.95em;
+    cursor: pointer;
+}
+
+/* Mobile Filter Toggle */
+.mobile-filter-toggle {
+    display: none;
+    width: 100%;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid #ddd;
+    color: #333;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: 600;
+    margin-bottom: 20px;
+    cursor: pointer;
+    transition: background 0.2s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.mobile-filter-toggle:active {
+    background: #f0f0f0;
+}
+
+/* Mobile Sidebar Overlay */
+.mobile-sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.mobile-sidebar-header {
+    display: none;
+    /* hidden on desktop */
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.mobile-sidebar-title {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #333;
+}
+
+.mobile-sidebar-close {
+    background: none;
+    border: none;
+    font-size: 1.5em;
+    color: #666;
+    cursor: pointer;
+    padding: 5px;
+}
+
+@media (max-width: 900px) {
+    .chollos-layout {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    /* Mobile Sidebar Drawer Style */
+    .chollos-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 85%;
+        max-width: 320px;
+        height: 100vh;
+        overflow-y: auto;
+        transform: translateX(-100%);
+        display: block !important;
+        /* Always block, controlled by transform */
+        border-radius: 0;
+        /* Full height = no radius needed usually */
+        border-right: 1px solid #eee;
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+        z-index: 10000;
+        /* High z-index for overlay */
+    }
+
+    .chollos-sidebar.open {
+        transform: translateX(0);
+    }
+
+    .mobile-sidebar-overlay.open {
+        display: block;
+        opacity: 1;
+    }
+
+    .mobile-sidebar-header {
+        display: flex;
+    }
+
+    .mobile-filter-toggle {
+        display: block;
+    }
+}
+
+@media (max-width: 600px) {
+    .chollos-container {
+        padding: 10px;
+    }
+}

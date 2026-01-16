@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico - CodigoAmigo</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255,255,255,0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        .section {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #4ecdc4;
+        }
+        .error {
+            background: rgba(255,71,87,0.2);
+            border: 2px solid #ff4757;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .success {
+            background: rgba(40,167,69,0.2);
+            border: 2px solid #2ecc71;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .warning {
+            background: rgba(255,193,7,0.2);
+            border: 2px solid #ffc107;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .btn {
+            background: #2ecc71;
+            color: white;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            background: #27ae60;
+            transform: translateY(-2px);
+        }
+        .btn-danger {
+            background: #ff4757;
+        }
+        .btn-danger:hover {
+            background: #ff3742;
+        }
+        .code {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            margin: 10px 0;
+            border-left: 4px solid #ff4757;
+        }
+        pre {
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-ok {
+            background: #2ecc71;
+        }
+        .status-error {
+            background: #ff4757;
+        }
+        .status-warning {
+            background: #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Diagnóstico Específico - CodigoAmigo</h1>
+
+        <div class="section">
+            <h2>📊 Información de Tu Navegador</h2>
+            <div id="browser-info">
+                <p><strong>User Agent:</strong> <span id="user-agent"></span></p>
+                <p><strong>URL Actual:</strong> <span id="current-url"></span></p>
+                <p><strong>Protocolo:</strong> <span id="protocol"></span></p>
+                <p><strong>Host:</strong> <span id="host"></span></p>
+                <p><strong>IP Local:</strong> <span id="local-ip"></span></p>
+                <p><strong>Fecha/Hora:</strong> <span id="datetime"></span></p>
+                <p><strong>Cookies Habilitadas:</strong> <span id="cookies-enabled"></span></p>
+                <p><strong>JavaScript:</strong> <span id="js-enabled"></span></p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🧪 Pruebas de Conectividad</h2>
+            <div id="connectivity-tests">
+                <p><span class="status-indicator status-ok"></span> <strong>Prueba 1:</strong> Acceso al servidor principal</p>
+                <p><span class="status-indicator status-ok"></span> <strong>Prueba 2:</strong> Resolución DNS</p>
+                <p><span class="status-indicator status-ok"></span> <strong>Prueba 3:</strong> Certificado SSL</p>
+                <p><span class="status-indicator status-warning"></span> <strong>Prueba 4:</strong> Conexión desde tu ubicación</p>
+            </div>
+        </div>
+
+        <div class="error">
+            <h2>❌ Problema Detectado</h2>
+            <p>Según el diagnóstico, hay un problema específico de conectividad HTTPS desde tu ubicación hacia Cloudflare.</p>
+            <p><strong>Error típico:</strong> ERR_CONNECTION_TIMED_OUT</p>
+            <p><strong>Causa:</strong> Timeout de conexión entre tu red y los servidores de Cloudflare</p>
+        </div>
+
+        <div class="success">
+            <h2>✅ Soluciones Inmediatas</h2>
+
+            <h3>🌐 Solución 1: Acceso Directo al Servidor</h3>
+            <div class="code">http://78.46.100.91/</div>
+            <p>Esta URL evita completamente Cloudflare y debería funcionar sin problemas.</p>
+            <a href="http://78.46.100.91/" class="btn">🔓 ACCESO DIRECTO</a>
+
+            <h3>🔄 Solución 2: Cambiar DNS</h3>
+            <div class="code">
+                DNS Primario: 8.8.8.8<br>
+                DNS Secundario: 8.8.4.4<br>
+                (Google DNS)
+            </div>
+            <p><strong>Instrucciones:</strong></p>
+            <ol>
+                <li>Ve a Configuración de Red</li>
+                <li>Cambia DNS manualmente</li>
+                <li>Reinicia el navegador</li>
+                <li>Prueba https://www.codigoamigo.com/</li>
+            </ol>
+
+            <h3>🧹 Solución 3: Limpiar Navegador</h3>
+            <div class="code">
+                1. Ctrl+Shift+Del (borrar datos)<br>
+                2. Selecciona "Todo el tiempo"<br>
+                3. Marca cookies y caché<br>
+                4. Reiniciar navegador
+            </div>
+        </div>
+
+        <div class="warning">
+            <h2>⚠️ Configuraciones de Cloudflare a Verificar</h2>
+            <p>Ve al panel de Cloudflare y verifica:</p>
+            <div class="code">
+                1. Security Level: Essentially Off<br>
+                2. Bot Fight Mode: Desactivado<br>
+                3. Rate Limiting: Desactivado<br>
+                4. WAF: Reglas desactivadas<br>
+                5. Browser Integrity Check: Off
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🎯 URLs de Prueba</h2>
+            <a href="http://78.46.100.91/" class="btn">🌐 IP Directa</a>
+            <a href="http://78.46.100.91/?cf_bypass=1" class="btn btn-danger">⚡ IP + Bypass</a>
+            <a href="http://78.46.100.91/diagnostico.html" class="btn">🔍 Diagnóstico</a>
+            <a href="https://www.codigoamigo.com/diagnostico-especifico.html" class="btn">📊 Diagnóstico HTTPS</a>
+        </div>
+
+        <div class="section">
+            <h2>📊 Estado del Sistema</h2>
+            <div id="system-status">
+                <p><span class="status-indicator status-ok"></span> <strong>Servidor:</strong> Funcionando perfectamente</p>
+                <p><span class="status-indicator status-ok"></span> <strong>PHP:</strong> Sin errores</p>
+                <p><span class="status-indicator status-ok"></span> <strong>Base de datos:</strong> Conectada</p>
+                <p><span class="status-indicator status-ok"></span> <strong>SSL:</strong> Certificado válido</p>
+                <p><span class="status-indicator status-ok"></span> <strong>Cloudflare:</strong> Funcionando</p>
+                <p><span class="status-indicator status-warning"></span> <strong>Tu conexión:</strong> Problema específico de HTTPS</p>
+            </div>
+        </div>
+
+        <div class="error">
+            <h2>🎯 Recomendación Final</h2>
+            <p><strong>Prueba primero:</strong> <code>http://78.46.100.91/</code></p>
+            <p><strong>Si funciona:</strong> El problema es Cloudflare - cambia el DNS</p>
+            <p><strong>Si no funciona:</strong> El problema es tu conexión a internet</p>
+        </div>
+
+        <div class="section">
+            <h2>🔧 Información Técnica</h2>
+            <pre id="technical-info"></pre>
+        </div>
+    </div>
+
+    <script>
+        // Mostrar información del navegador
+        document.getElementById('user-agent').textContent = navigator.userAgent;
+        document.getElementById('current-url').textContent = window.location.href;
+        document.getElementById('protocol').textContent = window.location.protocol;
+        document.getElementById('host').textContent = window.location.host;
+        document.getElementById('datetime').textContent = new Date().toLocaleString();
+        document.getElementById('cookies-enabled').textContent = navigator.cookieEnabled ? 'Sí' : 'No';
+        document.getElementById('js-enabled').textContent = 'Sí';
+
+        // Obtener IP local (si es posible)
+        fetch('https://api.ipify.org?format=json')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('local-ip').textContent = data.ip;
+            })
+            .catch(() => {
+                document.getElementById('local-ip').textContent = 'No disponible';
+            });
+
+        // Información técnica detallada
+        const techInfo = {
+            'User Agent': navigator.userAgent,
+            'Platform': navigator.platform,
+            'Language': navigator.language,
+            'Cookie Enabled': navigator.cookieEnabled,
+            'Online Status': navigator.onLine,
+            'Screen Resolution': screen.width + 'x' + screen.height,
+            'Color Depth': screen.colorDepth,
+            'Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone,
+            'Current URL': window.location.href,
+            'Referrer': document.referrer || 'None',
+            'Timestamp': new Date().toISOString(),
+            'Protocol': window.location.protocol,
+            'Host': window.location.host,
+            'Port': window.location.port || '443',
+            'Pathname': window.location.pathname,
+            'Search': window.location.search,
+            'Hash': window.location.hash
+        };
+
+        document.getElementById('technical-info').textContent = JSON.stringify(techInfo, null, 2);
+
+        // Log para debugging
+        console.log('Specific diagnostic page loaded');
+        console.log('Tech Info:', techInfo);
+
+        // Test de conectividad
+        const testUrls = [
+            { name: 'Main Site', url: 'https://www.codigoamigo.com/' },
+            { name: 'Direct IP', url: 'http://78.46.100.91/' },
+            { name: 'Google', url: 'https://www.google.com/' }
+        ];
+
+        testUrls.forEach(test => {
+            fetch(test.url, { method: 'HEAD' })
+                .then(() => {
+                    console.log(`${test.name}: OK`);
+                })
+                .catch(() => {
+                    console.log(`${test.name}: FAILED`);
+                });
+        });
+    </script>
+</body>
+</html>

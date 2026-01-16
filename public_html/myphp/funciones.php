@@ -1,35 +1,109 @@
 <?php
 
+// Cargar autoloader de Composer para MongoDB
+require_once __DIR__ . '/../vendor/autoload.php';
 
+if (!function_exists('getFechaActualCorregida')) {
+    /**
+     * Función para obtener la fecha actual corregida
+     * Corrige automáticamente si la fecha del servidor está mal configurada
+     *
+     * @return int Timestamp de la fecha actual corregida
+     */
+    function getFechaActualCorregida() {
+        static $fecha_corregida = null;
+        static $fecha_original = null;
+
+        if ($fecha_corregida === null) {
+            $fecha_original = time();
+
+            // Detectar si la fecha del servidor está mal configurada
+            // Si la fecha está más de 6 meses en el futuro, probablemente esté mal
+            $fecha_futura_limite = strtotime('+6 months');
+
+            if ($fecha_original > $fecha_futura_limite) {
+                // La fecha del servidor está en el futuro, corregirla
+                // Estimar que debe estar aproximadamente 1 año atrás
+                $fecha_corregida = $fecha_original - (365 * 24 * 60 * 60);
+
+                // Log de la corrección para debugging
+                error_log("Fecha del servidor corregida: " . date('Y-m-d H:i:s', $fecha_original) . " -> " . date('Y-m-d H:i:s', $fecha_corregida));
+            } else {
+                $fecha_corregida = $fecha_original;
+            }
+        }
+
+        return $fecha_corregida;
+    }
+}
+
+if (!function_exists('fechaCorregida')) {
+    /**
+     * Función para formatear fecha corregida
+     * Similar a date() pero usando la fecha corregida
+     *
+     * @param string $format Formato de fecha
+     * @param int $timestamp Timestamp opcional
+     * @return string Fecha formateada
+     */
+    function fechaCorregida($format, $timestamp = null) {
+        if ($timestamp === null) {
+            $timestamp = getFechaActualCorregida();
+        }
+        return date($format, $timestamp);
+    }
+}
+
+if (!function_exists('diasDesdeFechaCorregida')) {
+    /**
+     * Función para calcular días entre fechas usando fecha corregida
+     *
+     * @param string $fecha_str Fecha en formato string
+     * @return int Días desde la fecha hasta hoy (corregido)
+     */
+    function diasDesdeFechaCorregida($fecha_str) {
+        $timestamp_fecha = strtotime($fecha_str);
+        $fecha_actual = getFechaActualCorregida();
+
+        return floor(($fecha_actual - $timestamp_fecha) / (24 * 60 * 60));
+    }
+}
+
+if (!function_exists('createConnection')) {
     function createConnection() {
 
-        global $db,$sum;
+            global $db,$sum;
 
-        //$uri = "mongodb://ratUser:electr!cMongo3$@127.0.0.1:27017";
-        $uri = "mongodb://127.0.0.1:27017";
+            //$uri = "mongodb://ratUser:electr!cMongo3$@127.0.0.1:27017";
+            $uri = "mongodb://127.0.0.1:27017";
 
-        if($db){
-            return $db;
+            if($db){
+                return $db;
+            }
+
+            try {
+                $mongo = new MongoDB\Client($uri);
+
+                $db = $mongo->codigo_db;
+                //$db->setLogLevel(5);
+
+                return $db;
+            }
+            catch (MongoDB\Driver\Exception\Exception $e) {
+                error_log("Error de MongoDB en createConnection: " . $e->getMessage());
+                return null;
+            }
+            catch (Throwable $e) {
+                error_log("Error general en createConnection: " . $e->getMessage());
+                return null;
+            }
+
         }
-
-        try {
-            $mongo = new MongoDB\Client($uri);
-
-            $db = $mongo->codigo_db;
-            //$db->setLogLevel(5);
-
-
-            return $db;
-        }
-        catch (MongoCursorException $e) {
-            echo "mensaje de error: ".$e->getMessage()."\n";
-            echo "código del error: ".$e->getCode()."\n";
-        }
-
-    }
+}
 
 
 
+    if (!function_exists('mandaBot')) {
     function mandaBot($manda){
 
         // Inicializar variables para evitar warnings
@@ -66,9 +140,17 @@
                 $manda.= "\n\nEncontrado en: ".$last_file."...";
             }
 
-            $botToken = "1208948207:AAF0O45V1zcsp7wjRgbwOrLQ7tNRUHlfnME";
-            //$chatId="-1001249170942";
-            $chatId="-563343505";
+            // Ensure configuration is loaded
+            if (!defined('TELEGRAM_BOT_TOKEN')) {
+                // Try to find the config file relative to this file
+                $config_path = __DIR__ . '/../config/ai_config.php';
+                if (file_exists($config_path)) {
+                    @include_once $config_path;
+                }
+            }
+
+            $botToken = defined('TELEGRAM_BOT_TOKEN') ? TELEGRAM_BOT_TOKEN : "1208948207:AAF0O45V1zcsp7wjRgbwOrLQ7tNRUHlfnME";
+            $chatId = defined('TELEGRAM_ADMIN_CHAT_ID') ? TELEGRAM_ADMIN_CHAT_ID : "-563343505";
 
             $url = "https://api.telegram.org/bot".$botToken. "/sendMessage?chat_id=" . $chatId;
 
@@ -91,11 +173,13 @@
 
         }
     }
+}
 
     /**********************************************************
      *  CONEXION CON BD - USUARIO
      *********************************************************/
 
+    if (!function_exists('getObjectUser')) {
     function getObjectUser ($parameter, $value) {
 
         $collection_usuarios = getCollectionUsuarios();
@@ -116,11 +200,13 @@
         
         return $usuario;
     }
+}
 
     /**********************************************************
      *  PROPIAS DE USUARIO
      *********************************************************/
 
+    if (!function_exists('more_codes')) {
     function more_codes($datos) {
 
         $marca["nombre_clave"] = $datos["nombre_clave"];
@@ -147,9 +233,11 @@
 
 
     }
+}
 
 
 
+    if (!function_exists('show_estatistics')) {
     function show_estatistics($datos){
 
         session_start();
@@ -160,7 +248,6 @@
 
 
         ?>
-
                 <div class="modal-dialog modal-md">
                 <div class="modal-content">
 
@@ -172,7 +259,6 @@
                     <div class="text-center" style="font-size: 16px; padding: 30px; overflow:auto;max-height:800px;">
 
                    		 <?php muestra_visitas($datos["data_codigo_id"]); ?>
-
                     </div>
 
                 </div>
@@ -181,7 +267,9 @@
 		<?
 
     }
+}
 
+    if (!function_exists('last_codigo')) {
     function last_codigo($datos,$marca='') {
 
         session_start();
@@ -193,7 +281,6 @@
 
 
         ?>
-
         <div class="modal-dialog modal-md">
         <div class="modal-content">
 
@@ -208,7 +295,6 @@
 
 
                         	if((!$_SESSION["user_id"])) { ?>
-
                     	    		<div class="text-center block_codigo_no_sesion"><p>Por favor, inicia sesión para poder ver este código</p>
                     	    			<button class="btn btn_codigo_amigo btn-custom btn-mini login open_modal_login"><i class="fa fa-user"></i> Iniciar sesión</button>
                     	    		</div>
@@ -226,11 +312,9 @@
 
 
                         	?>
-
                         	</p>
 
-                        	<?php echo "<br><i class='fa fa-clipboard' aria-hidden='true'></i> <a onclick='executeCopy(\"".$codigo_to_show["codigo"]."\",$(this));'>Copiar al portapapeles</a>"; ?>
-                       		<hr>
+                        	<?php echo "<br><i class='fa fa-clipboard' aria-hidden='true'></i> <a onclick='executeCopy(\"".$codigo_to_show["codigo"]."\",$(this));'>Copiar al portapapeles</a>"; ?>                       		<hr>
                     		<div class="text-center">
 						<?php
 
@@ -287,8 +371,7 @@
 
                 		 echo $content2;
 
-                		 ?>
-                            </div>
+                		 ?>                            </div>
                         </div>
 
             </div>
@@ -298,13 +381,14 @@
         <?
 
     }
-
+}
 
 
     /**********************************************************
      *  CONEXION CON BD - MARCA
      *********************************************************/
 
+    if (!function_exists('getObjectMarca')) {
     function getObjectMarca ($parameter, $value) {
 
         $collection_marcas = getCollectionMarcas();
@@ -349,29 +433,151 @@
 
         return $marca;
     }
+}
 
     /**********************************************************
      *  CONEXION CON BD - CÓDIGO
      *********************************************************/
 
-    function añadir_vista_codigo ($codigo) {
-
-        $rand = rand(1, 3);
-        $num_vistas = $codigo["totalclicks"] + $rand;
-
+    // Función para añadir impresión cuando un código se muestra en una lista
+    function añadir_impresion_codigo ($codigo_id) {
         try {
             $collection_codigos = getCollectionCodigos();
+            
+            // Usar ObjectId si no lo es ya
+            if (!($codigo_id instanceof \MongoDB\BSON\ObjectId)) {
+                $codigo_id = new \MongoDB\BSON\ObjectId($codigo_id);
+            }
+            
+            // Obtener fecha actual en formato Y-m-d para el tracking diario
+            $fecha_hoy = date('Y-m-d');
+            $campo_stats = 'stats_diarias.' . $fecha_hoy . '.impresiones';
+            
+            // Incrementar el contador total y el contador diario
             $updateResult = $collection_codigos->updateOne(
-                ['_id' => new \MongoDB\BSON\ObjectId($codigo["_id"]) ],
-                ['$set' => ['totalclicks' => $num_vistas]]
+                ['_id' => $codigo_id],
+                [
+                    '$inc' => [
+                        'total_impressions' => 1,
+                        $campo_stats => 1
+                    ]
+                ]
             );
+            
+            return true;
         } catch(MongoDB\Driver\Exception\WriteException $e) {
-            $writeResult = $e->getWriteResult();
-            echo "Errores en MongoDB\n";
+            // Silenciosamente fallar para no interrumpir la renderización
+            return false;
+        }
+    }
+
+    // Función para añadir click cuando un usuario hace click en el código
+    function añadir_vista_codigo ($codigo) {
+        try {
+            $collection_codigos = getCollectionCodigos();
+            
+            // Obtener el ID del código
+            $codigo_id = null;
+            if (isset($codigo['_id'])) {
+                if ($codigo['_id'] instanceof \MongoDB\BSON\ObjectId) {
+                    $codigo_id = $codigo['_id'];
+                } else {
+                    $codigo_id = new \MongoDB\BSON\ObjectId($codigo['_id']);
+                }
+            } else {
+                return false; // No hay ID, no se puede registrar
+            }
+            
+            // Obtener fecha actual en formato Y-m-d para el tracking diario
+            $fecha_hoy = date('Y-m-d');
+            $campo_stats = 'stats_diarias.' . $fecha_hoy . '.clicks';
+            
+            // Incrementar el contador total y el contador diario (sin random)
+            $updateResult = $collection_codigos->updateOne(
+                ['_id' => $codigo_id],
+                [
+                    '$inc' => [
+                        'totalclicks' => 1,
+                        $campo_stats => 1
+                    ]
+                ]
+            );
+            
+            return true;
+        } catch(MongoDB\Driver\Exception\WriteException $e) {
+            // Silenciosamente fallar para no interrumpir la renderización
+            return false;
+        } catch (Exception $e) {
+            // Silenciosamente fallar para no interrumpir la renderización
+            return false;
         }
 
     }
 
+
+    // Función para obtener estadísticas diarias reales de un código
+    function get_estadisticas_diarias_codigo($codigo_id, $fecha_inicio, $fecha_fin) {
+        try {
+            $collection_codigos = getCollectionCodigos();
+            
+            // Usar ObjectId si no lo es ya
+            if (!($codigo_id instanceof \MongoDB\BSON\ObjectId)) {
+                $codigo_id = new \MongoDB\BSON\ObjectId($codigo_id);
+            }
+            
+            // Obtener el código con sus estadísticas diarias
+            $codigo = $collection_codigos->findOne(['_id' => $codigo_id]);
+            
+            if (!$codigo) {
+                return [];
+            }
+            
+            // Convertir a array si es objeto
+            if (is_object($codigo)) {
+                $codigo = (array)$codigo;
+            }
+            
+            $estadisticas_diarias = [];
+            $stats_diarias = isset($codigo['stats_diarias']) ? $codigo['stats_diarias'] : [];
+            
+            // Convertir a array si es objeto
+            if (is_object($stats_diarias)) {
+                $stats_diarias = (array)$stats_diarias;
+            }
+            
+            // Generar array con todas las fechas del rango
+            $fecha_actual = clone $fecha_inicio;
+            while ($fecha_actual <= $fecha_fin) {
+                $fecha_str = $fecha_actual->format('Y-m-d');
+                
+                $impresiones = 0;
+                $clicks = 0;
+                
+                // Obtener estadísticas reales si existen
+                if (isset($stats_diarias[$fecha_str])) {
+                    $stats_dia = $stats_diarias[$fecha_str];
+                    if (is_object($stats_dia)) {
+                        $stats_dia = (array)$stats_dia;
+                    }
+                    $impresiones = isset($stats_dia['impresiones']) ? (int)$stats_dia['impresiones'] : 0;
+                    $clicks = isset($stats_dia['clicks']) ? (int)$stats_dia['clicks'] : 0;
+                }
+                
+                $estadisticas_diarias[] = [
+                    'fecha' => $fecha_str,
+                    'impresiones' => $impresiones,
+                    'clicks' => $clicks
+                ];
+                
+                $fecha_actual->modify('+1 day');
+            }
+            
+            return $estadisticas_diarias;
+            
+        } catch (Exception $e) {
+            return [];
+        }
+    }
 
      function añadir_historial_codigo ($codigo) {
          $rand = rand(1, 3);
@@ -438,18 +644,29 @@
              $lista_codigos_pre = get_all_listado_codigos_array($array_filtro, $array_skip);
              $lista_codigos_patrocinados = $lista_codigos_pre["results"];
 
+             // Array para rastrear emails ya enviados y evitar duplicados
+             $emails_enviados = array();
+
              foreach($lista_codigos_patrocinados as $listado){
 
                  $usuario = getObjectUser('_id', new \MongoDB\BSON\ObjectId($listado["id_usuario"]));
                  $datos_usuario = get_array_de_usuario($usuario);
 
                  if($usuario_original["mail"] != $datos_usuario["mail"]){
+                     
+                     // Verificar si ya se envió un email a este destinatario
+                     $email_destinatario = strtolower(trim($datos_usuario["mail"] ?? ''));
+                     if (!empty($email_destinatario) && !isset($emails_enviados[$email_destinatario])) {
+                         
+                         // Marcar este email como enviado
+                         $emails_enviados[$email_destinatario] = true;
 
-                     $codigo_to_show = $collection_codigos->findOne(['_id' => $codigo["_id"]]);
-                     $m = getObjectMarca("nombre_clave", $listado["marca"]);
-                     $u = getObjectUser('_id', $codigo_to_show["id_usuario"]);
-                     $actual_link = "https://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
-                     enviar_mail_codigo_no_destacado($listado,  $datos_usuario["mail"], $datos_usuario["username"], $actual_link, $m["nombre"], $m["imagen"], $usuario_original);
+                         $codigo_to_show = $collection_codigos->findOne(['_id' => $codigo["_id"]]);
+                         $m = getObjectMarca("nombre_clave", $listado["marca"]);
+                         $u = getObjectUser('_id', $codigo_to_show["id_usuario"]);
+                         $actual_link = "https://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+                         enviar_mail_codigo_no_destacado($listado,  $datos_usuario["mail"], $datos_usuario["username"], $actual_link, $m["nombre"], $m["imagen"], $usuario_original);
+                     }
 
                  }
 
@@ -470,9 +687,9 @@
                 'tipo_destacado' => $tipo_destacado
             ];
             
-            // Para destacado super, agregar campo adicional
+            // Para destacado super, marcar también destacado_social (aparece en home)
             if($tipo_destacado == 'super') {
-                $update_data['destacado_super'] = strtotime('now');
+                $update_data['destacado_social'] = strtotime('now');
             }
             
             $updateResult = $collection_codigos->updateOne(
@@ -483,6 +700,23 @@
             if($updateResult->getModifiedCount() > 0) {
                 // Enviar notificación por email al usuario
                 enviar_notificacion_destacado($codigo_id, $tipo_destacado);
+                
+                // Si es destacado super, notificar a todos los usuarios con códigos en el home
+                if($tipo_destacado == 'super') {
+                    if (function_exists('notificar_competencia_home_destacado_super')) {
+                        $codigo_actualizado = $collection_codigos->findOne(['_id' => $obj_id_codigo]);
+                        $usuario_id = isset($codigo_actualizado['id_usuario']) ? (string)$codigo_actualizado['id_usuario'] : '';
+                        if ($usuario_id) {
+                            $emails_enviados = notificar_competencia_home_destacado_super(
+                                $codigo_id,
+                                $usuario_id,
+                                $codigo_actualizado
+                            );
+                            error_log("Notificaciones de competencia home enviadas desde destacar_codigo_moderno: $emails_enviados");
+                        }
+                    }
+                }
+                
                 return true;
             }
             
@@ -497,43 +731,82 @@
     // Función para enviar notificación de destacado
     function enviar_notificacion_destacado($codigo_id, $tipo_destacado) {
         try {
+            // Datos del código y usuario propietario
             $codigo = getCodeByID(new \MongoDB\BSON\ObjectId($codigo_id));
             if(!$codigo) return false;
-            
+
             $usuario = getObjectUser('_id', $codigo['id_usuario']);
             if(!$usuario) return false;
-            
+
             $marca = getObjectMarca('nombre_clave', $codigo['marca']);
             $marca_nombre = $marca['nombre'] ?? $codigo['marca'];
-            
+
             $tipo_texto = $tipo_destacado == 'super' ? 'Super Destacado' : 'Destacado Normal';
-            $duracion = $tipo_destacado == 'super' ? '60 días' : '30 días';
-            
+
+            // Email al propietario confirmando el destacado
             $asunto = "¡Tu código ha sido destacado exitosamente!";
-            $mensaje = "
-                <h2>¡Felicidades! Tu código ha sido destacado</h2>
-                <p>Tu código para <strong>{$marca_nombre}</strong> ha sido destacado como <strong>{$tipo_texto}</strong>.</p>
-                <p><strong>Detalles:</strong></p>
-                <ul>
-                    <li>Marca: {$marca_nombre}</li>
-                    <li>Código: {$codigo['codigo']}</li>
-                    <li>Tipo: {$tipo_texto}</li>
-                    <li>Duración: {$duracion}</li>
-                    <li>Fecha: " . date('d/m/Y H:i') . "</li>
-                </ul>
-                <p>Tu código ahora aparecerá en primera posición y tendrá mayor visibilidad.</p>
-                <p><a href='{$GLOBALS['website']}de-" . strtolower($codigo['marca']) . "' style='background: #ff6b35; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>Ver código destacado</a></p>
-            ";
+            $html = "<h2>¡Felicidades! Tu código ha sido destacado</h2>";
+            $html .= "<p>Tu código para <strong>{$marca_nombre}</strong> ha sido destacado como <strong>{$tipo_texto}</strong>.</p>";
+            $html .= "<ul><li>Marca: {$marca_nombre}</li><li>Código: {$codigo['codigo']}</li><li>Tipo: {$tipo_texto}</li><li>Prioridad: Sin límite de tiempo (mantienes la primera posición hasta que otro usuario te supere)</li><li>Fecha: ".date('d/m/Y H:i')."</li></ul>";
+            $html .= "<p>Tu código ahora aparecerá en primera posición y tendrá mayor visibilidad.</p>";
+            // Enlazar directamente a la ficha pública del código en CodigoAmigo
+            $link_codigo_amigo = $GLOBALS['website'] . 'de-' . strtolower($codigo['marca']) . '?codigo=' . (string)$codigo['_id'];
+            $html .= "<p><a href='" . $link_codigo_amigo . "' style='background:#E30613;color:#fff;padding:10px 20px;text-decoration:none;border-radius:5px;'>Ver código destacado</a></p>";
+
+            if (!function_exists('enviarEmailConBrevoYRegistrar')) {
+                include_once __DIR__ . '/email_helper.php';
+            }
+            enviarEmailConBrevoYRegistrar(
+                $usuario['mail'] ?? '',
+                $usuario['username'] ?? 'Usuario',
+                $asunto,
+                $html,
+                'confirmacion_destacado',
+                (string)($usuario['_id'] ?? ''),
+                ['codigo_id' => (string)$codigo['_id'], 'marca' => $marca_nombre, 'tipo' => $tipo_destacado]
+            );
+
+            // Notificar a competidores de la misma marca para incentivar recuperar la posición #1
+            $collection_codigos = getCollectionCodigos();
+            $filtro = ['marca' => $codigo['marca'], 'estado' => 0, 'destacado' => ['$ne' => 0]];
+            if ($tipo_destacado === 'super') {
+                $filtro['destacado_social'] = ['$exists' => true];
+            }
+            $competidores = get_all_listado_codigos_array($filtro, ['limit' => 50, 'sort' => ['destacado' => -1]]);
+            $lista = $competidores['results'] ?? [];
             
-            // Enviar email usando mail() de PHP
-            $headers = "MIME-Version: 1.0" . "\r\n";
-            $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
-            $headers .= "From: info@codigoamigo.com" . "\r\n";
+            // Array para rastrear emails ya enviados y evitar duplicados
+            $emails_enviados = array();
             
-            return mail($usuario['mail'], $asunto, $mensaje, $headers);
-            
+            foreach ($lista as $comp) {
+                // Evitar enviar al propio dueño que acaba de destacar
+                if (isset($comp['id_usuario']) && (string)$comp['id_usuario'] === (string)$codigo['id_usuario']) {
+                    continue;
+                }
+                $u_comp = getObjectUser('_id', new \MongoDB\BSON\ObjectId($comp['id_usuario']));
+                if (!$u_comp) { continue; }
+                $datos_u = get_array_de_usuario($u_comp);
+                
+                // Verificar si ya se envió un email a este destinatario
+                $email_destinatario = strtolower(trim($datos_u['mail'] ?? ''));
+                if (empty($email_destinatario) || isset($emails_enviados[$email_destinatario])) {
+                    continue; // Saltar si el email está vacío o ya se envió
+                }
+                
+                // Marcar este email como enviado
+                $emails_enviados[$email_destinatario] = true;
+                
+                $actual_link = isset($_SERVER['HTTP_HOST']) ? "https://".$_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI'] : $GLOBALS['website'];
+                if ($tipo_destacado === 'super') {
+                    enviar_mail_codigo_no_destacado_home($comp, $datos_u['mail'], $datos_u['username'], $actual_link, $marca_nombre, $marca['imagen'] ?? '', get_array_de_usuario($usuario));
+                } else {
+                    enviar_mail_codigo_no_destacado($comp, $datos_u['mail'], $datos_u['username'], $actual_link, $marca_nombre, $marca['imagen'] ?? '', get_array_de_usuario($usuario));
+                }
+            }
+
+            return true;
         } catch(Exception $e) {
-            error_log("Error enviando notificación de destacado: " . $e->getMessage());
+            error_log('Error enviando notificaciones de destacado: ' . $e->getMessage());
             return false;
         }
     }
@@ -554,7 +827,10 @@
                 //print_r($collection_codigos);
                 $updateResult = $collection_codigos->updateOne(
                     ['_id' => new \MongoDB\BSON\ObjectId($codigo["_id"]) ],
-                    ['$set' => ['destacado' => strtotime('now')]]
+                    ['$set' => [
+                        'destacado' => strtotime('now'),
+                        'tipo_destacado' => 'normal' // Mantener consistencia con nuevo sistema
+                    ]]
                     );
             } catch(MongoDB\Driver\Exception\WriteException $e) {
                 $writeResult = $e->getWriteResult();
@@ -585,24 +861,35 @@
             $lista_codigos_pre = get_all_listado_codigos_array($array_filtro, $array_skip);
             $lista_codigos_patrocinados = $lista_codigos_pre["results"];
 
+            // Array para rastrear emails ya enviados y evitar duplicados
+            $emails_enviados = array();
+
             foreach($lista_codigos_patrocinados as $listado){
 
                 $usuario = getObjectUser('_id', new \MongoDB\BSON\ObjectId($listado["id_usuario"]));
                 $datos_usuario = get_array_de_usuario($usuario);
 
                 if($usuario_original["mail"] != $datos_usuario["mail"]){
+                    
+                    // Verificar si ya se envió un email a este destinatario
+                    $email_destinatario = strtolower(trim($datos_usuario["mail"] ?? ''));
+                    if (!empty($email_destinatario) && !isset($emails_enviados[$email_destinatario])) {
+                        
+                        // Marcar este email como enviado
+                        $emails_enviados[$email_destinatario] = true;
 
-                    $codigo_to_show = $collection_codigos->findOne(['_id' => $codigo["_id"]]);
-                    $m = getObjectMarca("nombre_clave", $listado["marca"]);
-                    $u = getObjectUser('_id', $codigo_to_show["id_usuario"]);
-                    $actual_link = "https://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
-                    enviar_mail_codigo_no_destacado($listado,  $datos_usuario["mail"], $datos_usuario["username"], $actual_link, $m["nombre"], $m["imagen"], $usuario_original);
+                        $codigo_to_show = $collection_codigos->findOne(['_id' => $codigo["_id"]]);
+                        $m = getObjectMarca("nombre_clave", $listado["marca"]);
+                        $u = getObjectUser('_id', $codigo_to_show["id_usuario"]);
+                        $actual_link = "https://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+                        enviar_mail_codigo_no_destacado($listado,  $datos_usuario["mail"], $datos_usuario["username"], $actual_link, $m["nombre"], $m["imagen"], $usuario_original);
+                    }
 
                 }
 
             }
 
-        }elseif($codigo_operacion=='BCS'){
+        }elseif($codigo_operacion=='BCS'){ //BCS == destacado social (equivalente a super)
 
             try {
                 $collection_codigos = getCollectionCodigos();
@@ -610,7 +897,11 @@
 
                 $updateResult = $collection_codigos->updateOne(
                     ['_id' => new \MongoDB\BSON\ObjectId($codigo["_id"]) ],
-                    ['$set' => ['destacado' => strtotime('now'), 'destacado_social' => strtotime('now')]]
+                    ['$set' => [
+                        'destacado' => strtotime('now'), 
+                        'destacado_social' => strtotime('now'),
+                        'tipo_destacado' => 'super' // Mantener consistencia con nuevo sistema
+                    ]]
                     );
 
 
@@ -638,6 +929,9 @@
             $lista_codigos_pre = get_all_listado_codigos_array($array_filtro, $array_skip);
             $lista_codigos_patrocinados = $lista_codigos_pre["results"];
 
+            // Array para rastrear emails ya enviados y evitar duplicados
+            $emails_enviados = array();
+
             foreach($lista_codigos_patrocinados as $listado){
 
                 $usuario = getObjectUser('_id', new \MongoDB\BSON\ObjectId($listado["id_usuario"]));
@@ -646,11 +940,20 @@
 
 
                 if($usuario_original["mail"] != $datos_usuario["mail"]){
-                    $codigo_to_show = $collection_codigos->findOne(['_id' => $codigo["_id"]]);
-                    $m = getObjectMarca("nombre_clave", $listado["marca"]);
-                    $u = getObjectUser('_id', $codigo_to_show["id_usuario"]);
-                    $actual_link = "https://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
-                    enviar_mail_codigo_no_destacado_home($listado,  $datos_usuario["mail"], $datos_usuario["username"], $actual_link, $m["nombre"], $m["imagen"], $usuario_original);
+                    
+                    // Verificar si ya se envió un email a este destinatario
+                    $email_destinatario = strtolower(trim($datos_usuario["mail"] ?? ''));
+                    if (!empty($email_destinatario) && !isset($emails_enviados[$email_destinatario])) {
+                        
+                        // Marcar este email como enviado
+                        $emails_enviados[$email_destinatario] = true;
+
+                        $codigo_to_show = $collection_codigos->findOne(['_id' => $codigo["_id"]]);
+                        $m = getObjectMarca("nombre_clave", $listado["marca"]);
+                        $u = getObjectUser('_id', $codigo_to_show["id_usuario"]);
+                        $actual_link = "https://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+                        enviar_mail_codigo_no_destacado_home($listado,  $datos_usuario["mail"], $datos_usuario["username"], $actual_link, $m["nombre"], $m["imagen"], $usuario_original);
+                    }
                 }
 
             }
@@ -908,9 +1211,18 @@ function formatDateAgoLarge($value)
     }
 
 
+    function getCodeByID($id_codigo) {
+        $collection_codigos = getCollectionCodigos();
+
+        // Una sola consulta usando findOne() ya que buscamos por ID
+        $codigo = $collection_codigos->findOne(['_id' => $id_codigo]);
+
+        return $codigo;
+    }
+
     function getCodeByID_prelista($id_codigo) {
         $collection_codigos = getCollectionCodigos();
-        
+
         // Una sola consulta usando findOne() ya que buscamos por ID
         $codigo = $collection_codigos->findOne(['_id' => $id_codigo]);
         
@@ -1240,14 +1552,12 @@ function formatDateAgoLarge($value)
 
 
 	function rich_snippet_page () { ?>
-
 	    <?php
 	        global $rating_count_rs, $rating_value_rs, $url_logo_rs, $url_marca_rs, $title_marca_rs;
 
 
 	        $url_logo_rs = str_replace("https://www.codigoamigo.comhttps","https",$url_logo_rs);
 	    ?>
-
 	    <script type="application/ld+json">
             {
                 "@context": "http://schema.org",
@@ -1355,10 +1665,17 @@ function desencriptar($cadena){
 
 function get_posicion_codigo_en_marca($codigo_id, $marca_clave) {
     // Obtener códigos destacados de la marca (igual que en la página de marca)
-    $array_filtro_destacados = array("marca" => $marca_clave, "estado" => 0, "destacado" => array('$ne' => 0));
+    $array_filtro_destacados = array(
+        "marca" => $marca_clave, 
+        "estado" => 0, 
+        '$or' => array(
+            array("destacado_social" => array('$ne' => 0)),
+            array("destacado" => array('$ne' => 0))
+        )
+    );
     $array_opciones_destacados = array(
         'limit' => 10,
-        'sort' => array('destacado' => -1, '_id' => -1)
+        'sort' => array('destacado_social' => -1, 'destacado' => -1, '_id' => -1)
     );
     
     $lista_codigos_destacados = get_all_listado_codigos_array($array_filtro_destacados, $array_opciones_destacados);
@@ -1388,6 +1705,105 @@ function get_posicion_codigo_en_marca($codigo_id, $marca_clave) {
     
     // Si no se encuentra en los primeros 30 (10 destacados + 20 normales), devolver una posición alta
     return 999;
+}
+
+/**
+ * Actualiza la visibilidad de un código basada en su posición real en la marca
+ * 
+ * @param string $codigo_id ID del código
+ * @param string $marca_clave Clave de la marca
+ * @return bool True si se actualizó correctamente
+ */
+function updateCodeVisibilityByPosition($codigo_id, $marca_clave) {
+    try {
+        $posicion = get_posicion_codigo_en_marca($codigo_id, $marca_clave);
+        
+        // Determinar visibilidad basada en posición
+        $visibilidad = 'baja'; // Por defecto
+        if ($posicion == 1) {
+            $visibilidad = 'alta';
+        } elseif ($posicion == 2) {
+            $visibilidad = 'media';
+        } elseif ($posicion <= 5) {
+            $visibilidad = 'baja';
+        } else {
+            $visibilidad = 'baja'; // Posiciones muy altas también son baja visibilidad
+        }
+        
+        // Actualizar en la base de datos
+        $db = createConnection();
+        $collection = $db->selectCollection('codigos');
+        
+        $result = $collection->updateOne(
+            ['_id' => new MongoDB\BSON\ObjectId($codigo_id)],
+            [
+                '$set' => [
+                    'visibilidad' => $visibilidad,
+                    'posicion_real' => $posicion,
+                    'fecha_modificacion' => date('Y-m-d H:i:s'),
+                    'updated_at' => new MongoDB\BSON\UTCDateTime()
+                ]
+            ]
+        );
+        
+        if ($result->getModifiedCount() > 0) {
+            log_info("Visibilidad actualizada", [
+                'codigo_id' => $codigo_id,
+                'marca' => $marca_clave,
+                'posicion' => $posicion,
+                'visibilidad' => $visibilidad
+            ]);
+            return true;
+        }
+        
+        return false;
+    } catch (Exception $e) {
+        log_error("Error actualizando visibilidad", [
+            'codigo_id' => $codigo_id,
+            'marca' => $marca_clave,
+            'error' => $e->getMessage()
+        ]);
+        return false;
+    }
+}
+
+/**
+ * Actualiza la visibilidad de todos los códigos de una marca
+ * 
+ * @param string $marca_clave Clave de la marca
+ * @return int Número de códigos actualizados
+ */
+function updateAllCodesVisibilityInBrand($marca_clave) {
+    try {
+        $db = createConnection();
+        $collection = $db->selectCollection('codigos');
+        
+        // Obtener todos los códigos activos de la marca
+        $codigos = $collection->find([
+            'marca' => $marca_clave,
+            'estado' => 0
+        ]);
+        
+        $actualizados = 0;
+        foreach ($codigos as $codigo) {
+            if (updateCodeVisibilityByPosition((string)$codigo['_id'], $marca_clave)) {
+                $actualizados++;
+            }
+        }
+        
+        log_info("Visibilidad actualizada para marca", [
+            'marca' => $marca_clave,
+            'codigos_actualizados' => $actualizados
+        ]);
+        
+        return $actualizados;
+    } catch (Exception $e) {
+        log_error("Error actualizando visibilidad de marca", [
+            'marca' => $marca_clave,
+            'error' => $e->getMessage()
+        ]);
+        return 0;
+    }
 }
 
 // Función para obtener un código por ID
@@ -1435,7 +1851,13 @@ function updateCodigo($codigo_id, $update_data) {
         // Si se está actualizando la marca, buscar o crear marca existente
         if (isset($update_data['marca']) && !empty($update_data['marca'])) {
             $marca_normalizada = normalizeMarcaName($update_data['marca']);
-            $marca_existente = findOrCreateMarca($update_data['marca'], $marca_normalizada);
+            $marca_existente = findOrCreateMarca(
+                $update_data['marca'],
+                $marca_normalizada,
+                $update_data['url_imagen'] ?? null,
+                $update_data['categoria_valor'] ?? null,
+                $update_data['categoria_clave'] ?? null
+            );
             $update_data['marca'] = $marca_existente['nombre_clave'];
         }
         
@@ -1500,43 +1922,47 @@ function normalizeMarcaName($marca_name) {
 }
 
 // Función auxiliar para buscar o crear marca
-function findOrCreateMarca($marca_name, $marca_normalizada) {
+function findOrCreateMarca($marca_name, $marca_normalizada, $imagen_url = null, $categoria = null, $categoria_clave = null) {
+    error_log("findOrCreateMarca - Marca: $marca_name, Imagen: $imagen_url, Categoria: $categoria, Categoria clave: $categoria_clave");
+
     $db = createConnection();
     $collection_marcas = $db->selectCollection('marcas');
-    
+
     // Buscar marca existente por nombre_clave normalizado
     $marca_existente = $collection_marcas->findOne(['nombre_clave' => $marca_normalizada]);
-    
+
     if ($marca_existente) {
         return iterator_to_array($marca_existente);
     }
-    
+
     // Si no existe, buscar por nombre exacto (sin normalizar)
     $marca_exacta = $collection_marcas->findOne(['nombre' => $marca_name]);
-    
+
     if ($marca_exacta) {
         return iterator_to_array($marca_exacta);
     }
-    
+
     // Si no existe ninguna, crear nueva marca
     $nueva_marca = [
         'estado' => 1,
         'nombre' => $marca_name,
         'nombre_clave' => $marca_normalizada,
-        'categoria' => 'General',
-        'categoria_clave' => 'general',
-        'imagen' => '/img/no_image.png',
+        'categoria' => $categoria ?: 'General',
+        'categoria_clave' => $categoria_clave ?: 'general',
+        'imagen' => $imagen_url ?: '/img/no_image.png',
         'descripción' => '',
         'descripción_larga' => '',
         'fecha_publicacion' => date('d-m-Y H:i', strtotime('now')),
         'usuario_creador' => $_SESSION["user_id"] ?? 'system',
         'url' => '',
         'url_register' => '',
-        'aviso' => 'Marca creada al modificar código'
+        'aviso' => 'Marca creada por usuario'
     ];
-    
+
+    error_log("Creando nueva marca con imagen: " . ($imagen_url ?: '/img/no_image.png') . ", categoria: " . ($categoria ?: 'General'));
+
     $result = $collection_marcas->insertOne($nueva_marca);
-    
+
     // Retornar la marca recién creada
     $marca_creada = $collection_marcas->findOne(['_id' => $result->getInsertedId()]);
     return iterator_to_array($marca_creada);

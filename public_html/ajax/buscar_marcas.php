@@ -46,7 +46,10 @@ if (empty($query) || strlen($query) < 1) {
         foreach ($marcas as $marca) {
             if (isset($marca['nombre']) && $marca['nombre'] !== 'false' && $marca['nombre'] !== false && !empty($marca['nombre'])) {
                 $resultados[] = [
+                    'id' => $marca['nombre_clave'] ?? $marca['nombre'],
+                    'text' => $marca['nombre'],
                     'nombre' => $marca['nombre'],
+                    'nombre_clave' => $marca['nombre_clave'] ?? normalizeMarcaName($marca['nombre']),
                     'imagen' => $marca['imagen'] ?? '/img/no_image.png',
                     'categoria' => $marca['categoria'] ?? 'General'
                 ];
@@ -84,7 +87,10 @@ try {
         // Filtrar valores que sean "false" o vacíos
         if (isset($marca['nombre']) && $marca['nombre'] !== 'false' && $marca['nombre'] !== false && !empty($marca['nombre'])) {
             $resultados[] = [
+                'id' => $marca['nombre_clave'] ?? $marca['nombre'],
+                'text' => $marca['nombre'],
                 'nombre' => $marca['nombre'],
+                'nombre_clave' => $marca['nombre_clave'] ?? normalizeMarcaName($marca['nombre']),
                 'imagen' => $marca['imagen'] ?? '/img/no_image.png',
                 'categoria' => $marca['categoria'] ?? 'General'
             ];
@@ -94,8 +100,9 @@ try {
     // Si no hay resultados en la base de datos, agregar opción para crear nueva marca
     if (empty($resultados)) {
         $resultados[] = [
-            'nombre' => $query,
+            'id' => 'nueva_marca_' . $query,
             'text' => 'Añadir nueva marca: ' . $query,
+            'nombre' => $query,
             'imagen' => '/img/no_image.png',
             'categoria' => 'Nueva marca',
             'is_new' => true
@@ -110,8 +117,9 @@ try {
     // En caso de error, devolver el término de búsqueda como nueva marca
     echo json_encode([
         [
-            'nombre' => $query,
+            'id' => 'nueva_marca_' . $query,
             'text' => 'Añadir nueva marca: ' . $query,
+            'nombre' => $query,
             'imagen' => '/img/no_image.png',
             'categoria' => 'Nueva marca',
             'is_new' => true

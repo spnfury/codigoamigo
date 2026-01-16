@@ -1,4 +1,3 @@
-
 <?php 
 get_header_new($title, $description, $title_social, $description_social, $imagen_social, $links_meta); 
 
@@ -174,18 +173,17 @@ function bloque_marcas_perso($lista_marcas){
     	
     </div>
     
-    <?
-    
+    <?php
+
     }
-    
-    
+
+
     ?>
 	</div> 
 
 </div>
 
 </div>
-                
-<?php 
+                <?php 
 
 get_footer(); ?>

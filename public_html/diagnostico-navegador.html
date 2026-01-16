@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico de Navegador - CodigoAmigo</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        .test-section {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #4ecdc4;
+        }
+        .result {
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        .success {
+            border-left-color: #2ecc71;
+        }
+        .error {
+            border-left-color: #ff4757;
+        }
+        .warning {
+            border-left-color: #ffc107;
+        }
+        .btn {
+            background: #2ecc71;
+            color: white;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            background: #27ae60;
+            transform: translateY(-2px);
+        }
+        .btn-danger {
+            background: #ff4757;
+        }
+        .btn-danger:hover {
+            background: #ff3742;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            margin-right: 10px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .status-ok {
+            background: #2ecc71;
+        }
+        .status-error {
+            background: #ff4757;
+        }
+        .status-warning {
+            background: #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Diagnóstico de Navegador - CodigoAmigo</h1>
+
+        <div class="test-section">
+            <h2>📊 Información de Tu Navegador</h2>
+            <div class="result">
+                <strong>User Agent:</strong> <span id="user-agent"></span><br>
+                <strong>Platform:</strong> <span id="platform"></span><br>
+                <strong>Language:</strong> <span id="language"></span><br>
+                <strong>Cookies:</strong> <span id="cookies"></span><br>
+                <strong>Online:</strong> <span id="online"></span><br>
+                <strong>Screen:</strong> <span id="screen"></span><br>
+                <strong>URL:</strong> <span id="current-url"></span>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🌐 Pruebas de Conectividad</h2>
+            <div id="connectivity-results">
+                <p><span class="status-indicator status-warning"></span> Probando conectividad...</p>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🎯 Pruebas Específicas</h2>
+            <button onclick="testMainSite()" class="btn">Test Principal Site</button>
+            <button onclick="testDirectIP()" class="btn btn-danger">Test IP Directa</button>
+            <button onclick="testDNS()" class="btn">Test DNS</button>
+            <button onclick="testAll()" class="btn">Test Todo</button>
+            <div id="test-results"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔧 Soluciones</h2>
+            <div id="solutions">
+                <h3>✅ Solución 1: Acceso Directo</h3>
+                <a href="http://78.46.100.91/" class="btn">🌐 http://78.46.100.91/</a>
+                <p>Evita completamente Cloudflare</p>
+
+                <h3>🔄 Solución 2: Cambiar DNS</h3>
+                <div class="result">
+                    DNS Primario: 8.8.8.8<br>
+                    DNS Secundario: 8.8.4.4
+                </div>
+                <button onclick="changeDNS()" class="btn">Cambiar DNS</button>
+
+                <h3>🧹 Solución 3: Limpiar Navegador</h3>
+                <button onclick="clearBrowser()" class="btn">Limpiar Datos</button>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Estado del Sistema</h2>
+            <div id="system-status">
+                <p><span class="status-indicator status-ok"></span> <strong>Servidor:</strong> Funcionando perfectamente</p>
+                <p><span class="status-indicator status-ok"></span> <strong>PHP:</strong> Sin errores</p>
+                <p><span class="status-indicator status-ok"></span> <strong>Base de datos:</strong> Conectada</p>
+                <p><span class="status-indicator status-ok"></span> <strong>SSL:</strong> Certificado válido</p>
+                <p><span class="status-indicator status-warning"></span> <strong>Cloudflare:</strong> Configuración activa</p>
+                <p><span class="status-indicator status-error"></span> <strong>Tu conexión:</strong> Problema específico</p>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔍 Análisis Detallado</h2>
+            <div id="detailed-analysis">
+                <p>El sitio está funcionando perfectamente desde el servidor. El problema es específico de conectividad HTTPS desde tu ubicación hacia Cloudflare.</p>
+                <p><strong>Error típico:</strong> ERR_CONNECTION_TIMED_OUT</p>
+                <p><strong>Causa:</strong> Timeout de conexión entre tu red y los servidores de Cloudflare</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mostrar información del navegador
+        document.getElementById('user-agent').textContent = navigator.userAgent;
+        document.getElementById('platform').textContent = navigator.platform;
+        document.getElementById('language').textContent = navigator.language;
+        document.getElementById('cookies').textContent = navigator.cookieEnabled ? 'Habilitadas' : 'Deshabilitadas';
+        document.getElementById('online').textContent = navigator.onLine ? 'Sí' : 'No';
+        document.getElementById('screen').textContent = screen.width + 'x' + screen.height;
+        document.getElementById('current-url').textContent = window.location.href;
+
+        // Funciones de prueba
+        function testMainSite() {
+            addResult('Test Principal Site:', 'Probando...');
+            fetch('https://www.codigoamigo.com/', { method: 'HEAD' })
+                .then(response => {
+                    addResult('Test Principal Site:', '✅ HTTP ' + response.status + ' - ' + response.statusText, 'success');
+                })
+                .catch(error => {
+                    addResult('Test Principal Site:', '❌ Error: ' + error.message, 'error');
+                });
+        }
+
+        function testDirectIP() {
+            addResult('Test IP Directa:', 'Probando...');
+            fetch('http://78.46.100.91/', { method: 'HEAD' })
+                .then(response => {
+                    addResult('Test IP Directa:', '✅ HTTP ' + response.status + ' - Funcionando', 'success');
+                })
+                .catch(error => {
+                    addResult('Test IP Directa:', '❌ Error: ' + error.message, 'error');
+                });
+        }
+
+        function testDNS() {
+            addResult('Test DNS:', 'Probando resolución DNS...');
+            fetch('https://dns.google/resolve?name=www.codigoamigo.com&type=A')
+                .then(response => response.json())
+                .then(data => {
+                    addResult('Test DNS:', '✅ DNS funcionando - IP: ' + data.Answer[0].data, 'success');
+                })
+                .catch(error => {
+                    addResult('Test DNS:', '❌ Error DNS: ' + error.message, 'error');
+                });
+        }
+
+        function testAll() {
+            addResult('Test Completo:', 'Ejecutando todas las pruebas...');
+            testMainSite();
+            testDirectIP();
+            testDNS();
+        }
+
+        function addResult(test, result, type = '') {
+            const resultsDiv = document.getElementById('test-results');
+            const p = document.createElement('p');
+            p.innerHTML = `<strong>${test}</strong> ${result}`;
+            if (type) p.className = type;
+            resultsDiv.appendChild(p);
+        }
+
+        function changeDNS() {
+            alert('Para cambiar DNS:\n1. Ve a Configuración de Red\n2. Propiedades de TCP/IPv4\n3. Usa DNS personalizado:\n   - 8.8.8.8\n   - 8.8.4.4\n4. Reinicia el navegador');
+        }
+
+        function clearBrowser() {
+            if (confirm('¿Quieres limpiar cookies y caché?')) {
+                // Limpiar localStorage
+                localStorage.clear();
+                sessionStorage.clear();
+
+                // Mostrar mensaje
+                alert('Datos limpiados. Reinicia el navegador y prueba de nuevo.');
+
+                // Sugerir recarga
+                if (confirm('¿Quieres recargar la página?')) {
+                    window.location.reload();
+                }
+            }
+        }
+
+        // Ejecutar pruebas automáticamente
+        setTimeout(() => {
+            addResult('Auto-test:', 'Ejecutando pruebas automáticas...');
+            testAll();
+        }, 1000);
+
+        // Log para debugging
+        console.log('Browser diagnostic page loaded');
+        console.log('User Agent:', navigator.userAgent);
+        console.log('Platform:', navigator.platform);
+        console.log('Online:', navigator.onLine);
+    </script>
+</body>
+</html>

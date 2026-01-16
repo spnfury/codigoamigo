@@ -1,0 +1,396 @@
+/* Unified Chollo Card Styles - Premium Design */
+
+:root {
+    --chollo-primary: #E30613;
+    --chollo-primary-hover: #c00510;
+    --chollo-bg: #1E1E1E;
+    --chollo-border: #2a2a2a;
+    --chollo-text-main: #FFFFFF;
+    --chollo-text-muted: #aaaaaa;
+    --chollo-text-dim: #666666;
+    --chollo-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    --chollo-shadow-hover: 0 10px 25px rgba(0, 0, 0, 0.5);
+    --chollo-radius: 12px;
+    --chollo-transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.chollos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+/* In listado pages we might want more density */
+.chollos-grid-3 {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.chollo-card {
+    background: var(--chollo-bg);
+    border-radius: var(--chollo-radius);
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    border: 1px solid var(--chollo-border);
+    transition: var(--chollo-transition);
+}
+
+.chollo-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--chollo-shadow-hover);
+    border-color: var(--chollo-primary);
+}
+
+.chollo-image-link {
+    display: block;
+    position: relative;
+    background: #fff;
+    padding: 0;
+    overflow: hidden;
+}
+
+.chollo-image {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 15px;
+    background: #fff;
+}
+
+.chollo-image img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    transition: var(--chollo-transition);
+}
+
+.chollo-card:hover .chollo-image img {
+    transform: scale(1.05);
+}
+
+.chollo-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: var(--chollo-primary);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-weight: 800;
+    font-size: 0.85em;
+    z-index: 2;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.chollo-badge-hot {
+    background: #ff9800;
+    color: #000;
+}
+
+.chollo-content {
+    padding: 16px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.chollo-voting-wrapper {
+    margin-bottom: 12px;
+}
+
+.chollo-title {
+    font-size: 1.05em;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: var(--chollo-text-main) !important;
+    line-height: 1.4;
+    min-height: 2.8em;
+    max-height: 2.8em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    transition: color 0.2s;
+}
+
+.chollo-title-link {
+    text-decoration: none;
+}
+
+.chollo-title-link:hover .chollo-title {
+    color: var(--chollo-primary);
+}
+
+.chollo-description {
+    font-size: 0.9em;
+    color: var(--chollo-text-muted);
+    margin-bottom: 15px;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    flex-grow: 1;
+}
+
+.chollo-prices {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+}
+
+.chollo-price-discount {
+    font-size: 1.4em;
+    font-weight: 800;
+    color: var(--chollo-primary);
+    letter-spacing: -0.5px;
+}
+
+.chollo-price-original {
+    font-size: 0.9em;
+    color: var(--chollo-text-dim);
+    text-decoration: line-through;
+}
+
+.chollo-meta {
+    margin-bottom: 15px;
+    font-size: 0.82em;
+}
+
+.chollo-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.chollo-meta-item i {
+    color: var(--chollo-primary);
+    width: 14px;
+    text-align: center;
+}
+
+.chollo-clicks {
+    color: var(--chollo-primary);
+    font-weight: 600;
+}
+
+.chollo-date {
+    color: var(--chollo-text-dim);
+}
+
+.chollo-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: auto;
+}
+
+.chollo-button {
+    padding: 10px 5px;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.85em;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: var(--chollo-transition);
+    border: none;
+}
+
+.chollo-button-primary {
+    background: var(--chollo-primary);
+    color: #fff;
+}
+
+.chollo-button-primary:hover {
+    background: var(--chollo-primary-hover);
+}
+
+.chollo-button-secondary {
+    background: #2D2D2D;
+    color: #ddd;
+    border: 1px solid #444;
+}
+
+.chollo-button-secondary:hover {
+    background: #3D3D3D;
+    color: #fff;
+    border-color: #666;
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+    .chollos-grid {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 15px;
+    }
+}
+
+@media (max-width: 600px) {
+    .chollos-grid {
+        grid-template-columns: 1fr;
+        padding: 0 10px;
+        gap: 20px;
+        max-width: 100%;
+    }
+
+    .chollo-card {
+        flex-direction: column;
+        height: auto;
+        border-radius: 12px;
+        margin-bottom: 0;
+    }
+
+    .chollo-image-link {
+        width: 100%;
+        min-width: unset;
+        border-right: none;
+        border-bottom: 1px solid var(--chollo-border);
+    }
+
+    .chollo-image {
+        padding: 20px;
+        aspect-ratio: 16 / 9;
+        height: auto;
+        width: 100%;
+        max-height: 250px;
+    }
+
+    .chollo-content {
+        padding: 18px;
+    }
+
+    .chollo-title {
+        font-size: 1.1em;
+        margin-bottom: 10px;
+        min-height: unset;
+        max-height: 2.8em;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .chollo-description {
+        display: none;
+    }
+
+    .chollo-prices {
+        margin-bottom: 15px;
+        gap: 12px;
+        flex-direction: row;
+        align-items: baseline;
+    }
+
+    .chollo-price-discount {
+        font-size: 1.5em;
+    }
+
+    .chollo-price-original {
+        font-size: 0.95em;
+    }
+
+    .chollo-meta,
+    .chollo-voting-wrapper {
+        display: block;
+        margin-bottom: 12px;
+    }
+
+    .chollo-buttons {
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
+    .chollo-button {
+        padding: 12px 5px;
+        font-size: 0.85em;
+        border-radius: 8px;
+    }
+
+    .chollo-button-secondary {
+        display: flex;
+    }
+
+    .chollo-badge {
+        font-size: 0.85em;
+        padding: 4px 10px;
+        top: 10px;
+        right: 10px;
+    }
+}
+/* Premium Voting Styles */
+.chollo-voting-premium {
+    display: flex;
+    align-items: center;
+    background: #252525;
+    border-radius: 20px;
+    padding: 4px;
+    width: fit-content;
+    border: 1px solid #333;
+    gap: 2px;
+}
+
+.vote-btn-premium {
+    background: transparent;
+    border: none;
+    color: #888;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.9em;
+}
+
+.vote-btn-premium:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.vote-up-premium:hover {
+    color: #ff5252;
+    background: rgba(255, 82, 82, 0.1);
+}
+
+.vote-down-premium:hover {
+    color: #81d4fa;
+    background: rgba(129, 212, 250, 0.1);
+}
+
+.temp-premium {
+    font-weight: 800;
+    font-size: 0.95em;
+    padding: 0 8px;
+    min-width: 40px;
+    text-align: center;
+}
+
+.vote-btn-premium.active.vote-up-premium {
+    color: #ff5252;
+    background: rgba(255, 82, 82, 0.1);
+}
+
+.vote-btn-premium.active.vote-down-premium {
+    color: #81d4fa;
+    background: rgba(129, 212, 250, 0.1);
+}

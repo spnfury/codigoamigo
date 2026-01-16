@@ -1,0 +1,615 @@
+/* Estilos para diseño estilo Chollometro */
+
+/* Sistema de Tabs */
+.chollometro-tabs-container {
+    background: #f8f9fa;
+    padding: 20px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.chollometro-tabs {
+    display: flex;
+    gap: 0;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.tab-button {
+    flex: 1;
+    padding: 15px 20px;
+    background: white;
+    border: none;
+    border-right: 1px solid #e9ecef;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-weight: 500;
+    color: #6c757d;
+    position: relative;
+}
+
+.tab-button:last-child {
+    border-right: none;
+}
+
+.tab-button:hover {
+    background: #f8f9fa;
+    color: #495057;
+}
+
+.tab-button.active {
+    background: #E30613;
+    color: white;
+}
+
+.tab-button i {
+    font-size: 16px;
+}
+
+.tab-count {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.tab-button.active .tab-count {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Contenido de los tabs */
+.chollometro-content {
+    background: #f8f9fa;
+    min-height: 400px;
+    padding: 30px 0;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Sidebar de filtros */
+.filters-sidebar {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.filters-sidebar h4 {
+    color: #495057;
+    margin-bottom: 15px;
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.filter-option {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.filter-option:hover {
+    background: #f8f9fa;
+}
+
+.filter-option input[type="radio"] {
+    margin-right: 10px;
+    accent-color: #E30613;
+}
+
+.filter-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #495057;
+}
+
+.filter-label i {
+    font-size: 14px;
+    width: 16px;
+    text-align: center;
+}
+
+/* Header de listas de códigos */
+.codes-list-header {
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.codes-list-header h3 {
+    color: #495057;
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.codes-list-header p {
+    color: #6c757d;
+    font-size: 14px;
+    margin: 0;
+}
+
+/* Contenedor de códigos */
+.codes-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+/* Tarjetas de código estilo Chollometro */
+.chollometro-code-card {
+    background: white;
+    border-radius: 12px;
+    padding: 12px;
+    /* Compact padding */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    position: relative;
+    border: 1px solid #e9ecef;
+}
+
+.chollometro-code-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.chollometro-code-card.featured {
+    border-color: #E30613;
+    background: linear-gradient(135deg, #fff 0%, #fff8f5 100%);
+}
+
+.featured-badge {
+    position: absolute;
+    top: -8px;
+    right: 20px;
+    background: #E30613;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 2px 4px rgba(227, 6, 19, 0.3);
+}
+
+.featured-badge i {
+    font-size: 10px;
+}
+
+/* Header de la tarjeta */
+.code-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    /* Reduced gap */
+    margin-bottom: 8px;
+    /* Reduced margin */
+}
+
+.brand-image-container {
+    flex-shrink: 0;
+    width: 48px;
+    /* Smaller image */
+    height: 48px;
+    /* Smaller image */
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f8f9fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.brand-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.brand-placeholder {
+    color: #6c757d;
+    font-size: 24px;
+}
+
+.brand-link {
+    display: block;
+    width: 100%;
+    height: 100%;
+    text-decoration: none;
+}
+
+.code-main-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.brand-name {
+    margin: 0 0 4px 0;
+    /* Reduced margin */
+    font-size: 16px;
+    /* Smaller font */
+    font-weight: 600;
+    color: #495057;
+}
+
+.brand-name a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.brand-name a:hover {
+    color: #E30613;
+}
+
+.code-description {
+    margin: 0 0 8px 0;
+    /* Reduced margin */
+    color: #6c757d;
+    font-size: 13px;
+    /* Smaller description */
+    line-height: 1.4;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.user-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.user-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.user-placeholder {
+    color: #6c757d;
+    font-size: 12px;
+}
+
+.user-iniciales {
+    font-size: 10px;
+    font-weight: 600;
+    color: #495057;
+}
+
+.user-details {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.username {
+    font-size: 12px;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.username-link {
+    text-decoration: none;
+    color: inherit;
+    transition: color 0.3s ease;
+}
+
+.username-link:hover {
+    color: #E30613;
+}
+
+.username-link .username {
+    transition: color 0.3s ease;
+}
+
+.username-link:hover .username {
+    color: #E30613;
+}
+
+.premium-badge {
+    background: #E30613;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+/* Beneficio destacado */
+.code-benefit {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    text-align: center;
+}
+
+.benefit-amount {
+    background: #E30613;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(227, 6, 19, 0.3);
+}
+
+.benefit-amount .amount {
+    font-size: 16px;
+    display: block;
+}
+
+.benefit-amount .currency {
+    font-size: 12px;
+    opacity: 0.9;
+}
+
+/* Footer de la tarjeta */
+.code-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    /* Reduced margin */
+    padding-top: 8px;
+    /* Reduced padding */
+    border-top: 1px solid #e9ecef;
+}
+
+.code-stats {
+    display: flex;
+    gap: 15px;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #6c757d;
+    font-size: 12px;
+}
+
+.stat-item i {
+    font-size: 12px;
+}
+
+.code-action {
+    flex-shrink: 0;
+}
+
+.btn-view-code {
+    background: #E30613;
+    color: white;
+    border: none;
+    padding: 6px 14px;
+    /* Broader but thinner button */
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-view-code:hover {
+    background: #C40510;
+    transform: translateY(-1px);
+}
+
+.btn-view-code i {
+    font-size: 12px;
+}
+
+/* Mensaje cuando no hay códigos */
+.no-codes-message {
+    text-align: center;
+    padding: 60px 20px;
+    color: #6c757d;
+}
+
+.no-codes-message i {
+    font-size: 48px;
+    margin-bottom: 20px;
+    opacity: 0.5;
+}
+
+.no-codes-message h4 {
+    margin-bottom: 10px;
+    color: #495057;
+}
+
+.no-codes-message p {
+    margin: 0;
+    font-size: 14px;
+}
+
+/* Filtros móviles */
+.chollometro-mobile-filters {
+    display: none;
+    background: white;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.mobile-filter-toggle {
+    padding: 15px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-weight: 500;
+    color: #495057;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.mobile-filter-content {
+    padding: 20px;
+    display: none;
+}
+
+.mobile-filter-content.active {
+    display: block;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .chollometro-tabs {
+        flex-direction: column;
+    }
+
+    .tab-button {
+        border-right: none;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .tab-button:last-child {
+        border-bottom: none;
+    }
+
+    .filters-sidebar {
+        display: none;
+    }
+
+    .chollometro-mobile-filters {
+        display: block;
+    }
+
+    .chollometro-content .col-md-9 {
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+
+    .code-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .brand-image-container {
+        width: 50px;
+        height: 50px;
+    }
+
+    .code-benefit {
+        position: static;
+        margin-top: 10px;
+        align-self: flex-end;
+    }
+
+    .code-card-footer {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+
+    .code-stats {
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .btn-view-code {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .chollometro-code-card {
+        padding: 15px;
+    }
+
+    .codes-list-header h3 {
+        font-size: 20px;
+    }
+
+    .brand-name {
+        font-size: 16px;
+    }
+
+    .code-description {
+        font-size: 13px;
+    }
+
+    .stat-item {
+        font-size: 11px;
+    }
+
+    .btn-view-code {
+        padding: 10px 16px;
+        font-size: 13px;
+    }
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.chollometro-code-card {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Estados de carga */
+.loading-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}

@@ -161,4 +161,156 @@ function get_search_statistics() {
         );
     }
 }
+
+function get_related_searches($current_term, $limit = 8) {
+    // Obtener búsquedas relacionadas basadas en:
+    // 1. Búsquedas populares (excluyendo la actual)
+    // 2. Marcas relacionadas con el término
+    try {
+        $collection = getCollectionLogs();
+        $related_searches = array();
+        
+        // Obtener términos populares excluyendo el actual
+        $pipeline = array(
+            array('$match' => array(
+                'type' => 'search_term',
+                'timestamp' => array('$gte' => time() - (30 * 24 * 60 * 60)),
+                'term' => array('$ne' => strtolower(trim($current_term)))
+            )),
+            array('$group' => array(
+                '_id' => '$term',
+                'count' => array('$sum' => 1)
+            )),
+            array('$sort' => array('count' => -1)),
+            array('$limit' => $limit)
+        );
+        
+        $popular_terms = $collection->aggregate($pipeline)->toArray();
+        
+        foreach ($popular_terms as $term) {
+            if (isset($term['_id']) && !empty($term['_id'])) {
+                $related_searches[] = array(
+                    'term' => $term['_id'],
+                    'count' => $term['count']
+                );
+            }
+        }
+        
+        // Si no hay suficientes, buscar marcas relacionadas
+        if (count($related_searches) < $limit) {
+            try {
+                $collection_marcas = getCollectionMarcas();
+                $regex = new MongoDB\BSON\Regex($current_term, 'i');
+                
+                $marcas = $collection_marcas->find(
+                    array(
+                        'estado' => 0,
+                        '$or' => array(
+                            array('nombre' => $regex),
+                            array('categoria' => $regex)
+                        )
+                    ),
+                    array(
+                        'limit' => $limit - count($related_searches),
+                        'sort' => array('nombre' => 1)
+                    )
+                )->toArray();
+                
+                foreach ($marcas as $marca) {
+                    $marca_nombre = strtolower(trim($marca['nombre'] ?? ''));
+                    if (!empty($marca_nombre) && $marca_nombre !== strtolower(trim($current_term))) {
+                        // Verificar que no esté ya en la lista
+                        $exists = false;
+                        foreach ($related_searches as $existing) {
+                            if (strtolower($existing['term']) === $marca_nombre) {
+                                $exists = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!$exists) {
+                            $related_searches[] = array(
+                                'term' => $marca['nombre'],
+                                'count' => 0 // No tiene contador de búsquedas
+                            );
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                error_log("Error obteniendo marcas relacionadas: " . $e->getMessage());
+            }
+        }
+        
+        return $related_searches;
+        
+    } catch (Exception $e) {
+        error_log("Error obteniendo búsquedas relacionadas: " . $e->getMessage());
+        return array();
+    }
+}
+
+function get_popular_searches_by_period($period = 'today', $limit = 8) {
+    // Obtener búsquedas populares por período específico
+    // $period puede ser: 'today', 'week', 'month'
+    try {
+        $collection = getCollectionLogs();
+        
+        // Determinar el filtro de tiempo según el período
+        $time_filter = array();
+        switch ($period) {
+            case 'today':
+                $time_filter = array('day' => date('Y-m-d'));
+                break;
+            case 'week':
+                $time_filter = array('week' => date('Y-W'));
+                break;
+            case 'month':
+                $time_filter = array('month' => date('Y-m'));
+                break;
+            default:
+                $time_filter = array('timestamp' => array('$gte' => time() - (30 * 24 * 60 * 60)));
+        }
+        
+        // Pipeline de agregación
+        $pipeline = array(
+            array('$match' => array_merge(
+                array('type' => 'search_term'),
+                $time_filter
+            )),
+            array('$group' => array(
+                '_id' => '$term',
+                'count' => array('$sum' => 1)
+            )),
+            array('$sort' => array('count' => -1)),
+            array('$limit' => $limit)
+        );
+        
+        $popular_terms = $collection->aggregate($pipeline)->toArray();
+        
+        $results = array();
+        foreach ($popular_terms as $term) {
+            if (isset($term['_id']) && !empty($term['_id'])) {
+                $results[] = array(
+                    'term' => $term['_id'],
+                    'count' => $term['count']
+                );
+            }
+        }
+        
+        return $results;
+        
+    } catch (Exception $e) {
+        error_log("Error obteniendo búsquedas populares por período: " . $e->getMessage());
+        return array();
+    }
+}
+
+function get_popular_searches_all_periods($limit_per_period = 8) {
+    // Obtener búsquedas populares para todos los períodos
+    return array(
+        'today' => get_popular_searches_by_period('today', $limit_per_period),
+        'week' => get_popular_searches_by_period('week', $limit_per_period),
+        'month' => get_popular_searches_by_period('month', $limit_per_period)
+    );
+}
 ?>

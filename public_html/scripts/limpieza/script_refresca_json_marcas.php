@@ -68,12 +68,35 @@ foreach ( $array_codigos as $id => $marca )
     //SOLO PONGO LAS MARCAS CON MAS DE 1 CODIGO
     if($num_codes>=1){
         
+        // Procesar URL de imagen: convertir CDN a URL directa del servidor
+        $imagen = $marca["imagen"] ?? '';
+        if (!empty($imagen) && is_string($imagen)) {
+            // Convertir URLs de cdn.codigoamigo.com a URLs directas del servidor
+            if (strpos($imagen, 'cdn.codigoamigo.com') !== false) {
+                // Extraer el path de la URL del CDN
+                $path = parse_url($imagen, PHP_URL_PATH);
+                if ($path) {
+                    // Convertir a URL directa del servidor
+                    // Si es panel_marcas, necesita /img/ antes
+                    if (strpos($path, '/panel_marcas/') !== false) {
+                        $imagen = 'https://www.codigoamigo.com/img' . $path;
+                    } else {
+                        $imagen = 'https://www.codigoamigo.com' . $path;
+                    }
+                }
+            }
+            // Convertir http a https
+            if (strpos($imagen, 'http://') !== false) {
+                $imagen = str_replace('http://', 'https://', $imagen);
+            }
+        }
+        
         $elemento = array(
             'nombre' => $marca["nombre"],
             'nombre_clave' => $marca["nombre_clave"],
             'categoria' => $marca["categoria"],
             'categoria_clave' => $marca["categoria_clave"],
-            'imagen' => $marca["imagen"],
+            'imagen' => $imagen,
             'codes' => $num_codes,
             'url' => "https://www.codigoamigo.com/de-".$marca["nombre_clave"]
         );

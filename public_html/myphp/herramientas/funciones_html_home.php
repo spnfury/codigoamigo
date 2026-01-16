@@ -147,7 +147,7 @@ function bloque_info_home() { ?>
 
             ?><div class="panel panel-default" style="min-height:230px;">
                 		<div class="panel-body text-left">
-                			<a title="Códigos amigo de <?php echo $marca["nombre"]; ?>" href="<?php echo link_marca($marca["nombre_clave"]); ?>">
+                			<a title="Códigos descuento <?php echo htmlspecialchars($marca["nombre"]); ?>" href="<?php echo link_marca($marca["nombre_clave"]); ?>">
                 				<div class="pre_div_img"><img class="lazyload" src="data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==" data-src="<?php echo $marca["imagen"]; ?>" alt="Código amigo de <?php echo $marca["nombre"]; ?>"></div>
                 				<div class="pre_p">
                 				<h2><?php echo $marca["nombre"]; ?></h2>
@@ -196,10 +196,8 @@ function bloque_info_home() { ?>
     
             $marca["imagen"] = str_replace("http://","https://",$marca["imagen"]);
              
-            $num_codes = getNumCodes('marca', $marca["nombre_clave"], null);
-            if ($num_codes === null) {
-                $num_codes = 0;
-            }
+            // Usar el número de códigos que ya viene calculado en getMarcas
+            $num_codes = $marca["numero_codigos"] ?? 0;
             
             
             /* PATROCINADOS */
@@ -241,8 +239,8 @@ function bloque_info_home() { ?>
             
         }
     
-        array_sort_by($array_marcas, 'codes', $order= SORT_DESC); // Ordenamos array por numero de codes
-        $array_chunck= array_chunk($array_marcas, $num_marcas); // Truncamos array a partir del elemento 12
+        // Las marcas ya vienen ordenadas por número de códigos desde getMarcas
+        $array_chunck= array_chunk($array_marcas, $num_marcas); // Truncamos array a partir del elemento especificado
         $arrayfinal = isset($array_chunck[0]) ? $array_chunck[0] : array();
     ?>
     
@@ -253,7 +251,7 @@ function bloque_info_home() { ?>
                     <div class="panel panel-default">
                         <div class="panel-body text-center">
                             <a href="<?php echo link_marca($marca["nombre_clave"]); ?>" 
-                               title="Códigos amigo de <?php echo htmlspecialchars($marca["nombre"]); ?>">
+                               title="Códigos descuento <?php echo htmlspecialchars($marca["nombre"]); ?>">
                                 <img class="lazyload" 
                                      src="data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==" 
                                      data-src="<?php echo htmlspecialchars($marca["imagen"]); ?>" 

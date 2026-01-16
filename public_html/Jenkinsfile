@@ -1,0 +1,24 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Generate Sitemaps') {
+            steps {
+                script {
+                    echo 'Starting Sitemap Generation...'
+                    // Execute the PHP script to regenerate sitemaps
+                    sh 'php /home/admin/web/codigoamigo.com/public_html/cron/generar_sitemap_chollos.php'
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo 'Sitemaps generated successfully!'
+        }
+        failure {
+            echo 'Failed to generate sitemaps.'
+        }
+    }
+}

@@ -1,5 +1,5 @@
 <?php 
-    get_header_new($title, $description, $title_social, $description_social, $imagen_social); 
+    get_header_modern($title, $description, $title_social, $description_social, $imagen_social); 
     
     $link_usuario = enlace_usuario($_SESSION["username"], $_SESSION["user_id"]);
 
@@ -143,8 +143,3 @@
      });
 
 </script>
-           	
-<?php get_footer(); ?>
-
-
-}

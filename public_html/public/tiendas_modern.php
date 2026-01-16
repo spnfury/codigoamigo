@@ -133,7 +133,7 @@ echo '
 }
 
 .store-button:hover {
-    background-color: #E55A2B;
+    background-color: #C40510;
 }
 
 @media (max-width: 768px) {

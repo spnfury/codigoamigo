@@ -130,9 +130,59 @@ function get_share_url($platform, $url, $title = '') {
  * Verifica si el usuario puede votar
  */
 function can_user_vote($user_id, $codigo_id) {
-    // Aquí se implementaría la lógica para verificar si el usuario ya votó
-    // Por ahora, siempre retorna true
-    return true;
+    if (empty($user_id) || empty($codigo_id)) {
+        return false;
+    }
+
+    try {
+        // Incluir funciones de código si no están disponibles
+        if (!function_exists('getCollectionVotos')) {
+            include_once __DIR__ . '/../myphp/funciones_codigo.php';
+        }
+
+        $collection_votos = getCollectionVotos();
+        
+        // Verificar si el usuario ya votó este código
+        $voto_existente = $collection_votos->findOne([
+            'usuario_id' => $user_id,
+            'codigo_id' => $codigo_id
+        ]);
+
+        // Si no existe voto, puede votar
+        return $voto_existente === null;
+    } catch (Exception $e) {
+        // En caso de error, permitir votar (fallback)
+        if (function_exists('log_warning')) {
+            log_warning("Error verificando voto", ['error' => $e->getMessage()]);
+        }
+        return true;
+    }
+}
+
+/**
+ * Obtiene el tipo de voto del usuario para un código
+ */
+function get_user_vote_type($user_id, $codigo_id) {
+    if (empty($user_id) || empty($codigo_id)) {
+        return null;
+    }
+
+    try {
+        if (!function_exists('getCollectionVotos')) {
+            include_once __DIR__ . '/../myphp/funciones_codigo.php';
+        }
+
+        $collection_votos = getCollectionVotos();
+        
+        $voto = $collection_votos->findOne([
+            'usuario_id' => $user_id,
+            'codigo_id' => $codigo_id
+        ]);
+
+        return $voto ? ($voto['tipo_voto'] ?? null) : null;
+    } catch (Exception $e) {
+        return null;
+    }
 }
 
 /**
@@ -213,7 +263,7 @@ function get_primary_button_text($item) {
  * Obtiene las marcas relacionadas
  */
 function get_related_brands($marca, $limit = 6) {
-    if (!$marca['categoria_clave']) {
+    if (!$marca || !isset($marca['categoria_clave']) || !$marca['categoria_clave']) {
         return [];
     }
     
@@ -221,7 +271,7 @@ function get_related_brands($marca, $limit = 6) {
     
     // Filtrar la marca actual
     return array_filter($marcas_relacionadas, function($marca_rel) use ($marca) {
-        return $marca_rel['nombre_clave'] !== $marca['nombre_clave'];
+        return isset($marca_rel['nombre_clave']) && isset($marca['nombre_clave']) && $marca_rel['nombre_clave'] !== $marca['nombre_clave'];
     });
 }
 

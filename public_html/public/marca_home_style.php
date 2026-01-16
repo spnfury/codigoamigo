@@ -4,6 +4,9 @@
  * Basada en main.php pero mostrando solo información de la marca específica
  */
 
+// Incluir funciones necesarias
+require_once __DIR__ . '/../myphp/funciones_modern.php';
+
 // Inicializar detector de móviles si no está definido
 if (!isset($detect)) {
     $detect = new Mobile_Detect();
@@ -59,7 +62,7 @@ $descripcion_marca = $marca_info['descripcion'] ?? '';
         <div class="container">
             <div class="col-md-12 columns small-12 slider">
                 <div class="title">
-                    <h2>¡Destacados!</h2>
+                    <h2>¡Destacados home!</h2>
                 </div>
 
                 <div class="destacado_div">

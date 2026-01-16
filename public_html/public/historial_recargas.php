@@ -69,7 +69,7 @@ $total_pages = ceil($total_transacciones / $limit);
 $estadisticas = [
     'total_recargas' => $collection_transacciones->countDocuments([
         'usuario_id' => $user_id,
-        'tipo' => ['$in' => ['recarga', 'recarga_admin']],
+        'tipo' => ['$in' => ['recarga', 'recarga_admin', 'referido']],
         'cantidad' => ['$gt' => 0]
     ]),
     'total_gastos' => $collection_transacciones->countDocuments([
@@ -85,7 +85,7 @@ $estadisticas = [
 $pipeline_ingresos = [
     ['$match' => [
         'usuario_id' => $user_id,
-        'tipo' => ['$in' => ['recarga', 'recarga_admin']],
+        'tipo' => ['$in' => ['recarga', 'recarga_admin', 'referido']],
         'cantidad' => ['$gt' => 0]
     ]],
     ['$group' => ['_id' => null, 'total' => ['$sum' => '$cantidad']]]
@@ -110,6 +110,7 @@ function formatearTipoTransaccion($tipo) {
     $tipos = [
         'recarga' => 'Recarga de Saldo',
         'recarga_admin' => 'Recarga Administrativa',
+        'referido' => 'Recompensa por Referido',
         'destacado' => 'Destacado de Código',
         'destacado_splash' => 'Destacado Masivo',
         'patrocinado' => 'Patrocinio',
@@ -123,6 +124,7 @@ function obtenerIconoTipo($tipo) {
     $iconos = [
         'recarga' => 'fas fa-plus-circle text-success',
         'recarga_admin' => 'fas fa-gift text-success',
+        'referido' => 'fas fa-user-plus text-success',
         'destacado' => 'fas fa-star text-warning',
         'destacado_splash' => 'fas fa-rocket text-warning',
         'patrocinado' => 'fas fa-bullhorn text-info',

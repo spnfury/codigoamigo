@@ -92,36 +92,41 @@
 
     function uploadFotoUsuario ($file) {
 
-        include_once($_SERVER["DOCUMENT_ROOT"]."/inc/resize_class.php");
-        $img = new img($add);
-
-
         $msg = "";
         $uploadedfileload = "true";
+        
+        // Validar tamaño
         if (($file["uploadedfile"]['size']) > 2000000) {
             $uploadedfile_size = $file['uploadedfile']['size'];
             $msg = "Solo es posible subir fotos menores de 2MB";
             $uploadedfileload = "false";
         }
+        
+        // Validar tipo de archivo
         if (!($file["uploadedfile"]['type'] =="image/jpeg" OR $file["uploadedfile"]['type'] =="image/gif" OR $file["uploadedfile"]['type'] =="image/png")) {
             $msg = "Solo es posible subir archivos que sean imágenes.";
             $uploadedfileload = "false";
         }
-        $file_name = $file["uploadedfile"]['name'];
-        $add = $_SERVER['DOCUMENT_ROOT']."/uploads/$file_name";
-
+        
         if($uploadedfileload == "true") {
-            if(move_uploaded_file ($file["uploadedfile"]['tmp_name'], $add)) {
+            // Generar nombre único para evitar conflictos
+            $file_name = $file["uploadedfile"]['name'];
+            $file_ext = pathinfo($file_name, PATHINFO_EXTENSION);
+            $unique_name = uniqid() . '_' . time() . '.' . $file_ext;
+            $add = $_SERVER['DOCUMENT_ROOT']."/uploads/$unique_name";
 
+            if(move_uploaded_file ($file["uploadedfile"]['tmp_name'], $add)) {
+                include_once($_SERVER["DOCUMENT_ROOT"]."/inc/resize_class.php");
                 $img = new img($add);
                 $img->resize(302,404,true);
                 $img->store($add,50);
 
                 $msg = "Foto de perfil cambiada correctamente";
-                //echo " Ha sido subido satisfactoriamente";
-                $nueva_url_foto = "https://www.codigoamigo.com/uploads/$file_name";
+                $nueva_url_foto = "https://www.codigoamigo.com/uploads/$unique_name";
                 cambiarFotoUsuario($_SESSION["mail"], $nueva_url_foto);
-            } else { $msg = "Error al subir el archivo"; }
+            } else { 
+                $msg = "Error al subir el archivo"; 
+            }
         }
         return $msg;
     }
@@ -187,11 +192,11 @@
                     <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
                         <img src="https://www.codigoamigo.com/img/logo_codigoamigo.png" alt="Código Amigo" style="max-width: 200px; margin-bottom: 20px;"><br><br>
                         
-                        <h2 style="color: #ff6b35;">¡Bienvenido a Código Amigo!</h2>
+                        <h2 style="color: #E30613;">¡Bienvenido a Código Amigo!</h2>
                         
                         <p>Estimado usuario <strong>' . htmlspecialchars($nombre) . '</strong>:</p>
                         
-                        <p>Gracias por registrarte en nuestra web <a href="https://www.codigoamigo.com" style="color: #ff6b35;">Código Amigo</a>. 
+                        <p>Gracias por registrarte en nuestra web <a href="https://www.codigoamigo.com" style="color: #E30613;">Código Amigo</a>. 
                         Estamos encantados de tenerte como parte de nuestra comunidad.</p>
                         
                         <p>Para activar tu cuenta y comenzar a disfrutar de todos nuestros códigos descuento, 
@@ -199,7 +204,7 @@
                         
                         <div style="text-align: center; margin: 30px 0;">
                             <a href="https://www.codigoamigo.com/bienvenido_de_nuevo?codigo=' . $email_encriptado . '" 
-                               style="background-color: #ff6b35; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                               style="background-color: #E30613; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
                                 Activar mi cuenta
                             </a>
                         </div>
@@ -217,7 +222,7 @@
                         </ul>
                         
                         <p>Si tienes cualquier duda, pregunta o sugerencia, no dudes en contactarnos en 
-                        <a href="mailto:info@codigoamigo.com" style="color: #ff6b35;">info@codigoamigo.com</a></p>
+                        <a href="mailto:info@codigoamigo.com" style="color: #E30613;">info@codigoamigo.com</a></p>
                         
                         <p>¡Esperamos verte pronto en Código Amigo!</p>
                         
@@ -387,8 +392,37 @@ function optimizeUrlPath($texto , $space=false,$espacios='',$junto=''){
 
 function getListMarcaSpecial() {
     
-    // Obtener la lista de marcas revisadas
-    $lista_marcas = getMarcasRevisadas(10);
+    // Obtener la lista de marcas ordenadas por número de códigos
+    $lista_marcas = getMarcas(50); // Obtener más marcas para tener mejor selección
+    
+    // Lógica para fijar marcas específicas (como ING)
+    $pinned_brands = ['ing']; // Añadir aquí las marcas que queremos forzar
+    $existing_keys = [];
+    
+    if (!empty($lista_marcas)) {
+        foreach ($lista_marcas as $m) {
+            if (isset($m['nombre_clave'])) {
+                $existing_keys[$m['nombre_clave']] = true;
+            }
+        }
+    }
+    
+    // Intentar buscar las marcas fijadas si no están en la lista
+    foreach ($pinned_brands as $pinned) {
+        if (!isset($existing_keys[$pinned]) && function_exists('getObjectMarca')) {
+            $brand_obj = getObjectMarca('nombre_clave', $pinned);
+            if ($brand_obj) {
+                // Si getObjectMarca devuelve un objeto o array, nos aseguramos que tenga numero_codigos
+                // Si no tiene el count, lo seteamos bajo para que aparezca pero no rompa nada, 
+                // o intentamos contarlos si fuera crítico, pero asumimos que queremos mostrarla.
+                if (!isset($brand_obj['numero_codigos'])) {
+                    $brand_obj['numero_codigos'] = 1; // Asumimos al menos 1 para que pase el filtro
+                }
+                $lista_marcas[] = $brand_obj;
+            }
+        }
+    }
+    
     $array_marcas = array();
     
     if (empty($lista_marcas)) {
@@ -401,14 +435,15 @@ function getListMarcaSpecial() {
         $url_remover = ['http://www.codigoamigo.com', 'https://www.codigoamigo.com', 'https://codigoamigo.com'];
         $marca["imagen"] = str_replace($url_remover, '', $marca["imagen"]);
         
-        // Obtener el número de códigos asociados a la marca
-        $num_codes = getNumCodes('marca', $marca["nombre_clave"], null);
+        // Usar el número de códigos que ya viene calculado en getMarcas()
+        $num_codes = $marca["numero_codigos"] ?? 0;
         
-        // Verificar que $num_codes sea un valor válido
-        if ($num_codes === null) {
-            $num_codes = 0; // Asignar un valor por defecto si no se obtiene el número de códigos
+        // Si es una marca fijada y tiene 0 códigos, le ponemos al menos 1 para que se muestre si queremos forzarlo
+        if (in_array($marca["nombre_clave"], $pinned_brands) && $num_codes == 0) {
+           // Opcional: descomentar si queremos mostrar marcas vacías fijadas
+           // $num_codes = 1; 
         }
-        
+
         // Crear el array de la marca
         $elemento = array(
             'nombre' => $marca["nombre"],
@@ -422,7 +457,19 @@ function getListMarcaSpecial() {
     }
     
     // Ordenar el array por el número de códigos de forma descendente
-    //array_sort_by($array_marcas, 'codes', SORT_DESC);
+    // Modificado para priorizar marcas pinned si se desea, por ahora mantenemos orden natural por códigos
+    usort($array_marcas, function($a, $b) use ($pinned_brands) {
+        // Si ambos están en pinned o ninguno, ordenar por códigos
+        // Si queremos forzar pinned arriba descomentar lo siguiente:
+        /*
+        $a_pinned = in_array($a['nombre_clave'], $pinned_brands);
+        $b_pinned = in_array($b['nombre_clave'], $pinned_brands);
+        if ($a_pinned && !$b_pinned) return -1;
+        if (!$a_pinned && $b_pinned) return 1;
+        */
+        
+        return $b['codes'] - $a['codes'];
+    });
     
     
     // Dividir el array según el tipo de dispositivo
