@@ -8,9 +8,9 @@ $imagen_social = isset($imagen_social) ? $imagen_social : "";
 $links_meta = isset($links_meta) ? $links_meta : '';
 
 require_once __DIR__ . '/../../inc/sentry_bootstrap.php';
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 
 global $author_web, $img_compartir_pagina, $ubicacion_actual, $force_css, $name_page;
 global $provincia, $data_usuario, $detect, $author_web, $datos_usuario, $que_es;
@@ -91,10 +91,10 @@ if (!isset($panel)) {
         <!-- CSS -->
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/css/bootstrap.min.css">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-        <link rel="stylesheet" href="/css/design-fixed.css?v=<?php echo file_exists(__DIR__ . '/../css/design-fixed.css') ? filemtime(__DIR__ . '/../css/design-fixed.css') : time(); ?>">
-        <link rel="stylesheet" href="/css/modern-design.css?v=<?php echo file_exists(__DIR__ . '/../css/modern-design.css') ? filemtime(__DIR__ . '/../css/modern-design.css') : time(); ?>">
-        <link rel="stylesheet" href="/css/mobile-header-new.css?v=<?php echo file_exists(__DIR__ . '/../css/mobile-header-new.css') ? filemtime(__DIR__ . '/../css/mobile-header-new.css') : time(); ?>">
-        <link rel="stylesheet" href="/css/mobile-new-design.css?v=<?php echo file_exists(__DIR__ . '/../css/mobile-new-design.css') ? filemtime(__DIR__ . '/../css/mobile-new-design.css') : time(); ?>">
+        <link rel="stylesheet" href="/css/design-fixed.css?v=<?php echo time(); ?>">
+        <link rel="stylesheet" href="/css/modern-design.css?v=<?php echo time(); ?>">
+        <link rel="stylesheet" href="/css/mobile-header-new.css?v=<?php echo time(); ?>">
+        <link rel="stylesheet" href="/css/mobile-new-design.css?v=<?php echo time(); ?>">
         
         <?php if($force_css==1){ ?>
             <!-- CSS adicional solo si es necesario -->
@@ -153,44 +153,53 @@ if (!isset($panel)) {
         
         <!-- CSS para header fijo -->
         <style>
-        /* HEADER FIJO - DESKTOP Y MÓVIL */
-        .header-modern.desktop-only,
-        .header-modern.mobile-only {
+        /* HEADER FIJO - SOLO DESKTOP */
+        .header-modern.desktop-only {
             position: fixed !important;
             top: 0;
             left: 0;
             right: 0;
             z-index: 9999;
-            width: auto !important; /* Force auto so left/right works */
+            width: auto !important;
             transition: all 0.3s ease;
         }
         
-        /* Ajustar el body para compensar el header fijo */
+        /* Móvil: header NO fijo (se mueve con el scroll para ganar espacio) */
+        .header-modern.mobile-only {
+            position: relative !important;
+            z-index: 1000;
+            width: auto !important;
+        }
+        
+        /* Ajustar el body para compensar el header fijo solo en desktop */
         body {
-            margin-top: 80px !important;
+            margin-top: 0 !important;
         }
 
-        /* Asegurar que el contenedor use el 100% del ancho disponible */
         /* Asegurar que el contenedor use el 100% del ancho disponible */
         .header-container {
             width: 100% !important;
             min-width: 100% !important;
             max-width: none !important;
-            padding: 0 20px !important; /* Padding seguro */
+            padding: 0 20px !important;
             margin: 0 !important;
             box-sizing: border-box !important;
             display: flex !important;
             justify-content: space-between !important;
         }
         
-        /* Header móvil */
+        /* Header móvil - NO fijo */
         @media (max-width: 768px) {
             body {
-                margin-top: 60px !important;
+                margin-top: 0 !important;
+            }
+            
+            .mobile-header-top {
+                position: relative !important;
             }
             
             .header-modern.mobile-only {
-                height: 60px;
+                position: relative !important;
                 display: block !important;
             }
             
@@ -199,7 +208,7 @@ if (!isset($panel)) {
             }
         }
         
-        /* Header desktop */
+        /* Header desktop - FIJO */
         @media (min-width: 769px) {
             body {
                 margin-top: 80px !important;
@@ -262,10 +271,10 @@ if (!isset($panel)) {
             document.addEventListener('DOMContentLoaded', function() {
                 // Verificar que jQuery se cargó correctamente
                 if (typeof jQuery === 'undefined') {
-                    // jQuery no se cargó correctamente
-                } else {
-                    // jQuery cargado correctamente
+                    // jQuery no se cargó correctamente - skip further checks
+                    return;
                 }
+                // jQuery cargado correctamente
 
                 // Verificar que EasyAutoComplete se cargó correctamente
                 if (typeof jQuery.fn.easyAutocomplete === 'undefined') {
@@ -319,11 +328,11 @@ if (!isset($panel)) {
             }
             
             .easy-autocomplete-container {
-                background: white;
+                /* background: white;  REMOVED TO FIX CONFLICT */
                 border-radius: 8px;
                 box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
                 overflow: hidden;
-                margin-top: 5px;
+                /* margin-top: 5px; REMOVED TO FIX SPACING */
             }
             
             .easy-autocomplete-container ul {
@@ -342,7 +351,7 @@ if (!isset($panel)) {
             }
             
             .easy-autocomplete-container ul li:hover {
-                background: #f8f9fa;
+                background: rgba(0,0,0,0.05);
             }
             
             .easy-autocomplete-container ul li.selected {
@@ -445,81 +454,80 @@ if (!isset($panel)) {
             gtag('config', 'G-DVE5FZ2SZY');
         </script>
         <script src="/js/notificaciones.js?v=<?php echo file_exists(__DIR__ . '/../js/notificaciones.js') ? filemtime(__DIR__ . '/../js/notificaciones.js') : time(); ?>" defer></script>
+        <style>
+            /* DEFINITIVE FIX FOR SEARCH RESULTS LAYOUT */
+            .easy-autocomplete-container ul li > div {
+                display: flex !important;
+                flex-direction: row !important;
+                align-items: center !important;
+                justify-content: flex-start !important;
+                width: 100% !important;
+                word-break: normal !important;
+                white-space: nowrap !important;
+                text-align: left !important;
+                gap: 15px !important;
+                padding: 12px 15px !important;
+                box-sizing: border-box !important;
+            }
+            .brand-suggestion-item {
+                display: flex !important;
+                flex-direction: row !important;
+                align-items: center !important;
+                justify-content: flex-start !important;
+                gap: 15px !important;
+                width: 100% !important;
+                min-width: 0 !important;
+            }
+            .brand-suggestion-info {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                justify-content: center !important;
+                flex: 1 !important;
+                min-width: 0 !important;
+                gap: 2px !important;
+                overflow: hidden !important;
+            }
+            .brand-suggestion-name {
+                font-weight: 700 !important;
+                font-size: 16px !important;
+                color: #222 !important;
+                display: block !important;
+                width: 100% !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+            }
+            .brand-suggestion-count {
+                font-size: 13px !important;
+                color: #888 !important;
+                display: block !important;
+            }
+            .brand-suggestion-image-wrapper {
+                width: 45px !important;
+                height: 45px !important;
+                min-width: 45px !important;
+                background: white !important;
+                border-radius: 8px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                padding: 5px !important;
+                flex-shrink: 0 !important;
+                overflow: hidden !important;
+            }
+            .brand-suggestion-image-wrapper img {
+                max-width: 100% !important;
+                max-height: 100% !important;
+                width: auto !important;
+                height: auto !important;
+                object-fit: contain !important;
+            }
+        </style>
     </head>
     <body>
         <!-- HEADER MODERNO -->
-        <header class="header-modern desktop-only" id="main-header">
-            <div class="header-container">
-                <a href="/" class="logo-section">
-                    <div class="logo-text">
-                        <span class="logo-codigo">codigo</span>
-                        <span class="logo-amigo">amigo</span>
-                    </div>
-                </a>
-                
-                <div class="header-right-actions">
-                    <?php if (strpos($_SERVER['REQUEST_URI'], '/chat') !== false) { ?>
-                        <div class="chat-header-controls">
-                            <div class="chat-title-badge">
-                                <i class="fas fa-comments"></i>
-                                <span>Mensajes</span>
-                            </div>
-                            <a href="/" class="btn-header-back">
-                                <i class="fas fa-home"></i>
-                                <span class="hidden-xs">Inicio</span>
-                            </a>
-                        </div>
-                    <?php } ?>
-                </div>
-
-                <style>
-                    .header-right-actions {
-                        display: flex;
-                        align-items: center;
-                    }
-                    .chat-header-controls {
-                        display: flex;
-                        align-items: center;
-                        gap: 15px;
-                    }
-                    .chat-title-badge {
-                        display: flex;
-                        align-items: center;
-                        gap: 8px;
-                        color: #fff;
-                        font-weight: 600;
-                        font-size: 1.1rem;
-                        background: rgba(255,255,255,0.1);
-                        padding: 8px 16px;
-                        border-radius: 20px;
-                        border: 1px solid rgba(255,255,255,0.1);
-                    }
-                    .chat-title-badge i { color: #E30613; }
-                    .btn-header-back {
-                        display: flex;
-                        align-items: center;
-                        gap: 8px;
-                        color: rgba(255,255,255,0.7);
-                        text-decoration: none;
-                        padding: 8px 16px;
-                        border-radius: 20px;
-                        transition: all 0.2s;
-                        border: 1px solid transparent;
-                    }
-                    .btn-header-back:hover {
-                        background: rgba(255,255,255,0.1);
-                        color: #fff;
-                        text-decoration: none;
-                        border-color: rgba(255,255,255,0.1);
-                    }
-                    @media (max-width: 768px) {
-                        .hidden-xs { display: none; }
-                        .chat-title-badge span { display: none; }
-                        .chat-title-badge { padding: 8px; aspect-ratio: 1; justify-content: center; }
-                    }
-                </style>
-            </div>
-        </header>
+        <!-- Header removed for chat -->
 
 
         
@@ -719,9 +727,19 @@ if (!isset($panel)) {
                 var options_busqueda = {
                     url: url_d,
                     getValue: "nombre",
-                                            template: {
+                    listLocation: function(data) {
+                        return data.filter(function(item) {
+                            return item && item !== true && item !== "true" && item !== false && item !== "false" && item.nombre && item.nombre !== "false" && item.nombre !== false;
+                        });
+                    },
+                    template: {
                         type: "custom",
                         method: function(value, item) {
+                            // FILTRO AGRESIVO: Si el valor o el item son "false", nulos, o inválidos, NO RENDERIZAR NADA
+                            if (!item || item === false || item === "false" || value === "false" || value === false || !item.nombre_clave) {
+                                return "<div style='display:none'></div>";
+                            }
+
                             var ruta = "/de-" + item.nombre_clave;
 
                             var codes = "";
@@ -757,24 +775,81 @@ if (!isset($panel)) {
                                 imagenUrl = '/img/no_image.png';
                             }
 
-                            var element = "<a style='color: black; display: flex; align-items: center; padding: 10px;' href='" + item.url + "'>";
-                            element = element + "<div style='width: 60px; height: 60px; min-width: 60px; overflow: hidden; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: white; margin-right: 15px;'>";
-                            element = element + "<img style='width: 100%; height: 100%; object-fit: contain;' src='" + imagenUrl + "' onerror=\"this.src='/img/no_image.png'\" />";
+                            var element = "<div class='brand-suggestion-item'>";
+                            element = element + "<div class='brand-suggestion-image-wrapper'>";
+                            element = element + "<img src='" + imagenUrl + "' onerror=\"this.src='/img/no_image.png'\" />";
                             element = element + "</div>";
-                            element = element + "<div style='flex: 1; display: flex; flex-direction: column;'>";
-                            element = element + "<div style='font-size: 16px; font-weight: 600; color: #333; margin-bottom: 4px;'>" + value + "</div>";
+                            element = element + "<div class='brand-suggestion-info'>";
+                            element = element + "<div class='brand-suggestion-name'>" + value + "</div>";
                             if (codes) {
-                                element = element + "<div style='font-size: 13px; color: #666;'>(" + codes + ")</div>";
+                                element = element + "<div class='brand-suggestion-count'>" + codes + "</div>";
                             }
                             element = element + "</div>";
-                            element = element + "</a>";
+                            element = element + "</div>";
                             return element;
                         }
                     },
                     list: {
                         maxNumberOfElements: 10,
                         match: {
-                            enabled: true
+                            enabled: true,
+                            method: function(element, phrase) {
+                                if (!element || !phrase) return false;
+                                
+                                var p = phrase.toLowerCase().replace(/\s+/g, '');
+                                if (p === "ing" || p === "ingdirect") {
+                                    if (element.toLowerCase() === "banco ing") return true;
+                                }
+                                
+                                var e = element.toLowerCase().replace(/\s+/g, '');
+                                return e.indexOf(p) > -1;
+                            }
+                        },
+                        sort: {
+                            enabled: true,
+                            method: function(a, b) {
+                                var p = "";
+                                if ($("#busqueda_marca").is(":focus")) p = $("#busqueda_marca").val();
+                                else if ($("#busqueda_marca2").is(":focus")) p = $("#busqueda_marca2").val();
+                                else if ($("#mobile-search-input").is(":focus")) p = $("#mobile-search-input").val();
+                                else if ($("#mobile-search-input-header").is(":focus")) p = $("#mobile-search-input-header").val();
+                                else p = $(".easy-autocomplete input:focus").val() || "";
+                                
+                                p = p.toLowerCase().replace(/\s+/g, '');
+                                
+                                if (p === "ing" || p === "ingdirect") {
+                                    if (a.nombre.toLowerCase() === "banco ing") return -1;
+                                    if (b.nombre.toLowerCase() === "banco ing") return 1;
+                                }
+                                
+                                var ea = a.nombre.toLowerCase().replace(/\s+/g, '');
+                                var eb = b.nombre.toLowerCase().replace(/\s+/g, '');
+                                
+                                var startsWithA = ea.indexOf(p) === 0;
+                                var startsWithB = eb.indexOf(p) === 0;
+                                
+                                if (startsWithA && !startsWithB) return -1;
+                                if (!startsWithA && startsWithB) return 1;
+                                
+                                return 0;
+                            }
+                        },
+                        onDrawEvent: function() {
+                            var $input = $(this);
+                            var $container = $input.siblings(".easy-autocomplete-container");
+                            var $list = $container.find("ul");
+                            if ($list.children().length === 0) {
+                                $list.append("<li class='eac-item'><div style='padding:12px 15px; color:#888; text-align:center;'>Sin resultados</div></li>");
+                                // Eliminar elemento que contenga solo el texto "false"
+                                $list.children().each(function() {
+                                    var txt = $(this).text().trim(); if (txt === "false" || txt.toLowerCase() === "false" ) {
+                                        $(this).remove();
+                                    }
+                                });
+
+                                $list.show();
+                                $container.show();
+                            }
                         }
                     }
                 };
@@ -2363,6 +2438,28 @@ if (!isset($panel)) {
         // Redirigir a la página de detalle del código
         window.location.href = '/de-' + marca + '?codigo=' + codeId;
     };
+
+    // Función para abrir chat directo con un usuario desde tarjeta de código
+    window.openDirectChat = function(userId, username) {
+        var currentUserId = null;
+        if (window.serverUserData && window.serverUserData.id) {
+            currentUserId = window.serverUserData.id;
+        }
+        if (!currentUserId) {
+            var chatUrl = '/public/chat_usuario.php?open_chat=' + userId;
+            if (typeof window.showLoginModal === 'function') {
+                window.showLoginModal('Para contactar con ' + username + ' necesitas iniciar sesión en Código Amigo.', chatUrl);
+            } else if (typeof window.openLoginModalWithRedirect === 'function') {
+                localStorage.setItem('redirectAfterLogin', chatUrl);
+                window.openLoginModalWithRedirect(chatUrl);
+            } else {
+                window.location.href = '/login.php';
+            }
+            return;
+        }
+        var defaultMsg = encodeURIComponent('Hola buenas, me ayudas con el proceso y lo hacemos juntos?');
+        window.location.href = '/public/chat_usuario.php?open_chat=' + userId + '&msg=' + defaultMsg;
+    };
     
     // Función para copiar código al portapapeles
     window.copyCode = function() {
@@ -2393,6 +2490,10 @@ if (!isset($panel)) {
                 title: 'Código de descuento',
                 text: 'Mira este código de descuento que encontré',
                 url: window.location.href
+            }).catch(function(err) {
+                if (err.name !== 'AbortError') {
+                    console.error('Error sharing:', err);
+                }
             });
         } else {
             // Fallback: copiar URL al portapapeles

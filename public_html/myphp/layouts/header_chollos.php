@@ -9,9 +9,9 @@ $links_meta = isset($links_meta) ? $links_meta : '';
 
 require_once __DIR__ . '/../../inc/sentry_bootstrap.php';
 require_once __DIR__ . '/../links.php';
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 
 global $author_web, $img_compartir_pagina, $ubicacion_actual, $force_css, $name_page;
 global $provincia, $data_usuario, $detect, $author_web, $datos_usuario, $que_es;
@@ -87,10 +87,10 @@ if (!isset($panel)) {
         <!-- CSS -->
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/css/bootstrap.min.css">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-        <link rel="stylesheet" href="/css/design-fixed.css?v=<?php echo file_exists(__DIR__ . '/../css/design-fixed.css') ? filemtime(__DIR__ . '/../css/design-fixed.css') : time(); ?>">
-        <link rel="stylesheet" href="/css/modern-design.css?v=<?php echo file_exists(__DIR__ . '/../css/modern-design.css') ? filemtime(__DIR__ . '/../css/modern-design.css') : time(); ?>">
-        <link rel="stylesheet" href="/css/mobile-header-new.css?v=<?php echo file_exists(__DIR__ . '/../css/mobile-header-new.css') ? filemtime(__DIR__ . '/../css/mobile-header-new.css') : time(); ?>">
-        <link rel="stylesheet" href="/css/mobile-new-design.css?v=<?php echo file_exists(__DIR__ . '/../css/mobile-new-design.css') ? filemtime(__DIR__ . '/../css/mobile-new-design.css') : time(); ?>">
+        <link rel="stylesheet" href="/css/design-fixed.css?v=<?php echo time(); ?>">
+        <link rel="stylesheet" href="/css/modern-design.css?v=<?php echo time(); ?>">
+        <link rel="stylesheet" href="/css/mobile-header-new.css?v=<?php echo time(); ?>">
+        <link rel="stylesheet" href="/css/mobile-new-design.css?v=<?php echo time(); ?>">
         
         <?php if($force_css==1){ ?>
             <!-- CSS adicional solo si es necesario -->
@@ -258,10 +258,10 @@ if (!isset($panel)) {
             document.addEventListener('DOMContentLoaded', function() {
                 // Verificar que jQuery se cargó correctamente
                 if (typeof jQuery === 'undefined') {
-                    // jQuery no se cargó correctamente
-                } else {
-                    // jQuery cargado correctamente
+                    // jQuery no se cargó correctamente - skip further checks
+                    return;
                 }
+                // jQuery cargado correctamente
 
                 // Verificar que EasyAutoComplete se cargó correctamente
                 if (typeof jQuery.fn.easyAutocomplete === 'undefined') {
@@ -304,68 +304,114 @@ if (!isset($panel)) {
         }, true);
         </script>
         <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/js/bootstrap.min.js" crossorigin="anonymous"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/easy-autocomplete/1.3.5/jquery.easy-autocomplete.min.js" crossorigin="anonymous"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/easy-autocomplete/1.3.5/easy-autocomplete.min.css" crossorigin="anonymous">
         
         <!-- Estilos personalizados para EasyAutocomplete -->
         <style>
-            /* Mejorar apariencia del dropdown de autocompletado */
+            /* Búsqueda unificada y visible (Desktop) */
+            .search-header {
+                flex: 1;
+                justify-content: center;
+                max-width: 700px;
+                margin: 0 30px;
+                display: flex;
+                align-items: center;
+            }
+            
+            .search-container {
+                width: 100%;
+                position: relative;
+            }
+
+            .search-input-wrapper {
+                background: white !important;
+                border-radius: 24px !important;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+                border: 2px solid transparent !important;
+                transition: all 0.3s ease !important;
+                width: 100% !important;
+                display: flex !important;
+                align-items: center !important;
+                overflow: hidden !important;
+                height: 42px !important;
+            }
+
+            .search-input-wrapper:focus-within {
+                border-color: #E30613 !important;
+                box-shadow: 0 4px 20px rgba(227, 6, 19, 0.2) !important;
+            }
+
+            .search-input-header, 
+            .easy-autocomplete input {
+                background: white !important;
+                border: none !important;
+                color: #333 !important;
+                width: 100% !important;
+                height: 42px !important;
+                padding: 0 20px 0 40px !important;
+                font-size: 15px !important;
+                border-radius: 24px !important;
+                margin: 0 !important;
+                outline: none !important;
+                box-shadow: none !important;
+            }
+
+            .search-input-header::placeholder {
+                color: #888 !important;
+            }
+
+            .search-icon {
+                position: absolute !important;
+                color: #888 !important;
+                left: 14px !important;
+                top: 50% !important;
+                transform: translateY(-50%) !important;
+                z-index: 5 !important;
+                pointer-events: none !important;
+            }
+
+            .search-input-wrapper:focus-within .search-icon {
+                color: #E30613 !important;
+            }
+
+            .search-btn {
+                background: #E30613 !important;
+                color: white !important;
+                border-radius: 0 24px 24px 0 !important;
+                width: 50px !important;
+                height: 42px !important;
+                margin-left: 0 !important;
+                border: none !important;
+                transition: background 0.2s !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                position: absolute !important;
+                right: 0 !important;
+                top: 0 !important;
+                z-index: 10 !important;
+            }
+
+            .search-btn:hover {
+                background: #C40510 !important;
+            }
+
+            /* Ajustes para EasyAutocomplete */
             .easy-autocomplete {
                 width: 100% !important;
             }
             
             .easy-autocomplete-container {
-                background: white;
-                border-radius: 8px;
-                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-                overflow: hidden;
-                margin-top: 5px;
+                top: 100% !important;
+                background: white !important;
+                border-radius: 12px !important;
+                margin-top: 8px !important;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.2) !important;
+                border: 1px solid #eee !important;
             }
-            
-            .easy-autocomplete-container ul {
-                list-style: none;
-                margin: 0;
-                padding: 0;
-            }
-            
-            .easy-autocomplete-container ul li {
-                border-bottom: 1px solid #f0f0f0;
-                transition: background 0.2s ease;
-            }
-            
-            .easy-autocomplete-container ul li:last-child {
-                border-bottom: none;
-            }
-            
-            .easy-autocomplete-container ul li:hover {
-                background: #f8f9fa;
-            }
-            
-            .easy-autocomplete-container ul li.selected {
-                background: #E30613 !important;
-            }
-            
-            .easy-autocomplete-container ul li.selected a {
-                color: white !important;
-            }
-            
-            .easy-autocomplete-container ul li.selected div {
-                color: white !important;
-            }
-            
-            /* Mejorar el input de búsqueda */
-            .easy-autocomplete input {
-                border-radius: 25px;
-                padding: 12px 0px 12px 40px;
-                border: 2px solid #ddd;
-                transition: all 0.3s ease;
-            }
-            
-            .easy-autocomplete input:focus {
-                border-color: #E30613;
-                outline: none;
-                box-shadow: 0 0 0 3px rgba(227, 6, 19, 0.1);
-            }
+
         </style>
 
         <!-- Script de verificación de recursos externos -->
@@ -441,6 +487,76 @@ if (!isset($panel)) {
             gtag('config', 'G-DVE5FZ2SZY');
         </script>
         <script src="/js/notificaciones.js?v=<?php echo file_exists(__DIR__ . '/../js/notificaciones.js') ? filemtime(__DIR__ . '/../js/notificaciones.js') : time(); ?>" defer></script>
+        <style>
+            /* DEFINITIVE FIX FOR SEARCH RESULTS LAYOUT */
+            .easy-autocomplete-container ul li > div {
+                display: flex !important;
+                flex-direction: row !important;
+                align-items: center !important;
+                justify-content: flex-start !important;
+                width: 100% !important;
+                word-break: normal !important;
+                white-space: nowrap !important;
+                text-align: left !important;
+                gap: 15px !important;
+                padding: 12px 15px !important;
+                box-sizing: border-box !important;
+            }
+            .brand-suggestion-item {
+                display: flex !important;
+                flex-direction: row !important;
+                align-items: center !important;
+                justify-content: flex-start !important;
+                gap: 15px !important;
+                width: 100% !important;
+                min-width: 0 !important;
+            }
+            .brand-suggestion-info {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                justify-content: center !important;
+                flex: 1 !important;
+                min-width: 0 !important;
+                gap: 2px !important;
+                overflow: hidden !important;
+            }
+            .brand-suggestion-name {
+                font-weight: 700 !important;
+                font-size: 16px !important;
+                color: #222 !important;
+                display: block !important;
+                width: 100% !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+            }
+            .brand-suggestion-count {
+                font-size: 13px !important;
+                color: #888 !important;
+                display: block !important;
+            }
+            .brand-suggestion-image-wrapper {
+                width: 45px !important;
+                height: 45px !important;
+                min-width: 45px !important;
+                background: white !important;
+                border-radius: 8px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                padding: 5px !important;
+                flex-shrink: 0 !important;
+                overflow: hidden !important;
+            }
+            .brand-suggestion-image-wrapper img {
+                max-width: 100% !important;
+                max-height: 100% !important;
+                width: auto !important;
+                height: auto !important;
+                object-fit: contain !important;
+            }
+        </style>
     </head>
     <body>
         <!-- HEADER MODERNO -->
@@ -460,12 +576,19 @@ if (!isset($panel)) {
                         Códigos Amigo <i class="fas fa-chevron-down"></i>
                     </button>
                     <div class="dropdown-menu-modern" style="max-height: 80vh; overflow-y: auto;">
+                        <a href="/" class="dropdown-item-modern">
+                            <i class="fas fa-home"></i> Inicio
+                        </a>
+                        <div class="dropdown-divider"></div>
                         <span class="dropdown-header-modern"><i class="fas fa-tags"></i> Marcas</span>
                         <a href="<?php echo link_listado_marcas(); ?>" class="dropdown-item-modern">
                             Ver todas las marcas
                         </a>
                         <?php
-                        $lista_marcas = getListMarcaSpecial();
+                        if (!function_exists('getListMarcaSpecial')) {
+                            include_once dirname(__DIR__) . '/../inc/funciones.php';
+                        }
+                        $lista_marcas = function_exists('getListMarcaSpecial') ? getListMarcaSpecial() : [];
                         if($lista_marcas){
                             foreach($lista_marcas as $marca) {
                                 $codes = $marca["codes"] ?? 0;
@@ -492,7 +615,10 @@ if (!isset($panel)) {
                             Ver todas las categorías
                         </a>
                         <?php
-                        $listacategorias = getCategorias();
+                        if (!function_exists('getCategorias')) {
+                            include_once dirname(__DIR__) . '/../inc/conexion.php';
+                        }
+                        $listacategorias = function_exists('getCategorias') ? getCategorias() : [];
                         foreach($listacategorias as $categoria) { 
                             if(isset($categoria["nombre"]) && isset($categoria["nombre_clave"])) {
                         ?>
@@ -537,6 +663,11 @@ if (!isset($panel)) {
                     </div>
                 </div>
                 
+                <a href="https://www.malprecio.com/chollos-shorts" target="_blank" class="nav-link shorts-link" style="color: #FF0000; font-weight: 700; display: flex; align-items: center; gap: 6px; margin-right: 15px;">
+                    <svg class="shorts-icon" viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: #FF0000;"><path d="M17.7,3c-0.7,0-1.2,0.3-1.6,0.9l-10,15c-0.3,0.5-0.3,1.2,0,1.7C6.5,21.1,7,21.4,7.7,21.4h9.5c0.7,0,1.2-0.3,1.6-0.9l10-15c0.3-0.5,0.3-1.2,0-1.7C28.5,3.3,28,3,27.3,3H17.7z M12,14.7v-5.4l4.5,2.7L12,14.7z M17.7,3c-0.7,0-1.2,0.3-1.6,0.9l-10,15c-0.3,0.5-0.3,1.2,0,1.7C6.5,21.1,7,21.4,7.7,21.4h9.5c0.7,0,1.2-0.3,1.6-0.9l10-15c0.3-0.5,0.3-1.2,0-1.7C28.5,3.3,28,3,27.3,3H17.7z" transform="scale(0.8) translate(3,3)"/><path d="M10,15l5.19-3L10,9V15z M23.97,7c-0.03-0.4-0.12-0.79-0.26-1.15c-0.41-1.01-1.2-1.8-2.21-2.21C21.14,3.5,20.75,3.41,20.35,3.38 C19.54,3.16,18.06,3,12,3s-7.54,0.16-8.35,0.38C3.25,3.41,2.86,3.5,2.5,3.64C1.49,4.05,0.7,4.84,0.29,5.85 C0.15,6.21,0.05,6.6,0.03,7C0,7.81,0,9.29,0,15.35c0,6.06,0,7.54,0.03,8.35c0.03,0.4,0.12,0.79,0.26,1.15 c0.41,1.01,1.2,1.8,2.21,2.21c0.36,0.14,0.75,0.23,1.15,0.26c0.81,0.22,2.29,0.38,8.35,0.38s7.54-0.16,8.35-0.38 c0.4-0.03,0.79-0.12,1.15-0.26c1.01-0.41,1.8-1.2,2.21-2.21c0.14-0.36,0.23-0.75,0.26-1.15c0.22-0.81,0.38-2.29,0.38-8.35 S24.19,7.81,23.97,7z" style="display:none;"/><path d="M17.65,9.09c0,0-1.16-0.82-2.73-0.82c-1.21,0-2.12,0.49-2.12,1.77c0,1.05,0.85,1.49,1.88,1.9 c1.24,0.48,1.75,0.86,1.75,1.52c0,0.66-0.45,1.08-1.42,1.08c-1.18,0-2.31-0.64-2.31-0.64l-0.42,1.55c0,0,1.21,0.91,3,0.91 c1.58,0,2.54-0.71,2.54-1.99c0-1.14-0.85-1.57-2.11-2.12c-1.02-0.44-1.51-0.8-1.51-1.34c0-0.48,0.42-0.85,1.18-0.85 c0.91,0,1.81,0.45,1.81,0.45L17.65,9.09z" transform="scale(0.8) translate(4,3)"/></svg>
+                    Shorts <span style="background: #E30613; color: white; padding: 1px 5px; border-radius: 4px; font-size: 9px; margin-left: 2px;">NUEVO</span>
+                </a>
+                
                 <!-- Selector de Categorías de Chollos (Estilo Amazon) -->
                 <?php
                 if (!function_exists('renderCategorySelector')) {
@@ -559,13 +690,13 @@ if (!isset($panel)) {
                     
                     
                     <!-- Botón de login (oculto cuando está logueado) -->
-                    <button class="btn-acceder open_modal_login" id="btn-login">
+                    <button class="btn-acceder open_modal_login" id="btn-login" style="<?php echo (isset($_SESSION['user_id']) && !empty($_SESSION['user_id'])) ? 'display: none;' : 'display: block;'; ?>">
                         <i class="fas fa-user"></i>
                         Acceder
                     </button>
 
                     <!-- Menú de usuario (visible cuando está logueado) -->
-                    <div class="user-menu" id="user-menu" style="display: none;">
+                    <div class="user-menu" id="user-menu" style="<?php echo (isset($_SESSION['user_id']) && !empty($_SESSION['user_id'])) ? 'display: flex;' : 'display: none;'; ?>">
                         <!-- Notificaciones -->
                         <div class="notification-container" id="notification-container">
                             <button class="notification-btn" id="notification-btn" title="Notificaciones">
@@ -686,11 +817,6 @@ if (!isset($panel)) {
                                 Códigos Favoritos
                                 <?php if($count_favoritos > 0) { echo '<span class="badge pull-right" style="margin-left:auto; background:#eee; color:#333; padding:2px 8px; border-radius:10px; font-size:12px;">'.$count_favoritos.'</span>'; } ?>
                             </a>
-                            <a href="/mis-favoritos?tipo=chollo" class="dropdown-item">
-                                <i class="fas fa-fire"></i>
-                                Chollos Favoritos
-                                <?php if($count_chollos > 0) { echo '<span class="badge pull-right" style="margin-left:auto; background:#eee; color:#333; padding:2px 8px; border-radius:10px; font-size:12px;">'.$count_chollos.'</span>'; } ?>
-                            </a>
                             
                             <hr class="dropdown-divider">
                             <div class="dropdown-header-modern" style="padding: 5px 20px; font-size: 11px; text-transform: uppercase; color: #888; font-weight: 700;">Mi Cuenta</div>
@@ -760,49 +886,13 @@ if (!isset($panel)) {
         ?>
         
        
-            
-            <!-- MENÚ DESPLEGABLE MÓVIL -->
-            <div class="mobile-menu" id="mobile-menu">
-                <div class="mobile-menu-content">
-                    <nav class="mobile-nav-links">
-                        <a href="/destacados" class="mobile-nav-link">Destacados</a>
-                        <a href="/nuevos" class="mobile-nav-link">Nuevos</a>
-                        <a href="/populares" class="mobile-nav-link">Populares</a>
-                        
-                        <div class="mobile-nav-separator" style="height: 1px; background: #333; margin: 10px 0;"></div>
-                        <div style="padding: 10px 20px; color: #888; font-size: 12px; font-weight: bold; text-transform: uppercase;">Códigos Amigo</div>
-                        <a href="/marcas" class="mobile-nav-link" style="padding-left: 30px;">Marcas</a>
-                        <a href="/categorias" class="mobile-nav-link" style="padding-left: 30px;">Categorías</a>
-                        
-                        <div class="mobile-nav-separator" style="height: 1px; background: #333; margin: 10px 0;"></div>
-                        
-                        <a href="/chollos" class="mobile-nav-link">🔥 Chollos</a>
-                        <?php
-                        // Check if guides exist
-                         if (function_exists('get_active_super_landings')) {
-                            $guias_mobile = get_active_super_landings();
-                            if(!empty($guias_mobile)) {
-                                echo '<a href="/guias/' . $guias_mobile[0]['slug'] . '" class="mobile-nav-link">📚 Guías</a>';
-                            } else {
-                                echo '<a href="#" class="mobile-nav-link">📚 Guías</a>';
-                            }
-                         }
-                        ?>
-                        <a href="/nuevo_codigo" class="mobile-nav-link">Publicar Código</a>
-                        <a href="#" class="mobile-nav-link open_modal_login">Iniciar Sesión</a>
-                    </nav>
-                </div>
-            </div>
-            
-            <!-- OVERLAY PARA MENÚ MÓVIL -->
-            <div class="mobile-menu-overlay" id="mobile-menu-overlay"></div>
+        <?php
+        // El menú móvil antiguo ha sido eliminado ya que ahora se usa add_mobile_header_compact()
+        // que añade el nuevo menú hamburguesa y el bottom nav.
+        ?>
 
         <?php
-        // Mostrar widget de chollos calientes en todas las páginas
-        if (!function_exists('renderCompactHotDealsWidget')) {
-            include_once __DIR__ . '/funciones_chollos.php';
-        }
-        echo renderCompactHotDealsWidget();
+        // Widget de chollos desactivado en header - se muestra en el contenido
         ?>
 
         <!-- HERO SECTION - Solo en la home -->
@@ -992,9 +1082,19 @@ if (!isset($panel)) {
                 var options_busqueda = {
                     url: url_d,
                     getValue: "nombre",
-                                            template: {
+                    listLocation: function(data) {
+                        return data.filter(function(item) {
+                            return item && item !== true && item !== "true" && item !== false && item !== "false" && item.nombre;
+                        });
+                    },
+                    template: {
                         type: "custom",
                         method: function(value, item) {
+                            // FILTRO AGRESIVO: Si el valor o el item son "false", nulos, o inválidos, NO RENDERIZAR NADA
+                            if (!item || item === false || item === "false" || value === "false" || value === false || !item.nombre_clave) {
+                                return "<div style='display:none'></div>";
+                            }
+
                             var ruta = "/de-" + item.nombre_clave;
 
                             var codes = "";
@@ -1030,24 +1130,81 @@ if (!isset($panel)) {
                                 imagenUrl = '/img/no_image.png';
                             }
 
-                            var element = "<a style='color: black; display: flex; align-items: center; padding: 10px;' href='" + item.url + "'>";
-                            element = element + "<div style='width: 60px; height: 60px; min-width: 60px; overflow: hidden; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: white; margin-right: 15px;'>";
-                            element = element + "<img style='width: 100%; height: 100%; object-fit: contain;' src='" + imagenUrl + "' onerror=\"this.src='/img/no_image.png'\" />";
+                            var element = "<div class='brand-suggestion-item'>";
+                            element = element + "<div class='brand-suggestion-image-wrapper'>";
+                            element = element + "<img src='" + imagenUrl + "' onerror=\"this.src='/img/no_image.png'\" />";
                             element = element + "</div>";
-                            element = element + "<div style='flex: 1; display: flex; flex-direction: column;'>";
-                            element = element + "<div style='font-size: 16px; font-weight: 600; color: #333; margin-bottom: 4px;'>" + value + "</div>";
+                            element = element + "<div class='brand-suggestion-info'>";
+                            element = element + "<div class='brand-suggestion-name'>" + value + "</div>";
                             if (codes) {
-                                element = element + "<div style='font-size: 13px; color: #666;'>(" + codes + ")</div>";
+                                element = element + "<div class='brand-suggestion-count'>" + codes + "</div>";
                             }
                             element = element + "</div>";
-                            element = element + "</a>";
+                            element = element + "</div>";
                             return element;
                         }
                     },
                     list: {
                         maxNumberOfElements: 10,
                         match: {
-                            enabled: true
+                            enabled: true,
+                            method: function(element, phrase) {
+                                if (!element || !phrase) return false;
+                                
+                                var p = phrase.toLowerCase().replace(/\s+/g, '');
+                                if (p === "ing" || p === "ingdirect") {
+                                    if (element.toLowerCase() === "banco ing") return true;
+                                }
+                                
+                                var e = element.toLowerCase().replace(/\s+/g, '');
+                                return e.indexOf(p) > -1;
+                            }
+                        },
+                        sort: {
+                            enabled: true,
+                            method: function(a, b) {
+                                var p = "";
+                                if ($("#busqueda_marca").is(":focus")) p = $("#busqueda_marca").val();
+                                else if ($("#busqueda_marca2").is(":focus")) p = $("#busqueda_marca2").val();
+                                else if ($("#mobile-search-input").is(":focus")) p = $("#mobile-search-input").val();
+                                else if ($("#mobile-search-input-header").is(":focus")) p = $("#mobile-search-input-header").val();
+                                else p = $(".easy-autocomplete input:focus").val() || "";
+                                
+                                p = p.toLowerCase().replace(/\s+/g, '');
+                                
+                                if (p === "ing" || p === "ingdirect") {
+                                    if (a.nombre.toLowerCase() === "banco ing") return -1;
+                                    if (b.nombre.toLowerCase() === "banco ing") return 1;
+                                }
+                                
+                                var ea = a.nombre.toLowerCase().replace(/\s+/g, '');
+                                var eb = b.nombre.toLowerCase().replace(/\s+/g, '');
+                                
+                                var startsWithA = ea.indexOf(p) === 0;
+                                var startsWithB = eb.indexOf(p) === 0;
+                                
+                                if (startsWithA && !startsWithB) return -1;
+                                if (!startsWithA && startsWithB) return 1;
+                                
+                                return 0;
+                            }
+                        },
+                        onDrawEvent: function() {
+                            var $input = $(this);
+                            var $container = $input.siblings(".easy-autocomplete-container");
+                            var $list = $container.find("ul");
+                            if ($list.children().length === 0) {
+                                $list.append("<li class='eac-item'><div style='padding:12px 15px; color:#888; text-align:center;'>Sin resultados</div></li>");
+                                // Eliminar elemento que contenga solo el texto "false"
+                                $list.children().each(function() {
+                                    var txt = $(this).text().trim(); if (txt === "false" || txt.toLowerCase() === "false" ) {
+                                        $(this).remove();
+                                    }
+                                });
+
+                                $list.show();
+                                $container.show();
+                            }
                         }
                     }
                 };
@@ -1070,7 +1227,7 @@ if (!isset($panel)) {
 
                     // Aplicar autocompletado con verificación de elementos
                     // Solo incluir campos que existen en la página actual
-                    var searchFields = ["#busqueda_marca", "#mobile-search-input"];
+                    var searchFields = ["#busqueda_marca", "#mobile-search-input", "#mobile-search-input-header"];
                     if (document.getElementById('busqueda_marca2')) {
                         searchFields.push("#busqueda_marca2");
                     }
@@ -1179,7 +1336,7 @@ if (!isset($panel)) {
                 function setupEnterKey() {
                     // Configurando eventos de teclado
 
-                    $(document).off('keypress.search-enter').on('keypress.search-enter', '#busqueda_marca, #busqueda_marca2, #mobile-search-input', function(e) {
+                    $(document).off('keypress.search-enter').on('keypress.search-enter', '#busqueda_marca, #busqueda_marca2, #mobile-search-input, #mobile-search-input-header', function(e) {
                         if(e.which == 13) {
                             e.preventDefault();
                             // Enter presionado en campo de búsqueda
@@ -1259,29 +1416,8 @@ if (!isset($panel)) {
                 }, 10000);
             }
             
-            // Funcionalidad del menú móvil
-            $('#mobile-menu-toggle').on('click', function() {
-                $(this).toggleClass('active');
-                $('#mobile-menu').toggleClass('show');
-                $('#mobile-menu-overlay').toggleClass('show');
-                $('body').css('overflow', $('#mobile-menu').hasClass('show') ? 'hidden' : '');
-            });
-            
-            // Cerrar menú móvil al hacer clic en un enlace
-            $('.mobile-nav-link').on('click', function() {
-                $('#mobile-menu-toggle').removeClass('active');
-                $('#mobile-menu').removeClass('show');
-                $('#mobile-menu-overlay').removeClass('show');
-                $('body').css('overflow', '');
-            });
-            
-            // Cerrar menú móvil al hacer clic en el overlay
-            $('#mobile-menu-overlay').on('click', function() {
-                $('#mobile-menu-toggle').removeClass('active');
-                $('#mobile-menu').removeClass('show');
-                $(this).removeClass('show');
-                $('body').css('overflow', '');
-            });
+            // La funcionalidad del menú móvil antiguo ha sido eliminada 
+            // ya que ahora se gestiona en bottom_menu_script.php
             
             // HEADER FIJO - Efecto de scroll
             let lastScrollTop = 0;
@@ -2636,6 +2772,28 @@ if (!isset($panel)) {
         // Redirigir a la página de detalle del código
         window.location.href = '/de-' + marca + '?codigo=' + codeId;
     };
+
+    // Función para abrir chat directo con un usuario desde tarjeta de código
+    window.openDirectChat = function(userId, username) {
+        var currentUserId = null;
+        if (window.serverUserData && window.serverUserData.id) {
+            currentUserId = window.serverUserData.id;
+        }
+        if (!currentUserId) {
+            var chatUrl = '/public/chat_usuario.php?open_chat=' + userId;
+            if (typeof window.showLoginModal === 'function') {
+                window.showLoginModal('Para contactar con ' + username + ' necesitas iniciar sesión en Código Amigo.', chatUrl);
+            } else if (typeof window.openLoginModalWithRedirect === 'function') {
+                localStorage.setItem('redirectAfterLogin', chatUrl);
+                window.openLoginModalWithRedirect(chatUrl);
+            } else {
+                window.location.href = '/login.php';
+            }
+            return;
+        }
+        var defaultMsg = encodeURIComponent('Hola buenas, me ayudas con el proceso y lo hacemos juntos?');
+        window.location.href = '/public/chat_usuario.php?open_chat=' + userId + '&msg=' + defaultMsg;
+    };
     
     // Función para copiar código al portapapeles
     window.copyCode = function() {
@@ -2666,6 +2824,10 @@ if (!isset($panel)) {
                 title: 'Código de descuento',
                 text: 'Mira este código de descuento que encontré',
                 url: window.location.href
+            }).catch(function(err) {
+                if (err.name !== 'AbortError') {
+                    console.error('Error sharing:', err);
+                }
             });
         } else {
             // Fallback: copiar URL al portapapeles

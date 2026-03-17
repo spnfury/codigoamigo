@@ -9,9 +9,9 @@ $links_meta = isset($links_meta) ? $links_meta : '';
 
 require_once __DIR__ . '/../../inc/sentry_bootstrap.php';
 require_once __DIR__ . '/../links.php';
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 
 global $author_web, $img_compartir_pagina, $ubicacion_actual, $force_css, $name_page;
 global $provincia, $data_usuario, $detect, $author_web, $datos_usuario, $que_es;
@@ -55,6 +55,13 @@ if (!isset($panel)) {
         <title><?php echo $title; ?></title>
         <link rel="shortcut icon" href="/img/favicon_moneda_real.png">
         
+        <!-- Preconnect para recursos externos (reduce 200-500ms por conexión) -->
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+        <link rel="preconnect" href="https://cdn.jsdelivr.net">
+        <link rel="dns-prefetch" href="https://pagead2.googlesyndication.com">
+        <link rel="dns-prefetch" href="https://www.googletagmanager.com">
         <?php
         if(strpos($_SERVER['SERVER_NAME'],"dev.") !==false || $que_es==1 || $noindex == 1 || (isset($datos_usuario) && isset($datos_usuario["username"])) || isset($_GET["codigo"]) || isset($_GET["page"]) || isset($provincia) || (isset($args) && isset($args["mes"])) || (isset($GLOBALS["actual_url"]) && strpos($GLOBALS["actual_url"],"/public/") !==false)){ ?>
             <meta name="robots" content="noindex" />
@@ -68,7 +75,7 @@ if (!isset($panel)) {
         <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 
         <?php if(!isset($_GET["page"])){ ?>
-            <meta name="canonical" content="<?php echo isset($GLOBALS["actual_url_limpia"]) ? $GLOBALS["actual_url_limpia"] : ''; ?>"/>
+            <link rel="canonical" href="<?php echo isset($GLOBALS["actual_url_limpia"]) ? $GLOBALS["actual_url_limpia"] : ''; ?>"/>
         <?php } ?>
 
         <!-- Open Graph -->
@@ -84,13 +91,88 @@ if (!isset($panel)) {
         <meta name="twitter:description" content="<?php echo $description_social ? $description_social : $description; ?>">
         <meta name="twitter:image" content="<?php echo $imagen_social ? $imagen_social : 'https://www.codigoamigo.com/img/logo_codigoamigo_real4.png'; ?>">
 
+        <!-- Plausible Analytics -->
+        <script defer data-domain="codigoamigo.com" src="https://clase-plausible.s0e6bf.easypanel.host/js/script.js"></script>
+
         <!-- CSS -->
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/css/bootstrap.min.css">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-        <link rel="stylesheet" href="/css/design-fixed.css?v=<?php echo file_exists(__DIR__ . '/../css/design-fixed.css') ? filemtime(__DIR__ . '/../css/design-fixed.css') : time(); ?>">
-        <link rel="stylesheet" href="/css/modern-design.css?v=<?php echo file_exists(__DIR__ . '/../css/modern-design.css') ? filemtime(__DIR__ . '/../css/modern-design.css') : time(); ?>">
-        <link rel="stylesheet" href="/css/mobile-header-new.css?v=<?php echo file_exists(__DIR__ . '/../css/mobile-header-new.css') ? filemtime(__DIR__ . '/../css/mobile-header-new.css') : time(); ?>">
-        <link rel="stylesheet" href="/css/mobile-new-design.css?v=<?php echo file_exists(__DIR__ . '/../css/mobile-new-design.css') ? filemtime(__DIR__ . '/../css/mobile-new-design.css') : time(); ?>">
+        <link rel="stylesheet" href="/css/design-fixed.css?v=<?php echo time(); ?>">
+        <link rel="stylesheet" href="/css/modern-design.css?v=<?php echo time(); ?>">
+        <link rel="stylesheet" href="/css/mobile-header-new.css?v=<?php echo time(); ?>">
+        <link rel="stylesheet" href="/css/mobile-new-design.css?v=<?php echo time(); ?>">
+        
+        <style>
+            /* Premium Instagram-style VIP Badges */
+            .vip-avatar-wrapper {
+                position: relative;
+                display: inline-block;
+            }
+            .vip-avatar-wrapper .verified-badge {
+                position: absolute;
+                bottom: 5%;
+                right: 5%;
+                width: 25%;
+                height: 25%;
+                min-width: 18px;
+                min-height: 18px;
+                background: #ffd700;
+                color: white;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border: 2px solid #fff;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                z-index: 5;
+            }
+            .vip-avatar-wrapper .verified-badge i {
+                font-size: 0.6em;
+            }
+            
+            /* User Badge styling */
+            .vip-premium-badge {
+                background: linear-gradient(135deg, #ffd700 0%, #f9a825 100%);
+                color: #fff;
+                padding: 3px 10px;
+                border-radius: 50px;
+                font-size: 0.75rem;
+                font-weight: 900;
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                vertical-align: middle;
+                margin-left: 8px;
+                box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            }
+            .vip-premium-badge i {
+                font-size: 0.85rem;
+            }
+            
+            /* Dashboard Avatar Specific */
+            .dashboard-avatar-vip {
+                position: relative;
+                width: 60px;
+                height: 60px;
+            }
+            .dashboard-avatar-vip .verified-tick {
+                position: absolute;
+                bottom: -2px;
+                right: -2px;
+                background: #ffd700;
+                width: 22px;
+                height: 22px;
+                border-radius: 50%;
+                border: 3px solid #fff;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+            }
+        </style>
         
         <?php if($force_css==1){ ?>
             <!-- CSS adicional solo si es necesario -->
@@ -167,66 +249,163 @@ if (!isset($panel)) {
         }
 
         /* Asegurar que el contenedor use el 100% del ancho disponible */
-        /* Asegurar que el contenedor use el 100% del ancho disponible */
-        .header-container {
-            width: 100% !important;
-            min-width: 100% !important;
-            max-width: none !important;
-            padding: 0 20px !important; /* Padding seguro */
-            margin: 0 !important;
-            box-sizing: border-box !important;
-            display: flex !important;
-            justify-content: space-between !important;
+        /* Header containers and basic layout */
+        .header-modern {
+            background-color: #2d2d2d;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
         }
-        
-        /* Header móvil */
-        @media (max-width: 768px) {
-            body {
-                margin-top: 60px !important;
-            }
-            
-            .header-modern.mobile-only {
-                height: 60px;
-                display: block !important;
-            }
-            
-            .header-modern.desktop-only {
-                display: none !important;
-            }
-        }
-        
-        /* Header desktop */
-        @media (min-width: 769px) {
-            body {
-                margin-top: 80px !important;
-            }
-            
-            .header-modern.desktop-only {
-                display: block !important;
-            }
-            
-            .header-modern.mobile-only {
-                display: none !important;
-            }
-        }
-        
-        /* Efecto de transparencia al hacer scroll (opcional) */
+
         .header-modern.scrolled {
             background-color: rgba(45, 45, 45, 0.95);
             backdrop-filter: blur(10px);
             box-shadow: 0 2px 20px rgba(0,0,0,0.3);
         }
-        
-        /* Asegurar que el contenido no se oculte detrás del header */
-        .container-top,
-        .main-content,
-        .page-content {
-            margin-top: 20px;
+
+        .header-container {
+            width: 100% !important;
+            max-width: 1400px !important;
+            height: 100%;
+            padding: 0 20px !important;
+            margin: 0 auto !important;
+            box-sizing: border-box !important;
+            display: flex !important;
+            flex-wrap: nowrap !important; /* Strictly no line breaks */
+            align-items: center !important;
+            justify-content: space-between !important;
+            gap: 15px;
         }
         
-        /* Ajustes específicos para páginas que usan el header moderno */
-        .container-top {
-            padding-top: 20px;
+        /* Nav modern optimization */
+        .nav-modern {
+            display: flex !important;
+            align-items: center !important;
+            gap: 5px; /* Reduced gap to fit more items */
+            flex: 1;
+            justify-content: center;
+            min-width: 0;
+        }
+        
+        .nav-link {
+            white-space: nowrap !important;
+            font-size: 14px !important;
+            padding: 8px 10px !important; /* Slightly more compact */
+            color: #fff !important;
+            font-weight: 500;
+        }
+
+        /* Search header optimization */
+        .search-header {
+            display: flex !important;
+            align-items: center !important;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .search-container {
+            width: 250px;
+            max-width: 250px;
+            transition: all 0.3s ease;
+        }
+
+        .search-container:focus-within {
+            width: 320px;
+            max-width: 350px;
+        }
+
+        /* Logo section optimization */
+        .logo-section {
+            flex-shrink: 0;
+            margin-right: 10px;
+        }
+
+        /* User menu and Publicar button */
+        .user-menu {
+            display: flex;
+            align-items: center !important;
+            gap: 8px;
+        }
+
+        .btn-publicar {
+            white-space: nowrap !important;
+            padding: 8px 14px !important;
+            font-size: 13px !important;
+            flex-shrink: 0;
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px;
+            border-radius: 20px !important;
+            background-color: #E30613 !important;
+            color: #fff !important;
+            border: none !important;
+            font-weight: 600 !important;
+        }
+
+        /* Responsive Visibility */
+        @media (max-width: 900px) {
+            .nav-modern {
+                display: none !important; /* Hide nav links on smaller desktop screens instead of breaking */
+            }
+        }
+
+        @media (max-width: 768px) {
+            body { margin-top: 0 !important; }
+            .header-modern.mobile-only { display: block !important; height: 48px; }
+            .header-modern.desktop-only { display: none !important; }
+        }
+        
+        @media (min-width: 769px) {
+            body { margin-top: 80px !important; }
+            .header-modern.desktop-only { display: block !important; height: 80px; }
+            .header-modern.mobile-only { display: none !important; }
+        }
+
+        /* Mobile Header Fixes (from funciones_modern.php classes) */
+        .mobile-header-top {
+            background-color: #2d2d2d !important;
+            border-bottom: 1px solid #3d3d3d !important;
+        }
+        
+        .mobile-header-content-unified {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            padding: 0 12px !important;
+            height: 48px !important;
+            gap: 10px !important;
+        }
+
+        .mobile-iconotype-link {
+            flex-shrink: 0 !important;
+        }
+
+        .mobile-search-box-unified {
+            flex: 1 !important;
+            position: relative !important;
+            min-width: 0 !important;
+        }
+
+        .mobile-search-box-unified .search-icon {
+            position: absolute !important;
+            left: 14px !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            color: rgba(255,255,255,0.45) !important;
+            font-size: 14px !important;
+            z-index: 2 !important;
+            pointer-events: none !important;
+        }
+
+        .mobile-search-input-header {
+            background: rgba(255,255,255,0.08) !important;
+            border: 1px solid rgba(255,255,255,0.15) !important;
+            border-radius: 20px !important;
+            color: #fff !important;
+            width: 100% !important;
+            font-size: 14px !important;
+            padding: 0 15px 0 38px !important;
+            height: 38px !important;
+            outline: none !important;
         }
         </style>
         
@@ -258,10 +437,10 @@ if (!isset($panel)) {
             document.addEventListener('DOMContentLoaded', function() {
                 // Verificar que jQuery se cargó correctamente
                 if (typeof jQuery === 'undefined') {
-                    // jQuery no se cargó correctamente
-                } else {
-                    // jQuery cargado correctamente
+                    // jQuery no se cargó correctamente - skip further checks
+                    return;
                 }
+                // jQuery cargado correctamente
 
                 // Verificar que EasyAutoComplete se cargó correctamente
                 if (typeof jQuery.fn.easyAutocomplete === 'undefined') {
@@ -304,6 +483,7 @@ if (!isset($panel)) {
         }, true);
         </script>
         <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.4.1/js/bootstrap.min.js" crossorigin="anonymous"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/easy-autocomplete/1.3.5/jquery.easy-autocomplete.min.js" crossorigin="anonymous"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/easy-autocomplete/1.3.5/easy-autocomplete.min.css" crossorigin="anonymous">
         
@@ -315,11 +495,11 @@ if (!isset($panel)) {
             }
             
             .easy-autocomplete-container {
-                background: white;
+                /* background: white;  REMOVED TO FIX CONFLICT */
                 border-radius: 8px;
                 box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
                 overflow: hidden;
-                margin-top: 5px;
+                /* margin-top: 5px; REMOVED TO FIX SPACING */
             }
             
             .easy-autocomplete-container ul {
@@ -338,7 +518,7 @@ if (!isset($panel)) {
             }
             
             .easy-autocomplete-container ul li:hover {
-                background: #f8f9fa;
+                background: rgba(0,0,0,0.05);
             }
             
             .easy-autocomplete-container ul li.selected {
@@ -440,6 +620,44 @@ if (!isset($panel)) {
         ?>
         <script src="/js/code-viewer-modal.js?v=<?php echo $code_viewer_script_version; ?>" defer></script>
         
+        <!-- VIP Badge Click Modal -->
+        <div id="vipInfoModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; z-index:999999; background:rgba(0,0,0,0.7); justify-content:center; align-items:center;">
+            <div style="background:linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border:2px solid rgba(255,215,0,0.4); border-radius:20px; padding:30px; max-width:380px; width:90%; text-align:center; position:relative; box-shadow:0 20px 60px rgba(0,0,0,0.5);">
+                <button onclick="document.getElementById('vipInfoModal').style.display='none'" style="position:absolute; top:12px; right:15px; background:none; border:none; color:#aaa; font-size:1.3rem; cursor:pointer;">&times;</button>
+                <div style="font-size:2.5rem; margin-bottom:10px;">👑</div>
+                <h3 style="color:#ffd700; margin:0 0 5px 0; font-size:1.3rem;">Usuario VIP verificado</h3>
+                <p style="color:rgba(255,255,255,0.7); font-size:0.85rem; margin:0 0 20px 0;">Ventajas exclusivas del plan VIP</p>
+                <div style="text-align:left; margin-bottom:20px;">
+                    <div style="display:flex; align-items:center; gap:10px; padding:8px 0; color:rgba(255,255,255,0.9); font-size:0.9rem;"><i class="fas fa-check" style="color:#ffd700; width:16px;"></i> Badge dorado de confianza</div>
+                    <div style="display:flex; align-items:center; gap:10px; padding:8px 0; color:rgba(255,255,255,0.9); font-size:0.9rem;"><i class="fas fa-comments" style="color:#ffd700; width:16px;"></i> Chat ilimitado con viewers</div>
+                    <div style="display:flex; align-items:center; gap:10px; padding:8px 0; color:rgba(255,255,255,0.9); font-size:0.9rem;"><i class="fas fa-paper-plane" style="color:#ffd700; width:16px;"></i> Mensajes masivos</div>
+                    <div style="display:flex; align-items:center; gap:10px; padding:8px 0; color:rgba(255,255,255,0.9); font-size:0.9rem;"><i class="fas fa-wallet" style="color:#ffd700; width:16px;"></i> +10€ saldo gratis/mes</div>
+                </div>
+                <a href="/public/suscripcion_vip.php" style="display:block; background:linear-gradient(135deg, #ffd700 0%, #E30613 100%); color:white; padding:12px 20px; border-radius:25px; text-decoration:none; font-weight:700; font-size:1rem; transition:transform 0.2s;">Quiero ser VIP →</a>
+            </div>
+        </div>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Click handler for VIP badges - opens modal
+            document.addEventListener('click', function(e) {
+                var badge = e.target.closest('.vip-badge-gold');
+                if (badge) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var modal = document.getElementById('vipInfoModal');
+                    if (modal) modal.style.display = 'flex';
+                }
+            });
+            // Close modal on backdrop click
+            var vipModal = document.getElementById('vipInfoModal');
+            if (vipModal) {
+                vipModal.addEventListener('click', function(e) {
+                    if (e.target === this) this.style.display = 'none';
+                });
+            }
+        });
+        </script>
+        
         <!-- Google Analytics 4 -->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-DVE5FZ2SZY"></script>
         <script>
@@ -449,6 +667,76 @@ if (!isset($panel)) {
             gtag('config', 'G-DVE5FZ2SZY');
         </script>
         <script src="/js/notificaciones.js?v=<?php echo file_exists(__DIR__ . '/../js/notificaciones.js') ? filemtime(__DIR__ . '/../js/notificaciones.js') : time(); ?>" defer></script>
+        <style>
+            /* DEFINITIVE FIX FOR SEARCH RESULTS LAYOUT */
+            .easy-autocomplete-container ul li > div {
+                display: flex !important;
+                flex-direction: row !important;
+                align-items: center !important;
+                justify-content: flex-start !important;
+                width: 100% !important;
+                word-break: normal !important;
+                white-space: nowrap !important;
+                text-align: left !important;
+                gap: 15px !important;
+                padding: 12px 15px !important;
+                box-sizing: border-box !important;
+            }
+            .brand-suggestion-item {
+                display: flex !important;
+                flex-direction: row !important;
+                align-items: center !important;
+                justify-content: flex-start !important;
+                gap: 15px !important;
+                width: 100% !important;
+                min-width: 0 !important;
+            }
+            .brand-suggestion-info {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                justify-content: center !important;
+                flex: 1 !important;
+                min-width: 0 !important;
+                gap: 2px !important;
+                overflow: hidden !important;
+            }
+            .brand-suggestion-name {
+                font-weight: 700 !important;
+                font-size: 16px !important;
+                color: #222 !important;
+                display: block !important;
+                width: 100% !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+            }
+            .brand-suggestion-count {
+                font-size: 13px !important;
+                color: #888 !important;
+                display: block !important;
+            }
+            .brand-suggestion-image-wrapper {
+                width: 45px !important;
+                height: 45px !important;
+                min-width: 45px !important;
+                background: white !important;
+                border-radius: 8px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                padding: 5px !important;
+                flex-shrink: 0 !important;
+                overflow: hidden !important;
+            }
+            .brand-suggestion-image-wrapper img {
+                max-width: 100% !important;
+                max-height: 100% !important;
+                width: auto !important;
+                height: auto !important;
+                object-fit: contain !important;
+            }
+        </style>
     </head>
     <body>
     <?php
@@ -480,13 +768,13 @@ if (!isset($panel)) {
                      }
                      $is_vip = function_exists('es_usuario_vip') ? es_usuario_vip((string)$data_usuario['_id']) : false;
                      
-                     $bg_color = $is_vip ? 'linear-gradient(90deg, #ffd700 0%, #ff8c00 100%)' : 'linear-gradient(90deg, #1a1a2e 0%, #30475e 100%)';
+                     $bg_color = $is_vip ? 'linear-gradient(90deg, #ffd700 0%, #E30613 100%)' : 'linear-gradient(90deg, #1a1a2e 0%, #30475e 100%)';
                      $text_color = '#fff';
                      $icon = $is_vip ? 'fa-crown' : 'fa-users';
                      $msg = $is_vip 
-                        ? "<strong>¡Tienes $count viewers esperando!</strong> Contacta con ellos ahora." 
+                        ? "<strong>¡Tienes $count leads esperando!</strong> Contacta con ellos ahora." 
                         : "<strong>¡Tienes $count potenciales clientes esperando!</strong> Hazte VIP para contactarlos.";
-                     $btn_text = $is_vip ? "Ver Viewers" : "Ver oportunidad";
+                     $btn_text = $is_vip ? "Ver Leads" : "Ver oportunidad";
                      $link = "/public/mis_viewers.php";
                      
                      echo '<div style="background: '.$bg_color.'; color: '.$text_color.'; padding: 10px 20px; text-align: center; position: relative; z-index: 10000; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-family: \'Inter\', sans-serif;">';
@@ -519,12 +807,19 @@ if (!isset($panel)) {
                         Códigos Amigo <i class="fas fa-chevron-down"></i>
                     </button>
                     <div class="dropdown-menu-modern" style="max-height: 80vh; overflow-y: auto;">
+                        <a href="/" class="dropdown-item-modern">
+                            <i class="fas fa-home"></i> Inicio
+                        </a>
+                        <div class="dropdown-divider"></div>
                         <span class="dropdown-header-modern"><i class="fas fa-tags"></i> Marcas</span>
                         <a href="<?php echo link_listado_marcas(); ?>" class="dropdown-item-modern">
                             Ver todas las marcas
                         </a>
                         <?php
-                        $lista_marcas = getListMarcaSpecial();
+                        if (!function_exists('getListMarcaSpecial')) {
+                            include_once __DIR__ . '/../funciones.php';
+                        }
+                        $lista_marcas = function_exists('getListMarcaSpecial') ? getListMarcaSpecial() : [];
                         if($lista_marcas){
                             foreach($lista_marcas as $marca) {
                                 $codes = $marca["codes"] ?? 0;
@@ -551,7 +846,10 @@ if (!isset($panel)) {
                             Ver todas las categorías
                         </a>
                         <?php
-                        $listacategorias = getCategorias();
+                        if (!function_exists('getCategorias')) {
+                            include_once __DIR__ . '/../../inc/conexion.php';
+                        }
+                        $listacategorias = function_exists('getCategorias') ? getCategorias() : [];
                         foreach($listacategorias as $categoria) { 
                             if(isset($categoria["nombre"]) && isset($categoria["nombre_clave"])) {
                         ?>
@@ -596,12 +894,7 @@ if (!isset($panel)) {
                     </div>
                 </div>
                 
-                <!-- Amazon Services Link -->
-                <div class="dropdown-modern">
-                    <a href="/amazon" class="nav-link" style="text-decoration: none; color: #fff; font-weight: 500;">
-                        Amazon Gratis <i class="fas fa-crown text-warning"></i>
-                    </a>
-                </div>
+
 
                 <!-- Menú desplegable de Chollos -->
                 <div class="dropdown-modern">
@@ -609,8 +902,14 @@ if (!isset($panel)) {
                         Chollos <i class="fas fa-chevron-down"></i>
                     </button>
                     <div class="dropdown-menu-modern">
-                        <a href="/chollos" class="dropdown-item-modern">
+                        <a href="/amazon" class="dropdown-item-modern">
+                            <i class="fas fa-crown text-warning"></i> Amazon Gratis
+                        </a>
+                        <a href="https://www.malprecio.com/chollos" target="_blank" class="dropdown-item-modern">
                             <i class="fas fa-tag"></i> Todos los chollos
+                        </a>
+                        <a href="https://www.malprecio.com/chollos-shorts" target="_blank" class="dropdown-item-modern" style="color: #E30613; font-weight: 700;">
+                            <i class="fab fa-youtube"></i> Chollos Shorts <span style="background: #E30613; color: white; padding: 1px 5px; border-radius: 4px; font-size: 9px; margin-left: 5px;">NUEVO</span>
                         </a>
                         <a href="https://t.me/cholloscodigoamigo" target="_blank" class="dropdown-item-modern telegram-link">
                             <i class="fa-brands fa-telegram"></i> Canal de Telegram
@@ -632,13 +931,13 @@ if (!isset($panel)) {
                     
                     
                     <!-- Botón de login (oculto cuando está logueado) -->
-                    <button class="btn-acceder open_modal_login" id="btn-login">
+                    <button class="btn-acceder open_modal_login" id="btn-login" style="<?php echo (isset($_SESSION['user_id']) && !empty($_SESSION['user_id'])) ? 'display: none;' : 'display: block;'; ?>">
                         <i class="fas fa-user"></i>
                         Acceder
                     </button>
 
                     <!-- Menú de usuario (visible cuando está logueado) -->
-                    <div class="user-menu" id="user-menu" style="display: none;">
+                    <div class="user-menu" id="user-menu" style="<?php echo (isset($_SESSION['user_id']) && !empty($_SESSION['user_id'])) ? 'display: flex;' : 'display: none;'; ?>">
                         <!-- Notificaciones -->
                         <div class="notification-container" id="notification-container">
                             <button class="notification-btn" id="notification-btn" title="Notificaciones">
@@ -659,6 +958,9 @@ if (!isset($panel)) {
                         <div class="user-profile" id="user-profile">
                             <img src="" alt="Avatar" class="user-avatar-small" id="user-avatar">
                             <span class="user-name-small" id="user-name">Usuario</span>
+                            <?php if(isset($_SESSION["user_id"]) && es_usuario_vip($_SESSION["user_id"])): ?>
+                                <i class="fas fa-crown" style="color: #ffd700; margin-left: 5px;" title="VIP"></i>
+                            <?php endif; ?>
                             <i class="fas fa-chevron-down"></i>
                         </div>
                         
@@ -669,6 +971,7 @@ if (!isset($panel)) {
                         $count_favoritos = 0;
                         $count_chollos = 0;
                         $count_mensajes = 0;
+                        $header_total_potential = 0;
                         
                         if(isset($_SESSION["user_id"]) && !empty($_SESSION["user_id"])) {
                             $uid_session = $_SESSION["user_id"];
@@ -712,17 +1015,29 @@ if (!isset($panel)) {
                                         ]);
                                     }
                                 }
+                                
+                                // Potential Earnings Calculation
+                                if (!function_exists('obtener_potencial_completo_usuario')) {
+                                    include_once __DIR__ . '/../funciones_usuario.php';
+                                }
+                                $potencial_global = obtener_potencial_completo_usuario($uid_session);
+                                $header_total_potential = $potencial_global['total_potential'] ?? 0;
+                                
+                                // Count Leads (viewers)
+                                $count_leads = 0;
+                                if(function_exists('getCollectionCodeViewers')) {
+                                    $coll_viewers = getCollectionCodeViewers();
+                                    $uidObj = is_string($uid_session) ? new MongoDB\BSON\ObjectId($uid_session) : $uid_session;
+                                    $count_leads = $coll_viewers->countDocuments([
+                                        'codigo_owner_id' => $uidObj,
+                                        'viewer_user_id' => ['$exists' => true]
+                                    ]);
+                                }
                             } catch(Exception $e) {}
                         }
                         ?>
 
                         <div class="user-dropdown" id="user-dropdown">
-                        <a href="/nuevo_codigo" class="dropdown-item">
-                                <i class="fas fa-plus-circle"></i>
-                                Publicar código
-                            </a>
-                            
-                            <hr class="dropdown-divider">
                             <div class="dropdown-header-modern" style="padding: 5px 20px; font-size: 11px; text-transform: uppercase; color: #888; font-weight: 700;">Mi Contenido</div>
                             
                             <a href="/mis-anuncios" class="dropdown-item">
@@ -734,6 +1049,11 @@ if (!isset($panel)) {
                                 <i class="fas fa-link"></i>
                                 Mis URLs de Afiliados
                                 <?php if($count_afiliados > 0) { echo '<span class="badge pull-right" style="margin-left:auto; background:#eee; color:#333; padding:2px 8px; border-radius:10px; font-size:12px;">'.$count_afiliados.'</span>'; } ?>
+                            </a>
+                            <a href="/mis-favoritos" class="dropdown-item">
+                                <i class="fas fa-heart"></i>
+                                Códigos Favoritos
+                                <?php if($count_favoritos > 0) { echo '<span class="badge pull-right" style="margin-left:auto; background:#eee; color:#333; padding:2px 8px; border-radius:10px; font-size:12px;">'.$count_favoritos.'</span>'; } ?>
                             </a>
 
                             <hr class="dropdown-divider">
@@ -750,21 +1070,40 @@ if (!isset($panel)) {
                                 Invita amigos
                             </a>
                             <?php } ?>
-
-                            <hr class="dropdown-divider">
-                            <div class="dropdown-header-modern" style="padding: 5px 20px; font-size: 11px; text-transform: uppercase; color: #888; font-weight: 700;">Colecciones</div>
-
-                            <a href="/mis-favoritos" class="dropdown-item">
-                                <i class="fas fa-heart"></i>
-                                Códigos Favoritos
-                                <?php if($count_favoritos > 0) { echo '<span class="badge pull-right" style="margin-left:auto; background:#eee; color:#333; padding:2px 8px; border-radius:10px; font-size:12px;">'.$count_favoritos.'</span>'; } ?>
-                            </a>
-                            <a href="/mis-favoritos?tipo=chollo" class="dropdown-item">
-                                <i class="fas fa-fire"></i>
-                                Chollos Favoritos
-                                <?php if($count_chollos > 0) { echo '<span class="badge pull-right" style="margin-left:auto; background:#eee; color:#333; padding:2px 8px; border-radius:10px; font-size:12px;">'.$count_chollos.'</span>'; } ?>
-                            </a>
                             
+                            <?php 
+                            $dropdown_is_vip = isset($_SESSION["user_id"]) && function_exists('es_usuario_vip') && es_usuario_vip($_SESSION["user_id"]);
+                            $has_potential = isset($header_total_potential) && $header_total_potential > 0;
+                            $leads_link = $dropdown_is_vip ? '/public/mis_viewers.php' : '/public/suscripcion_vip.php';
+                            ?>
+                            <!-- Bloque visual Leads + VIP -->
+                            <div style="margin: 8px 10px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(102,126,234,0.3);">
+                                <a href="<?php echo $leads_link; ?>" style="display:block; text-decoration:none; padding: 14px 15px; background: linear-gradient(135deg, rgba(102,126,234,0.15) 0%, rgba(118,75,226,0.15) 100%);">
+                                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+                                        <i class="fas fa-crosshairs" style="color:#667eea; font-size:16px;"></i>
+                                        <span style="color:#fff; font-weight:700; font-size:14px;">Mis Leads</span>
+                                        <?php if($count_leads > 0): ?>
+                                            <span style="margin-left:auto; background:#667eea; color:white; padding:2px 10px; border-radius:10px; font-size:12px; font-weight:700;"><?php echo $count_leads; ?> personas</span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <?php if($has_potential): ?>
+                                    <div style="display:flex; align-items:baseline; gap:6px;">
+                                        <span style="color:#4ade80; font-size:22px; font-weight:900; letter-spacing:-0.5px;"><?php echo number_format($header_total_potential, 0, ',', '.'); ?>€</span>
+                                        <span style="color:rgba(255,255,255,0.6); font-size:12px;">potencial de ganancias</span>
+                                    </div>
+                                    <?php else: ?>
+                                    <div style="color:rgba(255,255,255,0.5); font-size:12px;">Publica códigos para generar leads</div>
+                                    <?php endif; ?>
+                                </a>
+                                <?php if(!$dropdown_is_vip): ?>
+                                <a href="/public/suscripcion_vip.php" style="display:flex; align-items:center; gap:10px; padding:10px 15px; background: linear-gradient(135deg, rgba(255,215,0,0.2) 0%, rgba(227,6,19,0.15) 100%); text-decoration:none; border-top: 1px solid rgba(255,215,0,0.2);">
+                                    <i class="fas fa-crown" style="color:#ffd700; font-size:14px;"></i>
+                                    <span style="color:#ffd700; font-weight:700; font-size:13px;">Hazte VIP para contactarlos</span>
+                                    <span style="margin-left:auto; background: linear-gradient(135deg, #ffd700 0%, #E30613 100%); color:white; padding:3px 8px; border-radius:10px; font-size:10px; font-weight:800;">9,99€/mes</span>
+                                </a>
+                                <?php endif; ?>
+                            </div>
+
                             <hr class="dropdown-divider">
                             <div class="dropdown-header-modern" style="padding: 5px 20px; font-size: 11px; text-transform: uppercase; color: #888; font-weight: 700;">Mi Cuenta</div>
 
@@ -773,7 +1112,6 @@ if (!isset($panel)) {
                                 <i class="fas fa-user-circle"></i>
                                 Mi perfil público
                             </a>
-                            
                             <?php } ?>
                             
                             <?php 
@@ -788,14 +1126,12 @@ if (!isset($panel)) {
                                         (isset($_SESSION["mail"]) && $_SESSION["mail"] === "thevega82@gmail.com");
                             
                             if($es_admin) { ?>
-                            <hr class="dropdown-divider">
                             <a target="_blank" href="/public/admin_dashboard.php" class="dropdown-item" style="color: #E30613; font-weight: 700;">
                                 <i class="fas fa-cogs"></i>
                                 Panel de Admin
                             </a>
                             <?php } ?>
                             
-                            <hr class="dropdown-divider">
                             <a href="/usuario" class="dropdown-item">
                                 <i class="fas fa-user-edit"></i>
                                 Editar perfil
@@ -828,43 +1164,10 @@ if (!isset($panel)) {
         add_mobile_header_compact();
         ?>
         
-       
-            
-            <!-- MENÚ DESPLEGABLE MÓVIL -->
-            <div class="mobile-menu" id="mobile-menu">
-                <div class="mobile-menu-content">
-                    <nav class="mobile-nav-links">
-                        <a href="/destacados" class="mobile-nav-link">Destacados</a>
-                        <a href="/nuevos" class="mobile-nav-link">Nuevos</a>
-                        <a href="/populares" class="mobile-nav-link">Populares</a>
-                        
-                        <div class="mobile-nav-separator" style="height: 1px; background: #333; margin: 10px 0;"></div>
-                        <div style="padding: 10px 20px; color: #888; font-size: 12px; font-weight: bold; text-transform: uppercase;">Códigos Amigo</div>
-                        <a href="/marcas" class="mobile-nav-link" style="padding-left: 30px;">Marcas</a>
-                        <a href="/categorias" class="mobile-nav-link" style="padding-left: 30px;">Categorías</a>
-                        
-                        <div class="mobile-nav-separator" style="height: 1px; background: #333; margin: 10px 0;"></div>
-                        
-                        <a href="/chollos" class="mobile-nav-link">🔥 Chollos</a>
-                        <?php
-                        // Check if guides exist
-                         if (function_exists('get_active_super_landings')) {
-                            $guias_mobile = get_active_super_landings();
-                            if(!empty($guias_mobile)) {
-                                echo '<a href="/guias/' . $guias_mobile[0]['slug'] . '" class="mobile-nav-link">📚 Guías</a>';
-                            } else {
-                                echo '<a href="#" class="mobile-nav-link">📚 Guías</a>';
-                            }
-                         }
-                        ?>
-                        <a href="/nuevo_codigo" class="mobile-nav-link">Publicar Código</a>
-                        <a href="#" class="mobile-nav-link open_modal_login">Iniciar Sesión</a>
-                    </nav>
-                </div>
-            </div>
-            
-            <!-- OVERLAY PARA MENÚ MÓVIL -->
-            <div class="mobile-menu-overlay" id="mobile-menu-overlay"></div>
+        <?php
+        // El menú móvil antiguo ha sido eliminado ya que ahora se usa add_mobile_header_compact()
+        // que añade el nuevo menú hamburguesa y el bottom nav.
+        ?>
 
         <?php
         // Widget de chollos eliminado de header global - movido a vistas específicas
@@ -1047,62 +1350,146 @@ if (!isset($panel)) {
                 var options_busqueda = {
                     url: url_d,
                     getValue: "nombre",
-                                            template: {
+                    listLocation: function(data) {
+                        return data.filter(function(item) {
+                            // Filtrado estricto: eliminar "false", strings "false", y objetos sin nombre válido
+                            if (!item || item === "false" || item === false) return false; console.log("EAC item is:", item);
+                            if (typeof item === 'object' && (!item.nombre || item.nombre === "false" || item.nombre === "false" || item.nombre === false)) return false;
+                            return true;
+                        });
+                    },
+                    template: {
                         type: "custom",
                         method: function(value, item) {
-                            var ruta = "/de-" + item.nombre_clave;
+                            // Si llegara algo inválido, no mostrar nada
+                            if (!item || !item.nombre_clave || value === "false" || value === false) {
+                                return "";
+                            }
 
+                            var ruta = "/de-" + item.nombre_clave;
+                            // Usar ruta directa del item si no hay nombre_clave pero hay url
+                            if (!item.nombre_clave && item.url) {
+                                ruta = item.url;
+                            }
+                            
                             var codes = "";
                             if (item.codes == 1) {
                                 codes = "1 código";
                             } else if (item.codes > 1) {
                                 codes = item.codes + " códigos";
-                            } else {
-                                codes = "";
                             }
 
-                            // Procesar URL de imagen: convertir CDN a URL directa del servidor
+                            // Procesar URL de imagen
                             var imagenUrl = item.imagen || '/img/no_image.png';
                             try {
                                 if (imagenUrl && typeof imagenUrl === 'string' && imagenUrl.indexOf('cdn.codigoamigo.com') !== -1) {
-                                    // Extraer el path de la URL del CDN
                                     var urlObj = new URL(imagenUrl);
                                     var path = urlObj.pathname;
-                                    // Convertir a URL directa del servidor
-                                    // Si es panel_marcas, necesita /img/ antes
-                                    if (path.indexOf('/panel_marcas/') !== -1) {
-                                        imagenUrl = 'https://www.codigoamigo.com/img' + path;
-                                    } else {
-                                        imagenUrl = 'https://www.codigoamigo.com' + path;
-                                    }
+                                    imagenUrl = (path.indexOf('/panel_marcas/') !== -1) ? 
+                                                'https://www.codigoamigo.com/img' + path : 
+                                                'https://www.codigoamigo.com' + path;
                                 }
-                                // Convertir http a https
                                 if (imagenUrl && typeof imagenUrl === 'string' && imagenUrl.indexOf('http://') !== -1) {
                                     imagenUrl = imagenUrl.replace('http://', 'https://');
                                 }
                             } catch (e) {
-                                // Si hay error al procesar la URL, usar imagen por defecto
                                 imagenUrl = '/img/no_image.png';
                             }
 
-                            var element = "<a style='color: black; display: flex; align-items: center; padding: 10px;' href='" + item.url + "'>";
-                            element = element + "<div style='width: 60px; height: 60px; min-width: 60px; overflow: hidden; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: white; margin-right: 15px;'>";
-                            element = element + "<img style='width: 100%; height: 100%; object-fit: contain;' src='" + imagenUrl + "' onerror=\"this.src='/img/no_image.png'\" />";
-                            element = element + "</div>";
-                            element = element + "<div style='flex: 1; display: flex; flex-direction: column;'>";
-                            element = element + "<div style='font-size: 16px; font-weight: 600; color: #333; margin-bottom: 4px;'>" + value + "</div>";
-                            if (codes) {
-                                element = element + "<div style='font-size: 13px; color: #666;'>(" + codes + ")</div>";
-                            }
-                            element = element + "</div>";
-                            element = element + "</a>";
-                            return element;
+                            // Usar etiqueta <a> para mejorar compatibilidad móvil y SEO
+                            return "<a href='" + ruta + "' class='brand-suggestion-item' style='text-decoration: none; color: inherit; display: flex; width: 100%;'>" +
+                                   "<div class='brand-suggestion-image-wrapper'>" +
+                                   "<img src='" + imagenUrl + "' onerror=\"this.src='/img/no_image.png'\" alt='" + value + "' />" +
+                                   "</div>" +
+                                   "<div class='brand-suggestion-info'>" +
+                                   "<div class='brand-suggestion-name'>" + value + "</div>" +
+                                   (codes ? "<div class='brand-suggestion-count'>" + codes + "</div>" : "") +
+                                   "</div>" +
+                                   "</a>";
                         }
                     },
                     list: {
                         maxNumberOfElements: 10,
                         match: {
-                            enabled: true
+                            enabled: true,
+                            method: function(element, phrase) {
+                                if (!element || !phrase) return false;
+                                
+                                var p = phrase.toLowerCase().replace(/\s+/g, '');
+                                if (p === "ing" || p === "ingdirect") {
+                                    if (element.toLowerCase() === "banco ing") return true;
+                                }
+                                
+                                var e = element.toLowerCase().replace(/\s+/g, '');
+                                return e.indexOf(p) > -1;
+                            }
+                        },
+                        sort: {
+                            enabled: true,
+                            method: function(a, b) {
+                                var p = "";
+                                if ($("#busqueda_marca").is(":focus")) p = $("#busqueda_marca").val();
+                                else if ($("#busqueda_marca2").is(":focus")) p = $("#busqueda_marca2").val();
+                                else if ($("#mobile-search-input").is(":focus")) p = $("#mobile-search-input").val();
+                                else if ($("#mobile-search-input-header").is(":focus")) p = $("#mobile-search-input-header").val();
+                                else p = $(".easy-autocomplete input:focus").val() || "";
+                                
+                                p = p.toLowerCase().replace(/\s+/g, '');
+                                
+                                if (p === "ing" || p === "ingdirect") {
+                                    if (a.nombre.toLowerCase() === "banco ing") return -1;
+                                    if (b.nombre.toLowerCase() === "banco ing") return 1;
+                                }
+                                
+                                var ea = a.nombre.toLowerCase().replace(/\s+/g, '');
+                                var eb = b.nombre.toLowerCase().replace(/\s+/g, '');
+                                
+                                var startsWithA = ea.indexOf(p) === 0;
+                                var startsWithB = eb.indexOf(p) === 0;
+                                
+                                if (startsWithA && !startsWithB) return -1;
+                                if (!startsWithA && startsWithB) return 1;
+                                
+                                return 0;
+                            }
+                        },
+                        onDrawEvent: function() {
+                            var $input = $(this);
+                            var $container = $input.siblings(".easy-autocomplete-container");
+                            var $list = $container.find("ul");
+                            if ($list.children().length === 0) {
+                                $list.append("<li class='eac-item'><div style='padding:12px 15px; color:#888; text-align:center;'>Sin resultados</div></li>");
+                                // Eliminar elemento que contenga solo el texto "false"
+                                $list.children().each(function() {
+                                    var txt = $(this).text().trim(); if (txt === "false" || txt.toLowerCase() === "false" ) {
+                                        $(this).remove();
+                                    }
+                                });
+
+                                $list.show();
+                                $container.show();
+                            }
+                        },
+                        onChooseEvent: function() {
+                            // Obtener el item seleccionado del input que disparó el evento
+                            var $input = $(this);
+                            var item = $input.getSelectedItemData();
+                            
+                            if (item && item.nombre_clave) {
+                                window.location.href = "/de-" + item.nombre_clave;
+                            } else if (item && item.url) {
+                                window.location.href = item.url;
+                            }
+                        },
+                        // Evento click específico para móvil
+                        onClickEvent: function() {
+                            var $input = $(this);
+                            var item = $input.getSelectedItemData();
+                            if (item && item.nombre_clave) {
+                                window.location.href = "/de-" + item.nombre_clave;
+                            } else if (item && item.url) {
+                                window.location.href = item.url;
+                            }
                         }
                     }
                 };
@@ -1125,7 +1512,7 @@ if (!isset($panel)) {
 
                     // Aplicar autocompletado con verificación de elementos
                     // Solo incluir campos que existen en la página actual
-                    var searchFields = ["#busqueda_marca", "#mobile-search-input"];
+                    var searchFields = ["#busqueda_marca", "#mobile-search-input", "#mobile-search-input-header"];
                     if (document.getElementById('busqueda_marca2')) {
                         searchFields.push("#busqueda_marca2");
                     }
@@ -1234,7 +1621,7 @@ if (!isset($panel)) {
                 function setupEnterKey() {
                     // Configurando eventos de teclado
 
-                    $(document).off('keypress.search-enter').on('keypress.search-enter', '#busqueda_marca, #busqueda_marca2, #mobile-search-input', function(e) {
+                    $(document).off('keypress.search-enter').on('keypress.search-enter', '#busqueda_marca, #busqueda_marca2, #mobile-search-input, #mobile-search-input-header', function(e) {
                         if(e.which == 13) {
                             e.preventDefault();
                             // Enter presionado en campo de búsqueda
@@ -1314,29 +1701,8 @@ if (!isset($panel)) {
                 }, 10000);
             }
             
-            // Funcionalidad del menú móvil
-            $('#mobile-menu-toggle').on('click', function() {
-                $(this).toggleClass('active');
-                $('#mobile-menu').toggleClass('show');
-                $('#mobile-menu-overlay').toggleClass('show');
-                $('body').css('overflow', $('#mobile-menu').hasClass('show') ? 'hidden' : '');
-            });
-            
-            // Cerrar menú móvil al hacer clic en un enlace
-            $('.mobile-nav-link').on('click', function() {
-                $('#mobile-menu-toggle').removeClass('active');
-                $('#mobile-menu').removeClass('show');
-                $('#mobile-menu-overlay').removeClass('show');
-                $('body').css('overflow', '');
-            });
-            
-            // Cerrar menú móvil al hacer clic en el overlay
-            $('#mobile-menu-overlay').on('click', function() {
-                $('#mobile-menu-toggle').removeClass('active');
-                $('#mobile-menu').removeClass('show');
-                $(this).removeClass('show');
-                $('body').css('overflow', '');
-            });
+            // La funcionalidad del menú móvil antiguo ha sido eliminada 
+            // ya que ahora se gestiona en bottom_menu_script.php
             
             // HEADER FIJO - Efecto de scroll
             let lastScrollTop = 0;
@@ -2711,6 +3077,33 @@ if (!isset($panel)) {
         // Redirigir a la página de detalle del código
         window.location.href = '/de-' + marca + '?codigo=' + codeId;
     };
+
+    // Función para abrir chat directo con un usuario desde tarjeta de código
+    window.openDirectChat = function(userId, username) {
+        // Comprobar si el usuario está logueado
+        var currentUserId = null;
+        if (window.serverUserData && window.serverUserData.id) {
+            currentUserId = window.serverUserData.id;
+        }
+
+        if (!currentUserId) {
+            // No logueado: mostrar modal de login con redirect al chat
+            var chatUrl = '/public/chat_usuario.php?open_chat=' + userId;
+            if (typeof window.showLoginModal === 'function') {
+                window.showLoginModal('Para contactar con ' + username + ' necesitas iniciar sesión en Código Amigo.', chatUrl);
+            } else if (typeof window.openLoginModalWithRedirect === 'function') {
+                localStorage.setItem('redirectAfterLogin', chatUrl);
+                window.openLoginModalWithRedirect(chatUrl);
+            } else {
+                window.location.href = '/login.php';
+            }
+            return;
+        }
+
+        // Logueado: abrir chat directamente con mensaje predeterminado
+        var defaultMsg = encodeURIComponent('Hola buenas, me ayudas con el proceso y lo hacemos juntos?');
+        window.location.href = '/public/chat_usuario.php?open_chat=' + userId + '&msg=' + defaultMsg;
+    };
     
     // Función para copiar código al portapapeles
     window.copyCode = function() {
@@ -2741,6 +3134,10 @@ if (!isset($panel)) {
                 title: 'Código de descuento',
                 text: 'Mira este código de descuento que encontré',
                 url: window.location.href
+            }).catch(function(err) {
+                if (err.name !== 'AbortError') {
+                    console.error('Error sharing:', err);
+                }
             });
         } else {
             // Fallback: copiar URL al portapapeles
