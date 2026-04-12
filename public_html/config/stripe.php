@@ -124,3 +124,28 @@ if (!function_exists('get_stripe_test_secret_key')) {
         return $key;
     }
 }
+
+if (!function_exists('get_stripe_webhook_secret')) {
+
+    /**
+     * Devuelve el signing secret del webhook de Stripe, usado por
+     * Stripe\Webhook::constructEvent() para verificar que los eventos POSTeados
+     * al endpoint webhook_stripe.php vienen realmente de Stripe.
+     *
+     * Se obtiene de STRIPE_WEBHOOK_SECRET vía entorno o private/stripe_secrets.php.
+     *
+     * @return string whsec_...
+     * @throws RuntimeException si no está configurado
+     */
+    function get_stripe_webhook_secret() {
+        $key = $_ENV['STRIPE_WEBHOOK_SECRET'] ?? getenv('STRIPE_WEBHOOK_SECRET') ?: null;
+        if (empty($key)) {
+            throw new RuntimeException(
+                'STRIPE_WEBHOOK_SECRET no está configurada. ' .
+                'Obtén el signing secret desde Stripe Dashboard > Webhooks > [tu endpoint] > Signing secret ' .
+                'y añade STRIPE_WEBHOOK_SECRET a private/stripe_secrets.php.'
+            );
+        }
+        return $key;
+    }
+}
