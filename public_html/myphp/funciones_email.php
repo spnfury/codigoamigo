@@ -6,6 +6,11 @@ if (!function_exists('getCollectionEmailLogs')) {
     include_once __DIR__ . '/funciones_usuario.php';
 }
 
+// Asegurar disponibilidad del logger (log_info) para mensajes informativos
+if (!function_exists('log_info')) {
+    require_once __DIR__ . '/../inc/logger.php';
+}
+
 // Función para registrar un email en el log
 function registrarEmailLog($to_email, $to_name, $subject, $tipo, $usuario_id = null, $detalles = [], $enviado = true, $metodo = 'PHP mail()', $error = '', $html_body = '') {
     try {
@@ -29,7 +34,7 @@ function registrarEmailLog($to_email, $to_name, $subject, $tipo, $usuario_id = n
         $result = $collection_email_logs->insertOne($email_log);
         
         if ($result->getInsertedId()) {
-            error_log("Email log registrado: $tipo a $to_email - Método: $metodo");
+            log_info("Email log registrado: $tipo a $to_email - Método: $metodo");
             return true;
         }
         

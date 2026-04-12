@@ -39,9 +39,10 @@ foreach ($argv as $arg) {
     }
 }
 
-// Claves de Stripe
-$stripe_test_key = "sk_test_ML0vGPIQHfl4iQYVHeflQTZt";
-$stripe_live_key = "sk_live_dfMwJTC7REoMy76Bp2PzVoZV00U5KaNCcv";
+// Claves de Stripe (via helper)
+require_once __DIR__ . '/../config/stripe.php';
+$stripe_test_key = get_stripe_test_secret_key();
+$stripe_live_key = get_stripe_live_secret_key();
 
 echo "========================================\n";
 echo "Sincronización de Transacciones Stripe\n";

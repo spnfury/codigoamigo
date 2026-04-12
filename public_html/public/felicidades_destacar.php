@@ -43,13 +43,9 @@ if ($metodo === 'tarjeta' && !empty($session_id)) {
         
         // Determinar qué clave usar según el session_id
         // Los session IDs de test empiezan con cs_test_, los de live con cs_live_
+        require_once __DIR__ . '/../config/stripe.php';
         $is_test = strpos($session_id, 'cs_test_') === 0;
-        
-        if ($is_test) {
-            $stripe_secret_key = "sk_test_ML0vGPIQHfl4iQYVHeflQTZt";
-        } else {
-            $stripe_secret_key = "sk_live_dfMwJTC7REoMy76Bp2PzVoZV00U5KaNCcv";
-        }
+        $stripe_secret_key = $is_test ? get_stripe_test_secret_key() : get_stripe_live_secret_key();
         
         error_log("Verificando sesión Stripe: $session_id (modo: " . ($is_test ? 'TEST' : 'LIVE') . ")");
         

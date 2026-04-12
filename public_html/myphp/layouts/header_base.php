@@ -971,6 +971,7 @@ if (!isset($panel)) {
                         $count_favoritos = 0;
                         $count_chollos = 0;
                         $count_mensajes = 0;
+                        $count_leads = 0;
                         $header_total_potential = 0;
                         
                         if(isset($_SESSION["user_id"]) && !empty($_SESSION["user_id"])) {

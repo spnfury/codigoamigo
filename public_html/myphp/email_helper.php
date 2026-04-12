@@ -6,6 +6,11 @@ if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
     require_once __DIR__ . '/../vendor/autoload.php';
 }
 
+// Asegurar disponibilidad del logger (log_info) para mensajes informativos
+if (!function_exists('log_info')) {
+    require_once __DIR__ . '/../inc/logger.php';
+}
+
 use SendGrid\Mail\Mail;
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
@@ -67,7 +72,7 @@ function enviarEmailSMTPBrevo($to_email, $to_name, $subject, $html_content, $tex
         $mail->send();
         
         $resultado['success'] = true;
-        error_log("Email enviado correctamente via Brevo SMTP a: " . $to_email);
+        log_info("Email enviado correctamente via Brevo SMTP a: " . $to_email);
         
     } catch (Exception $e) {
         $resultado['error'] = "Error PHPMailer: " . $e->getMessage();
@@ -132,7 +137,7 @@ function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text
         if ($resultado_brevo['success']) {
             $resultado['success'] = true;
             $resultado['method'] = 'Brevo SMTP';
-            error_log("Email enviado correctamente via Brevo SMTP a: " . $to_email);
+            log_info("Email enviado correctamente via Brevo SMTP a: " . $to_email);
             return $resultado;
         } else {
             $resultado['error'] = "Brevo SMTP: " . $resultado_brevo['error'];
@@ -164,7 +169,7 @@ function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text
         if ($response->statusCode() == 202) {
             $resultado['success'] = true;
             $resultado['method'] = 'SendGrid (fallback)';
-            error_log("Email enviado correctamente via SendGrid (fallback) a: " . $to_email);
+            log_info("Email enviado correctamente via SendGrid (fallback) a: " . $to_email);
             return $resultado;
         } else {
             $resultado['error'] .= " | SendGrid: Status " . $response->statusCode() . " - " . $response->body();
@@ -195,7 +200,7 @@ function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text
         if ($resultado_elastic && isset($resultado_elastic->success) && $resultado_elastic->success) {
             $resultado['success'] = true;
             $resultado['method'] = 'Elastic Email (último recurso)';
-            error_log("Email enviado correctamente via Elastic Email (último recurso) a: " . $to_email);
+            log_info("Email enviado correctamente via Elastic Email (último recurso) a: " . $to_email);
             return $resultado;
         } else {
             $resultado['error'] .= " | Elastic Email: " . json_encode($resultado_elastic);

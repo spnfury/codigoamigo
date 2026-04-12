@@ -44,7 +44,8 @@ if (!$usuario) {
 }
 
 // Configurar Stripe
-$stripe_secret_key = $_ENV['STRIPE_SECRET_KEY'] ?? 'sk_live_dfMwJTC7REoMy76Bp2PzVoZV00U5KaNCcv';
+require_once __DIR__ . '/config/stripe.php';
+$stripe_secret_key = get_stripe_live_secret_key();
 \Stripe\Stripe::setApiKey($stripe_secret_key);
 
 try {

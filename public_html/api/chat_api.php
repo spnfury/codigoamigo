@@ -61,7 +61,7 @@ try {
             // Si se solicita migración, ejecutarla primero
             if (isset($_REQUEST['migrate']) && $_REQUEST['migrate'] === '1') {
                 $migrados = migrarMensajesSinConversacionId();
-                error_log("get_conversaciones_usuario: Migración ejecutada, mensajes migrados: $migrados");
+                log_info("get_conversaciones_usuario: Migración ejecutada, mensajes migrados: $migrados");
             }
             
             // Intentar obtener conversaciones
@@ -105,19 +105,19 @@ try {
                         // Si hay mensajes sin conversacion_id, migrarlos automáticamente
                         if ($count_sin_id > 0) {
                             $migrados = migrarMensajesSinConversacionId();
-                            error_log("get_conversaciones_usuario: Migración automática ejecutada, mensajes migrados: $migrados");
+                            log_info("get_conversaciones_usuario: Migración automática ejecutada, mensajes migrados: $migrados");
                             // Intentar obtener conversaciones nuevamente después de la migración
                             $conversaciones = obtenerConversacionesUsuario($user_id);
                             $count = count($conversaciones);
                         } else {
                             // Si hay mensajes pero todos tienen conversacion_id, puede ser un problema de agregación
-                            error_log("get_conversaciones_usuario: Hay $count_total_mensajes mensajes pero 0 conversaciones. Posible problema en agregación.");
+                            log_warning("get_conversaciones_usuario: Hay $count_total_mensajes mensajes pero 0 conversaciones. Posible problema en agregación.");
                         }
                     }
                 }
             }
             
-            error_log("get_conversaciones_usuario: user_id=$user_id, count=$count");
+            log_info("get_conversaciones_usuario: user_id=$user_id, count=$count");
             
             // Para debugging: incluir información adicional siempre si no hay conversaciones o si se solicita debug
             $debug_info = [];

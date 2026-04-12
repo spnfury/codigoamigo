@@ -11,6 +11,11 @@ if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
     require_once __DIR__ . '/../vendor/autoload.php';
 }
 
+// Asegurar disponibilidad del logger (log_info) para mensajes informativos
+if (!function_exists('log_info')) {
+    require_once __DIR__ . '/../inc/logger.php';
+}
+
 // Incluir configuración
 if (!defined('BREVO_API_KEY')) {
     include_once __DIR__ . '/../config/email_config.php';
@@ -118,7 +123,7 @@ function enviarNewsletterBrevoAPI($to_email, $to_name, $subject, $html_content, 
         // Éxito
         $resultado['success'] = true;
         $resultado['message_id'] = $response->getMessageId();
-        error_log("Email enviado correctamente via Brevo API a: $to_email (Message ID: " . $resultado['message_id'] . ")");
+        log_info("Email enviado correctamente via Brevo API a: $to_email (Message ID: " . $resultado['message_id'] . ")");
         
     } catch (\Exception $e) {
         // Error
@@ -195,7 +200,7 @@ function enviarNewsletterBrevoSMTP($to_email, $to_name, $subject, $html_content,
         $resultado['success'] = true;
         $resultado['message_id'] = 'smtp-' . md5($to_email . $subject . time());
         
-        error_log("Email enviado correctamente via Brevo SMTP a: $to_email");
+        log_info("Email enviado correctamente via Brevo SMTP a: $to_email");
         
     } catch (Exception $e) {
         $resultado['error'] = "Error Brevo SMTP: " . $mail->ErrorInfo;

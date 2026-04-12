@@ -22,8 +22,9 @@ require_once __DIR__ . '/../vendor/stripe/stripe-php/init.php';
 $dias_revisar = 7; // Revisar últimos 7 días
 $umbral_alerta = 1; // Alertar si hay al menos 1 transacción faltante
 
-// Claves de Stripe
-$stripe_live_key = "sk_live_dfMwJTC7REoMy76Bp2PzVoZV00U5KaNCcv";
+// Claves de Stripe (via helper)
+require_once __DIR__ . '/../config/stripe.php';
+$stripe_live_key = get_stripe_live_secret_key();
 
 echo "[" . date('Y-m-d H:i:s') . "] Iniciando monitor de transacciones Stripe...\n";
 

@@ -5,9 +5,11 @@ if (!function_exists('log_warning')) {
     require_once __DIR__ . '/logger.php';
 }
 
-// Solo incluir funciones.php si createConnection no está definido Y no estamos en un contexto web
-// (para evitar circular dependency en contexto web donde funciones.php ya incluye conexion.php)
-if (!function_exists('createConnection') && php_sapi_name() === 'cli') {
+// Cargar funciones.php si createConnection no está definido.
+// Nota: el comentario previo advertía de una dependencia circular, pero funciones.php
+// NO incluye conexion.php, así que el guard por SAPI era innecesario y dejaba fatales
+// en rutas web que llegan aquí sin haber cargado antes funciones.php (p.ej. /aviso-legal).
+if (!function_exists('createConnection')) {
     require_once __DIR__ . '/../myphp/funciones.php';
 }
 

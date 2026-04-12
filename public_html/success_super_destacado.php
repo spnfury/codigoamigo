@@ -13,10 +13,10 @@ if (!$session_id || !$codigo_id) {
     exit;
 }
 
-// Get Stripe key
-$stripe_key = (strpos($_SERVER['SERVER_NAME'], 'dev.') !== false || $_SERVER['SERVER_NAME'] === 'localhost')
-    ? 'sk_test_51IREyUEbj8l3ljyFx06D1jG5gqy0y8lCpO9i4lqt6ZInXBrOD5bqAHLWbU9HcS6xE6J6dcrJjBhIZxHaSzjdQP8D00Q9jqC9JB'
-    : getenv('STRIPE_SECRET_KEY');
+// Get Stripe key (test en dev/localhost, live en prod)
+require_once __DIR__ . '/config/stripe.php';
+$is_dev = (strpos($_SERVER['SERVER_NAME'] ?? '', 'dev.') !== false) || (($_SERVER['SERVER_NAME'] ?? '') === 'localhost');
+$stripe_key = $is_dev ? get_stripe_test_secret_key() : get_stripe_live_secret_key();
 
 \Stripe\Stripe::setApiKey($stripe_key);
 

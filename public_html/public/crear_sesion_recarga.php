@@ -44,19 +44,14 @@ require_once '../vendor/stripe/stripe-php/init.php';
 $usuario = getObjectUserWithSession('_id', new MongoDB\BSON\ObjectId($_SESSION["user_id"]));
 $email_usuario = $usuario['email'] ?? '';
 
-if ($email_usuario === 'thevega82@gmail.com') {
-    // Usar Stripe de prueba para el usuario específico
-    $stripe_secret_key = "sk_test_ML0vGPIQHfl4iQYVHeflQTZt";
-} else {
-    // Usar Stripe de producción para el resto
-    $stripe_secret_key = "sk_live_dfMwJTC7REoMy76Bp2PzVoZV00U5KaNCcv";
-}
+require_once $_SERVER['DOCUMENT_ROOT'] . '/config/stripe.php';
+$stripe_secret_key = get_stripe_secret_key($email_usuario, $_SESSION['user_id'] ?? null);
 
 try {
     // Crear sesión de Stripe
     $stripe = new \Stripe\StripeClient($stripe_secret_key);
     
-    error_log("Creando sesión Stripe para paquete: $paquete, precio: $precio, saldo: $saldo");
+    if (function_exists('log_info')) { log_info("Creando sesión Stripe para paquete: $paquete, precio: $precio, saldo: $saldo"); }
     
     $session = $stripe->checkout->sessions->create([
         'payment_method_types' => ['card'],
@@ -83,7 +78,7 @@ try {
         ]
     ]);
     
-    error_log("Sesión Stripe creada exitosamente: " . $session->id);
+    if (function_exists('log_info')) { log_info("Sesión Stripe creada exitosamente: " . $session->id); }
     
     // Redirigir directamente a Stripe Checkout
     ob_clean();

@@ -13,23 +13,17 @@ get_header_new($title, $description, $title_social, $description_social, $imagen
 
 
 
-if($_SESSION["user_id"]=='639899bc6321ee0d0e4010d2' || $_SESSION["user_id"]=='58bd851da54e295b8b52f702' || $_SESSION["user_id"]=='5db1af3a2f55c82b47342172'){ //SI ES USUARIO ADMIN PATROCINO GRATIS
-    
+require_once $_SERVER['DOCUMENT_ROOT'] . '/config/stripe.php';
+$stripe_live_secret_key = get_stripe_secret_key(null, $_SESSION['user_id'] ?? null);
+$is_sandbox_admin = in_array($_SESSION['user_id'] ?? null, ['639899bc6321ee0d0e4010d2', '58bd851da54e295b8b52f702', '5db1af3a2f55c82b47342172'], true);
+if ($is_sandbox_admin) {
     $stripe_live_publishable_key = "pk_test_yU61XXQMBvqVt4Ah9XD5uk6V";
-    $stripe_live_secret_key = "sk_test_ML0vGPIQHfl4iQYVHeflQTZt";
-
     $sku_patrocinado_1 = 'sku_GJUimQssXxo3yB';
     $sku_patrocinado_2 = 'sku_GJWab8ArF8ZM6t';
-
-}else{ //PRODUCCION
-
+} else {
     $stripe_live_publishable_key = "pk_live_HvgqlImI22optTnSvHKFKDiG00VQ0EZdE9";
-    $stripe_live_secret_key = "sk_live_dfMwJTC7REoMy76Bp2PzVoZV00U5KaNCcv";
-
-
     $sku_patrocinado_1 = 'sku_H6K4Pf8TXO6w58'; //NORMAL 0,99
     $sku_patrocinado_2 = 'sku_H6K69kuQGeL0pV'; //HOME 3,99
-
 }
 
 

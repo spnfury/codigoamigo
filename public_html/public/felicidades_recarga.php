@@ -38,13 +38,8 @@ require_once __DIR__ . '/../vendor/stripe/stripe-php/init.php';
 $usuario = getObjectUserWithSession('_id', new MongoDB\BSON\ObjectId($_SESSION["user_id"]));
 $email_usuario = $usuario['email'] ?? '';
 
-if ($email_usuario === 'thevega82@gmail.com') {
-    // Usar Stripe de prueba para el usuario específico
-    $stripe_secret_key = "sk_test_ML0vGPIQHfl4iQYVHeflQTZt";
-} else {
-    // Usar Stripe de producción para el resto
-    $stripe_secret_key = "sk_live_dfMwJTC7REoMy76Bp2PzVoZV00U5KaNCcv";
-}
+require_once $_SERVER['DOCUMENT_ROOT'] . '/config/stripe.php';
+$stripe_secret_key = get_stripe_secret_key($email_usuario, $_SESSION['user_id'] ?? null);
 $stripe = new \Stripe\StripeClient($stripe_secret_key);
 
 try {

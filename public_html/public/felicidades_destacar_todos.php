@@ -26,7 +26,9 @@ if (empty($session_id)) {
 try {
     require_once __DIR__ . '/../vendor/stripe/stripe-php/init.php';
 
-    $stripe_secret_key = "sk_test_ML0vGPIQHfl4iQYVHeflQTZt";
+    require_once __DIR__ . '/../config/stripe.php';
+    // NOTA: este fichero históricamente usaba la test key en todos los casos.
+    $stripe_secret_key = get_stripe_test_secret_key();
     $stripe = new \Stripe\StripeClient($stripe_secret_key);
 
     $session = $stripe->checkout->sessions->retrieve($session_id);

@@ -52,19 +52,14 @@ $collection_usuarios = getCollectionUsuarios();
 $usuario = $collection_usuarios->findOne(['_id' => new MongoDB\BSON\ObjectId($_SESSION["user_id"])]);
 $email_usuario = $usuario['email'] ?? '';
 
-if ($email_usuario === 'thevega82@gmail.com' || in_array($_SESSION["user_id"], ['639899bc6321ee0d0e4010d2', '58bd851da54e295b8b52f702', '5db1af3a2f55c82b47342172'])) {
-    // Usar Stripe de prueba para usuarios admin
-    $stripe_secret_key = "sk_test_ML0vGPIQHfl4iQYVHeflQTZt";
-} else {
-    // Usar Stripe de producción
-    $stripe_secret_key = "sk_live_dfMwJTC7REoMy76Bp2PzVoZV00U5KaNCcv";
-}
+require_once $_SERVER['DOCUMENT_ROOT'] . '/config/stripe.php';
+$stripe_secret_key = get_stripe_secret_key($email_usuario, $_SESSION['user_id'] ?? null);
 
 try {
     // Crear sesión de Stripe
     $stripe = new \Stripe\StripeClient($stripe_secret_key);
     
-    error_log("Creando sesión Stripe para destacar código: $codigo_id, tipo: $tipo");
+    if (function_exists('log_info')) { log_info("Creando sesión Stripe para destacar código: $codigo_id, tipo: $tipo"); }
     
     $line_items = [];
     if ($sku === 'super_landing_999') {

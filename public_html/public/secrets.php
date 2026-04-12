@@ -1,7 +1,10 @@
 <?php
-// Keep your Stripe API key protected by including it as an environment variable
-// or in a private script that does not publicly expose the source code.
+// Compatibilidad con callers legacy que importan esta variable directamente.
+// Incluido actualmente por public/success.php.
+require_once __DIR__ . '/../config/stripe.php';
 
-// This is your test secret API key.
-$stripeSecretKey = 'sk_test_wbgUj87uQWJH2YpDFC0RZ53m007eBRilJy';
-$stripeSecretKey = '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';
+if (!empty($_ENV['STRIPE_SECRET_KEY_SECRETS_PHP'])) {
+    $stripeSecretKey = $_ENV['STRIPE_SECRET_KEY_SECRETS_PHP'];
+} else {
+    $stripeSecretKey = get_stripe_live_secret_key();
+}
