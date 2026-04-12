@@ -3,9 +3,10 @@ config/app.php
 config/email_config.php
 inc/conexion.php
 
-# Credenciales de servicios de terceros (fuera del webroot)
+# Credenciales y notas de sesión fuera del webroot
 private/stripe_secrets.php
 private/*.env
+private/*.md
 
 # Logs y archivos de debug
 *.log
