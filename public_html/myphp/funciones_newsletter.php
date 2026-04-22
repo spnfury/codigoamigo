@@ -4,6 +4,10 @@
  */
 
 // Incluir funciones necesarias
+if (!function_exists('log_info')) {
+    require_once __DIR__ . '/../inc/logger.php';
+}
+
 if (!function_exists('createConnection')) {
     include_once __DIR__ . '/funciones.php';
 }
@@ -28,7 +32,7 @@ function getCollectionNewsletters() {
     try {
         return $db->selectCollection('newsletters');
     } catch (Throwable $e) {
-        error_log("Error al obtener colección newsletters: " . $e->getMessage());
+        log_error("Error al obtener colección newsletters: " . $e->getMessage());
         return null;
     }
 }
@@ -45,7 +49,7 @@ function getCollectionNewsletterQueue() {
     try {
         return $db->selectCollection('newsletter_queue');
     } catch (Throwable $e) {
-        error_log("Error al obtener colección newsletter_queue: " . $e->getMessage());
+        log_error("Error al obtener colección newsletter_queue: " . $e->getMessage());
         return null;
     }
 }
@@ -62,7 +66,7 @@ function getCollectionNewsletterStats() {
     try {
         return $db->selectCollection('newsletter_stats');
     } catch (Throwable $e) {
-        error_log("Error al obtener colección newsletter_stats: " . $e->getMessage());
+        log_error("Error al obtener colección newsletter_stats: " . $e->getMessage());
         return null;
     }
 }
@@ -114,14 +118,14 @@ function obtenerUsuariosActivos($filtros = []) {
             // Limitar a 50,000 usuarios para evitar problemas de memoria
             // Si hay más, se recomienda usar segmentación
             if ($contador >= 50000) {
-                error_log("Advertencia: Se limitó la búsqueda a 50,000 usuarios para evitar problemas de memoria. Use segmentación para más usuarios.");
+                log_warning("Advertencia: Se limitó la búsqueda a 50,000 usuarios para evitar problemas de memoria. Use segmentación para más usuarios.");
                 break;
             }
         }
         
         return $usuarios_validos;
     } catch (Throwable $e) {
-        error_log("Error al obtener usuarios activos: " . $e->getMessage());
+        log_error("Error al obtener usuarios activos: " . $e->getMessage());
         return [];
     }
 }
@@ -265,11 +269,11 @@ function crearNewsletter($datos) {
         $resultado['newsletter_id'] = $newsletter_id;
         $resultado['total_destinatarios'] = $total_destinatarios;
         
-        error_log("Newsletter creada: $newsletter_id con $total_destinatarios destinatarios");
+        log_info("Newsletter creada: $newsletter_id con $total_destinatarios destinatarios");
         
     } catch (Throwable $e) {
         $resultado['error'] = 'Error al crear newsletter: ' . $e->getMessage();
-        error_log("Error al crear newsletter: " . $e->getMessage());
+        log_error("Error al crear newsletter: " . $e->getMessage());
     }
     
     return $resultado;
@@ -403,14 +407,14 @@ function editarNewsletter($newsletter_id, $datos) {
         
         if ($update_result->getModifiedCount() > 0 || $update_result->getMatchedCount() > 0) {
             $resultado['success'] = true;
-            error_log("Newsletter editada: $newsletter_id");
+            log_info("Newsletter editada: $newsletter_id");
         } else {
             $resultado['error'] = 'No se realizaron cambios';
         }
         
     } catch (Throwable $e) {
         $resultado['error'] = 'Error al editar newsletter: ' . $e->getMessage();
-        error_log("Error al editar newsletter: " . $e->getMessage());
+        log_error("Error al editar newsletter: " . $e->getMessage());
     }
     
     return $resultado;
@@ -548,11 +552,11 @@ function reactivarNewsletter($newsletter_id, $regenerar_cola = false) {
         );
         
         $resultado['success'] = true;
-        error_log("Newsletter reactivada: $newsletter_id");
+        log_info("Newsletter reactivada: $newsletter_id");
         
     } catch (Throwable $e) {
         $resultado['error'] = 'Error al reactivar newsletter: ' . $e->getMessage();
-        error_log("Error al reactivar newsletter: " . $e->getMessage());
+        log_error("Error al reactivar newsletter: " . $e->getMessage());
     }
     
     return $resultado;
@@ -590,7 +594,7 @@ function procesarColaNewsletter($limite_diario = 300) {
         
         if ($disponibles <= 0) {
             $resultado['limite_alcanzado'] = true;
-            error_log("Límite diario alcanzado. Emails enviados hoy: $emails_enviados_hoy / $limite_diario");
+            log_warning("Límite diario alcanzado. Emails enviados hoy: $emails_enviados_hoy / $limite_diario");
             return $resultado;
         }
         
@@ -606,7 +610,7 @@ function procesarColaNewsletter($limite_diario = 300) {
         )->toArray();
         
         if (empty($pendientes)) {
-            error_log("No hay emails pendientes en la cola");
+            log_info("No hay emails pendientes en la cola");
             return $resultado;
         }
         
@@ -744,7 +748,7 @@ function procesarColaNewsletter($limite_diario = 300) {
         }
         
     } catch (Throwable $e) {
-        error_log("Error al procesar cola de newsletters: " . $e->getMessage());
+        log_error("Error al procesar cola de newsletters: " . $e->getMessage());
         $resultado['error'] = $e->getMessage();
     }
     
@@ -794,7 +798,7 @@ function obtenerEstadisticasNewsletter($newsletter_id) {
             }
         }
     } catch (Throwable $e) {
-        error_log("Error al obtener estadísticas de newsletter: " . $e->getMessage());
+        log_error("Error al obtener estadísticas de newsletter: " . $e->getMessage());
     }
     
     return $resultado;
@@ -855,7 +859,7 @@ function obtenerEmailsNewsletter($newsletter_id, $limit = 0, $skip = 0, $estado 
         
         return $resultado;
     } catch (Throwable $e) {
-        error_log("Error al obtener emails de newsletter: " . $e->getMessage());
+        log_error("Error al obtener emails de newsletter: " . $e->getMessage());
         return [];
     }
 }
@@ -908,7 +912,7 @@ function contarEmailsNewsletterPorEstado($newsletter_id) {
             'total' => $pendiente + $enviado + $error + $cancelado
         ];
     } catch (Throwable $e) {
-        error_log("Error al contar emails por estado: " . $e->getMessage());
+        log_error("Error al contar emails por estado: " . $e->getMessage());
         return [
             'pendiente' => 0,
             'enviado' => 0,
@@ -945,7 +949,7 @@ function obtenerEmailsEnviadosHoy() {
         
         return $count;
     } catch (Throwable $e) {
-        error_log("Error al obtener emails enviados hoy: " . $e->getMessage());
+        log_error("Error al obtener emails enviados hoy: " . $e->getMessage());
         return 0;
     }
 }
@@ -1061,7 +1065,7 @@ function registrarAperturaNewsletter($token) {
         return true;
         
     } catch (Throwable $e) {
-        error_log("Error al registrar apertura de newsletter: " . $e->getMessage());
+        log_error("Error al registrar apertura de newsletter: " . $e->getMessage());
         return false;
     }
 }
@@ -1105,7 +1109,7 @@ function registrarClicNewsletter($token, $url_original) {
         }
         
     } catch (Throwable $e) {
-        error_log("Error al registrar clic de newsletter: " . $e->getMessage());
+        log_error("Error al registrar clic de newsletter: " . $e->getMessage());
     }
     
     return $url_original;
@@ -1140,7 +1144,7 @@ function decodificarTokenTracking($token) {
         
         return false;
     } catch (Throwable $e) {
-        error_log("Error al decodificar token: " . $e->getMessage());
+        log_error("Error al decodificar token: " . $e->getMessage());
         return false;
     }
 }
@@ -1183,7 +1187,7 @@ function obtenerEstadisticasCompletasNewsletter($newsletter_id) {
             }
             
         } catch (Throwable $e) {
-            error_log("Error al obtener estadísticas completas: " . $e->getMessage());
+            log_error("Error al obtener estadísticas completas: " . $e->getMessage());
         }
     }
     
@@ -1260,11 +1264,11 @@ function cancelarColaNewsletter($newsletter_id) {
         $resultado['success'] = true;
         $resultado['cancelados'] = $cancelados;
         
-        error_log("Cola cancelada para newsletter $newsletter_id: $cancelados emails cancelados");
+        log_info("Cola cancelada para newsletter $newsletter_id: $cancelados emails cancelados");
         
     } catch (Throwable $e) {
         $resultado['error'] = 'Error al cancelar cola: ' . $e->getMessage();
-        error_log("Error al cancelar cola de newsletter: " . $e->getMessage());
+        log_error("Error al cancelar cola de newsletter: " . $e->getMessage());
     }
     
     return $resultado;
@@ -1329,14 +1333,14 @@ function eliminarNewsletter($newsletter_id) {
         
         if ($delete_result->getDeletedCount() > 0) {
             $resultado['success'] = true;
-            error_log("Newsletter eliminada: $newsletter_id");
+            log_info("Newsletter eliminada: $newsletter_id");
         } else {
             $resultado['error'] = 'No se pudo eliminar la newsletter';
         }
         
     } catch (Throwable $e) {
         $resultado['error'] = 'Error al eliminar newsletter: ' . $e->getMessage();
-        error_log("Error al eliminar newsletter: " . $e->getMessage());
+        log_error("Error al eliminar newsletter: " . $e->getMessage());
     }
     
     return $resultado;
