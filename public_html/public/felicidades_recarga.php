@@ -6,14 +6,11 @@ include_once __DIR__ . '/../inc/includes.php';
 include_once __DIR__ . '/../myphp/funciones.php';
 include_once __DIR__ . '/../inc/funciones.php';
 
-// Logging detallado para debugging
-error_log("=== FELICIDADES_RECARGA.PHP INICIADO ===");
-error_log("GET parameters: " . print_r($_GET, true));
-error_log("SESSION data: " . print_r($_SESSION, true));
+log_info("felicidades_recarga iniciado", ['get' => $_GET, 'user_id' => $_SESSION['user_id'] ?? null]);
 
 // Verificar que el usuario esté logueado
 if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
-    error_log("ERROR: Usuario no logueado, redirigiendo a login");
+    log_warning("felicidades_recarga: usuario no logueado, redirigiendo a login");
     header("Location: /login");
     exit;
 }
@@ -23,10 +20,8 @@ $session_id = $_GET['session_id'] ?? '';
 $paquete = $_GET['paquete'] ?? '';
 $saldo = $_GET['saldo'] ?? '';
 
-error_log("Parámetros recibidos - session_id: $session_id, paquete: $paquete, saldo: $saldo");
-
 if (empty($session_id) || empty($paquete) || empty($saldo)) {
-    error_log("ERROR: Parámetros faltantes, redirigiendo a mis-anuncios");
+    log_warning("felicidades_recarga: parámetros faltantes", ['session_id' => $session_id, 'paquete' => $paquete, 'saldo' => $saldo]);
     header("Location: /mis-anuncios?error=parametros_faltantes");
     exit;
 }
@@ -43,22 +38,21 @@ $stripe_secret_key = get_stripe_secret_key($email_usuario, $_SESSION['user_id'] 
 $stripe = new \Stripe\StripeClient($stripe_secret_key);
 
 try {
-    error_log("Iniciando verificación de sesión Stripe: $session_id");
-    
+    log_info("felicidades_recarga: verificando sesión Stripe", ['session_id' => $session_id]);
+
     // Obtener la sesión de Stripe
     $session = $stripe->checkout->sessions->retrieve($session_id);
-    
-    error_log("Sesión Stripe obtenida - payment_status: " . $session->payment_status);
-    error_log("Sesión Stripe - client_reference_id: " . $session->client_reference_id);
-    error_log("Sesión Stripe - metadata: " . print_r($session->metadata, true));
-    
+
+    log_info("felicidades_recarga: sesión Stripe recibida", [
+        'payment_status' => $session->payment_status,
+        'client_reference_id' => $session->client_reference_id,
+    ]);
+
     if ($session->payment_status !== 'paid') {
-        error_log("ERROR: Pago no completado, payment_status: " . $session->payment_status);
+        log_warning("felicidades_recarga: pago no completado", ['payment_status' => $session->payment_status, 'session_id' => $session_id]);
         header("Location: /mis-anuncios?error=pago_no_completado");
         exit;
     }
-    
-    error_log("Pago verificado correctamente, procediendo con actualización de saldo");
     
     // Verificar que el usuario coincida (opcional - por seguridad)
     // Comentado temporalmente para permitir acceso a la página de éxito
@@ -73,17 +67,18 @@ try {
     $saldo_anterior = $usuario_antes['saldo'] ?? 0;
     
     // Actualizar el saldo del usuario en la base de datos
-    error_log("Actualizando saldo para usuario: " . $_SESSION["user_id"] . " - cantidad: " . $saldo);
-    
     $resultado = $collection_usuarios->updateOne(
         ['_id' => new MongoDB\BSON\ObjectId($_SESSION["user_id"])],
         ['$inc' => ['saldo' => (int)$saldo]]
     );
-    
-    error_log("Resultado de actualización - modifiedCount: " . $resultado->getModifiedCount());
-    
+
+    log_info("felicidades_recarga: updateOne saldo", [
+        'user_id' => $_SESSION["user_id"],
+        'cantidad' => (int)$saldo,
+        'modified_count' => $resultado->getModifiedCount(),
+    ]);
+
     if ($resultado->getModifiedCount() > 0) {
-        error_log("Saldo actualizado correctamente, procediendo con registro de transacción");
         
         // Registrar la transacción en la base de datos (si no existe ya por webhook)
         $collection_transacciones = getCollectionTransacciones();
@@ -106,7 +101,7 @@ try {
                 'saldo_nuevo' => $saldo_anterior + (int)$saldo
             ];
             $collection_transacciones->insertOne($transaccion);
-            error_log("Transacción de recarga registrada desde felicidades_recarga.php: " . $session_id);
+            log_info("felicidades_recarga: transacción registrada", ['session_id' => $session_id, 'user_id' => $_SESSION["user_id"]]);
         }
         
         // Obtener el saldo actualizado
@@ -204,15 +199,25 @@ try {
         
     <?php
     } else {
-        // Error al actualizar el saldo
-        error_log("ERROR: No se pudo actualizar el saldo - modifiedCount: " . $resultado->getModifiedCount());
+        // Pago OK en Stripe pero update saldo falló — caso crítico (dinero cobrado sin acreditar)
+        log_critical("felicidades_recarga: pago OK pero no se pudo actualizar saldo", [
+            'session_id' => $session_id,
+            'user_id' => $_SESSION["user_id"],
+            'paquete' => $paquete,
+            'saldo' => $saldo,
+            'modified_count' => $resultado->getModifiedCount(),
+        ]);
         header("Location: /mis-anuncios?error=error_actualizando_saldo");
         exit;
     }
-    
+
 } catch (Exception $e) {
-    error_log("ERROR verificando pago Stripe: " . $e->getMessage());
-    error_log("Stack trace: " . $e->getTraceAsString());
+    log_error("felicidades_recarga: excepción verificando pago Stripe", [
+        'session_id' => $session_id,
+        'user_id' => $_SESSION["user_id"] ?? null,
+        'error' => $e->getMessage(),
+        'trace' => $e->getTraceAsString(),
+    ]);
     header("Location: /mis-anuncios?error=error_verificando_pago");
     exit;
 }
