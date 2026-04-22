@@ -75,10 +75,10 @@ try {
     $db = createConnection();
     $collection = $db->selectCollection('marcas');
     
-    // Buscar marcas que coincidan con el término de búsqueda
+    // Buscar marcas que coincidan con el término de búsqueda (escapar chars regex)
     $marcas = $collection->find(
         [
-            'nombre' => new MongoDB\BSON\Regex($query, 'i')
+            'nombre' => new MongoDB\BSON\Regex(preg_quote($query, '/'), 'i')
         ],
         [
             'limit' => 50,
@@ -122,7 +122,7 @@ try {
     echo json_encode($resultados);
     
 } catch (Exception $e) {
-    log_error("Error en búsqueda de marcas", ['error' => $e->getMessage(), 'search_term' => $search_term]);
+    log_error("Error en búsqueda de marcas", ['error' => $e->getMessage(), 'query' => $query]);
     
     // En caso de error, devolver el término de búsqueda como nueva marca
     echo json_encode([
