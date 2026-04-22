@@ -407,7 +407,7 @@ if ($GLOBALS["actual_url"] != $url_move_fix) {
  *******************************************************************/
 
 // Include Mobile_Detect library
-include_once __DIR__ . '/../myphp/librerias/Mobile_Detect.php';
+include_once __DIR__ . '/myphp/librerias/Mobile_Detect.php';
 
 $detect = new Mobile_Detect();
 global $detect;
