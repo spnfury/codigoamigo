@@ -226,7 +226,13 @@ html {
 
 </style>
 
-<?php 
+<?php
+$title = $title ?? 'Página no encontrada';
+$description = $description ?? 'La página solicitada no existe';
+$title_social = $title_social ?? $title;
+$description_social = $description_social ?? $description;
+$imagen_social = $imagen_social ?? '';
+$links_meta = $links_meta ?? '';
 get_header_modern($title, $description, $title_social, $description_social, $imagen_social, $links_meta);
 $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno para el footer correspondiente
 ?>
