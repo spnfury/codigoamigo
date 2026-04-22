@@ -31,8 +31,35 @@ $total_usuarios = $collection_usuarios->countDocuments([]);
 $total_marcas = $collection_marcas->countDocuments([]);
 $total_codigos = $collection_codigos->countDocuments([]);
 $total_codigos_activos = $collection_codigos->countDocuments(['estado' => 0]);
-$total_codigos_destacados = $collection_codigos->countDocuments(['destacado' => 1]);
-$total_codigos_destacados_premium = $collection_codigos->countDocuments(['destacado_social' => 1]);
+$now_utc = new MongoDB\BSON\UTCDateTime();
+$total_codigos_destacados_activos = $collection_codigos->countDocuments([
+    'destacado' => ['$gt' => 0],
+    'estado' => 0,
+    'fecha_fin_destacado' => ['$gt' => $now_utc]
+]);
+$total_codigos_destacados_super = $collection_codigos->countDocuments([
+    'tipo_destacado' => 'super',
+    'estado' => 0,
+    'fecha_fin_destacado' => ['$gt' => $now_utc]
+]);
+$total_codigos_destacados_expirados = $collection_codigos->countDocuments([
+    'destacado' => ['$gt' => 0],
+    'estado' => 0,
+    'fecha_fin_destacado' => ['$lte' => $now_utc]
+]);
+$total_auto_renovar = $collection_codigos->countDocuments([
+    'auto_renovar_destacado' => true,
+    'destacado' => ['$gt' => 0],
+    'estado' => 0,
+    'fecha_fin_destacado' => ['$gt' => $now_utc]
+]);
+// Códigos que expiran en los próximos 2 días
+$dos_dias = new MongoDB\BSON\UTCDateTime((time() + 2*86400) * 1000);
+$total_expiran_pronto = $collection_codigos->countDocuments([
+    'destacado' => ['$gt' => 0],
+    'estado' => 0,
+    'fecha_fin_destacado' => ['$gt' => $now_utc, '$lte' => $dos_dias]
+]);
 
 // Fechas para estadísticas
 $fecha_hoy = new MongoDB\BSON\UTCDateTime(strtotime('today') * 1000);
@@ -85,36 +112,36 @@ try {
 // Estadísticas de códigos destacados de hoy
 try {
     $codigos_destacados_hoy = $collection_codigos->countDocuments([
-        'destacado' => 1,
-        'fecha_modificacion' => ['$gte' => date('Y-m-d', strtotime('today'))]
+        'destacado' => ['$gt' => 0],
+        'fecha_destacado' => ['$gte' => $fecha_hoy]
     ]);
 
-    $codigos_destacados_premium_hoy = $collection_codigos->countDocuments([
-        'destacado_social' => 1,
-        'fecha_modificacion' => ['$gte' => date('Y-m-d', strtotime('today'))]
+    $codigos_destacados_super_hoy = $collection_codigos->countDocuments([
+        'tipo_destacado' => 'super',
+        'fecha_destacado' => ['$gte' => $fecha_hoy]
     ]);
 } catch (Exception $e) {
     error_log("Error en conteo de destacados hoy: " . $e->getMessage());
     $codigos_destacados_hoy = 0;
-    $codigos_destacados_premium_hoy = 0;
+    $codigos_destacados_super_hoy = 0;
 }
 
 // Datos para gráfica de códigos destacados (últimos 30 días)
 try {
-    // Usar fecha de creación (_id) para agrupar por días
     $pipeline_destacados_tiempo = [
         ['$match' => [
-            'destacado' => ['$in' => [1, 2]]
+            'destacado' => ['$gt' => 0],
+            'fecha_destacado' => ['$gte' => $fecha_30_dias, '$type' => 'date']
         ]],
         ['$group' => [
             '_id' => [
-                'year' => ['$year' => '$_id'],
-                'month' => ['$month' => '$_id'],
-                'day' => ['$dayOfMonth' => '$_id']
+                'year' => ['$year' => '$fecha_destacado'],
+                'month' => ['$month' => '$fecha_destacado'],
+                'day' => ['$dayOfMonth' => '$fecha_destacado']
             ],
             'total_destacados' => ['$sum' => 1],
-            'destacados_normal' => ['$sum' => ['$cond' => [['$eq' => ['$destacado', 1]], 1, 0]]],
-            'destacados_premium' => ['$sum' => ['$cond' => [['$eq' => ['$destacado_social', 1]], 1, 0]]]
+            'destacados_normal' => ['$sum' => ['$cond' => [['$eq' => ['$tipo_destacado', 'normal']], 1, 0]]],
+            'destacados_super' => ['$sum' => ['$cond' => [['$eq' => ['$tipo_destacado', 'super']], 1, 0]]]
         ]],
         ['$sort' => ['_id' => 1]],
         ['$limit' => 30]
@@ -128,18 +155,20 @@ try {
 // Códigos destacados recientes (últimos 10)
 try {
     $codigos_destacados_recientes = $collection_codigos->find(
-        ['destacado' => ['$in' => [1, 2]]],
+        ['destacado' => ['$gt' => 0], 'fecha_fin_destacado' => ['$exists' => true]],
         [
-            'sort' => ['fecha_modificacion' => -1],
+            'sort' => ['fecha_destacado' => -1],
             'limit' => 10,
             'projection' => [
                 'codigo' => 1,
                 'marca' => 1,
-                'destacado' => 1,
-                'destacado_social' => 1,
-                'fecha_modificacion' => 1,
+                'tipo_destacado' => 1,
+                'fecha_destacado' => 1,
+                'fecha_fin_destacado' => 1,
+                'auto_renovar_destacado' => 1,
                 'totalclicks' => 1,
-                'total_impressions' => 1
+                'total_impressions' => 1,
+                'id_usuario' => 1
             ]
         ]
     )->toArray();
@@ -417,9 +446,12 @@ $title = "Panel de Administración - Dashboard";
                                 <div class="card-body">
                                     <div class="row align-items-center">
                                         <div class="col">
-                                            <div class="text-uppercase text-danger fw-bold small">Códigos Destacados</div>
-                                            <div class="h3 mb-0"><?php echo number_format($total_codigos_destacados); ?></div>
-                                            <small class="text-muted">Premium: <?php echo number_format($total_codigos_destacados_premium); ?></small>
+                                            <div class="text-uppercase text-danger fw-bold small">Destacados Activos</div>
+                                            <div class="h3 mb-0"><?php echo number_format($total_codigos_destacados_activos); ?></div>
+                                            <small class="text-muted">Super: <?php echo number_format($total_codigos_destacados_super); ?> · Expirados: <?php echo number_format($total_codigos_destacados_expirados); ?></small>
+                                            <?php if($total_expiran_pronto > 0): ?>
+                                                <br><small class="text-warning"><i class="fas fa-exclamation-triangle"></i> <?php echo $total_expiran_pronto; ?> expiran en 2d</small>
+                                            <?php endif; ?>
                                         </div>
                                         <div class="col-auto">
                                             <i class="fas fa-star stat-icon text-danger"></i>
@@ -470,7 +502,7 @@ $title = "Panel de Administración - Dashboard";
                                         <div class="col">
                                             <div class="text-uppercase text-warning fw-bold small">Destacados Hoy</div>
                                             <div class="h3 mb-0"><?php echo number_format($codigos_destacados_hoy); ?></div>
-                                            <small class="text-muted">Premium hoy: <?php echo number_format($codigos_destacados_premium_hoy); ?></small>
+                                            <small class="text-muted">Super hoy: <?php echo number_format($codigos_destacados_super_hoy); ?> · Auto-renovar: <?php echo number_format($total_auto_renovar); ?></small>
                                         </div>
                                         <div class="col-auto">
                                             <i class="fas fa-star-half-alt stat-icon text-warning"></i>
@@ -596,6 +628,7 @@ $title = "Panel de Administración - Dashboard";
                                                 <tr>
                                                     <th>Fecha</th>
                                                     <th>Usuario</th>
+                                                    <th>Código</th>
                                                     <th>Tipo</th>
                                                     <th>Método</th>
                                                     <th>Cantidad</th>
@@ -645,6 +678,22 @@ $title = "Panel de Administración - Dashboard";
                                                             <?php endif; ?>
                                                             <span><?php echo htmlspecialchars($transaccion['usuario_nombre'] ?? substr($transaccion['usuario_id'], 0, 8) . '...'); ?></span>
                                                         </a>
+                                                    </td>
+                                                    <td>
+                                                        <?php if (!empty($transaccion['marca'])): ?>
+                                                            <a href="/de-<?php echo strtolower(htmlspecialchars($transaccion['marca'])); ?>" 
+                                                               target="_blank" 
+                                                               class="text-decoration-none"
+                                                               onclick="event.stopPropagation();">
+                                                                <span class="badge bg-light text-dark border">
+                                                                    <i class="fas fa-tag me-1"></i><?php echo htmlspecialchars(ucfirst($transaccion['marca'])); ?>
+                                                                </span>
+                                                            </a>
+                                                        <?php elseif (!empty($transaccion['descripcion'])): ?>
+                                                            <small class="text-muted"><?php echo htmlspecialchars(mb_strimwidth($transaccion['descripcion'], 0, 30, '...')); ?></small>
+                                                        <?php else: ?>
+                                                            <span class="text-muted">—</span>
+                                                        <?php endif; ?>
                                                     </td>
                                                     <td>
                                                         <span class="badge bg-<?php echo ($transaccion['tipo'] ?? '') == 'recarga' ? 'success' : 'info'; ?>">
@@ -786,25 +835,59 @@ $title = "Panel de Administración - Dashboard";
                                                 <tr>
                                                     <th>Código</th>
                                                     <th>Marca</th>
-                                                    <th>Tipo</th>
+                                                    <th>Tier</th>
+                                                    <th>Estado</th>
+                                                    <th>Auto-🔄</th>
                                                     <th>Clics</th>
-                                                    <th>Fecha</th>
+                                                    <th>Destacado</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                <?php foreach ($codigos_destacados_recientes as $codigo): ?>
+                                                <?php foreach ($codigos_destacados_recientes as $codigo): 
+                                                    $tipo_d = $codigo['tipo_destacado'] ?? 'normal';
+                                                    $auto_r = isset($codigo['auto_renovar_destacado']) && $codigo['auto_renovar_destacado'] === true;
+                                                    $activo = false;
+                                                    $dias_r = 0;
+                                                    if (isset($codigo['fecha_fin_destacado']) && $codigo['fecha_fin_destacado'] instanceof MongoDB\BSON\UTCDateTime) {
+                                                        $ts_f = $codigo['fecha_fin_destacado']->toDateTime()->getTimestamp();
+                                                        $activo = $ts_f > time();
+                                                        $dias_r = max(0, ceil(($ts_f - time()) / 86400));
+                                                    }
+                                                ?>
                                                 <tr>
                                                     <td><code><?php echo htmlspecialchars(substr($codigo['codigo'], 0, 20)); ?></code></td>
                                                     <td><strong><?php echo htmlspecialchars($codigo['marca']); ?></strong></td>
                                                     <td>
-                                                        <?php if (isset($codigo['destacado_social']) && $codigo['destacado_social'] == 1): ?>
-                                                            <span class="badge bg-warning">Premium</span>
-                                                        <?php elseif (isset($codigo['destacado']) && $codigo['destacado'] == 1): ?>
-                                                            <span class="badge bg-info">Normal</span>
+                                                        <?php if ($tipo_d === 'super'): ?>
+                                                            <span class="badge bg-warning text-dark">👑 Super</span>
+                                                        <?php else: ?>
+                                                            <span class="badge bg-info">⭐ Normal</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ($activo): ?>
+                                                            <span class="badge bg-success"><?php echo $dias_r; ?>d</span>
+                                                        <?php else: ?>
+                                                            <span class="badge bg-secondary">Expirado</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ($auto_r): ?>
+                                                            <span class="badge bg-success">ON</span>
+                                                        <?php else: ?>
+                                                            <span class="text-muted">-</span>
                                                         <?php endif; ?>
                                                     </td>
                                                     <td><?php echo number_format($codigo['totalclicks'] ?? 0); ?></td>
-                                                    <td><?php echo isset($codigo['fecha_modificacion']) ? date('d/m/Y H:i', strtotime($codigo['fecha_modificacion'])) : 'N/A'; ?></td>
+                                                    <td>
+                                                        <?php 
+                                                        if (isset($codigo['fecha_destacado']) && $codigo['fecha_destacado'] instanceof MongoDB\BSON\UTCDateTime) {
+                                                            echo $codigo['fecha_destacado']->toDateTime()->format('d/m/Y H:i');
+                                                        } else {
+                                                            echo 'N/A';
+                                                        }
+                                                        ?>
+                                                    </td>
                                                 </tr>
                                                 <?php endforeach; ?>
                                             </tbody>
@@ -1008,7 +1091,7 @@ $title = "Panel de Administración - Dashboard";
             // Preparar datos para la gráfica
             $labels = [];
             $datos_normal = [];
-            $datos_premium = [];
+            $datos_super = [];
             $datos_total = [];
 
             if (!empty($datos_grafica_destacados)) {
@@ -1017,7 +1100,7 @@ $title = "Panel de Administración - Dashboard";
                         $fecha = $dato['_id']['day'] . '/' . $dato['_id']['month'];
                         $labels[] = $fecha;
                         $datos_normal[] = $dato['destacados_normal'] ?? 0;
-                        $datos_premium[] = $dato['destacados_premium'] ?? 0;
+                        $datos_super[] = $dato['destacados_super'] ?? 0;
                         $datos_total[] = $dato['total_destacados'] ?? 0;
                     }
                 }
@@ -1027,7 +1110,7 @@ $title = "Panel de Administración - Dashboard";
             if (empty($labels)) {
                 $labels = ['No hay datos'];
                 $datos_normal = [0];
-                $datos_premium = [0];
+                $datos_super = [0];
                 $datos_total = [0];
             }
             ?>
@@ -1038,14 +1121,14 @@ $title = "Panel de Administración - Dashboard";
                 data: {
                     labels: <?php echo json_encode($labels); ?>,
                     datasets: [{
-                        label: 'Códigos Destacados Normales',
+                        label: 'Destacados Normal',
                         data: <?php echo json_encode($datos_normal); ?>,
                         borderColor: 'rgb(54, 162, 235)',
                         backgroundColor: 'rgba(54, 162, 235, 0.2)',
                         tension: 0.1
                     }, {
-                        label: 'Códigos Destacados Premium',
-                        data: <?php echo json_encode($datos_premium); ?>,
+                        label: 'Destacados Super',
+                        data: <?php echo json_encode($datos_super); ?>,
                         borderColor: 'rgb(255, 193, 7)',
                         backgroundColor: 'rgba(255, 193, 7, 0.2)',
                         tension: 0.1

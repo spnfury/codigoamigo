@@ -183,6 +183,13 @@
             Si tienes alguna duda, puedes comunicarte con nosotros en <strong>info@codigoamigo.com</strong>
         </p>
 
+        <?php if (!empty($_SESSION['msg_error'])): ?>
+        <div class="alert alert-danger" style="border-radius: 10px; margin-bottom: 20px;">
+            <i class="fas fa-exclamation-triangle"></i> <?php echo htmlspecialchars($_SESSION['msg_error']); ?>
+            <?php unset($_SESSION['msg_error']); ?>
+        </div>
+        <?php endif; ?>
+
         <form id="nuevo_codigo" method="post" action="<?php echo $modo_modificacion ? '/modificar_codigo/' . $codigo_data['codigo_id'] : '/codigo_insertado'; ?>">
             <div class="form-group">
                 <label for="marca">Marca o Servicio</label>
@@ -204,6 +211,9 @@
                             <option value="porcentaje" <?php echo ($descuento == 'porcentaje') ? 'selected' : ''; ?>>%</option>
                         </select>
                     </div>
+                </div>
+                <div id="beneficio_oficial_info" class="alert alert-info" style="display: none; border-radius: 8px; margin-top: 8px; padding: 10px 15px; font-size: 14px;">
+                    <i class="fas fa-shield-alt"></i> <span id="beneficio_oficial_texto"></span>
                 </div>
             </div>
 
@@ -280,6 +290,30 @@
                 onChooseEvent: function() {
                     var selectedItemData = $("#marca").getSelectedItemData();
                     console.log("Marca seleccionada:", selectedItemData);
+                    
+                    // Manejar beneficio oficial
+                    var bo = selectedItemData.beneficio_oficial;
+                    var $numBeneficio = $('#num_beneficio');
+                    var $boInfo = $('#beneficio_oficial_info');
+                    var $boTexto = $('#beneficio_oficial_texto');
+                    
+                    if (bo && bo.cantidad) {
+                        var unidad = (bo.tipo === 'euros') ? '€' : '%';
+                        var textoInfo = 'Máximo oficial: ' + bo.cantidad + unidad;
+                        if (bo.texto) textoInfo += ' — ' + bo.texto;
+                        
+                        $boTexto.text(textoInfo);
+                        $boInfo.show();
+                        $numBeneficio.attr('max', bo.cantidad);
+                        
+                        // Si el valor actual supera el máximo, corregir
+                        if (parseFloat($numBeneficio.val()) > bo.cantidad) {
+                            $numBeneficio.val(bo.cantidad);
+                        }
+                    } else {
+                        $boInfo.hide();
+                        $numBeneficio.removeAttr('max');
+                    }
                 }
             },
             onShowListEvent: function() {

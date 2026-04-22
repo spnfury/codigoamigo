@@ -529,6 +529,7 @@ $title = "Reportes y Estadísticas - Panel de Administración";
                                                 <tr>
                                                     <th>Usuario</th>
                                                     <th>Tipo</th>
+                                                    <th>Código</th>
                                                     <th>Cantidad</th>
                                                     <th>Descripción</th>
                                                     <th>Fecha</th>
@@ -546,6 +547,18 @@ $title = "Reportes y Estadísticas - Panel de Administración";
                                                         <span class="badge bg-<?php echo $transaccion['tipo'] == 'recarga' ? 'success' : 'info'; ?>">
                                                             <?php echo ucfirst($transaccion['tipo']); ?>
                                                         </span>
+                                                    </td>
+                                                    <td>
+                                                        <?php if (!empty($transaccion['marca'])): ?>
+                                                            <a href="/de-<?php echo strtolower(htmlspecialchars($transaccion['marca'])); ?>" 
+                                                               target="_blank" class="text-decoration-none">
+                                                                <span class="badge bg-light text-dark border">
+                                                                    <i class="fas fa-tag me-1"></i><?php echo htmlspecialchars(ucfirst($transaccion['marca'])); ?>
+                                                                </span>
+                                                            </a>
+                                                        <?php else: ?>
+                                                            <span class="text-muted">—</span>
+                                                        <?php endif; ?>
                                                     </td>
                                                     <td class="<?php echo $transaccion['cantidad'] > 0 ? 'text-success' : 'text-danger'; ?>">
                                                         €<?php echo number_format($transaccion['cantidad'], 2); ?>

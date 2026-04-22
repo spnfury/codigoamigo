@@ -33,6 +33,12 @@ function añadir_favorito($usuario_id, $codigo_id, $tipo = 'codigo') {
             $msg_not_found = 'Chollo no encontrado';
             $msg_success = 'Chollo guardado en favoritos';
             $msg_exists = 'Este chollo ya está en tus favoritos';
+        } elseif ($tipo === 'usuario') {
+            $collection_usuarios = getCollectionUsuarios();
+            $item = $collection_usuarios->findOne(['_id' => new MongoDB\BSON\ObjectId($codigo_id)]);
+            $msg_not_found = 'Usuario no encontrado';
+            $msg_success = 'Has empezado a seguir a este usuario';
+            $msg_exists = 'Ya sigues a este usuario';
         } else {
             $collection_codigos = getCollectionCodigos();
             $item = $collection_codigos->findOne(['_id' => new MongoDB\BSON\ObjectId($codigo_id)]);
@@ -45,13 +51,20 @@ function añadir_favorito($usuario_id, $codigo_id, $tipo = 'codigo') {
             return ['success' => false, 'message' => $msg_not_found];
         }
 
+        // Asegurar que usamos ObjectId si es posible para usuario_id
+        $uid_obj = $usuario_id;
+        try {
+            if (is_string($usuario_id) && strlen($usuario_id) === 24) {
+                 $uid_obj = new MongoDB\BSON\ObjectId($usuario_id);
+            }
+        } catch(Exception $e) {}
+
         // Verificar si ya está en favoritos
         $query = [
-            'usuario_id' => $usuario_id,
-            'codigo_id' => $codigo_id
+            'usuario_id' => $uid_obj,
+            'codigo_id' => new MongoDB\BSON\ObjectId($codigo_id)
         ];
         // Solo verificamos tipo si no es el default 'codigo' para compatibilidad backward
-        // O mejor: guardar siempre el tipo
         if ($tipo !== 'codigo') {
             $query['tipo'] = $tipo;
         }
@@ -64,8 +77,8 @@ function añadir_favorito($usuario_id, $codigo_id, $tipo = 'codigo') {
 
         // Añadir a favoritos
         $collection_favoritos->insertOne([
-            'usuario_id' => $usuario_id,
-            'codigo_id' => $codigo_id,
+            'usuario_id' => $uid_obj,
+            'codigo_id' => new MongoDB\BSON\ObjectId($codigo_id),
             'tipo' => $tipo,
             'fecha_creacion' => date('Y-m-d H:i:s'),
             'created_at' => new MongoDB\BSON\UTCDateTime(),
@@ -115,9 +128,17 @@ function eliminar_favorito($usuario_id, $codigo_id, $tipo = 'codigo') {
     try {
         $collection_favoritos = getCollectionFavoritos();
 
+        // Asegurar IDs como ObjectId
+        $uid_obj = $usuario_id;
+        try {
+            if (is_string($usuario_id) && strlen($usuario_id) === 24) {
+                 $uid_obj = new MongoDB\BSON\ObjectId($usuario_id);
+            }
+        } catch(Exception $e) {}
+
         $query = [
-            'usuario_id' => $usuario_id,
-            'codigo_id' => $codigo_id
+            'usuario_id' => $uid_obj,
+            'codigo_id' => new MongoDB\BSON\ObjectId($codigo_id)
         ];
         
         if ($tipo !== 'codigo') {
@@ -126,8 +147,24 @@ function eliminar_favorito($usuario_id, $codigo_id, $tipo = 'codigo') {
 
         $result = $collection_favoritos->deleteOne($query);
 
-        $msg_success = ($tipo === 'chollo') ? 'Chollo eliminado de favoritos' : 'Código eliminado de favoritos';
-        $msg_not_found = ($tipo === 'chollo') ? 'El chollo no estaba en tus favoritos' : 'El código no estaba en tus favoritos';
+        $msg_success = 'Elemento eliminado de favoritos';
+        $msg_not_found = 'Elemento no encontrado en favoritos';
+        
+        switch ($tipo) {
+            case 'chollo':
+                $msg_success = 'Chollo eliminado de favoritos';
+                $msg_not_found = 'El chollo no estaba en tus favoritos';
+                break;
+            case 'usuario':
+                $msg_success = 'Has dejado de seguir a este usuario';
+                $msg_not_found = 'No seguías a este usuario';
+                break;
+            case 'codigo':
+            default:
+                $msg_success = 'Código eliminado de favoritos';
+                $msg_not_found = 'El código no estaba en tus favoritos';
+                break;
+        }
 
         if ($result->getDeletedCount() > 0) {
             return ['success' => true, 'message' => $msg_success];
@@ -156,9 +193,17 @@ function es_favorito($usuario_id, $codigo_id, $tipo = 'codigo') {
     try {
         $collection_favoritos = getCollectionFavoritos();
 
+        // Asegurar IDs como ObjectId
+        $uid_obj = $usuario_id;
+        try {
+            if (is_string($usuario_id) && strlen($usuario_id) === 24) {
+                 $uid_obj = new MongoDB\BSON\ObjectId($usuario_id);
+            }
+        } catch(Exception $e) {}
+
         $query = [
-            'usuario_id' => $usuario_id,
-            'codigo_id' => $codigo_id
+            'usuario_id' => $uid_obj,
+            'codigo_id' => new MongoDB\BSON\ObjectId($codigo_id)
         ];
         
         if ($tipo !== 'codigo') {
@@ -192,8 +237,16 @@ function obtener_favoritos_usuario($usuario_id, $tipo = 'codigo', $limit = 50, $
     try {
         $collection_favoritos = getCollectionFavoritos();
         
+        // Asegurar IDs como ObjectId
+        $uid_obj = $usuario_id;
+        try {
+            if (is_string($usuario_id) && strlen($usuario_id) === 24) {
+                 $uid_obj = new MongoDB\BSON\ObjectId($usuario_id);
+            }
+        } catch(Exception $e) {}
+
         // Filtro base
-        $filter = ['usuario_id' => $usuario_id];
+        $filter = ['usuario_id' => $uid_obj];
         
         // Filtrar por tipo si se especifica (default 'codigo' para compatibilidad)
         // Si en DB no hay campo 'tipo', asumimos que es 'codigo'
@@ -236,6 +289,9 @@ function obtener_favoritos_usuario($usuario_id, $tipo = 'codigo', $limit = 50, $
             $collection = getCollectionChollos();
             // Para chollos, necesitamos query normal
             $cursor = $collection->find(['_id' => ['$in' => $ids]]);
+        } elseif ($tipo === 'usuario') {
+            $collection = getCollectionUsuarios();
+            $cursor = $collection->find(['_id' => ['$in' => $ids]]);
         } else {
             // Default codigos
             $collection = getCollectionCodigos();
@@ -273,7 +329,15 @@ function contar_favoritos_usuario($usuario_id, $tipo = 'codigo') {
     try {
         $collection_favoritos = getCollectionFavoritos();
         
-        $filter = ['usuario_id' => $usuario_id];
+        // Asegurar IDs como ObjectId
+        $uid_obj = $usuario_id;
+        try {
+            if (is_string($usuario_id) && strlen($usuario_id) === 24) {
+                 $uid_obj = new MongoDB\BSON\ObjectId($usuario_id);
+            }
+        } catch(Exception $e) {}
+
+        $filter = ['usuario_id' => $uid_obj];
         
         if ($tipo === 'codigo') {
             $filter['$or'] = [

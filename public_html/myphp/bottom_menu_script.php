@@ -184,7 +184,6 @@ if (profileToggle) {
 // Funcionalidad de los botones de navegación
 const homeNav = document.getElementById('home-nav');
 const categoriesNav = document.getElementById('categories-nav');
-const chollosNav = document.getElementById('chollos-nav');
 const favoritesNav = document.getElementById('favorites-nav');
 
 if (homeNav) {
@@ -200,14 +199,6 @@ if (categoriesNav) {
         e.preventDefault();
         devLog('Botón Categorías clickeado (móvil)');
         window.location.href = '/categorias';
-    });
-}
-
-if (chollosNav) {
-    chollosNav.addEventListener('click', function(e) {
-        e.preventDefault();
-        devLog('Botón Chollos clickeado (móvil)');
-        window.location.href = '/chollos';
     });
 }
 
@@ -419,32 +410,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Funcionalidad del menú hamburguesa
-const menuToggle = document.getElementById('menu-toggle');
-const hamburgerMenu = document.getElementById('mobile-hamburger-menu');
-const closeHamburgerMenu = document.getElementById('close-hamburger-menu');
-
-if (menuToggle && hamburgerMenu) {
-    menuToggle.addEventListener('click', function(e) {
-        e.preventDefault();
-        hamburgerMenu.classList.add('show');
-        document.body.style.overflow = 'hidden';
-    });
-
-    if (closeHamburgerMenu) {
-        closeHamburgerMenu.addEventListener('click', function() {
-            hamburgerMenu.classList.remove('show');
-            document.body.style.overflow = '';
-        });
-    }
-
-    hamburgerMenu.addEventListener('click', function(e) {
-        if (e.target === hamburgerMenu) {
-            hamburgerMenu.classList.remove('show');
-            document.body.style.overflow = '';
-        }
-    });
-}
+// Menú hamburguesa eliminado - la navegación se hace desde el bottom nav
 
 // Funcionalidad del menú de perfil
 const profileMenu = document.getElementById('mobile-profile-menu');
@@ -482,10 +448,8 @@ window.addEventListener('storage', function(e) {
 
 // Función para cerrar menús desplegables
 function closeMobileMenus() {
-    // Cerrar menú hamburguesa del footer
-    const hamburgerMenu = document.getElementById('mobile-hamburger-menu');
+    // Cerrar menú de perfil
     const profileMenu = document.getElementById('mobile-profile-menu');
-    if (hamburgerMenu) hamburgerMenu.classList.remove('show');
     if (profileMenu) profileMenu.classList.remove('show');
 
     // Cerrar menú móvil del header
@@ -499,15 +463,7 @@ function closeMobileMenus() {
     document.body.style.overflow = '';
 }
 
-// Cerrar menús cuando se hace clic en enlaces del menú hamburguesa
-document.addEventListener('DOMContentLoaded', function() {
-    const hamburgerMenuItems = document.querySelectorAll('.hamburger-menu-item');
-    hamburgerMenuItems.forEach(function(item) {
-        item.addEventListener('click', function() {
-            closeMobileMenus();
-        });
-    });
-});
+
 
 // Cerrar menús cuando se hace clic en enlaces del menú de perfil
 function setupProfileMenuLogoutHandler() {

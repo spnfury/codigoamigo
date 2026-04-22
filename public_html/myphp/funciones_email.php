@@ -292,4 +292,255 @@ function crearPlantillaEmailSaldo($username, $cantidad, $nuevo_saldo, $motivo) {
     </body>
     </html>';
 }
+
+// Función para enviar email de bienvenida VIP
+function enviarEmailBienvenidaVIP($usuario) {
+    if (!function_exists('enviarEmailConBrevoYRegistrar')) {
+        include_once __DIR__ . '/email_helper.php';
+    }
+    
+    $to_email = $usuario['mail'] ?? $usuario['email'] ?? '';
+    $username = $usuario['username'] ?? 'Usuario';
+    $user_id = isset($usuario['_id']) ? (string)$usuario['_id'] : null;
+    
+    if (empty($to_email)) {
+        error_log("enviarEmailBienvenidaVIP: No email found for user $username");
+        return false;
+    }
+    
+    $subject = "👑 ¡Bienvenido al VIP, $username! Tu badge dorado está activo";
+    
+    $html = '<!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Bienvenido al VIP - CodigoAmigo</title>
+    </head>
+    <body style="font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+            
+            <!-- Header VIP -->
+            <div style="background: linear-gradient(135deg, #ffd700 0%, #E30613 100%); color: white; padding: 40px 20px; text-align: center;">
+                <div style="font-size: 50px; margin-bottom: 10px;">👑</div>
+                <h1 style="margin: 0; font-size: 28px; font-weight: 800;">¡Bienvenido al VIP!</h1>
+                <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.95;">Tu badge dorado ya está activo en todos tus códigos</p>
+            </div>
+            
+            <!-- Contenido -->
+            <div style="padding: 40px 30px;">
+                <h2 style="margin-top: 0;">Hola ' . htmlspecialchars($username) . ',</h2>
+                
+                <p>¡Enhorabuena por dar el paso! Ahora eres parte del grupo exclusivo de usuarios VIP de CodigoAmigo. Esto es lo que ya tienes activo:</p>
+                
+                <!-- Beneficios -->
+                <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 15px; padding: 25px; margin: 25px 0; color: white;">
+                    <div style="display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <span style="font-size: 24px;">🏆</span>
+                        <div>
+                            <strong style="color: #ffd700;">Badge VIP Dorado</strong><br>
+                            <span style="font-size: 14px; opacity: 0.9;">Visible en todos tus códigos y tu perfil</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <span style="font-size: 24px;">💬</span>
+                        <div>
+                            <strong style="color: #ffd700;">Chat ilimitado con viewers</strong><br>
+                            <span style="font-size: 14px; opacity: 0.9;">Contacta a quien vea tus códigos</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <span style="font-size: 24px;">📨</span>
+                        <div>
+                            <strong style="color: #ffd700;">Mensajes masivos</strong><br>
+                            <span style="font-size: 14px; opacity: 0.9;">Escribe a todos tus viewers a la vez</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px; padding: 10px 0;">
+                        <span style="font-size: 24px;">💰</span>
+                        <div>
+                            <strong style="color: #ffd700;">+10€ de saldo GRATIS</strong><br>
+                            <span style="font-size: 14px; opacity: 0.9;">Ya tienes 10€ para destacar tus códigos</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Próximos pasos -->
+                <h3 style="color: #1a1a2e; margin-bottom: 15px;">🚀 Tus próximos pasos:</h3>
+                
+                <div style="background: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 20px;">
+                    <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 15px;">
+                        <div style="background: #E30613; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0;">1</div>
+                        <div>
+                            <strong>Publica un código</strong><br>
+                            <span style="font-size: 14px; color: #666;">Tu badge VIP lo hará destacar sobre los demás</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 15px;">
+                        <div style="background: #E30613; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0;">2</div>
+                        <div>
+                            <strong>Destácalo con tu saldo</strong><br>
+                            <span style="font-size: 14px; color: #666;">Usa tus 10€ para ponerlo en primera posición</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: flex-start; gap: 12px;">
+                        <div style="background: #E30613; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0;">3</div>
+                        <div>
+                            <strong>Chatea con tus viewers</strong><br>
+                            <span style="font-size: 14px; color: #666;">Cuando alguien vea tu código, contacta y cierra el deal</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- CTA -->
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="https://www.codigoamigo.com/publicar" style="display: inline-block; background: linear-gradient(135deg, #ffd700 0%, #E30613 100%); color: white; padding: 16px 40px; text-decoration: none; border-radius: 30px; font-weight: 700; font-size: 16px;">
+                        👑 Publicar mi primer código VIP
+                    </a>
+                </div>
+                
+                <p style="color: #666; font-size: 14px; text-align: center;">Tu suscripción se renueva automáticamente cada mes. Puedes cancelarla en cualquier momento.</p>
+            </div>
+            
+            <!-- Footer -->
+            <div style="background: #1a1a2e; color: white; padding: 25px; text-align: center;">
+                <p style="margin: 5px 0; font-size: 14px;"><strong>CodigoAmigo</strong></p>
+                <p style="margin: 5px 0; font-size: 13px; opacity: 0.8;">
+                    <a href="https://www.codigoamigo.com" style="color: #ffd700; text-decoration: none;">www.codigoamigo.com</a>
+                </p>
+            </div>
+        </div>
+    </body>
+    </html>';
+    
+    $resultado = enviarEmailConBrevoYRegistrar(
+        $to_email,
+        $username,
+        $subject,
+        $html,
+        'bienvenida_vip',
+        $user_id,
+        ['tipo' => 'bienvenida_vip'],
+        '',
+        'noreply@codigoamigo.com',
+        'Código Amigo VIP'
+    );
+    
+    if ($resultado['success']) {
+        error_log("Email de bienvenida VIP enviado a: $to_email");
+    } else {
+        error_log("Error enviando email de bienvenida VIP a: $to_email - " . ($resultado['error'] ?? ''));
+    }
+
+    return $resultado;
+}
+
+// Email de suscripción VIP cancelada por fallo de cobro
+function enviarEmailVIPPagoFallido($usuario, $motivo_decline = '', $card_last4 = '', $card_brand = '') {
+    if (!function_exists('enviarEmailConBrevoYRegistrar')) {
+        include_once __DIR__ . '/email_helper.php';
+    }
+
+    $to_email = $usuario['mail'] ?? $usuario['email'] ?? '';
+    $username = $usuario['username'] ?? 'Usuario';
+    $user_id = isset($usuario['_id']) ? (string)$usuario['_id'] : null;
+
+    if (empty($to_email)) {
+        error_log("enviarEmailVIPPagoFallido: No email found for user $username");
+        return ['success' => false, 'error' => 'No email'];
+    }
+
+    $subject = "⚠️ Tu suscripción VIP ha sido cancelada - CodigoAmigo";
+
+    $card_info = '';
+    if ($card_brand && $card_last4) {
+        $card_info = '<p style="margin: 5px 0; font-size: 14px; color: #666;">Tarjeta: ' . htmlspecialchars(strtoupper($card_brand)) . ' •••• ' . htmlspecialchars($card_last4) . '</p>';
+    }
+
+    $motivo_html = '';
+    if (!empty($motivo_decline)) {
+        $motivo_html = '<p style="margin: 5px 0; font-size: 14px; color: #666;">Motivo del banco: <em>' . htmlspecialchars($motivo_decline) . '</em></p>';
+    }
+
+    $html = '<!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Suscripción VIP cancelada - CodigoAmigo</title>
+    </head>
+    <body style="font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+
+            <div style="background: linear-gradient(135deg, #c0392b 0%, #7b1a12 100%); color: white; padding: 40px 20px; text-align: center;">
+                <div style="font-size: 50px; margin-bottom: 10px;">⚠️</div>
+                <h1 style="margin: 0; font-size: 26px; font-weight: 800;">Tu VIP ha sido cancelado</h1>
+                <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.95;">No hemos podido cobrar la renovación</p>
+            </div>
+
+            <div style="padding: 40px 30px;">
+                <h2 style="margin-top: 0;">Hola ' . htmlspecialchars($username) . ',</h2>
+
+                <p>Tu banco ha rechazado el cobro de la renovación mensual de tu suscripción VIP (9,99€). Hemos intentado varias veces sin éxito, por lo que <strong>hemos cancelado la suscripción y desactivado los beneficios VIP</strong> en tu cuenta.</p>
+
+                <div style="background: #fdf3f2; border-left: 4px solid #c0392b; border-radius: 6px; padding: 18px 20px; margin: 25px 0;">
+                    <p style="margin: 0 0 8px 0; font-weight: 700; color: #7b1a12;">Detalles del rechazo</p>
+                    ' . $card_info . '
+                    ' . $motivo_html . '
+                </div>
+
+                <h3 style="color: #1a1a2e; margin-bottom: 10px;">¿Qué ha pasado?</h3>
+                <p>El código de rechazo indica que <strong>tu banco no permite este tipo de transacción</strong> (suscripciones recurrentes online). Esto suele deberse a:</p>
+                <ul style="padding-left: 20px;">
+                    <li>Restricciones de la tarjeta para pagos online o recurrentes</li>
+                    <li>Límites de compras internacionales</li>
+                    <li>Bloqueo del banco a comercios de determinada categoría</li>
+                </ul>
+
+                <h3 style="color: #1a1a2e; margin-bottom: 10px;">Cómo reactivar tu VIP</h3>
+                <ol style="padding-left: 20px;">
+                    <li>Contacta con tu banco y pide que desbloquee pagos recurrentes online, o</li>
+                    <li>Usa otra tarjeta al volver a suscribirte</li>
+                </ol>
+
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="https://www.codigoamigo.com/suscripcion-vip" style="display: inline-block; background: linear-gradient(135deg, #ffd700 0%, #E30613 100%); color: white; padding: 16px 40px; text-decoration: none; border-radius: 30px; font-weight: 700; font-size: 16px;">
+                        👑 Reactivar mi VIP
+                    </a>
+                </div>
+
+                <p style="color: #666; font-size: 14px; text-align: center;">Si crees que esto es un error, responde a este email y te ayudamos.</p>
+            </div>
+
+            <div style="background: #1a1a2e; color: white; padding: 25px; text-align: center;">
+                <p style="margin: 5px 0; font-size: 14px;"><strong>CodigoAmigo</strong></p>
+                <p style="margin: 5px 0; font-size: 13px; opacity: 0.8;">
+                    <a href="https://www.codigoamigo.com" style="color: #ffd700; text-decoration: none;">www.codigoamigo.com</a>
+                </p>
+            </div>
+        </div>
+    </body>
+    </html>';
+
+    $resultado = enviarEmailConBrevoYRegistrar(
+        $to_email,
+        $username,
+        $subject,
+        $html,
+        'vip_pago_fallido',
+        $user_id,
+        ['tipo' => 'vip_pago_fallido', 'motivo_decline' => $motivo_decline, 'card_last4' => $card_last4, 'card_brand' => $card_brand],
+        '',
+        'noreply@codigoamigo.com',
+        'Código Amigo'
+    );
+
+    if ($resultado['success']) {
+        error_log("Email VIP pago fallido enviado a: $to_email");
+    } else {
+        error_log("Error enviando email VIP pago fallido a: $to_email - " . ($resultado['error'] ?? ''));
+    }
+
+    return $resultado;
+}
 ?>

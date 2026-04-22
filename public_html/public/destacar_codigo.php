@@ -403,13 +403,12 @@ if (function_exists('get_active_super_landings')) {
             </div>
             <div class="pricing-price">0,99€</div>
             <ul class="pricing-features">
-                <li><i class="fas fa-check"></i> Aparece en primera posición</li>
+                <li><i class="fas fa-check"></i> Destacado durante <strong>7 días</strong> en la página de la marca</li>
                 <li><i class="fas fa-check"></i> Badge "Destacado" visible</li>
-                <li><i class="fas fa-check"></i> Mayor visibilidad en la marca</li>
-                <li><i class="fas fa-check"></i> Sin fecha límite: mantienes el #1 hasta que otro te supere</li>
+                <li><i class="fas fa-check"></i> Posición prioritaria frente a códigos normales</li>
             </ul>
             <button class="destacar-btn" id="destacar-normal" data-price="99" data-sku="<?php echo $sku_destacado_normal; ?>" data-tipo="normal">
-                <i class="fas fa-star"></i> Destacar Normal
+                <i class="fas fa-star"></i> Destacar 7 días
             </button>
         </div>
 
@@ -419,20 +418,20 @@ if (function_exists('get_active_super_landings')) {
             </div>
             <div class="pricing-price">3,99€</div>
             <ul class="pricing-features">
-                <li><i class="fas fa-check"></i> Aparece en primera posición</li>
-                <li><i class="fas fa-check"></i> Badge "Destacado" dorado</li>
-                <li><i class="fas fa-check"></i> Aparece en página principal</li>
-                <li><i class="fas fa-check"></i> Mayor visibilidad en la marca</li>
-                <li><i class="fas fa-check"></i> Sin fecha límite: mantienes el #1 hasta que otro te supere</li>
+                <li><i class="fas fa-check"></i> Destacado durante <strong>14 días</strong> en la marca</li>
+                <li><i class="fas fa-check"></i> Badge dorado "Super Destacado"</li>
+                <li><i class="fas fa-check"></i> Prioridad sobre destacados normales</li>
+                <li><i class="fas fa-check"></i> Aparece en el carrusel de la página principal</li>
+                <li><i class="fas fa-random"></i> Rotación inteligente: máxima visibilidad al comprar, visibilidad garantizada toda la semana</li>
             </ul>
             <button class="destacar-btn" id="destacar-super" data-price="399" data-sku="<?php echo $sku_destacado_super; ?>" data-tipo="super">
-                <i class="fas fa-crown"></i> Destacar Super
+                <i class="fas fa-crown"></i> Destacar 14 días
             </button>
         </div>
         
         <?php if ($has_super_landing): ?>
         <div class="pricing-card super-landing-card" style="border-color: #FFD700;">
-            <div class="super-landing-badge" style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #FFD700, #FFA500); color: #333; padding: 5px 20px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; box-shadow: 0 4px 10px rgba(255, 215, 0, 0.4);">
+            <div class="super-landing-badge" style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #FFD700, #E30613); color: #333; padding: 5px 20px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; box-shadow: 0 4px 10px rgba(255, 215, 0, 0.4);">
                 ★ GUÍA OFICIAL ★
             </div>
             <div class="pricing-header">
@@ -447,7 +446,7 @@ if (function_exists('get_active_super_landings')) {
                 <li><i class="fas fa-check"></i> Carrusel si hay varios (visibilidad rotativa)</li>
                 <li><i class="fas fa-check"></i> Duración: 30 días garantizados</li>
             </ul>
-            <button class="destacar-btn" id="destacar-guia" data-price="999" data-sku="super_landing_999" data-tipo="super_landing" style="background: linear-gradient(135deg, #FFD700, #FFA500); color: #333;">
+            <button class="destacar-btn" id="destacar-guia" data-price="999" data-sku="super_landing_999" data-tipo="super_landing" style="background: linear-gradient(135deg, #FFD700, #E30613); color: #333;">
                 <i class="fas fa-trophy"></i> Destacar en Guía
             </button>
         </div>
@@ -474,9 +473,9 @@ if (function_exists('get_active_super_landings')) {
                 <p>Los códigos destacados reciben hasta 5 veces más clicks que los normales.</p>
             </div>
             <div class="benefit-item">
-                <i class="fas fa-clock"></i>
-                <h3>Prioridad sin fecha fin</h3>
-                <p>Tu código mantiene la primera posición hasta que otro usuario decida destacar la misma marca.</p>
+                <i class="fas fa-sync-alt"></i>
+                <h3>Sistema Rotativo Justo</h3>
+                <p>Nuestro carrusel de inicio rota los códigos súper destacados para que nunca te quedes estancado debajo de otros usuarios.</p>
             </div>
         </div>
     </div>
@@ -515,7 +514,7 @@ if (function_exists('get_active_super_landings')) {
                     </li>
                     <li style="color: #ccc; padding: 8px 0; display: flex; align-items: center;">
                         <i class="fas fa-check" style="color: #E30613; margin-right: 10px; font-size: 1rem;"></i>
-                        <span>Sin fecha límite: mantienes el #1 hasta que otro te supere</span>
+                        <span>Opción de auto-renovación desde tu saldo</span>
                     </li>
                 </ul>
             </div>
@@ -551,6 +550,17 @@ if (function_exists('get_active_super_landings')) {
                         <i class="fas fa-arrow-right" style="color: #E30613;"></i>
                     </div>
                 </div>
+            </div>
+
+            <!-- Auto-renovar -->
+            <div style="background: #353535; padding: 15px 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #454545;">
+                <label style="display: flex; align-items: center; cursor: pointer; margin: 0; gap: 12px;" for="autoRenovarCheck">
+                    <input type="checkbox" id="autoRenovarCheck" style="width: 20px; height: 20px; accent-color: #28a745; cursor: pointer;">
+                    <div>
+                        <span style="color: white; font-weight: 600; font-size: 1rem;">🔄 Auto-renovar al expirar</span>
+                        <p style="color: #aaa; font-size: 0.85rem; margin: 4px 0 0 0;">Se renovará automáticamente desde tu saldo cuando expire</p>
+                    </div>
+                </label>
             </div>
 
             <!-- Saldo del usuario y precio -->
@@ -744,7 +754,8 @@ function procesarPagoConTarjeta() {
         data: {
             codigo_id: codigoId,
             tipo: tipo,
-            sku: sku
+            sku: sku,
+            auto_renovar: $('#autoRenovarCheck').is(':checked') ? '1' : '0'
         },
         success: function(response) {
             if (response.error) {
@@ -809,7 +820,8 @@ function procesarPagoConSaldo() {
             codigo_id: codigoId,
             tipo: tipo,
             precio: precio,
-            sku: sku
+            sku: sku,
+            auto_renovar: $('#autoRenovarCheck').is(':checked') ? '1' : '0'
         },
         dataType: 'json',
         success: function(response) {

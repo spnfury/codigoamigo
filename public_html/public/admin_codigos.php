@@ -427,47 +427,27 @@ $total_pages = ceil($total_codigos / $limit);
 // Obtener marcas para el filtro
 $marcas = $collection_marcas->find([], ['sort' => ['nombre' => 1]])->toArray();
 
-// Obtener estadísticas basadas en los filtros aplicados
-// Crear filtros para cada tipo de estadística
-$filtros_total = $filtros;
-$filtros_activos = array_merge($filtros, ['estado' => 0]);
-$filtros_inactivos = array_merge($filtros, ['estado' => -1]);
-
-// Para destacados, incluir tanto destacado como premium
-// Un código está destacado si tiene destacado > 0 O destacado_social > 0 (timestamp válido)
-$filtros_destacados = $filtros;
-// Si ya hay filtros $and, agregar el filtro de destacados
-if (isset($filtros_destacados['$and'])) {
-    $filtros_destacados['$and'][] = [
-        '$or' => [
-            ['destacado' => ['$gt' => 0]],
-            ['destacado_social' => ['$gt' => 0]]
-        ]
-    ];
-} else {
-    // Si no hay $and, crear uno nuevo
-    $filtros_destacados['$and'] = [
-        [
-            '$or' => [
-                ['destacado' => ['$gt' => 0]],
-                ['destacado_social' => ['$gt' => 0]]
-            ]
-        ]
-    ];
-}
+// Obtener estadísticas GLOBALES (sin filtros) para las tarjetas principales
+// Estas siempre muestran el total real de la base de datos
+$filtros_destacados_global = [
+    '$or' => [
+        ['destacado' => ['$gt' => 0]],
+        ['destacado_social' => ['$gt' => 0]]
+    ]
+];
 
 // Para códigos nuevos hoy, usar timestamp del ObjectId
 $timestamp_hoy = strtotime('today');
 $objectId_hoy = new MongoDB\BSON\ObjectId(sprintf('%08x%s', $timestamp_hoy, str_repeat('0', 16)));
-$filtros_hoy = array_merge($filtros, ['_id' => ['$gte' => $objectId_hoy]]);
 
 $estadisticas = [
-    'total' => $collection_codigos->countDocuments($filtros_total),
-    'activos' => $collection_codigos->countDocuments($filtros_activos),
-    'inactivos' => $collection_codigos->countDocuments($filtros_inactivos),
-    'destacados' => $collection_codigos->countDocuments($filtros_destacados),
-    'nuevos_hoy' => $collection_codigos->countDocuments($filtros_hoy),
-    'filtrados' => $total_codigos // Este ya está calculado correctamente arriba
+    'total' => $collection_codigos->countDocuments([]),
+    'activos' => $collection_codigos->countDocuments(['estado' => 0]),
+    'inactivos' => $collection_codigos->countDocuments(['estado' => -1]),
+    'antiguos' => $collection_codigos->countDocuments(['estado' => -3]),
+    'destacados' => $collection_codigos->countDocuments($filtros_destacados_global),
+    'nuevos_hoy' => $collection_codigos->countDocuments(['_id' => ['$gte' => $objectId_hoy]]),
+    'filtrados' => $total_codigos // Este refleja los filtros aplicados
 ];
 
 // Datos para gráfica de códigos publicados por fecha
@@ -773,51 +753,69 @@ $title = "Gestión de Códigos - Panel de Administración";
 
                     <!-- Estadísticas -->
                     <div class="row mb-4">
-                        <div class="col-md-2 mb-3">
+                        <div class="col mb-3">
+                            <a href="?estado=" class="text-decoration-none">
+                                <div class="card card-stat<?php echo $filtro_estado === '' ? ' border-primary border-2' : ''; ?>" style="cursor:pointer">
+                                    <div class="card-body text-center py-2">
+                                        <h3 class="text-primary mb-0"><?php echo number_format($estadisticas['total']); ?></h3>
+                                        <p class="text-muted mb-0 small">Total</p>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="col mb-3">
+                            <a href="?estado=0" class="text-decoration-none">
+                                <div class="card card-stat<?php echo $filtro_estado === '0' ? ' border-success border-2' : ''; ?>" style="cursor:pointer">
+                                    <div class="card-body text-center py-2">
+                                        <h3 class="text-success mb-0"><?php echo number_format($estadisticas['activos']); ?></h3>
+                                        <p class="text-muted mb-0 small">Activos</p>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="col mb-3">
+                            <a href="?estado=-1" class="text-decoration-none">
+                                <div class="card card-stat<?php echo $filtro_estado === '-1' ? ' border-danger border-2' : ''; ?>" style="cursor:pointer">
+                                    <div class="card-body text-center py-2">
+                                        <h3 class="text-danger mb-0"><?php echo number_format($estadisticas['inactivos']); ?></h3>
+                                        <p class="text-muted mb-0 small">Inactivos</p>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="col mb-3">
+                            <a href="?estado=-3" class="text-decoration-none">
+                                <div class="card card-stat<?php echo $filtro_estado === '-3' ? ' border-warning border-2' : ''; ?>" style="cursor:pointer">
+                                    <div class="card-body text-center py-2">
+                                        <h3 class="text-warning mb-0"><i class="fas fa-clock me-1" style="font-size:0.7em"></i><?php echo number_format($estadisticas['antiguos']); ?></h3>
+                                        <p class="text-muted mb-0 small">Antiguos</p>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="col mb-3">
                             <div class="card card-stat">
-                                <div class="card-body text-center">
-                                    <h3 class="text-primary"><?php echo number_format($estadisticas['total']); ?></h3>
-                                    <p class="text-muted mb-0">Total</p>
+                                <div class="card-body text-center py-2">
+                                    <h3 class="text-info mb-0"><?php echo number_format($estadisticas['destacados']); ?></h3>
+                                    <p class="text-muted mb-0 small">Destacados</p>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-2 mb-3">
-                            <div class="card card-stat">
-                                <div class="card-body text-center">
-                                    <h3 class="text-success"><?php echo number_format($estadisticas['activos']); ?></h3>
-                                    <p class="text-muted mb-0">Activos</p>
+                        <div class="col mb-3">
+                            <a href="?filtro_nuevos_hoy=1" class="text-decoration-none">
+                                <div class="card card-stat" style="cursor:pointer">
+                                    <div class="card-body text-center py-2">
+                                        <h3 class="text-primary mb-0"><?php echo number_format($estadisticas['nuevos_hoy']); ?></h3>
+                                        <p class="text-muted mb-0 small">Hoy</p>
+                                    </div>
                                 </div>
-                            </div>
+                            </a>
                         </div>
-                        <div class="col-md-2 mb-3">
+                        <div class="col mb-3">
                             <div class="card card-stat">
-                                <div class="card-body text-center">
-                                    <h3 class="text-danger"><?php echo number_format($estadisticas['inactivos']); ?></h3>
-                                    <p class="text-muted mb-0">Inactivos</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-2 mb-3">
-                            <div class="card card-stat">
-                                <div class="card-body text-center">
-                                    <h3 class="text-warning"><?php echo number_format($estadisticas['destacados']); ?></h3>
-                                    <p class="text-muted mb-0">Destacados</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-2 mb-3">
-                            <div class="card card-stat">
-                                <div class="card-body text-center">
-                                    <h3 class="text-info"><?php echo number_format($estadisticas['nuevos_hoy']); ?></h3>
-                                    <p class="text-muted mb-0">Hoy</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-2 mb-3">
-                            <div class="card card-stat">
-                                <div class="card-body text-center">
-                                    <h3 class="text-secondary"><?php echo number_format($total_codigos); ?></h3>
-                                    <p class="text-muted mb-0">Filtrados</p>
+                                <div class="card-body text-center py-2">
+                                    <h3 class="text-secondary mb-0"><?php echo number_format($total_codigos); ?></h3>
+                                    <p class="text-muted mb-0 small">Filtrados</p>
                                 </div>
                             </div>
                         </div>
@@ -905,6 +903,7 @@ $title = "Gestión de Códigos - Panel de Administración";
                                         <option value="0" <?php echo $filtro_estado === '0' ? 'selected' : ''; ?>>Activo</option>
                                         <option value="-1" <?php echo $filtro_estado === '-1' ? 'selected' : ''; ?>>Inactivo</option>
                                         <option value="-2" <?php echo $filtro_estado === '-2' ? 'selected' : ''; ?>>Desactivado por usuario</option>
+                                        <option value="-3" <?php echo $filtro_estado === '-3' ? 'selected' : ''; ?>>Desactivado por antigüedad</option>
                                     </select>
                                 </div>
                                 <div class="col-md-2">
@@ -1271,8 +1270,11 @@ $title = "Gestión de Códigos - Panel de Administración";
                                             <td>
                                                 <?php 
                                                 $estado = $codigo['estado'] ?? 0;
-                                                $estado_class = $estado == 0 ? 'success' : ($estado == -1 ? 'danger' : 'warning');
-                                                $estado_text = $estado == 0 ? 'Activo' : ($estado == -1 ? 'Inactivo' : 'Desactivado');
+                                                if ($estado == 0) { $estado_class = 'success'; $estado_text = 'Activo'; }
+                                                elseif ($estado == -1) { $estado_class = 'danger'; $estado_text = 'Inactivo'; }
+                                                elseif ($estado == -3) { $estado_class = 'warning'; $estado_text = '⏳ Antigüedad'; }
+                                                elseif ($estado == -2) { $estado_class = 'secondary'; $estado_text = 'Desact. usuario'; }
+                                                else { $estado_class = 'dark'; $estado_text = 'Desconocido'; }
                                                 ?>
                                                 <span class="badge bg-<?php echo $estado_class; ?>"><?php echo $estado_text; ?></span>
                                             </td>

@@ -118,13 +118,25 @@ function generate_titulo_marca_mejorado($marca, $lista_codigos) {
                 $pre_txt = "Códigos Descuento ";
                 break;
             case 'n26':
+            case 'revolut':
+            case 'qonto':
                 $pre_txt = "Códigos Promocionales ";
                 break;
             case 'mitto':
                 $pre_txt = "Códigos Invitación ";
                 break;
             case 'traderepublic':
+            case 'scalable-capital':
+            case 'degiro':
                 $pre_txt = "Código Invitación ";
+                break;
+            case 'backmarket':
+            case 'wallapop':
+            case 'vinted':
+                $pre_txt = "Código amigo ";
+                break;
+            case 'yego':
+                $pre_txt = "Primer trayecto gratis y Código Promocional ";
                 break;
         }
     }
@@ -166,9 +178,38 @@ function generate_descripcion_marca_mejorada($marca, $lista_codigos, $numero_cod
     $nombre_marca = isset($marca['nombre']) ? $marca['nombre'] : 'la marca';
     
     if ($ahorro_ultimo) {
-        $descripcion = trim($ahorro_ultimo) . " con tu código invitación " . $nombre_marca . ". Códigos descuento y cupones descuento válidos para " . $string_fecha . " ✅ - ¡Aprovecha y gana dinero";
+        $descripcion = trim($ahorro_ultimo) . " con tu código amigo " . $nombre_marca . ". Códigos descuento y cupones descuento válidos para " . $string_fecha . " ✅ - ¡Aprovecha y gana dinero";
     } else {
         $descripcion = "Códigos de amigo y cupones descuento de " . $nombre_marca . ". " . $numero_codigos . " códigos verificados válidos para " . $string_fecha . " ✅ - ¡Aprovecha y gana dinero";
+    }
+    
+    // Enriquecer con top keywords transaccionales de SEO si están disponibles
+    if (!function_exists('get_brand_keywords_by_type')) {
+        $kw_file = __DIR__ . '/funciones_keywords_marca.php';
+        if (file_exists($kw_file)) {
+            include_once $kw_file;
+        }
+    }
+    
+    if (function_exists('get_brand_keywords_by_type')) {
+        $top_kws = get_brand_keywords_by_type($nombre_clave, 'transactional', 3);
+        if (!empty($top_kws)) {
+            // Extraer solo las keywords que no sean redundantes con el nombre de marca
+            $kw_terms = [];
+            $brand_lower = mb_strtolower($nombre_marca);
+            foreach ($top_kws as $kw) {
+                $kw_text = $kw['kw'] ?? '';
+                // Solo añadir keywords que no sean simplemente "codigo descuento [marca]" (ya está implícito)
+                $clean_kw = str_replace($brand_lower, '', mb_strtolower($kw_text));
+                $clean_kw = trim(preg_replace('/\s+/', ' ', $clean_kw));
+                if (mb_strlen($clean_kw) > 3 && !in_array($clean_kw, ['codigo descuento', 'cupones', 'codigo amigo'])) {
+                    $kw_terms[] = trim($kw_text);
+                }
+            }
+            if (!empty($kw_terms)) {
+                $descripcion .= ". Búsquedas: " . implode(', ', array_slice($kw_terms, 0, 2));
+            }
+        }
     }
     
     return $descripcion;

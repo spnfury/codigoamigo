@@ -8,6 +8,16 @@ require_once __DIR__ . '/inc/includes.php';
 require_once __DIR__ . '/vendor/stripe/stripe-php/init.php';
 require_once __DIR__ . '/myphp/funciones_usuario.php';
 
+// Iniciar sesión si no está iniciada
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Definir URL base si no existe
+if (!isset($GLOBALS['website'])) {
+    $GLOBALS['website'] = 'https://www.codigoamigo.com/';
+}
+
 // Verificar que el usuario está logueado
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     header('Content-Type: application/json');
@@ -47,6 +57,11 @@ if (!$usuario) {
 require_once __DIR__ . '/config/stripe.php';
 $stripe_secret_key = get_stripe_live_secret_key();
 \Stripe\Stripe::setApiKey($stripe_secret_key);
+\Stripe\Stripe::setApiVersion('2023-10-16');
+
+// Intentar capturar el origen de la suscripción (ej. página pincipal vs modal)
+$input = json_decode(file_get_contents('php://input'), true);
+$source = $input['source'] ?? 'suscripcion_vip_page';
 
 try {
     // Buscar o crear el producto de suscripción VIP en Stripe
@@ -70,7 +85,7 @@ try {
     
     // Buscar o crear el precio de 9,99€/mes
     $prices = \Stripe\Price::search([
-        'query' => 'product:"' . $product->id . '" AND active:"true" AND recurring.interval:"month"',
+        'query' => 'product:"' . $product->id . '" AND active:"true" AND metadata["price_type"]:"vip_monthly"',
         'limit' => 1
     ]);
     
@@ -108,18 +123,40 @@ try {
         'subscription_data' => [
             'metadata' => [
                 'tipo' => 'suscripcion_vip',
-                'usuario_id' => $user_id
+                'usuario_id' => $user_id,
+                'source' => $source
             ]
         ],
         'metadata' => [
             'tipo' => 'suscripcion_vip',
-            'usuario_id' => $user_id
+            'usuario_id' => $user_id,
+            'source' => $source
         ],
         'success_url' => $success_url,
         'cancel_url' => $cancel_url,
         'locale' => 'es',
         'allow_promotion_codes' => true
     ]);
+    
+    // Guardar el carrito abandonado (intención de checkout) en la BBDD
+    try {
+        global $client, $db_name;
+        if ($client && $db_name) {
+            $db = $client->selectDatabase($db_name);
+            $coll_checkouts = $db->selectCollection('vip_checkout_intents');
+            $coll_checkouts->insertOne([
+                'usuario_id' => new MongoDB\BSON\ObjectId($user_id),
+                'session_id' => $checkout_session->id,
+                'source' => $source,
+                'created_at' => new MongoDB\BSON\UTCDateTime(),
+                'status' => 'pending',
+                'recovery_email_sent' => false
+            ]);
+        }
+    } catch (Throwable $db_error) {
+        // No detener el proceso de pago si falla el guardado estadístico
+        error_log("No se pudo guardar la intención de checkout VIP: " . $db_error->getMessage());
+    }
     
     // Retornar la URL de checkout
     header('Content-Type: application/json');

@@ -42,7 +42,7 @@ function muestra_texto($marca){
         
          
         
-        <?
+        <?php
         
     }elseif($marca=='scoot'){
         
@@ -70,7 +70,7 @@ function muestra_texto($marca){
         
          
         
-        <?
+        <?php
         
     }elseif($marca=='holaluz'){ ?>
         
@@ -83,7 +83,7 @@ function muestra_texto($marca){
         <br>
         ¡Comparte tu código e invita a tus amigos a ahorrar con la energía verde!
         
-        <?
+        <?php
         
     }else{
         

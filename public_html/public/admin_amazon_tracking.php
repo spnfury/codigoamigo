@@ -30,10 +30,18 @@ function esClickAmazon($click) {
     // 1. Chequeo base de datos (flag explícito)
     if (isset($click['es_amazon']) && $click['es_amazon']) return true;
     
-    // 2. Chequeo URL final u original
-    $url = $click['enlace_final'] ?? ($click['enlace_original'] ?? '');
-    foreach ($dominios_amazon as $dominio) {
-        if (stripos($url, $dominio) !== false) return true;
+    // 2. Chequeo URL final (si ya existe y es Amazon, es Amazon)
+    if (!empty($click['enlace_final'])) {
+        foreach ($dominios_amazon as $dominio) {
+            if (stripos($click['enlace_final'], $dominio) !== false) return true;
+        }
+    }
+
+    // 3. Chequeo URL original (solo si es un acortador específico de Amazon)
+    $url_original = $click['enlace_original'] ?? '';
+    $acortadores_amazon = ['amzn', 'amz.tf', 'chollo.biz', 'ganga.ad'];
+    foreach ($acortadores_amazon as $acortador) {
+        if (stripos($url_original, $acortador) !== false) return true;
     }
 
     return false;
@@ -107,12 +115,13 @@ $filtro_bd = [
 
 // Nota: No filtramos por 'es_amazon' en la query de Mongo si queremos detectar cosas como chollo.biz 
 // que Mongo quizás no marcó como Amazon. Filtramos en memoria.
-// Si son MUCHOS datos, esto podría optimizarse, pero para un tracking diario está bien.
+// Eliminamos el límite severo para permitir "Últimos 30 días" completo, pero procesamos con cursor.
 $clicks_cursor = $collection->find($filtro_bd, [
     'sort' => ['fecha' => -1],
-    'limit' => 2000 // Aumentamos límite para tener buena muestra
+    'limit' => 50000 // Límite de seguridad muy alto, pero no infinito
 ]);
-$clicks = $clicks_cursor->toArray();
+// No usamos toArray() para no explotar la memoria
+
 
 // --- PROCESAMIENTO DE DATOS ---
 
@@ -148,7 +157,7 @@ if ($agrupacion_por_hora) {
 // Array final filtrado para mostrar en tabla
 $clicks_filtrados = [];
 
-foreach ($clicks as $click) {
+foreach ($clicks_cursor as $click) {
     // Aplicar filtro de "Solo Amazon" en memoria si está activo
     $es_amazon = esClickAmazon($click);
     
@@ -163,8 +172,10 @@ foreach ($clicks as $click) {
         if (tieneTagAfiliado($click)) continue; 
     }
     
-    // Guardar para tabla
-    $clicks_filtrados[] = $click;
+    // Guardar para tabla (Solo los primeros 500 para no matar el navegador)
+    if (count($clicks_filtrados) < 500) {
+        $clicks_filtrados[] = $click;
+    }
     
     $total_clicks++;
     
@@ -523,8 +534,16 @@ $tasa_exito = $clicks_amazon > 0 ? round(($clicks_con_tag / $clicks_amazon) * 10
                                         
                                         $row_class = '';
                                         if ($es_amazon) {
+                                            $url_check = $click['enlace_final'] ?? ($click['enlace_original'] ?? '');
+                                            $es_shortener = (strpos($url_check, 'ganga.ad') !== false || strpos($url_check, 'chollo.biz') !== false || strpos($url_check, 'amz.tf') !== false || strpos($url_check, 'bit.ly') !== false || strpos($url_check, 't.co') !== false);
+                                            
+                                            // Si no tiene tag, marcamos error SALVO que sea un shortener (que se resolverá o es genérico)
                                             if (!$tiene_tag || $es_busqueda) {
-                                                $row_class = 'sin-tag-afiliado'; // Usamos la misma clase de error
+                                                if ($es_shortener && !$es_busqueda) {
+                                                    $row_class = 'table-warning'; // Amarillo para pendientes o externos
+                                                } else {
+                                                    $row_class = 'sin-tag-afiliado'; // Rojo para errores reales en Amazon
+                                                }
                                             }
                                         }
                                         
@@ -541,14 +560,26 @@ $tasa_exito = $clicks_amazon > 0 ? round(($clicks_con_tag / $clicks_amazon) * 10
                                         // Limpiar Referer para mostrar
                                         $referer = $click['referer'] ?? '';
                                         $referer_mostrar = '-';
-                                        if (!empty($referer)) {
+                                        $referer_badge = '';
+                                        $referer_icon = 'fa-link';
+                                        
+                                        if ($referer === 'Shorts Feed') {
+                                            $referer_mostrar = 'Shorts Feed';
+                                            $referer_badge = '<span class="badge bg-danger me-1" style="font-size: 0.65rem;">🎬 Shorts</span>';
+                                            $referer_icon = 'fa-video';
+                                        } elseif (!empty($referer)) {
                                             $parsed_ref = parse_url($referer);
                                             // Si es interno, mostrar solo path, si es externo mostrar host
                                             if (isset($parsed_ref['host']) && strpos($parsed_ref['host'], 'codigoamigo.com') !== false) {
                                                 $referer_mostrar = 'Int: ' . ($parsed_ref['path'] ?? '/');
+                                                $referer_badge = '<span class="badge bg-secondary me-1" style="font-size: 0.65rem;">🔗 Web</span>';
                                             } else {
                                                 $referer_mostrar = $referer;
+                                                $referer_badge = '<span class="badge bg-info me-1" style="font-size: 0.65rem;">🌐 Ext</span>';
                                             }
+                                        } else {
+                                            $referer_badge = '<span class="badge bg-dark me-1" style="font-size: 0.65rem;">➡️ Directo</span>';
+                                            $referer_mostrar = 'Acceso directo';
                                         }
                                     ?>
                                     <tr class="<?php echo $row_class; ?>">
@@ -571,8 +602,9 @@ $tasa_exito = $clicks_amazon > 0 ? round(($clicks_con_tag / $clicks_amazon) * 10
                                                 <span class="text-muted">ID: <?php echo substr((string)$click['chollo_id'], -6); ?></span>
                                             <?php endif; ?>
                                             
-                                            <div class="url-cell text-muted x-small mt-1" title="Referer: <?php echo htmlspecialchars($referer); ?>" style="font-size: 0.75rem; opacity: 0.8;">
-                                                <i class="fas fa-link me-1"></i><?php echo htmlspecialchars(mb_substr($referer_mostrar, 0, 80)) . (mb_strlen($referer_mostrar) > 80 ? '...' : ''); ?>
+                                            <div class="url-cell text-muted x-small mt-1" title="Referer: <?php echo htmlspecialchars($referer); ?>" style="font-size: 0.75rem; opacity: 0.9;">
+                                                <?php echo $referer_badge; ?>
+                                                <i class="fas <?php echo $referer_icon; ?> me-1"></i><?php echo htmlspecialchars(mb_substr($referer_mostrar, 0, 60)) . (mb_strlen($referer_mostrar) > 60 ? '...' : ''); ?>
                                             </div>
                                         </td>
 
@@ -588,9 +620,16 @@ $tasa_exito = $clicks_amazon > 0 ? round(($clicks_con_tag / $clicks_amazon) * 10
                                                 } else {
                                                     echo '<span class="badge badge-danger"><i class="fas fa-times me-1"></i>SIN TAG</span>';
                                                 }
+                                        } else {
+                                            // NO ES AMAZON (detectado por dominio ppal)
+                                            // Revisamos manualmente si es shortener para informar del estado
+                                            $url_check = $click['enlace_final'] ?? ($click['enlace_original'] ?? '');
+                                            if (strpos($url_check, 'ganga.ad') !== false || strpos($url_check, 'chollo.biz') !== false || strpos($url_check, 'bit.ly') !== false) {
+                                                 echo '<span class="badge bg-warning text-dark"><i class="fas fa-sync fa-spin me-1"></i>Resolviendo...</span>';
                                             } else {
-                                                echo '<span class="badge bg-light text-muted">N/A</span>';
+                                                 echo '<span class="badge bg-light text-muted">N/A</span>';
                                             }
+                                        }
                                             ?>
                                         </td>
                                         <td class="small text-muted"><?php echo htmlspecialchars($click['ip'] ?? '-'); ?></td>

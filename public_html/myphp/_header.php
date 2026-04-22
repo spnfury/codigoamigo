@@ -20,11 +20,12 @@ function get_header_slim($title = "", $description = "", $title_social = "", $de
                 <link rel="shortcut icon" href="/img/favicon_moneda_real.png">
 
                 <?php
-                if(strpos($_SERVER['SERVER_NAME'],"dev.") !==false || $que_es==1 || $noindex == 1 || (isset($datos_usuario) && isset($datos_usuario["username"])) || isset($_GET["codigo"]) || isset($_GET["page"]) || isset($provincia) || (isset($args) && isset($args["mes"])) || (isset($GLOBALS["actual_url"]) && strpos($GLOBALS["actual_url"],"/public/") !==false)){ ?>
+                // Logic for noindex: block dev, explicit noindex, users, parameters, etc.
+                // We removed the restrictive check for "/public/" as many friendly URLs load files from there.
+                if(strpos($_SERVER['SERVER_NAME'],"dev.") !==false || $que_es==1 || $noindex == 1 || (isset($datos_usuario) && isset($datos_usuario["username"])) || isset($_GET["codigo"]) || isset($_GET["page"]) || isset($provincia) || (isset($args) && isset($args["mes"]))){ ?>
                 	<meta name="robots" content="noindex" />
                 <?php }else{ ?>
                 	<meta name="robots" content="index,follow" />
-
                 <?php } ?>
 
                 <meta name="author" content="<?php echo $author_web; ?>">
@@ -32,8 +33,12 @@ function get_header_slim($title = "", $description = "", $title_social = "", $de
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 
-                <?php if(!isset($_GET["page"])){ ?>
-                    <meta name="canonical" content="<?php echo isset($GLOBALS["actual_url_limpia"]) ? $GLOBALS["actual_url_limpia"] : ''; ?>"/>
+                <?php if(!isset($_GET["page"])){ 
+                    // Force canonical to always use www. for consistency
+                    $canonical_url = isset($GLOBALS["actual_url_limpia"]) ? $GLOBALS["actual_url_limpia"] : '';
+                    $canonical_url = str_replace("https://codigoamigo.com", "https://www.codigoamigo.com", $canonical_url);
+                ?>
+                    <meta name="canonical" content="<?php echo $canonical_url; ?>"/>
                 <?php } ?>
 
                 <meta name="google-site-verification" content="nKq2RB4r_Up2pP8rZfsCEuesPABSQrCI2mzIPY4TlCk"/>
@@ -77,24 +82,7 @@ function get_header_slim($title = "", $description = "", $title_social = "", $de
             <link rel="stylesheet" type="text/css" href="/css/libs/slick.min.css">
 			<link rel="stylesheet" type="text/css" href="/css/slick-theme.css">            
 
-<? if($title && strpos($title,"Descubre ") === false && !$anula_adsense){   ?>
-    <script>
-    // Prevenir carga duplicada del script de AdSense
-    if (!document.querySelector('script[src*="adsbygoogle.js"]')) {
-        var adsenseScript = document.createElement('script');
-        adsenseScript.async = true;
-        adsenseScript.setAttribute('data-ad-client', 'ca-pub-2091026230098067');
-        adsenseScript.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js';
-        adsenseScript.crossOrigin = 'anonymous';
-        adsenseScript.onerror = function() {
-            console.warn('Error al cargar el script de AdSense');
-        };
-        document.head.appendChild(adsenseScript);
-    }
-    
-    window.adsenseScriptLoaded = true;
-    </script>
-<?php } ?>
+
 
         <?php
         if (function_exists('codigoamigo_get_sentry_browser_snippet')) {

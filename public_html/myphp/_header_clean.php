@@ -76,24 +76,7 @@ function get_header_slim($title = "", $description = "", $title_social = "", $de
             <link rel="stylesheet" type="text/css" href="/css/libs/slick.min.css">
 			<link rel="stylesheet" type="text/css" href="/css/slick-theme.css">
 
-        	<? if($title && strpos($title,"Descubre ") === false && !$anula_adsense){   ?>
-            <script>
-            // Prevenir carga duplicada del script de AdSense
-            if (!document.querySelector('script[src*="adsbygoogle.js"]')) {
-                var adsenseScript = document.createElement('script');
-                adsenseScript.async = true;
-                adsenseScript.setAttribute('data-ad-client', 'ca-pub-2091026230098067');
-                adsenseScript.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js';
-                adsenseScript.crossOrigin = 'anonymous';
-                adsenseScript.onerror = function() {
-                    console.warn('Error al cargar el script de AdSense');
-                };
-                document.head.appendChild(adsenseScript);
-            }
-            
-            window.adsenseScriptLoaded = true;
-            </script>
-    <?php } ?>
+
 </head>
             <body id="<? echo $name_page; ?>">
 

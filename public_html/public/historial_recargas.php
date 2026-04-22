@@ -429,7 +429,18 @@ $title = "Historial de Recargas - CodigoAmigo";
                                                 <p><?php echo $transaccion['descripcion']; ?></p>
                                                 <small class="text-muted">
                                                     <i class="fas fa-calendar me-1"></i>
-                                                    <?php echo date('d/m/Y H:i', $transaccion['fecha']->toDateTime()->getTimestamp()); ?>
+                                                    <?php
+                                                    $fecha_trans = $transaccion['fecha'] ?? null;
+                                                    if ($fecha_trans instanceof MongoDB\BSON\UTCDateTime) {
+                                                        echo date('d/m/Y H:i', $fecha_trans->toDateTime()->getTimestamp());
+                                                    } elseif (is_numeric($fecha_trans)) {
+                                                        echo date('d/m/Y H:i', (int)$fecha_trans);
+                                                    } elseif (is_string($fecha_trans)) {
+                                                        echo date('d/m/Y H:i', strtotime($fecha_trans) ?: time());
+                                                    } else {
+                                                        echo 'N/A';
+                                                    }
+                                                    ?>
                                                 </small>
                                             </div>
                                         </div>

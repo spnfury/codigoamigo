@@ -88,6 +88,14 @@ use SendGrid\Mail\ReplyTo;
 
         global $url_logo_web;
         session_start();
+
+        // Comprobar preferencia del usuario destinatario
+        $id_usuario_codigo = $codigo_to_show['id_usuario'] ?? null;
+        if ($id_usuario_codigo && !usuarioAceptaEmail((string)$id_usuario_codigo, 'apertura_codigo')) {
+            error_log("Email apertura_codigo NO enviado a $correo: usuario ha desactivado esta notificación");
+            return;
+        }
+
         $nombre_quien_ha_abierto = $_SESSION["username"];
         
         $to = $correo;
@@ -109,8 +117,6 @@ use SendGrid\Mail\ReplyTo;
         $body .= "</p>";
         $body .= "<a target='_blank' href='".$url_codigo."' title='ver código'>'".$url_codigo."'</a>";
         $body .= "<br><p>Recuerda que si tienes cualquier duda, pregunta o sugerencia, puedes hacernosla llegar a <b>info@codigoamigo.com</b></p>";
-        $body .= "<hr><p>Si no deseas recibir más correos de este tipo, puedes editar los avisos en tu
-            <a href='https://www.codigoamigo.com/usuario' title='panel de control'>panel de control.</a></p>";
         $body = ($body);
 
         //mail($to, $asunto, $body, $headers, "-finfo@codigoamigo.com");
@@ -290,6 +296,13 @@ use SendGrid\Mail\ReplyTo;
 
         global $url_logo_web;
 
+        // Comprobar preferencia del usuario destinatario
+        $id_usuario_codigo = $codigo_to_show['id_usuario'] ?? null;
+        if ($id_usuario_codigo && !usuarioAceptaEmail((string)$id_usuario_codigo, 'competencia')) {
+            error_log("Email competencia NO enviado a $correo: usuario ha desactivado esta notificación");
+            return false;
+        }
+
         $to_email = $correo;
         $to_name = $nombre;
         $asunto = "Pst, tienes competencia en " . $nombre_marca;
@@ -339,6 +352,13 @@ use SendGrid\Mail\ReplyTo;
     function enviar_mail_codigo_no_destacado_home($codigo_to_show, $correo, $nombre, $url_codigo, $nombre_marca, $img_marca, $usuario_original) {
 
         global $url_logo_web;
+
+        // Comprobar preferencia del usuario destinatario
+        $id_usuario_codigo = $codigo_to_show['id_usuario'] ?? null;
+        if ($id_usuario_codigo && !usuarioAceptaEmail((string)$id_usuario_codigo, 'competencia_home')) {
+            error_log("Email competencia_home NO enviado a $correo: usuario ha desactivado esta notificación");
+            return false;
+        }
 
         $to_email = $correo;
         $to_name = $nombre;
@@ -459,6 +479,12 @@ use SendGrid\Mail\ReplyTo;
 
                 // Evitar duplicados y emails vacíos
                 if (empty($email_usuario) || isset($emails_enviados[$email_usuario])) {
+                    continue;
+                }
+
+                // Comprobar preferencia del usuario destinatario
+                if (!usuarioAceptaEmail($usuario_id_home, 'competencia_home_super')) {
+                    error_log("Email competencia_home_super NO enviado a $email_usuario: usuario ha desactivado esta notificación");
                     continue;
                 }
 

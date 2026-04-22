@@ -500,12 +500,14 @@ if (!isset($panel)) {
                 box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
                 overflow: hidden;
                 /* margin-top: 5px; REMOVED TO FIX SPACING */
+                font-size: 0; /* Hide any bare text nodes like "false" */
             }
             
             .easy-autocomplete-container ul {
                 list-style: none;
                 margin: 0;
                 padding: 0;
+                font-size: 14px; /* Restore font-size for actual content */
             }
             
             .easy-autocomplete-container ul li {
@@ -633,7 +635,7 @@ if (!isset($panel)) {
                     <div style="display:flex; align-items:center; gap:10px; padding:8px 0; color:rgba(255,255,255,0.9); font-size:0.9rem;"><i class="fas fa-paper-plane" style="color:#ffd700; width:16px;"></i> Mensajes masivos</div>
                     <div style="display:flex; align-items:center; gap:10px; padding:8px 0; color:rgba(255,255,255,0.9); font-size:0.9rem;"><i class="fas fa-wallet" style="color:#ffd700; width:16px;"></i> +10€ saldo gratis/mes</div>
                 </div>
-                <a href="/public/suscripcion_vip.php" style="display:block; background:linear-gradient(135deg, #ffd700 0%, #E30613 100%); color:white; padding:12px 20px; border-radius:25px; text-decoration:none; font-weight:700; font-size:1rem; transition:transform 0.2s;">Quiero ser VIP →</a>
+                <a href="/public/mis_viewers.php" style="display:block; background:linear-gradient(135deg, #ffd700 0%, #E30613 100%); color:white; padding:12px 20px; border-radius:25px; text-decoration:none; font-weight:700; font-size:1rem; transition:transform 0.2s;">Quiero ser VIP →</a>
             </div>
         </div>
         <script>
@@ -1075,7 +1077,7 @@ if (!isset($panel)) {
                             <?php 
                             $dropdown_is_vip = isset($_SESSION["user_id"]) && function_exists('es_usuario_vip') && es_usuario_vip($_SESSION["user_id"]);
                             $has_potential = isset($header_total_potential) && $header_total_potential > 0;
-                            $leads_link = $dropdown_is_vip ? '/public/mis_viewers.php' : '/public/suscripcion_vip.php';
+                            $leads_link = '/public/mis_viewers.php';
                             ?>
                             <!-- Bloque visual Leads + VIP -->
                             <div style="margin: 8px 10px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(102,126,234,0.3);">
@@ -1097,7 +1099,7 @@ if (!isset($panel)) {
                                     <?php endif; ?>
                                 </a>
                                 <?php if(!$dropdown_is_vip): ?>
-                                <a href="/public/suscripcion_vip.php" style="display:flex; align-items:center; gap:10px; padding:10px 15px; background: linear-gradient(135deg, rgba(255,215,0,0.2) 0%, rgba(227,6,19,0.15) 100%); text-decoration:none; border-top: 1px solid rgba(255,215,0,0.2);">
+                                <a href="/public/mis_viewers.php" style="display:flex; align-items:center; gap:10px; padding:10px 15px; background: linear-gradient(135deg, rgba(255,215,0,0.2) 0%, rgba(227,6,19,0.15) 100%); text-decoration:none; border-top: 1px solid rgba(255,215,0,0.2);">
                                     <i class="fas fa-crown" style="color:#ffd700; font-size:14px;"></i>
                                     <span style="color:#ffd700; font-weight:700; font-size:13px;">Hazte VIP para contactarlos</span>
                                     <span style="margin-left:auto; background: linear-gradient(135deg, #ffd700 0%, #E30613 100%); color:white; padding:3px 8px; border-radius:10px; font-size:10px; font-weight:800;">9,99€/mes</span>
@@ -1132,6 +1134,13 @@ if (!isset($panel)) {
                                 Panel de Admin
                             </a>
                             <?php } ?>
+                            
+                            <?php if($dropdown_is_vip): ?>
+                            <a href="/public/mis_viewers.php" class="dropdown-item" style="color: #ffd700; font-weight: 600;">
+                                <i class="fas fa-crown"></i>
+                                Gestionar VIP
+                            </a>
+                            <?php endif; ?>
                             
                             <a href="/usuario" class="dropdown-item">
                                 <i class="fas fa-user-edit"></i>
@@ -1454,22 +1463,32 @@ if (!isset($panel)) {
                                 return 0;
                             }
                         },
-                        onDrawEvent: function() {
-                            var $input = $(this);
-                            var $container = $input.siblings(".easy-autocomplete-container");
-                            var $list = $container.find("ul");
-                            if ($list.children().length === 0) {
-                                $list.append("<li class='eac-item'><div style='padding:12px 15px; color:#888; text-align:center;'>Sin resultados</div></li>");
-                                // Eliminar elemento que contenga solo el texto "false"
+                        onLoadEvent: function() {
+                            var $containers = $(".easy-autocomplete-container");
+                            $containers.each(function() {
+                                var $list = $(this).find("ul");
+                                
+                                // Eliminar elementos que contengan solo el texto "false"
                                 $list.children().each(function() {
-                                    var txt = $(this).text().trim(); if (txt === "false" || txt.toLowerCase() === "false" ) {
+                                    var txt = $(this).text().trim(); 
+                                    if (txt === "false" || txt.toLowerCase() === "false") {
                                         $(this).remove();
                                     }
                                 });
+                                // Eliminar nodos de texto sueltos con "false"
+                                $list.contents().filter(function() {
+                                    return this.nodeType === 3 && this.textContent.trim().toLowerCase() === 'false';
+                                }).remove();
+                                $(this).contents().filter(function() {
+                                    return this.nodeType === 3 && this.textContent.trim().toLowerCase() === 'false';
+                                }).remove();
 
-                                $list.show();
-                                $container.show();
-                            }
+                                if ($list.children().length === 0) {
+                                    $list.append("<li class='eac-item'><div style='padding:12px 15px; color:#888; text-align:center;'>Sin resultados</div></li>");
+                                    $list.show();
+                                    $(this).show();
+                                }
+                            });
                         },
                         onChooseEvent: function() {
                             // Obtener el item seleccionado del input que disparó el evento

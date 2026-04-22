@@ -4,13 +4,17 @@
     // Verificar si hay un código de referido
     $codigo_referido = isset($_GET['ref']) ? $_GET['ref'] : '';
     $nombre_referidor = '';
+    $foto_referidor = 'https://www.codigoamigo.com/img/utilidades/usuario_sin_foto.jpg';
 
     if (!empty($codigo_referido)) {
-        // Buscar el nombre del usuario que hizo la invitación
+        // Buscar el nombre y foto del usuario que hizo la invitación
         $collection_usuarios = getCollectionUsuarios();
         $referidor = $collection_usuarios->findOne(['codigo_referido' => $codigo_referido]);
         if ($referidor) {
             $nombre_referidor = $referidor['username'];
+            if (!empty($referidor['img'])) {
+                $foto_referidor = $referidor['img'];
+            }
         }
     }
 
@@ -59,10 +63,31 @@
         text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
 
+    .inviter-avatar {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        border: 4px solid rgba(255,255,255,0.3);
+        margin: 0 auto 20px;
+        overflow: hidden;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        background: white;
+    }
+
+    .inviter-avatar img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
     .invitacion-header p {
-        font-size: 1.1em;
+        font-size: 1.25em;
         margin-bottom: 30px;
         opacity: 0.9;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+        line-height: 1.4;
     }
 
     .ventajas-grid {
@@ -359,15 +384,18 @@
 <div class="registro-invitacion">
     <div class="container">
         <div class="invitacion-header">
+            <div class="inviter-avatar">
+                <img src="<?php echo htmlspecialchars($foto_referidor); ?>" alt="<?php echo htmlspecialchars($nombre_referidor); ?>">
+            </div>
             <h1>🎉 ¡Te han invitado a Código Amigo!</h1>
-            <p><strong><?php echo htmlspecialchars($nombre_referidor); ?></strong> quiere compartir contigo los mejores códigos de descuento</p>
+            <p><strong><?php echo htmlspecialchars($nombre_referidor); ?></strong> te ha enviado una invitación exclusiva con <strong>5€ de regalo</strong> para que empieces a ahorrar</p>
         </div>
 
         <div class="ventajas-grid">
-            <div class="ventaja-card">
+            <div class="ventaja-card" style="background: rgba(255, 255, 255, 0.25); border: 2px solid rgba(255, 255, 255, 0.4);">
                 <span class="ventaja-icon">💰</span>
-                <h3>Gana dinero recomendando</h3>
-                <p>Gana 5€ por cada amigo que se registre usando tu código de referido</p>
+                <h3>5€ de Regalo</h3>
+                <p>Recibe 5€ automáticos en tu cuenta al completar tu registro y verificar tu perfil</p>
             </div>
             <div class="ventaja-card">
                 <span class="ventaja-icon">🎁</span>
@@ -412,7 +440,7 @@
                 <div class="referral-code">
                     <strong>🎯 Código de referido aplicado:</strong> <?php echo htmlspecialchars($codigo_referido); ?>
                     <br>
-                    <small>Se aplicará automáticamente cuando completes el registro</small>
+                    <small>Se aplicará tu regalo de 5€ automáticamente tras la verificación</small>
                 </div>
             </div>
 

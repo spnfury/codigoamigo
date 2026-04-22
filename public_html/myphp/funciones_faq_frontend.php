@@ -8,6 +8,9 @@ if (!function_exists('getFAQsByMarca')) {
 /**
  * Genera el HTML para mostrar las FAQs de una marca con formato Google-style
  */
+/**
+ * Genera el HTML para mostrar las FAQs de una marca con formato moderno
+ */
 function mostrarFAQsMarca($marca_clave, $titulo_seccion = 'Preguntas Frecuentes') {
     $faqs = getFAQsByMarca($marca_clave, true); // Solo activas
     
@@ -15,256 +18,16 @@ function mostrarFAQsMarca($marca_clave, $titulo_seccion = 'Preguntas Frecuentes'
         return '';
     }
     
-    $html = '';
-    
-    // Estilos CSS para el acordeón estilo Google
-    $html .= '<style>
-        .faq-container {
-            max-width: 800px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-        
-        .faq-section-title {
-            font-size: 1.8rem;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 30px;
-            text-align: center;
-            position: relative;
-        }
-        
-        .faq-section-title:after {
-            content: "";
-            position: absolute;
-            bottom: -10px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 60px;
-            height: 3px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border-radius: 2px;
-        }
-        
-        .faq-item {
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            margin-bottom: 8px;
-            background: white;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            transition: all 0.3s ease;
-        }
-        
-        .faq-item:hover {
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        }
-        
-        .faq-question {
-            background: none;
-            border: none;
-            width: 100%;
-            padding: 20px 24px;
-            text-align: left;
-            font-size: 1rem;
-            font-weight: 500;
-            color: #333;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: all 0.3s ease;
-            position: relative;
-        }
-        
-        .faq-question:hover {
-            background: #f8f9fa;
-        }
-        
-        .faq-question.active {
-            background: #f8f9fa;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        
-        .faq-question-text {
-            flex: 1;
-            margin-right: 20px;
-            line-height: 1.5;
-        }
-        
-        .faq-icon {
-            font-size: 1.2rem;
-            color: #666;
-            transition: transform 0.3s ease;
-            flex-shrink: 0;
-        }
-        
-        .faq-question.active .faq-icon {
-            transform: rotate(180deg);
-            color: #667eea;
-        }
-        
-        .faq-answer {
-            padding: 0 24px;
-            max-height: 0;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            background: #f8f9fa;
-            border-radius: 0 0 8px 8px;
-        }
-        
-        .faq-answer.active {
-            padding: 20px 24px;
-            max-height: 500px;
-        }
-        
-        .faq-answer-content {
-            color: #555;
-            line-height: 1.6;
-            font-size: 0.95rem;
-        }
-        
-        .faq-answer-content p {
-            margin-bottom: 12px;
-        }
-        
-        .faq-answer-content p:last-child {
-            margin-bottom: 0;
-        }
-        
-        .faq-answer-content ul, .faq-answer-content ol {
-            margin: 12px 0;
-            padding-left: 20px;
-        }
-        
-        .faq-answer-content li {
-            margin-bottom: 6px;
-        }
-        
-        .faq-answer-content strong {
-            color: #333;
-            font-weight: 600;
-        }
-        
-        .faq-answer-content a {
-            color: #667eea;
-            text-decoration: none;
-        }
-        
-        .faq-answer-content a:hover {
-            text-decoration: underline;
-        }
-        
-        /* Responsive */
-        @media (max-width: 768px) {
-            .faq-container {
-                margin: 30px auto;
-                padding: 0 15px;
-            }
-            
-            .faq-section-title {
-                font-size: 1.5rem;
-                margin-bottom: 25px;
-            }
-            
-            .faq-question {
-                padding: 16px 18px;
-                font-size: 0.95rem;
-            }
-            
-            .faq-question-text {
-                margin-right: 15px;
-            }
-            
-            .faq-answer.active {
-                padding: 16px 18px;
-            }
-            
-            .faq-icon {
-                font-size: 1.1rem;
-            }
-        }
-        
-        /* Animación suave para el contenido */
-        .faq-answer-content {
-            animation: fadeInUp 0.3s ease-out;
-        }
-        
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-    </style>';
-    
-    // HTML del contenedor de FAQs
-    $html .= '<div class="faq-container">';
-    $html .= '<h2 class="faq-section-title">' . htmlspecialchars($titulo_seccion) . '</h2>';
-    
-    foreach ($faqs as $index => $faq) {
-        $faq_id = 'faq-' . $index;
-        $question_text = htmlspecialchars($faq['titulo']);
-        $answer_text = nl2br(htmlspecialchars($faq['respuesta']));
-        
-        $html .= '<div class="faq-item">';
-        $html .= '<button class="faq-question" onclick="toggleFAQ(\'' . $faq_id . '\')">';
-        $html .= '<span class="faq-question-text">' . $question_text . '</span>';
-        $html .= '<i class="fas fa-chevron-down faq-icon"></i>';
-        $html .= '</button>';
-        $html .= '<div class="faq-answer" id="' . $faq_id . '">';
-        $html .= '<div class="faq-answer-content">' . $answer_text . '</div>';
-        $html .= '</div>';
-        $html .= '</div>';
+    // Mapear al formato esperado por renderFAQAccordion
+    $mapped_faqs = [];
+    foreach ($faqs as $faq) {
+        $mapped_faqs[] = [
+            'q' => $faq['titulo'] ?? $faq['pregunta'],
+            'a' => $faq['respuesta']
+        ];
     }
     
-    $html .= '</div>';
-    
-    // JavaScript para el funcionamiento del acordeón
-    $html .= '<script>
-        function toggleFAQ(faqId) {
-            const answer = document.getElementById(faqId);
-            const question = answer.previousElementSibling;
-            
-            // Toggle active class
-            question.classList.toggle("active");
-            answer.classList.toggle("active");
-            
-            // Cerrar otros FAQs si es necesario (comportamiento tipo Google)
-            // Descomenta las siguientes líneas si quieres que solo un FAQ esté abierto a la vez
-            
-            /*
-            const allQuestions = document.querySelectorAll(".faq-question");
-            const allAnswers = document.querySelectorAll(".faq-answer");
-            
-            allQuestions.forEach(q => {
-                if (q !== question) {
-                    q.classList.remove("active");
-                }
-            });
-            
-            allAnswers.forEach(a => {
-                if (a !== answer) {
-                    a.classList.remove("active");
-                }
-            });
-            */
-        }
-        
-        // Opcional: Abrir primer FAQ por defecto
-        document.addEventListener("DOMContentLoaded", function() {
-            const firstFAQ = document.querySelector(".faq-question");
-            if (firstFAQ) {
-                // Descomenta la siguiente línea para abrir el primer FAQ automáticamente
-                // toggleFAQ(firstFAQ.nextElementSibling.id);
-            }
-        });
-    </script>';
-    
-    return $html;
+    return renderFAQAccordion($mapped_faqs, $marca_clave, $titulo_seccion);
 }
 
 /**
@@ -277,34 +40,183 @@ function generarSchemaFAQs($marca_clave, $marca_nombre) {
         return '';
     }
     
+    return generarSchemaFAQsFromArray($faqs);
+}
+
+/**
+ * Renderiza un array de FAQs en formato acordeón
+ * $faqs must be an array of ['q' => '...', 'a' => '...']
+ */
+function renderFAQAccordion($faqs, $brand_name = '', $titulo_seccion = 'Preguntas Frecuentes') {
+    if (empty($faqs)) {
+        return '';
+    }
+    
+    $html = '';
+    
+    // Solo incluir estilos si no se han incluido antes
+    static $styles_included = false;
+    if (!$styles_included) {
+        $html .= '<style>
+            .faq-container-modern {
+                margin: 30px 0;
+            }
+            
+            .faq-modern-title {
+                font-size: 1.6rem;
+                font-weight: 700;
+                color: #fff;
+                margin-bottom: 25px;
+            }
+            
+            .faq-modern-item {
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 12px;
+                margin-bottom: 15px;
+                overflow: hidden;
+                transition: all 0.3s ease;
+            }
+            
+            .faq-modern-item:hover {
+                background: rgba(255, 255, 255, 0.08);
+                border-color: rgba(227, 6, 19, 0.3);
+            }
+            
+            .faq-modern-question {
+                width: 100%;
+                padding: 18px 25px;
+                background: none;
+                border: none;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                cursor: pointer;
+                text-align: left;
+                color: #fff;
+                font-size: 1.1rem;
+                font-weight: 600;
+            }
+            
+            .faq-modern-question i {
+                color: #E30613;
+                transition: transform 0.3s ease;
+            }
+            
+            .faq-modern-item.active .faq-modern-question i {
+                transform: rotate(180deg);
+            }
+            
+            .faq-modern-answer {
+                max-height: 0;
+                overflow: hidden;
+                transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                background: rgba(0, 0, 0, 0.1);
+            }
+            
+            .faq-modern-item.active .faq-modern-answer {
+                max-height: 1000px;
+                border-top: 1px solid rgba(255, 255, 255, 0.05);
+            }
+            
+            .faq-modern-answer-content {
+                padding: 20px 25px;
+                color: #ccc;
+                line-height: 1.7;
+                font-size: 1rem;
+            }
+        </style>';
+        
+        $html .= '<script>
+            function handleFAQToggle(btn) {
+                const item = btn.parentElement;
+                const isActive = item.classList.contains("active");
+                
+                // Opcional: Cerrar otros (comentado por ahora)
+                /*
+                document.querySelectorAll(".faq-modern-item").forEach(i => i.classList.remove("active"));
+                */
+                
+                if (isActive) {
+                    item.classList.remove("active");
+                } else {
+                    item.classList.add("active");
+                }
+            }
+        </script>';
+        $styles_included = true;
+    }
+    
+    $html .= '<div class="faq-container-modern">';
+    if ($titulo_seccion) {
+        $html .= '<h2 class="faq-modern-title">' . htmlspecialchars($titulo_seccion) . '</h2>';
+    }
+    
+    foreach ($faqs as $index => $faq) {
+        $q = $faq['q'] ?? $faq['titulo'] ?? $faq['pregunta'] ?? '';
+        $a = $faq['a'] ?? $faq['respuesta'] ?? '';
+        
+        if (empty($q) || empty($a)) continue;
+        
+        $html .= '<div class="faq-modern-item">';
+        $html .= '<button class="faq-modern-question" onclick="handleFAQToggle(this)">';
+        $html .= '<span>' . htmlspecialchars($q) . '</span>';
+        $html .= '<i class="fas fa-chevron-down"></i>';
+        $html .= '</button>';
+        $html .= '<div class="faq-modern-answer">';
+        $html .= '<div class="faq-modern-answer-content">' . nl2br($a) . '</div>';
+        $html .= '</div>';
+        $html .= '</div>';
+    }
+    
+    $html .= '</div>';
+    
+    return $html;
+}
+
+/**
+ * Función helper para incluir FAQs en páginas de marca
+ * Ahora soporta pasar un array personalizado de FAQs
+ */
+function incluirFAQsEnMarca($marca_clave, $marca_nombre, $custom_faqs = null) {
+    if ($custom_faqs !== null && is_array($custom_faqs)) {
+        $faqs_html = renderFAQAccordion($custom_faqs, $marca_nombre, 'Preguntas Frecuentes sobre ' . $marca_nombre);
+        // El esquema todavía requiere el formato de DB o uno mapeado
+        $mapped_faqs = [];
+        foreach($custom_faqs as $cf) {
+            $mapped_faqs[] = [
+                'titulo' => $cf['q'] ?? $cf['titulo'] ?? '',
+                'respuesta' => $cf['a'] ?? $cf['respuesta'] ?? ''
+            ];
+        }
+        $schema_html = generarSchemaFAQsFromArray($mapped_faqs);
+    } else {
+        $faqs_html = mostrarFAQsMarca($marca_clave, 'Preguntas Frecuentes sobre ' . $marca_nombre);
+        $schema_html = generarSchemaFAQs($marca_clave, $marca_nombre);
+    }
+    
+    return $faqs_html . $schema_html;
+}
+
+/**
+ * Genera schema a partir de array
+ */
+function generarSchemaFAQsFromArray($faqs) {
+    if (empty($faqs)) return '';
     $schema = [
         '@context' => 'https://schema.org',
         '@type' => 'FAQPage',
         'mainEntity' => []
     ];
-    
     foreach ($faqs as $faq) {
         $schema['mainEntity'][] = [
             '@type' => 'Question',
-            'name' => $faq['titulo'],
+            'name' => $faq['titulo'] ?? $faq['q'] ?? '',
             'acceptedAnswer' => [
                 '@type' => 'Answer',
-                'text' => strip_tags($faq['respuesta'])
+                'text' => strip_tags($faq['respuesta'] ?? $faq['a'] ?? '')
             ]
         ];
     }
-    
-    return '<script type="application/ld+json">' . json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . '</script>';
+    return '<script type="application/ld+json">' . json_encode($schema, JSON_UNESCAPED_UNICODE) . '</script>';
 }
-
-/**
- * Función helper para incluir FAQs en páginas de marca
- */
-function incluirFAQsEnMarca($marca_clave, $marca_nombre) {
-    $faqs_html = mostrarFAQsMarca($marca_clave, 'Preguntas Frecuentes sobre ' . $marca_nombre);
-    $schema_html = generarSchemaFAQs($marca_clave, $marca_nombre);
-    
-    return $faqs_html . $schema_html;
-}
-
-?>

@@ -424,36 +424,16 @@ elseif ($event->type === 'customer.subscription.created') {
         }
     }
     // Verificar si es una suscripción VIP (9,99€/mes)
+    // NOTA: La activación real del VIP se hace en invoice.paid para evitar doble crédito de saldo
+    // (subscription.created e invoice.paid llegan casi simultáneamente en la primera suscripción)
     elseif (isset($subscription->metadata) && isset($subscription->metadata->tipo) && $subscription->metadata->tipo === 'suscripcion_vip') {
         $usuario_id = $subscription->metadata->usuario_id ?? null;
         
-        if ($usuario_id) {
-            // Incluir funciones de usuario (VIP)
-            if (!function_exists('activar_vip')) {
-                include_once __DIR__ . '/../myphp/funciones_usuario.php';
-            }
-            
-            // Calcular fecha de expiración basada en current_period_end de Stripe
-            $current_period_end = $subscription->current_period_end ?? time() + (30 * 24 * 60 * 60);
-            $expires_at = new DateTime();
-            $expires_at->setTimestamp($current_period_end);
-            
-            // Activar suscripción VIP
-            $resultado = activar_vip($usuario_id, $subscription->id, $expires_at);
-            
-            if ($resultado) {
-                logWebhook("Suscripción VIP activada exitosamente", [
-                    'subscription_id' => $subscription->id ?? 'UNKNOWN',
-                    'usuario_id' => $usuario_id,
-                    'expires_at' => $expires_at->format('Y-m-d H:i:s')
-                ]);
-            } else {
-                logWebhook("ERROR: No se pudo activar suscripción VIP", [
-                    'subscription_id' => $subscription->id ?? 'UNKNOWN',
-                    'usuario_id' => $usuario_id
-                ], 'ERROR');
-            }
-        }
+        logWebhook("Suscripción VIP creada - la activación se realizará via invoice.paid", [
+            'subscription_id' => $subscription->id ?? 'UNKNOWN',
+            'usuario_id' => $usuario_id,
+            'status' => $subscription->status ?? 'UNKNOWN'
+        ]);
     }
 }
 elseif ($event->type === 'customer.subscription.deleted' || $event->type === 'customer.subscription.updated') {
@@ -534,6 +514,18 @@ elseif ($event->type === 'customer.subscription.deleted' || $event->type === 'cu
                 'usuario_id' => $usuario_id,
                 'current_period_end' => $subscription->current_period_end ?? 'UNKNOWN'
             ]);
+            // Sync cancel pending flag in MongoDB
+            if ($usuario_id) {
+                try {
+                    $collection_usuarios = getCollectionUsuarios();
+                    $collection_usuarios->updateOne(
+                        ['_id' => new MongoDB\BSON\ObjectId($usuario_id)],
+                        ['$set' => ['vip_cancel_pending' => true]]
+                    );
+                } catch (Throwable $e) {
+                    logWebhook("ERROR: No se pudo marcar vip_cancel_pending", ['error' => $e->getMessage()], 'ERROR');
+                }
+            }
         }
         // Si la suscripción fue reactivada
         elseif ($subscription->status === 'active' && $subscription->cancel_at_period_end === false) {
@@ -547,6 +539,16 @@ elseif ($event->type === 'customer.subscription.deleted' || $event->type === 'cu
                         'subscription_id' => $subscription->id ?? 'UNKNOWN',
                         'usuario_id' => $usuario_id
                     ]);
+                }
+                // Clear cancel pending flag
+                try {
+                    $collection_usuarios = getCollectionUsuarios();
+                    $collection_usuarios->updateOne(
+                        ['_id' => new MongoDB\BSON\ObjectId($usuario_id)],
+                        ['$set' => ['vip_cancel_pending' => false]]
+                    );
+                } catch (Throwable $e) {
+                    logWebhook("ERROR: No se pudo limpiar vip_cancel_pending", ['error' => $e->getMessage()], 'ERROR');
                 }
             }
         }

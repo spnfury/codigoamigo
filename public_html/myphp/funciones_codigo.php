@@ -45,38 +45,44 @@
 
     function get_code_position ($marca,$mi_id){
         
-
-
-
-        $array_filtro = array("marca"=>$marca->nombre_clave);
-        $array_filtro = array_merge($array_filtro, array("estado"=>0));
-        $array_filtro = array_merge($array_filtro, array("destacado"=>array('$ne' => 0)));
-
-
-         $array_skip = array("limit"=>13);
-        $array_skip = array_merge($array_skip, array("sort"=>array('destacado' => -1)));
-
-        $lista_codigos_patrocinados_pre = get_all_listado_codigos_array($array_filtro, $array_skip);
-        $lista_codigos_patrocinados = $lista_codigos_patrocinados_pre["results"];
-
-
-        $posicion = 1;
-        foreach ($lista_codigos_patrocinados as $item) {
-
-            //$item_auxiliar = array();
-
-            if($mi_id == $item->_id){
-                return $posicion;
-                break;
-            }
-
-            $posicion ++;
-
+        // Buscar TODOS los códigos activos de la marca (destacados + normales)
+        // ordenados igual que la página de marca: destacados primero, luego por _id descendente
+        $nombre_clave = '';
+        if (is_object($marca) && isset($marca->nombre_clave)) {
+            $nombre_clave = $marca->nombre_clave;
+        } elseif (is_array($marca) && isset($marca['nombre_clave'])) {
+            $nombre_clave = $marca['nombre_clave'];
+        }
+        
+        if (empty($nombre_clave)) {
+            return 999;
         }
 
-        return "+".$posicion;
+        $array_filtro = array("marca" => $nombre_clave, "estado" => 0);
+        $array_skip = array(
+            "limit" => 50,
+            "sort" => array('destacado' => -1, 'destacado_social' => -1, '_id' => -1)
+        );
 
+        $lista_codigos_pre = get_all_listado_codigos_array($array_filtro, $array_skip);
+        $lista_codigos = isset($lista_codigos_pre["results"]) ? $lista_codigos_pre["results"] : [];
 
+        $posicion = 1;
+        foreach ($lista_codigos as $item) {
+            $item_id = '';
+            if (is_object($item) && isset($item->_id)) {
+                $item_id = (string)$item->_id;
+            } elseif (is_array($item) && isset($item['_id'])) {
+                $item_id = (string)$item['_id'];
+            }
+            
+            if ((string)$mi_id == $item_id) {
+                return $posicion;
+            }
+            $posicion++;
+        }
+
+        return $posicion; // Si no se encontró entre los primeros 50
     }
 
     function get_all_codigos_panel_control() {
@@ -178,6 +184,9 @@
             } else if($item_auxiliar["estado"] == -2) {
                 $item_auxiliar["estado_string"] = "DESACTIVADO POR USUARIO";
                 $item_auxiliar["estado_class"] = "label-warning";
+            } else if($item_auxiliar["estado"] == -3) {
+                $item_auxiliar["estado_string"] = "DESACTIVADO POR ANTIGÜEDAD";
+                $item_auxiliar["estado_class"] = "label-info";
             } else {
                 $item_auxiliar["estado_string"] = "REVISAR URGENTE";
                 $item_auxiliar["estado_class"] = "label-warning";
@@ -227,7 +236,9 @@
 
 
     function votar_codigo($datos) {
-        session_start();
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
 
         // Verificar que el usuario esté logueado
         if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
@@ -561,7 +572,7 @@
             $obj_id_codigo = new \MongoDB\BSON\ObjectId($datos["id_codigo"]);
             $lista_codigos = getCodeByID_prelista($obj_id_codigo);
 
-            //SECURITY CHECK
+            //SECURITY CHECK - supports restoring estado -2 (user deactivated) and -3 (age deactivated)
             if($_SESSION["user_id"] == (string) $lista_codigos[0]->id_usuario){
                 $collection_codigos = getCollectionCodigos();
 
@@ -569,7 +580,10 @@
                 try {
                     $updateResult = $collection_codigos->updateOne(
                         ['_id' => new \MongoDB\BSON\ObjectId($datos["id_codigo"]) ],
-                        ['$set' => ['estado' => 0] ]
+                        ['$set' => [
+                            'estado' => 0,
+                            'fecha_publicacion' => date('Y-m-d H:i:s'), // Renovar fecha al reactivar
+                        ]]
                         );
                 } catch(MongoDB\Driver\Exception\WriteException $e) {
                     $writeResult = $e->getWriteResult();

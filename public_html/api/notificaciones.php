@@ -59,6 +59,44 @@ switch ($action) {
                 
                 $enlace = "/chollos/" . $slug . "#comment-" . ($n['datos']['comentario_id'] ?? '');
                 $icono = 'fas fa-reply';
+            } elseif ($n['tipo'] === 'nuevo_viewer') {
+                $marca = htmlspecialchars($n['datos']['marca'] ?? 'tu código');
+                $beneficio = (int)($n['datos']['beneficio'] ?? 0);
+                $is_vip = $n['datos']['is_vip'] ?? false;
+                
+                if ($is_vip) {
+                    $viewer_name = htmlspecialchars($n['datos']['viewer_username'] ?? 'Alguien');
+                    $mensaje = "<strong>{$viewer_name}</strong> ha visto tu código de <strong>{$marca}</strong>. Potencial: <strong>{$beneficio}€</strong>";
+                    $enlace = "/public/mis_viewers.php";
+                } else {
+                    $mensaje = "¡Alguien está interesado en tu código de <strong>{$marca}</strong>! Potencial: <strong>{$beneficio}€</strong>. <span style='color:#ffd700;font-weight:bold;'>Hazte VIP</span> para contactarle";
+                    $enlace = "/public/mis_viewers.php";
+                }
+                $icono = 'fas fa-eye';
+            } elseif ($n['tipo'] === 'nuevo_mensaje') {
+                $is_vip_destinatario = $n['datos']['is_vip'] ?? false;
+                $is_vip_remitente = $n['datos']['is_vip_remitente'] ?? null;
+                $de_username = htmlspecialchars($n['datos']['de_username'] ?? 'Alguien');
+                $de_usuario_id = $n['datos']['de_usuario_id'] ?? '';
+                
+                // Para notificaciones antiguas sin is_vip_remitente, verificar dinámicamente
+                if ($is_vip_remitente === null && !empty($de_usuario_id)) {
+                    if (!function_exists('es_usuario_vip')) {
+                        require_once __DIR__ . '/../myphp/funciones_usuario.php';
+                    }
+                    $is_vip_remitente = es_usuario_vip($de_usuario_id);
+                }
+                
+                if ($is_vip_destinatario || $is_vip_remitente) {
+                    // El destinatario es VIP, o el remitente es VIP (el no-VIP puede leer y responder)
+                    $preview = isset($n['datos']['preview']) && $n['datos']['preview'] ? htmlspecialchars($n['datos']['preview']) : '';
+                    $mensaje = "<strong>{$de_username}</strong> te envió un mensaje" . ($preview ? ": \"{$preview}...\"" : "");
+                    $enlace = "/public/chat_usuario.php?open_chat=" . $de_usuario_id;
+                } else {
+                    $mensaje = "<strong>{$de_username}</strong> te ha enviado un mensaje. <span style='color:#ffd700;font-weight:bold;'>Hazte VIP</span> para leerlo y ganar dinero";
+                    $enlace = "/public/mis_viewers.php";
+                }
+                $icono = 'fas fa-envelope';
             }
             
             $notificaciones[] = [

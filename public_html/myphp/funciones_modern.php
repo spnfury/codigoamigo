@@ -410,10 +410,25 @@ function get_user_info($usuario_identifier) {
             // Buscar imagen en diferentes campos posibles
             $img = $usuario['img'] ?? $usuario['avatar'] ?? $usuario['foto'] ?? $usuario['image'] ?? '';
             
-            // Si no hay imagen, usar la imagen por defecto
+            // Sanitizar URLs de imágenes rotas
+            if (!empty($img)) {
+                // Dead CloudFront CDN - redirigir a URL local
+                if (strpos($img, 'd3hcf0nbuqjt3g.cloudfront.net') !== false) {
+                    $img = str_replace('https://d3hcf0nbuqjt3g.cloudfront.net/', 'https://www.codigoamigo.com/img/', $img);
+                }
+                // Facebook CDN URLs expiradas (fbsbx.com, fbcdn.net)
+                if (strpos($img, 'fbsbx') !== false || strpos($img, 'fbcdn') !== false) {
+                    $img = '';
+                }
+                // Graph.facebook.com profile pics (suelen estar retiradas)
+                if (strpos($img, 'graph.facebook.com') !== false) {
+                    $img = '';
+                }
+            }
+            
+            // Si no hay imagen válida, usar la imagen por defecto
             if (empty($img)) {
-                global $url_usuario_sin_foto;
-                $img = $url_usuario_sin_foto ?? 'https://www.codigoamigo.com/img/utilidades/usuario_sin_foto.jpg';
+                $img = '/img/user-default.png';
             }
             
             $resultado = [
@@ -518,6 +533,7 @@ function get_brand_info($marca_clave) {
                 'imagen' => $imagen,
                 'codes' => $marca_especifica['total_codigos'] ?? 0,
                 'categoria' => $marca_especifica['categoria'] ?? '',
+                'categoria_clave' => $marca_especifica['categoria_clave'] ?? '',
                 'web' => $marca_especifica['web'] ?? '',
                 'video' => $marca_especifica['video'] ?? '',
                 'seo_que_es' => $marca_especifica['seo_que_es'] ?? '',
@@ -592,7 +608,6 @@ function add_mobile_header_compact() {
     $count_codigos = 0;
     $count_afiliados = 0;
     $count_favoritos = 0;
-    $count_chollos = 0;
     $count_mensajes = 0;
     
     if ($usuario_logueado && $user_id) {
@@ -618,7 +633,6 @@ function add_mobile_header_compact() {
             // Contar favoritos
             if (function_exists('contar_favoritos_usuario')) {
                 $count_favoritos = contar_favoritos_usuario($user_id, 'codigo');
-                $count_chollos = contar_favoritos_usuario($user_id, 'chollo');
             }
             
             // Contar conversaciones (Total)
@@ -639,45 +653,98 @@ function add_mobile_header_compact() {
     }
     
     echo '
-    <!-- HEADER MÓVIL SUPERIOR - COMPACTO COMO CHOLLOMETRO -->
+    <!-- HEADER MÓVIL SUPERIOR - ICONOTIPO + BUSCADOR + HAMBURGUESA -->
     <header class="mobile-header-top" id="mobile-header-top">
-        <div class="mobile-header-content">
-            <!-- LOGO Y NOMBRE COMPACTO -->
-            <a href="/" class="mobile-logo">
-                <div class="logo-container">
-                    <i class="fas fa-fire logo-icon"></i>
-                    <div class="logo-text">
-                        <span class="logo-codigo">codigo</span><span class="logo-amigo">amigo</span>
-                    </div>
-                </div>
+        <div class="mobile-header-content-unified">
+            <!-- ICONOTIPO (Logo compacto) -->
+            <a href="/" class="mobile-iconotype-link">
+                <img src="/img/favicon_moneda_real.png" alt="CodigoAmigo" class="mobile-iconotype-img">
             </a>
 
-            <!-- BÚSQUEDA COMPACTA -->
-            <div class="mobile-search-container" id="mobile-search-container">
-                <button class="mobile-search-back" id="mobile-search-close">
-                    <i class="fas fa-arrow-left"></i>
-                </button>
-                <div class="mobile-search-box">
-                    <i class="fas fa-search search-icon"></i>
-                    <input type="text"
-                           class="mobile-search-input"
-                           placeholder="Buscar códigos..."
-                           id="mobile-search-input">
-                    <div class="search-suggestions" id="search-suggestions"></div>
-                </div>
+            <!-- BUSCADOR EXPANDIDO -->
+            <div class="mobile-search-box-unified">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text"
+                       class="mobile-search-input-header"
+                       placeholder="Buscar..."
+                       id="mobile-search-input-header">
+                <div class="search-suggestions" id="search-suggestions-header"></div>
             </div>
 
-            <!-- BOTONES DE ACCIÓN -->
-            <div class="mobile-header-actions">
-                <button class="mobile-action-btn search-toggle" id="mobile-search-toggle">
-                    <i class="fas fa-search"></i>
-                </button>
-            </div>
+            <!-- BOTÓN HAMBURGUESA -->
+            <button class="mobile-hamburger-btn" id="mobileHamburgerBtn" aria-label="Menú">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
         </div>
     </header>
+
+    <!-- OVERLAY del menú hamburguesa -->
+    <div class="mobile-slide-overlay" id="mobileSlideOverlay"></div>
+
+    <!-- MENÚ DESLIZANTE HAMBURGUESA -->
+    <nav class="mobile-slide-menu" id="mobileSlideMenu">
+        <div class="mobile-slide-header">
+            <a href="/" class="mobile-slide-logo-link">
+                <img src="/img/favicon_moneda_real.png" alt="CodigoAmigo" class="slide-logo-img">
+                <span class="slide-logo-text"><span class="sl-codigo">codigo</span><span class="sl-amigo">amigo</span></span>
+            </a>
+            <button class="mobile-slide-close" id="mobileSlideClose" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="mobile-slide-user">
+            '; if($usuario_logueado) { echo '
+            <div class="slide-user-info">
+                <img src="' . htmlspecialchars($foto_perfil ?: '/img/po.png') . '" alt="Perfil" class="slide-user-avatar">
+                <div class="slide-user-details">
+                    <span class="slide-user-name">' . htmlspecialchars($nombre_usuario ?: 'Usuario') . '</span>
+                    <a href="/mi-perfil" class="slide-user-link">Ver perfil →</a>
+                </div>
+            </div>
+            '; } else { echo '
+            <button class="slide-login-btn" onclick="if(typeof openLoginModalWithRedirect===\'function\'){openLoginModalWithRedirect(window.location.href);}else{window.location.href=\'/login.php\';}">
+                <i class="fas fa-user"></i> Iniciar sesión
+            </button>
+            '; } echo '
+        </div>
+        <div class="mobile-slide-nav">
+            <a href="/" class="slide-nav-item"><i class="fas fa-home"></i> Inicio</a>
+            '; if($usuario_logueado) { echo '
+            <a href="/nuevo_codigo" class="slide-nav-item slide-nav-highlight"><i class="fas fa-plus-circle"></i> Publicar Código</a>
+            '; } echo '
+            <a href="/marcas" class="slide-nav-item"><i class="fas fa-tags"></i> Marcas</a>
+            <a href="/listado-categorias" class="slide-nav-item"><i class="fas fa-list"></i> Categorías</a>
+            <div class="slide-nav-divider"></div>
+            <a href="https://www.malprecio.com/chollos-shorts" target="_blank" class="slide-nav-item slide-nav-shorts"><i class="fas fa-play-circle"></i> Shorts <span class="slide-badge-new">NUEVO</span></a>
+        </div>
+        '; if($usuario_logueado) { echo '
+        <div class="mobile-slide-nav" style="margin-top:0;">
+            <div class="slide-nav-divider"></div>
+            <span class="slide-nav-section">Mi Cuenta</span>
+            <a href="/mis-anuncios" class="slide-nav-item"><i class="fas fa-code"></i> Mis Códigos'; if($count_codigos > 0) { echo ' <span class="slide-counter">'.$count_codigos.'</span>'; } echo '</a>
+            <a href="/afiliados" class="slide-nav-item"><i class="fas fa-link"></i> Mis URLs Afiliados'; if($count_afiliados > 0) { echo ' <span class="slide-counter">'.$count_afiliados.'</span>'; } echo '</a>
+            <a href="/chat" class="slide-nav-item"><i class="fas fa-comments"></i> Chat'; if($count_mensajes > 0) { echo ' <span class="slide-counter">'.$count_mensajes.'</span>'; } echo '</a>
+            <a href="/mis-favoritos" class="slide-nav-item"><i class="fas fa-heart"></i> Favoritos'; if($count_favoritos > 0) { echo ' <span class="slide-counter">'.$count_favoritos.'</span>'; } echo '</a>
+            <a href="/invitar-amigos" class="slide-nav-item" style="color:#E30613;"><i class="fas fa-gift"></i> Invitar Amigos</a>
+            <div class="slide-nav-divider"></div>
+            <a href="/logout" class="slide-nav-item" style="color:#999;"><i class="fas fa-sign-out-alt"></i> Cerrar Sesión</a>
+        </div>
+        '; } echo '
+    </nav>
+
+    <!-- JS para hamburguesa -->
+    <script>
+    (function(){
+        var hBtn=document.getElementById("mobileHamburgerBtn"),sMenu=document.getElementById("mobileSlideMenu"),sOvl=document.getElementById("mobileSlideOverlay"),sClose=document.getElementById("mobileSlideClose");
+        function openM(){hBtn.classList.add("active");sMenu.classList.add("open");sOvl.classList.add("open");document.body.style.overflow="hidden";}
+        function closeM(){hBtn.classList.remove("active");sMenu.classList.remove("open");sOvl.classList.remove("open");document.body.style.overflow="";}
+        if(hBtn){hBtn.addEventListener("click",function(){sMenu.classList.contains("open")?closeM():openM();});}
+        if(sOvl){sOvl.addEventListener("click",closeM);}
+        if(sClose){sClose.addEventListener("click",closeM);}
+    })();
+    </script>
     
-        
-    <!-- MENÚ INFERIOR FIJO - NUEVO DISEÑO MEJORADO -->
+    <!-- MENÚ INFERIOR FIJO -->
     <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
         <a href="/" class="bottom-nav-item" id="home-nav">
             <i class="fas fa-home"></i>
@@ -694,12 +761,6 @@ function add_mobile_header_compact() {
             <span>Publicar</span>
         </a>
 
-        <a href="/chollos" class="bottom-nav-item chollos-btn" id="chollos-nav">
-            <div class="chollos-circle">
-                <i class="fas fa-fire"></i>
-            </div>
-            <span>Chollos</span>
-        </a>
         <a href="#" class="bottom-nav-item" id="profile-toggle">
             <div class="profile-container">
                 <i class="fas fa-user" id="profile-icon"></i>
@@ -708,36 +769,6 @@ function add_mobile_header_compact() {
             </div>
         </a>
     </nav>
-    
-    <!-- MENÚ HAMBURGUESA DESPLEGABLE -->
-    <div class="mobile-hamburger-menu" id="mobile-hamburger-menu">
-        <div class="hamburger-menu-content">
-            <div class="hamburger-menu-header">
-                <div class="menu-title">Menú</div>
-                <button class="close-menu" id="close-hamburger-menu">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="hamburger-menu-items">
-                <a href="/chollos" class="hamburger-menu-item">
-                    <i class="fas fa-fire"></i>
-                    <span>Chollos</span>
-                </a>
-                <a href="/categorias" class="hamburger-menu-item">
-                    <i class="fas fa-th-large"></i>
-                    <span>Categorías</span>
-                </a>
-                <a href="/afiliados" class="hamburger-menu-item">
-                    <i class="fas fa-link"></i>
-                    <span>Mis URLs de Afiliados</span>
-                </a>
-                <a href="/contacto" class="hamburger-menu-item">
-                    <i class="fas fa-envelope"></i>
-                    <span>Contacto</span>
-                </a>
-            </div>
-        </div>
-    </div>
     
     <!-- MENÚ PERFIL DESPLEGABLE - NUEVO DISEÑO MEJORADO -->
     <div class="mobile-profile-menu" id="mobile-profile-menu">
@@ -755,13 +786,10 @@ function add_mobile_header_compact() {
                 </button>
             </div>
             <div class="profile-menu-items">
-                <a href="/usuario" class="profile-menu-item">
-                    <i class="fas fa-user"></i>
-                    <span>Mi Perfil</span>
-                </a>
+                <div style="padding: 10px 20px; color: #888; font-size: 11px; font-weight: bold; text-transform: uppercase;">Mi Contenido</div>
                 <a href="/mis-anuncios" class="profile-menu-item">
-                    <i class="fas fa-code"></i>
-                    <span>Mis Códigos</span>
+                    <i class="fas fa-list"></i>
+                    <span>Mis Códigos Amigo</span>
                     '; if($count_codigos > 0) { echo '<span style="background:#ff5722; color:white; padding: 2px 8px; border-radius: 10px; font-size: 12px; margin-left: auto;">'.$count_codigos.'</span>'; } echo '
                 </a>
                 <a href="/afiliados" class="profile-menu-item">
@@ -769,21 +797,56 @@ function add_mobile_header_compact() {
                     <span>Mis URLs de Afiliados</span>
                     '; if($count_afiliados > 0) { echo '<span style="background:#ff5722; color:white; padding: 2px 8px; border-radius: 10px; font-size: 12px; margin-left: auto;">'.$count_afiliados.'</span>'; } echo '
                 </a>
+                
+                <div style="height: 1px; background: #eee; margin: 10px 0;"></div>
+                <div style="padding: 10px 20px; color: #888; font-size: 11px; font-weight: bold; text-transform: uppercase;">Social & VIP</div>
+
                 <a href="/chat" class="profile-menu-item">
                     <i class="fas fa-comments"></i>
                     <span>Chat</span>
                     '; if($count_mensajes > 0) { echo '<span style="background:#ff5722; color:white; padding: 2px 8px; border-radius: 10px; font-size: 12px; margin-left: auto;">'.$count_mensajes.'</span>'; } echo '
                 </a>
+                
+                <?php
+                if (!function_exists(\'es_usuario_vip\')) {
+                    include_once __DIR__ . \'/funciones_usuario.php\';
+                }
+                $is_vip = isset($_SESSION["user_id"]) && function_exists(\'es_usuario_vip\') && es_usuario_vip($_SESSION["user_id"]);
+                ?>
+                <a href="/public/mis_viewers.php" class="profile-menu-item">
+                    <i class="fas fa-crosshairs" style="color: #667eea;"></i>
+                    <span style="font-weight: 600;">Mis Leads</span>
+                    <?php if ($is_vip): ?>
+                        <span style="margin-left:auto; background: linear-gradient(135deg, #ffd700 0%, #E30613 100%); color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700;">VIP</span>
+                    <?php else: ?>
+                        <span style="margin-left:auto; background: rgba(255,215,0,0.2); color: #d4a017; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700;"><i class="fas fa-lock"></i></span>
+                    <?php endif; ?>
+                </a>
+                <?php if ($is_vip): ?>
+                <a href="/public/mis_viewers.php" class="profile-menu-item">
+                    <i class="fas fa-crown" style="color: #ffd700;"></i>
+                    <span style="font-weight: 600; color: #ffd700;">Gestionar VIP</span>
+                </a>
+                <?php else: ?>
+                <a href="/public/mis_viewers.php" class="profile-menu-item" style="background: linear-gradient(135deg, rgba(255,215,0,0.1) 0%, rgba(227,6,19,0.1) 100%); color: #E30613; margin: 5px 15px; border-radius: 8px; padding: 12px;">
+                    <i class="fas fa-crown" style="color: #ffd700;"></i>
+                    <span style="font-weight: 700;">Hazte VIP — 9,99€/mes</span>
+                </a>
+                <?php endif; ?>
+
+                <div style="height: 1px; background: #eee; margin: 10px 0;"></div>
+
                 <a href="/mis-favoritos" class="profile-menu-item">
                     <i class="fas fa-heart"></i>
                     <span>Códigos Favoritos</span>
                     '; if($count_favoritos > 0) { echo '<span style="background:#ff5722; color:white; padding: 2px 8px; border-radius: 10px; font-size: 12px; margin-left: auto;">'.$count_favoritos.'</span>'; } echo '
                 </a>
-                <a href="/mis-favoritos?tipo=chollo" class="profile-menu-item">
-                    <i class="fas fa-fire"></i>
-                    <span>Chollos Favoritos</span>
-                    '; if($count_chollos > 0) { echo '<span style="background:#ff5722; color:white; padding: 2px 8px; border-radius: 10px; font-size: 12px; margin-left: auto;">'.$count_chollos.'</span>'; } echo '
+                
+                <a href="/usuario" class="profile-menu-item">
+                    <i class="fas fa-user-edit"></i>
+                    <span>Editar Perfil</span>
                 </a>
+
                 <a href="/logout" class="profile-menu-item logout">
                     <i class="fas fa-sign-out-alt"></i>
                     <span>Cerrar Sesión</span>
@@ -818,7 +881,7 @@ function generate_modern_featured_cards($lista_codigos_destacados, $show_all = f
     // Asegurar que el script del slider se cargue
     add_mobile_javascript();
     // Usar el nuevo slider en lugar del grid
-    return generate_featured_codes_slider($lista_codigos_destacados, $show_all, '¡Destacados!', 'Los mejores códigos de descuento seleccionados para ti', $marca_nombre_clave, $codigo_existente);
+    return generate_featured_codes_slider($lista_codigos_destacados, $show_all, '🌟 Códigos Destacados', 'Los códigos más rentables, patrocinados por nuestra comunidad para asegurar que ahorres al máximo.', $marca_nombre_clave, $codigo_existente);
 }
 
 // Función para generar una tarjeta destacada individual
@@ -848,6 +911,12 @@ function generate_single_featured_card($codigo, $index = 0) {
     // Crear enlace al perfil del usuario
     $user_url = link_usuario($username, $usuario_id);
     
+    // Check if user is VIP
+    $es_vip = false;
+    if (function_exists('es_usuario_vip') && !empty($usuario_id)) {
+        $es_vip = es_usuario_vip($usuario_id);
+    }
+    
     // Obtener información de la marca para el logo
     $marca_info = get_brand_info($brand);
     $marca_imagen = $marca_info['imagen'] ?? '';
@@ -862,7 +931,10 @@ function generate_single_featured_card($codigo, $index = 0) {
     $is_long_description = mb_strlen($description) > 120;
     $short_description = mb_substr($description, 0, 120);
     
-    $html = '<div class="featured-card glass-card animate-on-scroll" data-code-id="' . htmlspecialchars($code_id) . '">';
+    $html = '<div class="featured-card glass-card animate-on-scroll' . ($es_vip ? ' vip-user' : '') . '" data-code-id="' . htmlspecialchars($code_id) . '" style="position: relative;">';
+    
+    // Stretch link para Faux Block Link (UX: hace todo el bloque navegable al código)
+    $html .= '<div class="faux-stretch-link" onclick="viewCode(\'' . htmlspecialchars($code_id) . '\', \'' . htmlspecialchars($brand_slug) . '\')" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 10; cursor: pointer;" title="Ver código"></div>';
     
     // Badge destacado
     $html .= '<div class="featured-badge">';
@@ -875,9 +947,9 @@ function generate_single_featured_card($codigo, $index = 0) {
     
     // Front side
     $html .= '<div class="flip-card-front">';
-    // Logo de la marca (clickeable)
+    // Logo de la marca (ahora visual, clic gestionado por el stretch-link al código)
     $html .= '<div class="featured-brand-logo">';
-    $html .= '<a href="' . htmlspecialchars($marca_url) . '" onclick="event.preventDefault(); event.stopPropagation(); window.location.href=\'' . htmlspecialchars($marca_url) . '\';" class="brand-link" style="z-index: 50; pointer-events: auto;" title="Códigos descuento ' . htmlspecialchars($brand) . '">';
+    $html .= '<div class="brand-link" style="width: 100%; height: 100%; display: block; border-radius: 12px; overflow: hidden; pointer-events: none;">';
     if($marca_imagen) {
         $html .= '<img loading="lazy" src="' . htmlspecialchars($marca_imagen) . '" alt="Logo de ' . htmlspecialchars($brand) . '" class="brand-logo-img">';
     } else {
@@ -885,10 +957,10 @@ function generate_single_featured_card($codigo, $index = 0) {
         $html .= '<i class="fas fa-tag"></i>';
         $html .= '</div>';
     }
-    $html .= '</a>';
-    // Badge flotante con nombre de marca
-    $html .= '<div class="brand-name-badge" style="z-index: 100; pointer-events: auto; padding: 0 !important;">';
-    $html .= '<a href="' . htmlspecialchars($marca_url) . '" onclick="event.preventDefault(); event.stopPropagation(); window.location.href=\'' . htmlspecialchars($marca_url) . '\';" style="cursor: pointer; color: inherit; text-decoration: none; display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; position: relative; z-index: 102; padding: 0.5rem 0.75rem;">';
+    $html .= '</div>';
+    // Badge flotante con nombre de marca (El enlace SEO original de la marca se mantiene aquí)
+    $html .= '<div class="brand-name-badge" style="position: relative; z-index: 20; pointer-events: auto; padding: 0 !important;">';
+    $html .= '<a href="' . htmlspecialchars($marca_url) . '" onclick="event.stopPropagation();" style="cursor: pointer; color: inherit; text-decoration: none; display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; padding: 0.5rem 0.75rem;" title="Ver códigos de ' . htmlspecialchars($brand) . '">';
     $html .= htmlspecialchars($brand);
     $html .= '</a>';
     $html .= '</div>';
@@ -921,7 +993,7 @@ function generate_single_featured_card($codigo, $index = 0) {
     $html .= '</div>'; // .flip-card-inner
     
     // Mobile trigger
-    $html .= '<div class="flip-trigger-mobile" title="Saber más sobre esta marca"><i class="fas fa-question-circle"></i></div>';
+    $html .= '<div class="flip-trigger-mobile" title="Saber más sobre esta marca" style="position: relative; z-index: 20;"><i class="fas fa-question-circle"></i></div>';
     
     $html .= '</div>'; // .flip-card
     
@@ -935,10 +1007,12 @@ function generate_single_featured_card($codigo, $index = 0) {
     $stats_comments = rand(5, 100); // Placeholder simulado
     $stats_likes = rand(50, 1000); // Placeholder simulado
     
-    $html .= '<div class="featured-user-info user-modal-trigger" style="cursor:pointer" ';
+    $html .= '<div class="featured-user-info user-modal-trigger" style="cursor:pointer; position: relative; z-index: 20;" ';
     $html .= 'data-username="' . $safe_username . '" ';
     $html .= 'data-image="' . $safe_img . '" ';
     $html .= 'data-official="false" ';
+    $html .= 'data-vip="' . ($es_vip ? 'true' : 'false') . '" ';
+    $html .= 'data-profile-url="' . htmlspecialchars($user_url) . '" ';
     $html .= 'data-joined="Miembro verificado" ';
     $html .= 'data-stats-offers="' . $stats_offers . '" ';
     $html .= 'data-stats-comments="' . $stats_comments . '" ';
@@ -956,16 +1030,20 @@ function generate_single_featured_card($codigo, $index = 0) {
     }
     $html .= '</div>';
     $html .= '<div class="featured-user-details">';
-    $html .= '<span class="featured-user-name" title="Ver perfil de ' . $safe_username . '">' . $safe_username . '</span>';
+    $vip_badge_html = '';
+    if ($es_vip) {
+        $vip_badge_html = ' <span class="vip-badge-gold" data-vip-tt="1" style="font-size: 0.6rem; margin-left: 4px; vertical-align: middle; display: inline-flex; align-items: center; gap: 2px; padding: 2px 5px;" title="Usuario VIP"><i class="fas fa-crown"></i> VIP</span>';
+    }
+    $html .= '<span class="featured-user-name" title="Ver perfil de ' . $safe_username . '">' . $safe_username . $vip_badge_html . '</span>';
     $html .= '</div>';
     $html .= '</div>';
     $html .= '</div>';
     
     // Descripción con funcionalidad "ver más"
     if ($is_long_description) {
-        $html .= '<div class="featured-description read-more-content" data-full-text="' . htmlspecialchars($description) . '" data-short-text="' . htmlspecialchars($short_description) . '...">' . htmlspecialchars($short_description) . '... <span class="read-more-btn">ver más</span></div>';
+        $html .= '<div class="featured-description read-more-content" style="position: relative; z-index: 20;" data-full-text="' . htmlspecialchars($description) . '" data-short-text="' . htmlspecialchars($short_description) . '...">' . htmlspecialchars($short_description) . '... <span class="read-more-btn">ver más</span></div>';
     } else {
-        $html .= '<div class="featured-description">' . htmlspecialchars($description) . '</div>';
+        $html .= '<div class="featured-description" style="position: relative; z-index: 20;">' . htmlspecialchars($description) . '</div>';
     }
     
     // Información adicional
@@ -982,13 +1060,13 @@ function generate_single_featured_card($codigo, $index = 0) {
     // Mostrar impresiones si existen
     $impressions = isset($codigo['total_impressions']) ? $codigo['total_impressions'] : 0;
     if($impressions > 0) {
-		$html .= '<span class="featured-stat impressions-link" title="Ver estadísticas" style="cursor: pointer;" data-codigo-id="' . htmlspecialchars((string)$code_id, ENT_QUOTES, 'UTF-8') . '" onclick="if(window.viewStatsModal){viewStatsModal(\'' . htmlspecialchars((string)$code_id, ENT_QUOTES, 'UTF-8') . '\');} return false;"><i class="fas fa-eye"></i> ' . number_format($impressions) . ' impresiones</span>';
+		$html .= '<span class="featured-stat impressions-link" title="Ver estadísticas" style="cursor: pointer; position: relative; z-index: 20;" data-codigo-id="' . htmlspecialchars((string)$code_id, ENT_QUOTES, 'UTF-8') . '" onclick="if(window.viewStatsModal){viewStatsModal(\'' . htmlspecialchars((string)$code_id, ENT_QUOTES, 'UTF-8') . '\');} return false;"><i class="fas fa-eye"></i> ' . number_format($impressions) . ' impresiones</span>';
     }
     
     $html .= '</div>';
     
     // Botón de acción
-    $html .= '<button class="featured-button" onclick="viewCode(\'' . htmlspecialchars($code_id) . '\', \'' . htmlspecialchars($brand_slug) . '\')">';
+    $html .= '<button class="featured-button" onclick="viewCode(\'' . htmlspecialchars($code_id) . '\', \'' . htmlspecialchars($brand_slug) . '\')" style="position: relative; z-index: 20;">';
     $html .= '<i class="fas fa-eye"></i> Ver Código';
     $html .= '</button>';
     
@@ -1113,7 +1191,7 @@ function generate_empty_featured_card($marca_nombre_clave = null, $codigo_existe
 
     // Descripción motivacional
     $html .= '<div class="featured-description empty-description">';
-    $html .= '¡Comparte tu mejor código de descuento y gana dinero recomendándolo!';
+    $html .= '¡Asegura la primera posición! Destaca tu código para llegar a miles de usuarios y multiplicar tus ganancias.';
     $html .= '</div>';
 
     // Información adicional
@@ -1133,7 +1211,7 @@ function generate_empty_featured_card($marca_nombre_clave = null, $codigo_existe
 }
 
 // Función para generar el slider de códigos destacados en la home
-function generate_featured_codes_slider($lista_codigos_destacados, $show_all = false, $title = '¡Destacados!', $subtitle = 'Los mejores códigos de descuento seleccionados para ti', $marca_nombre_clave = null, $codigo_existente = null) {
+function generate_featured_codes_slider($lista_codigos_destacados, $show_all = false, $title = '🌟 Códigos Destacados', $subtitle = 'Los códigos más rentables, patrocinados por nuestra comunidad para asegurar que ahorres al máximo.', $marca_nombre_clave = null, $codigo_existente = null) {
     if(empty($lista_codigos_destacados)) {
         return '';
     }
@@ -1146,15 +1224,27 @@ function generate_featured_codes_slider($lista_codigos_destacados, $show_all = f
 
     $html = '<div class="featured-codes-section">';
     $html .= '<div class="container">';
+    
+    // Header flex container
+    $html .= '<div class="featured-header-flex" style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; margin-bottom: 30px; gap: 15px;">';
+    $html .= '<div class="title-container">';
     if (!empty($title)) {
-        $html .= '<div class="section-title h2-style">' . htmlspecialchars($title) . '</div>';
+        $html .= '<div class="section-title h2-style" style="margin-bottom: 5px;">' . htmlspecialchars($title) . '</div>';
     }
     if (!empty($subtitle)) {
-        $html .= '<p class="section-subtitle">' . htmlspecialchars($subtitle) . '</p>';
+        $html .= '<p class="section-subtitle" style="margin-bottom: 0;">' . htmlspecialchars($subtitle) . '</p>';
     }
+    $html .= '</div>'; // title-container
+    
+    // CTA Button
+    $html .= '<a href="/mis-anuncios" class="btn-destaca-tu-codigo" style="display: inline-flex; align-items: center; gap: 8px; background: rgba(227, 6, 19, 0.1); color: #E30613; border: 1px solid rgba(227, 6, 19, 0.3); padding: 10px 20px; border-radius: 20px; font-weight: 600; text-decoration: none; transition: all 0.3s ease;">';
+    $html .= '🚀 ¿Quieres salir el primero? Destaca tu código';
+    $html .= '</a>';
+    
+    $html .= '</div>'; // featured-header-flex
 
     // Contenedor del slider
-    $html .= '<div class="featured-codes-slider-container" data-slider-root data-slider-id="' . $slider_id . '" data-slides-desktop="4" data-slides-tablet="2" data-slides-mobile="1.1">';
+    $html .= '<div class="featured-codes-slider-container" data-slider-root data-slider-id="' . $slider_id . '" data-slides-desktop="4" data-slides-tablet="2" data-slides-mobile="1.02">';
     $html .= '<div class="featured-codes-slider" id="' . $slider_id . '" data-slider-track>';
 
     foreach($codigos_para_slider as $index => $codigo) {
@@ -1357,25 +1447,25 @@ function generate_popular_brands_section($limit = 9) {
 // Función para generar la sección de categorías populares en la home
 function generate_popular_categories_section() {
     $categorias = [
-        ['nombre' => 'Electrónica', 'slug' => 'electronica', 'icon' => 'fas fa-laptop'],
-        ['nombre' => 'Moda', 'slug' => 'moda', 'icon' => 'fas fa-tshirt'],
-        ['nombre' => 'Hogar', 'slug' => 'hogar', 'icon' => 'fas fa-home'],
-        ['nombre' => 'Videojuegos', 'slug' => 'videojuegos', 'icon' => 'fas fa-gamepad'],
-        ['nombre' => 'Deportes', 'slug' => 'deportes', 'icon' => 'fas fa-running'],
-        ['nombre' => 'Viajes', 'slug' => 'viajes', 'icon' => 'fas fa-plane'],
-        ['nombre' => 'Alimentación', 'slug' => 'alimentacion', 'icon' => 'fas fa-utensils'],
-        ['nombre' => 'Salud y Belleza', 'slug' => 'belleza', 'icon' => 'fas fa-heart']
+        ['nombre' => 'Banca y Cripto', 'slug' => 'banca-y-criptomonedas', 'icon' => 'fas fa-university'],
+        ['nombre' => 'Deportes y Nutrición', 'slug' => 'deportes-y-nutricion', 'icon' => 'fas fa-running'],
+        ['nombre' => 'Telefonía', 'slug' => 'telefonia-y-comunicaciones', 'icon' => 'fas fa-mobile-alt'],
+        ['nombre' => 'Vehículos', 'slug' => 'vehiculos-y-movilidad', 'icon' => 'fas fa-car'],
+        ['nombre' => 'Viajes', 'slug' => 'viajes-y-alojamiento', 'icon' => 'fas fa-plane'],
+        ['nombre' => 'Alimentación', 'slug' => 'alimentacion-y-gastronomia', 'icon' => 'fas fa-utensils'],
+        ['nombre' => 'Plataformas', 'slug' => 'plataformas-y-suscripciones', 'icon' => 'fas fa-tv'],
+        ['nombre' => 'Ocio', 'slug' => 'ocio-y-entretenimiento', 'icon' => 'fas fa-gamepad']
     ];
     
     $html = '<div class="popular-categories-section" style="padding: 60px 0; background: #333;">';
     $html .= '<div class="container">';
     $html .= '<div class="section-title h2-style" style="color:#fff; text-align:center; margin-bottom:10px;">Categorías Destacadas</div>';
-    $html .= '<p class="section-subtitle" style="color:#ccc; text-align:center; margin-bottom:40px;">Explora los mejores chollos por categoría</p>';
+    $html .= '<p class="section-subtitle" style="color:#ccc; text-align:center; margin-bottom:40px;">Explora los mejores códigos por categoría</p>';
     
     $html .= '<div class="categories-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:20px;">';
     
     foreach ($categorias as $cat) {
-        $html .= '<a href="/chollos/' . $cat['slug'] . '" class="category-card-modern glass-card animate-on-scroll" style="text-decoration:none;">';
+        $html .= '<a href="/' . $cat['slug'] . '-comparte-y-gana" class="category-card-modern glass-card animate-on-scroll" style="text-decoration:none;">';
         $html .= '<div class="category-icon" style="font-size: 2rem; color: #E30613; margin-bottom:15px;"><i class="' . $cat['icon'] . '"></i></div>';
         $html .= '<div class="category-name" style="color:#fff; font-weight:700; font-size:1.1rem;">' . $cat['nombre'] . '</div>';
         $html .= '</a>';
@@ -1384,7 +1474,7 @@ function generate_popular_categories_section() {
     $html .= '</div>'; // categories-grid
     
     $html .= '<div style="text-align: center; margin-top: 40px;">';
-    $html .= '<a href="/chollos" class="btn-modern-outline" style="text-decoration:none;">Ver todos los chollos</a>';
+    $html .= '<a href="/listado-categorias" class="btn-modern-outline" style="text-decoration:none;">Ver todas las categorías</a>';
     $html .= '</div>';
     
     $html .= '</div>'; // container
@@ -1466,13 +1556,9 @@ function process_marca_imagen($imagen) {
         if (strpos($imagen, '/img/panel_marcas/') !== false) {
             $imagen = 'https://www.codigoamigo.com' . $imagen;
         } 
-        // Para otras rutas en /img/, convertir a CloudFront (excepto panel_marcas)
+        // Para otras rutas en /img/, servir directamente (CloudFront CDN está caído)
         elseif (strpos($imagen, '/img/') !== false) {
             $imagen = 'https://www.codigoamigo.com' . $imagen;
-            // Convertir a CloudFront solo si no es panel_marcas
-            if (strpos($imagen, '/img/panel_marcas/') === false) {
-                $imagen = str_replace("https://www.codigoamigo.com/img/", "https://d3hcf0nbuqjt3g.cloudfront.net/", $imagen);
-            }
         } else {
             // Otras rutas relativas, añadir dominio
             $imagen = 'https://www.codigoamigo.com' . $imagen;
@@ -1792,6 +1878,52 @@ function generate_modern_code_cards($lista_codigos) {
     return $html;
 }
 
+/**
+ * Genera un slider con tarjetas de códigos modernos
+ */
+function generate_modern_codes_slider($lista_codigos, $nombre_marca = '') {
+    if(empty($lista_codigos)) {
+        return '';
+    }
+
+    static $codes_slider_counter = 0;
+    $slider_id = 'codesSlider-' . (++$codes_slider_counter);
+
+    $html = '<div class="featured-codes-slider-container" data-slider-root data-slider-id="' . $slider_id . '" data-slides-desktop="3" data-slides-tablet="2" data-slides-mobile="1.1">';
+    $html .= '<div class="featured-codes-slider" id="' . $slider_id . '" data-slider-track>';
+
+    foreach($lista_codigos as $codigo) {
+        $html .= '<div class="featured-code-slide" data-slider-item>';
+        $html .= generate_single_code_card($codigo);
+        $html .= '</div>';
+    }
+
+    $html .= '</div>'; // featured-codes-slider
+
+    // Controles del slider
+    $html .= '<button type="button" class="slider-btn slider-prev" data-slider-action="prev" data-slider-target="' . $slider_id . '">';
+    $html .= '<i class="fas fa-chevron-left"></i>';
+    $html .= '</button>';
+    $html .= '<button type="button" class="slider-btn slider-next" data-slider-action="next" data-slider-target="' . $slider_id . '">';
+    $html .= '<i class="fas fa-chevron-right"></i>';
+    $html .= '</button>';
+
+    // Indicadores de puntos
+    $html .= '<div class="slider-dots">';
+    $total_slides = count($lista_codigos);
+    $slides_per_view = 3; 
+    $dots_needed = ceil($total_slides / $slides_per_view);
+    for($i = 0; $i < $dots_needed; $i++) {
+        $active_class = ($i === 0) ? ' active' : '';
+        $html .= '<span class="dot' . $active_class . '" data-slider-dot="' . $i . '" data-slider-target="' . $slider_id . '"></span>';
+    }
+    $html .= '</div>';
+
+    $html .= '</div>'; // featured-codes-slider-container
+    
+    return $html;
+}
+
 // Función para generar una tarjeta de código individual
 function generate_single_code_card($codigo) {
     $brand = isset($codigo['marca']) ? $codigo['marca'] : 'Marca desconocida';
@@ -1921,6 +2053,11 @@ function generate_single_code_card($codigo) {
     }
     $html .= '</div>';
     $html .= '<div class="code-description-text">' . htmlspecialchars($description) . '</div>';
+    // Fecha de publicación visible
+    if(isset($codigo['fecha_publicacion'])) {
+        $fecha_pub = formatDateAgoLarge($codigo['fecha_publicacion']);
+        $html .= '<div class="code-publish-date"><i class="far fa-calendar-alt"></i> Publicado ' . htmlspecialchars($fecha_pub) . '</div>';
+    }
     $html .= '</div>';
     
     // Información adicional - Solo Beneficio (la fecha ya está en el logo)
@@ -1954,6 +2091,19 @@ function generate_single_code_card($codigo) {
     $html .= '<button class="code-button" onclick="viewCode(\'' . htmlspecialchars($code_id) . '\', \'' . htmlspecialchars($brand_slug) . '\')">';
     $html .= '<i class="fas fa-eye"></i> Ver Código';
     $html .= '</button>';
+    
+    // Botón de chat directo para usuarios VIP
+    if ($es_vip && !empty($user_id)) {
+        $current_user_id = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : '';
+        // No mostrar el botón de chat en la propia tarjeta del usuario logueado
+        if ((string)$current_user_id !== (string)$user_id) {
+            $chat_user_id = htmlspecialchars((string)$user_id);
+            $chat_username = htmlspecialchars($username);
+            $html .= '<button class="code-button-chat" onclick="openDirectChat(\'' . $chat_user_id . '\', \'' . $chat_username . '\')">';
+            $html .= '<i class="fas fa-comments"></i> Contactar';
+            $html .= '</button>';
+        }
+    }
     
     $html .= '</div>';
     
@@ -2253,15 +2403,16 @@ function get_modern_additional_css() {
     
     .featured-badge {
         position: absolute;
-        top: -10px;
-        right: 16px;
-        background: linear-gradient(135deg, var(--primary-orange), #FF4D4D);
-        color: #fff;
+        top: 12px;
+        right: 12px;
+        background: linear-gradient(135deg, var(--primary-orange), #FF4D4D) !important;
+        color: #fff !important;
         padding: 0.35rem .75rem;
-        border-radius: 999px;
+        border-radius: 999px !important;
         font-weight: 700;
         font-size: .75rem;
         box-shadow: 0 6px 16px rgba(255,107,53,0.35);
+        z-index: 15;
     }
     
     .featured-brand-logo {
@@ -2497,6 +2648,29 @@ function get_modern_additional_css() {
     }
     
     @media (max-width: 768px) {
+        .page-header {
+            padding: 2rem 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 16px;
+        }
+
+        .premium-h1 {
+            font-size: 1.8rem !important;
+        }
+
+        .premium-subtitle {
+            font-size: 1rem !important;
+        }
+
+        .breadcrumb-container {
+            margin-top: 10px !important;
+        }
+
+        .breadcrumb-nav {
+            margin-bottom: 15px !important;
+            font-size: 0.8rem;
+        }
+
         .featured-grid {
             grid-template-columns: 1fr;
         }
@@ -3625,602 +3799,77 @@ function generate_brand_advantages_with_ai($marca) {
     return array_slice($ventajas, 0, 3);
 }
 
-/******************************************************
- *  FUNCIONES PARA CHOLLOS
- * ***************************************************/
+/********************************************************************
+ *  FIN FUNCIONES PARA CHOLLOS (ELIMINADAS)
+ *******************************************************************/
 
 /**
- * Imprime una tarjeta de chollo estilo chollometro
- */
-function imprimir_tarjeta_chollo($chollo) {
-    if (empty($chollo)) {
-        return;
-    }
-
-    $titulo = htmlspecialchars($chollo['titulo'] ?? '');
-    $descripcion = htmlspecialchars($chollo['descripcion'] ?? '');
-    $precio_original = $chollo['precio_original'] ?? null;
-    $precio_descuento = $chollo['precio_descuento'] ?? null;
-    $porcentaje_descuento = $chollo['porcentaje_descuento'] ?? null;
-    $enlace = htmlspecialchars($chollo['enlace'] ?? '#');
-    $imagen = htmlspecialchars($chollo['imagen'] ?? '');
-    
-    // Asegurar que el helper esté disponible
-    if (!function_exists('categoriaToSlug')) {
-        include_once __DIR__ . '/funciones_chollos_helpers.php';
-    }
-
-    // Manejar categoría (puede ser array o string)
-    $categoria_raw = $chollo['categoria'] ?? 'general';
-    $categoria = 'general';
-    
-    // Si viene como BSONArray u objeto iterable, convertir a array
-    if (is_object($categoria_raw) && method_exists($categoria_raw, 'getArrayCopy')) {
-        $categoria_raw = $categoria_raw->getArrayCopy();
-    }
-    
-    if (is_array($categoria_raw)) {
-        foreach ($categoria_raw as $cat) {
-            if ($cat !== 'general' && $cat !== 'black-friday') {
-                $categoria = $cat;
-                break;
-            }
-        }
-        if ($categoria === 'general' && !empty($categoria_raw)) {
-            $categoria = isset($categoria_raw[0]) ? $categoria_raw[0] : 'general';
-        }
-    } else {
-        $categoria = (string)$categoria_raw ?: 'general';
-    }
-    
-    $categoria_slug = categoriaToSlug($categoria);
-    $id = htmlspecialchars($chollo['id'] ?? '');
-    
-    if (!function_exists('generarUrlAcortadaChollo')) {
-        include_once __DIR__ . '/funciones_chollos.php';
-    }
-    $url_directa = generarUrlAcortadaChollo($id);
-    $url_ficha = '/chollos/' . $categoria_slug . '/' . $id;
-    
-    // Calcular porcentaje si no existe
-    if ($porcentaje_descuento === null && $precio_original && $precio_descuento) {
-        $porcentaje_descuento = round((($precio_original - $precio_descuento) / $precio_original) * 100);
-    }
-    
-    // Imagen por defecto
-    if (empty($imagen)) {
-        $imagen = 'https://via.placeholder.com/300x300?text=Chollo';
-    }
-    
-    echo '<div class="chollo-card">';
-    
-    // Badge de descuento
-    if ($porcentaje_descuento) {
-        $badge_class = 'chollo-badge';
-        $badge_icon = '';
-        if ($porcentaje_descuento >= 50) {
-            $badge_class .= ' chollo-badge-hot';
-            $badge_icon = ' <i class="fas fa-fire"></i>';
-        }
-        echo '<div class="' . $badge_class . '">-' . $porcentaje_descuento . '%' . $badge_icon . '</div>';
-    }
-    
-    // Imagen
-    echo '<a href="' . $url_ficha . '" class="chollo-image-link">';
-    echo '<div class="chollo-image">';
-    echo '<img src="' . $imagen . '" alt="' . $titulo . '" loading="lazy">';
-    echo '</div>';
-    echo '</a>';
-    
-    // Contenido
-    echo '<div class="chollo-content">';
-    
-    // Votación
-    if (function_exists('renderCholloVoting')) {
-        echo '<div class="chollo-voting-wrapper">';
-        echo renderCholloVoting($chollo, 'small');
-        echo '</div>';
-    }
-
-    echo '<a href="' . $url_ficha . '" class="chollo-title-link">';
-    echo '<h3 class="chollo-title">' . $titulo . '</h3>';
-    echo '</a>';
-    
-    if (!empty($descripcion)) {
-        $descripcion_corta = strlen($descripcion) > 120 ? substr($descripcion, 0, 117) . '...' : $descripcion;
-        echo '<p class="chollo-description">' . htmlspecialchars($descripcion_corta) . '</p>';
-    }
-    
-    // Precios
-    if ($precio_original || $precio_descuento) {
-        echo '<div class="chollo-prices">';
-        if ($precio_descuento) {
-            echo '<span class="chollo-price-discount">' . number_format($precio_descuento, 2, ',', '.') . ' €</span>';
-        }
-        if ($precio_original && $precio_original > $precio_descuento) {
-            echo '<span class="chollo-price-original">' . number_format($precio_original, 2, ',', '.') . ' €</span>';
-        }
-        echo '</div>';
-    }
-    
-    // Meta Info (Clicks y Fecha)
-    echo '<div class="chollo-meta">';
-    
-    $clicks = $chollo['clicks'] ?? 0;
-    if ($clicks > 0) {
-        echo '<div class="chollo-meta-item chollo-clicks">';
-        echo '<i class="fas fa-fire"></i>';
-        echo '<span><strong>' . number_format($clicks) . '</strong> personas vistas</span>';
-        echo '</div>';
-    }
-    
-    $fecha_creacion = null;
-    if (isset($chollo['fecha_creacion'])) {
-        $fecha_raw = $chollo['fecha_creacion'];
-        if ($fecha_raw instanceof MongoDB\BSON\UTCDateTime) {
-            $fecha_creacion = $fecha_raw->toDateTime()->format('Y-m-d H:i:s');
-        } elseif (is_string($fecha_raw) && !empty(trim($fecha_raw))) {
-            $fecha_creacion = $fecha_raw;
-        }
-    }
-    
-    if ($fecha_creacion) {
-        $timestamp = strtotime($fecha_creacion);
-        if ($timestamp !== false) {
-            $fecha_formateada = date('d/m/Y H:i', $timestamp);
-            echo '<div class="chollo-meta-item chollo-date">';
-            echo '<i class="fas fa-calendar-alt"></i>';
-            echo '<span>' . htmlspecialchars($fecha_formateada) . '</span>';
-            echo '</div>';
-        }
-    }
-    
-    echo '</div>'; // .chollo-meta
-    
-    // Botones
-    echo '<div class="chollo-buttons">';
-    echo '<a href="' . $url_directa . '" class="chollo-button chollo-button-primary" target="_blank" rel="nofollow sponsored">';
-    echo '<i class="fas fa-external-link-alt"></i> Ver oferta';
-    echo '</a>';
-    echo '<a href="' . $url_ficha . '" class="chollo-button chollo-button-secondary">';
-    echo '<i class="fas fa-info-circle"></i> Ficha';
-    echo '</a>';
-    echo '</div>';
-    
-    echo '</div>'; // .chollo-content
-    echo '</div>'; // .chollo-card
-}
-
-/**
- * Imprime un grid de chollos
- */
-function imprimir_grid_chollos($chollos, $columnas = 3) {
-    if (empty($chollos)) {
-        echo '<div class="no-chollos-found">No hay chollos disponibles en este momento.</div>';
-        return;
-    }
-    
-    $columnas_class = 'chollos-grid-' . $columnas;
-    
-    echo '<div class="chollos-grid ' . $columnas_class . '">';
-    $counter = 0;
-    foreach ($chollos as $chollo) {
-        imprimir_tarjeta_chollo($chollo);
-        $counter++;
-        
-        // Insertar tarjeta FOMO de Telegram después del cuarto chollo
-        if ($counter == 4) {
-            echo '
-            <div class="chollo-card telegram-promo-card" style="background: linear-gradient(135deg, #2AABEE 0%, #229ED9 100%); border: none;">
-                <div class="chollo-content" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; height: 100%; padding: 30px 20px; color: white;">
-                    <div style="font-size: 3.5rem; margin-bottom: 15px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));">✈️</div>
-                    <div style="font-weight: 800; font-size: 1.4rem; margin-bottom: 10px; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">¿Te lo vas a perder?</div>
-                    <p style="font-size: 1rem; margin-bottom: 25px; line-height: 1.5; color: rgba(255,255,255,0.95);">
-                        Los mejores chollos vuelan en segundos. Únete a nuestro canal y entérate antes que nadie.
-                    </p>
-                    <a href="https://t.me/cholloscodigoamigo" target="_blank" rel="noopener noreferrer" 
-                       style="background: white; color: #229ED9; padding: 12px 28px; border-radius: 50px; text-decoration: none; font-weight: 700; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: all 0.3s; display: inline-flex; align-items: center; gap: 8px;">
-                        <i class="fa-brands fa-telegram"></i> Unirme YA
-                    </a>
-                    <div style="margin-top: 15px; font-size: 0.85rem; opacity: 0.8;">
-                        <i class="fas fa-user-friends"></i> +400 miembros activos
-                    </div>
-                </div>
-            </div>
-            <style>
-            .telegram-promo-card {
-                grid-row: span 1;
-                transition: transform 0.3s ease;
-            }
-            .telegram-promo-card:hover {
-                transform: translateY(-5px) scale(1.02);
-            }
-            </style>
-            ';
-        }
-    }
-    echo '</div>';
-}
-
-/**
- * Imprime filtros de categorías de chollos
- */
-function imprimir_filtros_chollos($categorias, $categoria_actual = '') {
-    if (empty($categorias)) {
-        return;
-    }
-    
-    echo '<div class="chollos-filters">';
-    echo '<a href="/chollos" title="Ver todos los chollos y ofertas" class="chollo-filter' . ($categoria_actual === '' ? ' active' : '') . '">Todos</a>';
-
-    foreach ($categorias as $key => $nombre) {
-        $active = $categoria_actual === $key ? ' active' : '';
-        $title = 'Chollos de ' . htmlspecialchars($nombre);
-        echo '<a href="/chollos/' . $key . '" title="' . $title . '" class="chollo-filter' . $active . '">' . htmlspecialchars($nombre) . '</a>';
-    }
-    
-    echo '</div>';
-}
-
-/**
- * Obtiene los últimos chollos para mostrar en secciones
- * @param int $limit Número de chollos a obtener (por defecto 3)
- * @return array Array con información de chollos
- */
-function get_ultimos_chollos($limit = 3) {
-    // Incluir funciones de chollos si no están disponibles
-    if (!function_exists('obtenerChollos')) {
-        include_once __DIR__ . '/funciones_chollos.php';
-    }
-    
-    if (!function_exists('obtenerChollos')) {
-        return [];
-    }
-    
-    $filtros = [
-        'estado' => 1,
-        'limite' => $limit
-    ];
-    
-    return obtenerChollos($filtros);
-}
-
-/**
- * Imprime una sección con los últimos chollos
- * @param int $limit Número de chollos a mostrar (por defecto 3)
- * @param string $titulo Título de la sección (por defecto "Últimos Chollos")
- * @param bool $mostrar_ver_todos Si mostrar el botón "Ver todos los chollos" (por defecto true)
- */
-function imprimir_seccion_ultimos_chollos($limit = 3, $titulo = 'Últimos Chollos', $mostrar_ver_todos = true) {
-    $chollos = get_ultimos_chollos($limit);
-    
-    if (empty($chollos)) {
-        return;
-    }
-    
-    echo '<div class="ultimos-chollos-section" style="margin: 30px 0; padding: 40px 0; background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); border-top: 1px solid #e9ecef;">';
-    echo '<div class="container">';
-    echo '<div class="d-flex justify-content-between align-items-center mb-4" style="flex-wrap: wrap; gap: 15px;">';
-    echo '<div class="section-title h2-style" style="font-size: 2rem; color: #333; margin: 0; font-weight: 700; display: flex; align-items: center; gap: 12px;">';
-    echo '<i class="fas fa-fire" style="color: #E30613; font-size: 1.8rem;"></i>';
-    echo '<span>' . htmlspecialchars($titulo) . '</span>';
-    echo '</div>';
-    if ($mostrar_ver_todos) {
-        echo '<a href="/chollos" class="btn-ver-todos" style="padding: 12px 30px; background: linear-gradient(135deg, #E30613, #C40510); color: white; text-decoration: none; border-radius: 30px; font-weight: 600; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 10px; box-shadow: 0 4px 15px rgba(227, 6, 19, 0.3); white-space: nowrap;">';
-        echo '<span>Ver todos los chollos</span> <i class="fas fa-arrow-right"></i>';
-        echo '</a>';
-    }
-    echo '</div>';
-    
-    // Incluir estilos mejorados
-    echo '<style>
-    .ultimos-chollos-section {
-        position: relative;
-    }
-    .ultimos-chollos-section::before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 4px;
-        background: linear-gradient(90deg, #E30613, #C40510, #E30613);
-    }
-    .ultimos-chollos-section .chollos-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 25px;
-        margin-top: 20px;
-    }
-    .ultimos-chollos-section .chollo-card {
-        background: white;
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-        transition: all 0.3s ease;
-        border: 1px solid #f0f0f0;
-        position: relative;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-    }
-    .ultimos-chollos-section .chollo-card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 8px 25px rgba(227, 6, 19, 0.2);
-        border-color: #E30613;
-    }
-    .ultimos-chollos-section .chollo-link {
-        text-decoration: none;
-        color: inherit;
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-    }
-    .ultimos-chollos-section .chollo-badge {
-        position: absolute;
-        top: 12px;
-        right: 12px;
-        background: #E30613;
-        color: white;
-        padding: 6px 14px;
-        border-radius: 20px;
-        font-weight: bold;
-        font-size: 0.9em;
-        z-index: 2;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    }
-    .ultimos-chollos-section .chollo-image {
-        width: 100%;
-        height: 220px;
-        overflow: hidden;
-        background: #f0f0f0;
-        position: relative;
-    }
-    .ultimos-chollos-section .chollo-image img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        transition: transform 0.3s ease;
-    }
-    .ultimos-chollos-section .chollo-card:hover .chollo-image img {
-        transform: scale(1.05);
-    }
-    .ultimos-chollos-section .chollo-content {
-        padding: 20px;
-        display: flex;
-        flex-direction: column;
-        flex-grow: 1;
-    }
-    .ultimos-chollos-section .chollo-title {
-        font-size: 1.05em;
-        font-weight: 600;
-        margin-bottom: 10px;
-        color: #333;
-        line-height: 1.4;
-        min-height: 44px;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-    .ultimos-chollos-section .chollo-description {
-        font-size: 0.9em;
-        color: #666;
-        margin-bottom: 15px;
-        line-height: 1.5;
-        flex-grow: 1;
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-    .ultimos-chollos-section .chollo-prices {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-bottom: 15px;
-        flex-wrap: wrap;
-    }
-    .ultimos-chollos-section .chollo-price-original {
-        font-size: 0.9em;
-        color: #999;
-        text-decoration: line-through;
-    }
-    .ultimos-chollos-section .chollo-price-discount {
-        font-size: 1.3em;
-        font-weight: bold;
-        color: #E30613;
-    }
-    .ultimos-chollos-section .chollo-clicks {
-        font-size: 0.85em;
-        color: #E30613;
-        margin-bottom: 10px;
-        display: flex;
-        align-items: center;
-        gap: 5px;
-    }
-    .ultimos-chollos-section .chollo-buttons {
-        display: flex;
-        gap: 10px;
-        margin-top: auto;
-    }
-    .ultimos-chollos-section .chollo-button {
-        flex: 1;
-        padding: 12px 16px;
-        border-radius: 6px;
-        text-align: center;
-        font-weight: 600;
-        font-size: 0.95em;
-        text-decoration: none;
-        transition: all 0.3s;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        border: none;
-        cursor: pointer;
-    }
-    .ultimos-chollos-section .chollo-button-primary {
-        background: #E30613;
-        color: white;
-    }
-    .ultimos-chollos-section .chollo-button-primary:hover {
-        background: #C40510;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(227, 6, 19, 0.3);
-    }
-    .ultimos-chollos-section .chollo-button-secondary {
-        background: #f8f9fa;
-        color: #333;
-        border: 2px solid #e0e0e0;
-    }
-    .ultimos-chollos-section .chollo-button-secondary:hover {
-        background: #e9ecef;
-        border-color: #E30613;
-        color: #E30613;
-        transform: translateY(-2px);
-    }
-    .ultimos-chollos-section .chollo-image-link {
-        text-decoration: none;
-        display: block;
-        transition: opacity 0.3s;
-    }
-    .ultimos-chollos-section .chollo-image-link:hover {
-        opacity: 0.9;
-    }
-    .ultimos-chollos-section .chollo-title-link {
-        text-decoration: none;
-        color: inherit;
-        display: block;
-    }
-    .ultimos-chollos-section .chollo-title-link:hover .chollo-title {
-        color: #E30613;
-    }
-    .ultimos-chollos-section .chollo-card:hover .chollo-button-primary {
-        background: #C40510;
-    }
-    .ultimos-chollos-section .btn-ver-todos:hover {
-        background: linear-gradient(135deg, #C40510, #d44a1f) !important;
-        transform: translateY(-3px);
-        box-shadow: 0 6px 20px rgba(227, 6, 19, 0.4) !important;
-    }
-    @media (max-width: 768px) {
-        .ultimos-chollos-section {
-            padding: 30px 0 !important;
-            margin: 20px 0 !important;
-        }
-        .ultimos-chollos-section .d-flex {
-            flex-direction: column;
-            align-items: flex-start !important;
-            gap: 20px;
-        }
-        .ultimos-chollos-section .section-title {
-            font-size: 1.5rem !important;
-        }
-        .ultimos-chollos-section .chollos-grid {
-            grid-template-columns: 1fr;
-            gap: 20px;
-        }
-        .ultimos-chollos-section .btn-ver-todos {
-            width: 100%;
-            justify-content: center;
-        }
-        .ultimos-chollos-section .chollo-image {
-            height: 180px;
-        }
-        .ultimos-chollos-section .chollo-buttons {
-            flex-direction: column;
-            gap: 8px;
-        }
-        .ultimos-chollos-section .chollo-button {
-            width: 100%;
-            padding: 10px 14px;
-            font-size: 0.9em;
-        }
-    }
-    </style>';
-    
-    if (function_exists('imprimir_grid_chollos')) {
-        imprimir_grid_chollos($chollos, 3);
-    } else {
-        // Fallback si la función no existe
-        echo '<div class="chollos-grid">';
-        foreach ($chollos as $chollo) {
-            if (function_exists('imprimir_tarjeta_chollo')) {
-                imprimir_tarjeta_chollo($chollo);
-            }
-        }
-        echo '</div>';
-    }
-    
-    echo '</div>';
-    echo '</div>';
-}
-
-/**
- * Obtiene los usuarios más activos (con más códigos publicados)
- * @param int $limit Número de usuarios a obtener (por defecto 4)
+ * Obtiene usuarios VIP con suscripción activa para mostrar en el footer.
+ * Consulta directamente la colección de usuarios filtrando por is_vip=true.
+ * @param int $limit Número de usuarios a obtener (por defecto 12)
  * @return array Array con información de usuarios (username, img, total_codigos)
  */
-function get_usuarios_activos_footer($limit = 4) {
+function get_usuarios_activos_footer($limit = 12) {
     try {
-        $collection_codigos = getCollectionCodigos();
-        
-        // Pipeline para obtener usuarios más activos
-        // Aumentamos el límite de la agregación para filtrar después por imagen
-        $pipeline = [
-            ['$match' => ['estado' => 0]], // Solo códigos activos
-            ['$group' => [
-                '_id' => '$id_usuario',
-                'total_codigos' => ['$sum' => 1]
-            ]],
-            ['$sort' => ['total_codigos' => -1]],
-            ['$limit' => 50] // Buscamos entre los 50 más activos para filtrar
+        if (!function_exists('getCollectionUsuarios')) {
+            include_once __DIR__ . '/funciones_usuario.php';
+        }
+
+        $collection_usuarios = getCollectionUsuarios();
+        $ahora = new MongoDB\BSON\UTCDateTime(time() * 1000);
+
+        // Buscar usuarios VIP: is_vip=true y (sin vip_expires_at o con fecha futura)
+        $filtro = [
+            'is_vip' => true,
+            '$or' => [
+                ['vip_expires_at' => ['$exists' => false]],
+                ['vip_expires_at' => null],
+                ['vip_expires_at' => ['$gt' => $ahora]]
+            ]
         ];
-        
-        $usuarios_activos = $collection_codigos->aggregate($pipeline)->toArray();
-        
+
+        $opciones = [
+            'limit'      => $limit * 3, // traemos más para filtrar por foto
+            'sort'       => ['fecha_registro' => -1],
+            'projection' => [
+                '_id'      => 1,
+                'username' => 1,
+                'img'      => 1,
+                'avatar'   => 1,
+                'foto'     => 1,
+                'image'    => 1
+            ]
+        ];
+
+        $cursor   = $collection_usuarios->find($filtro, $opciones);
         $resultado = [];
-        $url_usuario_sin_foto = 'https://www.codigoamigo.com/img/utilidades/usuario_sin_foto.jpg';
-        
-        foreach ($usuarios_activos as $usuario_data) {
-            if (!isset($usuario_data['_id']) || !$usuario_data['_id']) {
-                continue;
-            }
-            
-            // Si ya tenemos suficientes resultados, paramos
+        $url_sin_foto = 'https://www.codigoamigo.com/img/utilidades/usuario_sin_foto.jpg';
+
+        foreach ($cursor as $usuario) {
             if (count($resultado) >= $limit) {
                 break;
             }
-            
-            try {
-                $usuario = getObjectUser('_id', $usuario_data['_id']);
-                
-                if ($usuario) {
-                    $img = $usuario['img'] ?? $usuario['avatar'] ?? $usuario['foto'] ?? $usuario['image'] ?? '';
-                    
-                    // FILTRO: Solo usuarios con foto real (no vacía y que no sea la de defecto)
-                    if (empty($img) || strpos($img, 'usuario_sin_foto') !== false) {
-                        continue;
-                    }
-                    
-                    $resultado[] = [
-                        'username' => $usuario['username'] ?? 'Usuario',
-                        'img' => $img,
-                        'total_codigos' => $usuario_data['total_codigos'] ?? 0,
-                        'id' => (string)$usuario['_id']
-                    ];
-                }
-            } catch (Exception $e) {
-                // Continuar con el siguiente usuario si hay error
-                continue;
+
+            $user_arr = iterator_to_array($usuario);
+            $img = $user_arr['img'] ?? $user_arr['avatar'] ?? $user_arr['foto'] ?? $user_arr['image'] ?? '';
+
+            // Usar foto por defecto si no tiene imagen propia
+            if (empty($img) || strpos($img, 'usuario_sin_foto') !== false) {
+                $img = $url_sin_foto;
             }
+
+            $resultado[] = [
+                'username'     => $user_arr['username'] ?? 'VIP',
+                'img'          => $img,
+                'total_codigos'=> 0,
+                'id'           => (string)$user_arr['_id']
+            ];
         }
-        
+
         return $resultado;
-        
+
     } catch (Exception $e) {
-        // En caso de error, retornar vacío
+        error_log('get_usuarios_activos_footer error: ' . $e->getMessage());
         return [];
     }
 }
@@ -4268,6 +3917,7 @@ function add_global_user_modal() {
                     <div class="user-modal-actions">
                         <a href="#" class="user-modal-btn user-btn-profile" id="modalProfileLink">Mostrar perfil</a>
                         <a href="#" class="user-modal-btn user-btn-chat" id="modalChatLink"><i class="fas fa-comments"></i> Chat</a>
+                        <button type="button" class="user-modal-btn user-btn-follow" id="modalFollowBtn" data-usuario-id="" style="display:none; grid-column: span 2;"><i class="fas fa-user-plus"></i> <span id="modalFollowText">Seguir</span></button>
                     </div>
                 </div>
                 
@@ -4492,6 +4142,23 @@ function add_global_user_modal() {
         background: #C40510;
         border-color: #C40510;
     }
+    
+    .user-btn-follow {
+        background: transparent;
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        cursor: pointer;
+    }
+    
+    .user-btn-follow:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+    
+    .user-btn-follow.following {
+        background: #444;
+        border-color: #444;
+        color: #ddd;
+    }
 
     .user-modal-stats-list {
         border-top: 1px solid #333;
@@ -4557,6 +4224,8 @@ function add_global_user_modal() {
         const mStatTemp = document.getElementById('modalStatTemp');
         const mStatComments = document.getElementById('modalStatComments');
         const mStatLikes = document.getElementById('modalStatLikes');
+        const mFollowBtn = document.getElementById('modalFollowBtn');
+        const mFollowText = document.getElementById('modalFollowText');
 
         // Función para cerrar el modal
         const closeModal = () => {
@@ -4572,6 +4241,118 @@ function add_global_user_modal() {
         if(modal) modal.addEventListener('click', function(e) {
             if (e.target === modal) closeModal();
         });
+
+        /**
+         * Carga estadísticas reales del usuario desde el endpoint AJAX
+         * y actualiza el modal con los datos recibidos.
+         */
+        function cargarStatsUsuario(userId, username) {
+            if (!userId) return;
+
+            // Mostrar estado de carga
+            [mQOffers, mQComments, mStatOffers, mStatComments, mStatLikes, mStatTemp].forEach(function(el) {
+                if (el) el.textContent = '...';
+            });
+
+            fetch('/ajax/get_user_stats.php?user_id=' + encodeURIComponent(userId))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.ok) return;
+
+                    // Ofertas
+                    if (mQOffers)     mQOffers.textContent     = data.total_codigos;
+                    if (mStatOffers)  mStatOffers.textContent  = data.total_codigos;
+
+                    // Comentarios
+                    if (mQComments)   mQComments.textContent   = data.total_comentarios;
+                    if (mStatComments) mStatComments.textContent = data.total_comentarios;
+
+                    // Likes
+                    if (mStatLikes)   mStatLikes.textContent   = data.total_likes;
+
+                    // Temperatura
+                    if (mStatTemp)    mStatTemp.textContent    = data.promedio_temp || '-°';
+
+                    // Fecha registro
+                    if (mJoined)      mJoined.textContent      = data.fecha_registro || 'Miembro de la comunidad';
+
+                    // Añadir badge VIP si procede
+                    if (data.is_vip && mName) {
+                        if (!mName.querySelector('.vip-badge-gold')) {
+                            mName.innerHTML += ' <span class="vip-badge-gold" style="margin-left: 8px; font-size: 0.8rem; vertical-align: middle; display:inline-block;" title="Usuario VIP Verificado"><i class="fas fa-crown"></i> VIP</span>';
+                        }
+                    }
+                    
+                    // Actualizar botón de Seguir
+                    if (mFollowBtn) {
+                        mFollowBtn.style.display = 'block';
+                        mFollowBtn.setAttribute('data-usuario-id', userId);
+                        if (data.is_following) {
+                            mFollowBtn.classList.add('following');
+                            mFollowText.textContent = 'Dejar de seguir';
+                            mFollowBtn.querySelector('i').className = 'fas fa-user-minus';
+                        } else {
+                            mFollowBtn.classList.remove('following');
+                            mFollowText.textContent = 'Seguir';
+                            mFollowBtn.querySelector('i').className = 'fas fa-user-plus';
+                        }
+                    }
+                })
+                .catch(function() { /* silencioso: los datos iniciales del data-* ya están */ });
+        }
+        
+        // Manejar el botón de Seguir en el modal
+        if (mFollowBtn) {
+            mFollowBtn.addEventListener('click', function() {
+                const usuarioId = this.getAttribute('data-usuario-id');
+                if (!usuarioId) return;
+                
+                const isSiguiendo = this.classList.contains('following');
+                const action = isSiguiendo ? 'eliminar_favorito' : 'añadir_favorito';
+                
+                const $icon = this.querySelector('i');
+                const originalIconClass = $icon.className;
+                $icon.className = 'fas fa-spinner fa-spin';
+                
+                $.ajax({
+                    url: '/ajax_actions',
+                    method: 'POST',
+                    data: {
+                        action: action,
+                        codigo_id: usuarioId,
+                        tipo: 'usuario'
+                    },
+                    success: (response) => {
+                        if (typeof response === 'string') {
+                            try { response = JSON.parse(response); } catch(e) {}
+                        }
+                        if (response && response.success) {
+                            if (isSiguiendo) {
+                                this.classList.remove('following');
+                                mFollowText.textContent = 'Seguir';
+                                $icon.className = 'fas fa-user-plus';
+                            } else {
+                                this.classList.add('following');
+                                mFollowText.textContent = 'Dejar de seguir';
+                                $icon.className = 'fas fa-user-minus';
+                            }
+                        } else {
+                            // Suponemos error o no logueado
+                            if (response && response.error === 'not_logged_in') {
+                                window.location.href = '/login';
+                            } else {
+                                alert(response.message || 'Necesitas iniciar sesión para seguir usuarios.');
+                            }
+                            $icon.className = originalIconClass;
+                        }
+                    },
+                    error: () => {
+                        alert('Error de conexión');
+                        $icon.className = originalIconClass;
+                    }
+                });
+            });
+        }
 
         // Event Delegation para abrir el modal - CON PROTECCIÓN CONTRA CONFLICTOS
         document.body.addEventListener('click', function(e) {
@@ -4607,15 +4388,18 @@ function add_global_user_modal() {
 
                 if(mName) {
                     let html = username;
+                    if(ds.vip === 'true') {
+                         html += ' <span class="vip-badge-gold" style="margin-left: 8px; font-size: 0.8rem; vertical-align: middle; display:inline-block;" title="Usuario VIP Verificado"><i class="fas fa-crown"></i> VIP</span>';
+                    }
                     if(ds.official === 'true') {
-                         html += ' <span class="user-badge-official" style="display:inline-block"><i class="fas fa-check-circle"></i> Oficial</span>';
+                         html += ' <span class="user-badge-official" style="display:inline-block; font-size: 0.8rem; margin-left: 5px;"><i class="fas fa-check-circle"></i> Oficial</span>';
                     }
                     mName.innerHTML = html;
                 }
                 
                 if(mJoined) mJoined.textContent = ds.joined || 'Miembro de la comunidad';
                 
-                // Stats
+                // Stats iniciales desde data-* (pueden ser 0 si viene del footer VIP)
                 const offers = ds.statsOffers || '-'; 
                 const comments = ds.statsComments || '-';
                 
@@ -4623,7 +4407,26 @@ function add_global_user_modal() {
                 if(mQComments) mQComments.textContent = comments;
                 
                 // Links
-                if(mLinkProfile) mLinkProfile.href = '/usuario/' + username;
+                if(mLinkProfile) {
+                    // Fallback to JS generated URL if data-profile-url is missing
+                    let defaultProfileUrl = '';
+                    if (ds.username && ds.userId) {
+                        const encodedName = encodeURIComponent(ds.username).toLowerCase().replace(/%20/g, '+');
+                        defaultProfileUrl = '/usuario_' + encodedName + '_' + ds.userId;
+                    } else {
+                        defaultProfileUrl = '/usuario/' + username;
+                    }
+                    
+                    const profileUrl = ds.profileUrl ? ds.profileUrl : defaultProfileUrl;
+                    mLinkProfile.href = profileUrl;
+                    
+                    // Asegurar que el click no sea interceptado por otros scripts
+                    mLinkProfile.onclick = function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        window.location.href = profileUrl;
+                    };
+                }
                 
                 // Chat Logic
                 if (mLinkChat) {
@@ -4637,6 +4440,7 @@ function add_global_user_modal() {
                         // Handler de click unificado
                         mLinkChat.onclick = function(e) {
                             e.preventDefault();
+                            e.stopPropagation();
                             
                             // Si no está logueado, mostrar modal de login
                             if (!currentId) {
@@ -4670,11 +4474,20 @@ function add_global_user_modal() {
                     }
                 }
                 
-                // Full Stats
+                // Full Stats (valores iniciales)
                 if(mStatOffers) mStatOffers.textContent = offers;
                 if(mStatTemp) mStatTemp.textContent = (ds.statsTemp || '-°');
                 if(mStatComments) mStatComments.textContent = comments;
                 if(mStatLikes) mStatLikes.textContent = ds.statsLikes || '-';
+
+                // Esconder el botón de seguir temporalmente hasta que el server conteste si es que no es el id propio
+                if(mFollowBtn) {
+                    mFollowBtn.style.display = 'none';
+                    mFollowBtn.classList.remove('following');
+                    if (mFollowText) mFollowText.textContent = 'Seguir';
+                    const icon = mFollowBtn.querySelector('i');
+                    if (icon) icon.className = 'fas fa-user-plus';
+                }
 
                 // Mostrar
                 if(modal) {
@@ -4684,12 +4497,18 @@ function add_global_user_modal() {
                     }, 10);
                     document.body.style.overflow = 'hidden';
                 }
+
+                // Cargar stats reales via AJAX
+                cargarStatsUsuario(userId, username);
             }
         }, false); // false = fase de bubbling (después de otros handlers)
     });
     </script>
     <?php
 }
+
+
+
 
 // Función para mostrar botón flotante de Telegram
 function add_sticky_telegram_button() {

@@ -443,31 +443,13 @@ show_short_desc($marca);
             </div>
             <div class="col-md-6">
                 <div id="wide_ad_unit" style="height:600px;">
-                    <!-- Codigoamigo_top_marcas -->
-                    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-                    <ins class="adsbygoogle"
-                         style="display:block"
-                         data-ad-slot="2215822301"
-                         data-ad-format="auto"
-                         data-full-width-responsive="true"></ins>
-                    <script>
-                         (adsbygoogle = window.adsbygoogle || []).push({});
-                    </script>
+                    <!-- AdSense desactivado -->
                 </div>
             </div>
         </div>
     <?php }else{ ?>
         
-            <!-- Codigoamigo_top_marcas -->
-            <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-            <ins class="adsbygoogle"
-                 style="display:block"
-                 data-ad-slot="2215822301"
-                 data-ad-format="auto"
-                 data-full-width-responsive="true"></ins>
-            <script>
-                 (adsbygoogle = window.adsbygoogle || []).push({});
-            </script>
+            <!-- AdSense desactivado -->
     <?php } ?>
 </div>
 
@@ -579,16 +561,7 @@ show_short_desc($marca);
             	<div class="col-md-12 card_real">
 
                     
-                                    <!-- Codigoamigo - top -->
-                            <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-                            <ins class="adsbygoogle"
-                                 style="display:block"
-                                 data-ad-slot="9558662809"
-                                 data-ad-format="auto"
-                                 data-full-width-responsive="true"></ins>
-                            <script>
-                                 (adsbygoogle = window.adsbygoogle || []).push({});
-                            </script>
+                                    <!-- AdSense desactivado -->
                 </div>
         	</div>
 
@@ -664,25 +637,18 @@ show_short_desc($marca);
         					
         					
         					?>
-        					<div class="listado_codigos">
-        					<?php block_listado_codigos($sublista1, $a_printar); ?>
-        					</div> 
+        					<div class="destacado_div">
+                                <div class="listado_codigos">
+        					       <?php block_listado_codigos($sublista1, "destacados"); ?>
+        					    </div> 
+                            </div>
                             <?
         					
                                 if($_GET["codigo"] && !$detect_device->isMobile()){ ?>
 
                                 <div class="col-lg-3">
                                 	
-                                    <!-- Codigoamigo Detalle Lateral -->
-                                    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-                                    <ins class="adsbygoogle"
-                                         style="display:block"
-                                         data-ad-slot="2861865272"
-                                         data-ad-format="auto"
-                                         data-full-width-responsive="true"></ins>
-                                    <script>
-                                         (adsbygoogle = window.adsbygoogle || []).push({});
-                                    </script>
+                                    <!-- AdSense desactivado -->
                                 </div>
                                 <?php }
 
@@ -714,16 +680,7 @@ show_short_desc($marca);
                           if($_GET["codigo"] && !$detect_device->isMobile()){ ?>
         					 <div class="col-lg-3">
                                 	
-                                    <!-- Codigoamigo Detalle Lateral -->
-                                    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-                                    <ins class="adsbygoogle"
-                                         style="display:block"
-                                         data-ad-slot="2861865272"
-                                         data-ad-format="auto"
-                                         data-full-width-responsive="true"></ins>
-                                    <script>
-                                         (adsbygoogle = window.adsbygoogle || []).push({});
-                                    </script>
+                                    <!-- AdSense desactivado -->
                                 </div>
                             <?php }
                             

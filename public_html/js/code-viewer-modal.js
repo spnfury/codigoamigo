@@ -236,85 +236,172 @@
     document.head.appendChild(styleSheet);
 
     // Función para mostrar el modal de reveal
-    window.showCodeRevealModal = function (codigoId, marca, beneficio) {
+    window.showCodeRevealModal = function (codigoId, marca, beneficio, triggerBtn) {
         const isLoggedIn = typeof currentUserId !== 'undefined' && currentUserId && currentUserId !== '';
 
-        const overlay = document.createElement('div');
-        overlay.className = 'code-reveal-modal-overlay';
-        overlay.innerHTML = `
-            <div class="code-reveal-modal" style="position: relative;">
-                <button class="close-modal-btn" onclick="this.closest('.code-reveal-modal-overlay').remove()">
-                    <i class="fas fa-times"></i>
-                </button>
-                <div class="code-reveal-header">
-                    <h3><i class="fas fa-gift"></i> ¡Código disponible!</h3>
-                    <p>Gana ${beneficio || 'dinero'}€ con este código de ${marca || 'referido'}</p>
-                </div>
-                <div class="code-reveal-body">
-                    <div class="code-reveal-benefits">
-                        <div class="code-reveal-benefit">
-                            <div class="code-reveal-benefit-icon">
-                                <i class="fas fa-hands-helping"></i>
+        if (isLoggedIn && triggerBtn) {
+            // Si está logueado y tenemos el botón, revelar directamente
+            revealCodeInPage(codigoId, triggerBtn);
+        } else {
+            // Si no, mostrar modal habitual
+            const overlay = document.createElement('div');
+            overlay.className = 'code-reveal-modal-overlay';
+            overlay.innerHTML = `
+                <div class="code-reveal-modal" style="position: relative;">
+                    <button class="close-modal-btn" onclick="this.closest('.code-reveal-modal-overlay').remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <div class="code-reveal-header">
+                        <h3><i class="fas fa-gift"></i> ¡Código disponible!</h3>
+                        <p>Gana ${beneficio || 'dinero'}€ con este código de ${marca || 'referido'}</p>
+                    </div>
+                    <div class="code-reveal-body">
+                        <div class="code-reveal-benefits">
+                            <div class="code-reveal-benefit">
+                                <div class="code-reveal-benefit-icon">
+                                    <i class="fas fa-hands-helping"></i>
+                                </div>
+                                <div class="code-reveal-benefit-text">
+                                    <h5>Ayuda personalizada</h5>
+                                    <p>El autor del código puede contactarte por chat y ayudarte paso a paso para que ambos ganéis el beneficio. ¡Situación win-win!</p>
+                                </div>
                             </div>
-                            <div class="code-reveal-benefit-text">
-                                <h5>Ayuda personalizada</h5>
-                                <p>El autor del código puede contactarte por chat y ayudarte paso a paso para que ambos ganéis el beneficio. ¡Situación win-win!</p>
+                            <div class="code-reveal-benefit">
+                                <div class="code-reveal-benefit-icon">
+                                    <i class="fas fa-shield-alt"></i>
+                                </div>
+                                <div class="code-reveal-benefit-text">
+                                    <h5>Proceso verificado</h5>
+                                    <p>El autor tiene experiencia con este código y sabe exactamente qué pasos seguir para que el beneficio se aplique correctamente.</p>
+                                </div>
+                            </div>
+                            <div class="code-reveal-benefit">
+                                <div class="code-reveal-benefit-icon">
+                                    <i class="fas fa-comments"></i>
+                                </div>
+                                <div class="code-reveal-benefit-text">
+                                    <h5>Chat directo</h5>
+                                    <p>Si tienes dudas durante el proceso, podrás preguntar directamente al autor. Gratis y sin compromiso.</p>
+                                </div>
                             </div>
                         </div>
-                        <div class="code-reveal-benefit">
-                            <div class="code-reveal-benefit-icon">
-                                <i class="fas fa-shield-alt"></i>
-                            </div>
-                            <div class="code-reveal-benefit-text">
-                                <h5>Proceso verificado</h5>
-                                <p>El autor tiene experiencia con este código y sabe exactamente qué pasos seguir para que el beneficio se aplique correctamente.</p>
-                            </div>
-                        </div>
-                        <div class="code-reveal-benefit">
-                            <div class="code-reveal-benefit-icon">
-                                <i class="fas fa-comments"></i>
-                            </div>
-                            <div class="code-reveal-benefit-text">
-                                <h5>Chat directo</h5>
-                                <p>Si tienes dudas durante el proceso, podrás preguntar directamente al autor. Gratis y sin compromiso.</p>
-                            </div>
+                        
+                        <div class="code-reveal-actions">
+                            ${!isLoggedIn ? `
+                                <button class="btn-reveal-register" onclick="showLoginModal('Regístrate para ver el código y recibir ayuda', window.location.href); this.closest('.code-reveal-modal-overlay').remove();">
+                                    <i class="fas fa-user-plus"></i> Registrarme y ver código
+                                </button>
+                                <button class="btn-reveal-continue" onclick="revealCodeWithoutLogin('${codigoId}', this)">
+                                    <i class="fas fa-eye"></i> Ver código sin registrarme
+                                </button>
+                            ` : `
+                                <button class="btn-reveal-register" onclick="revealCodeAsUser('${codigoId}', this)">
+                                    <i class="fas fa-unlock"></i> Ver código
+                                </button>
+                            `}
                         </div>
                     </div>
-                    
-                    <div class="code-reveal-actions">
-                        ${!isLoggedIn ? `
-                            <button class="btn-reveal-register" onclick="showLoginModal('Regístrate para ver el código y recibir ayuda', window.location.href); this.closest('.code-reveal-modal-overlay').remove();">
-                                <i class="fas fa-user-plus"></i> Registrarme y ver código
-                            </button>
-                            <button class="btn-reveal-continue" onclick="revealCodeWithoutLogin('${codigoId}', this)">
-                                <i class="fas fa-eye"></i> Ver código sin registrarme
-                            </button>
-                        ` : `
-                            <button class="btn-reveal-register" onclick="revealCodeAsUser('${codigoId}', this)">
-                                <i class="fas fa-unlock"></i> Ver código
-                            </button>
-                        `}
+                    <div class="code-reveal-disclaimer">
+                        <i class="fas fa-lock"></i> Tus datos están protegidos. Solo el autor podrá contactarte si te registras.
                     </div>
                 </div>
-                <div class="code-reveal-disclaimer">
-                    <i class="fas fa-lock"></i> Tus datos están protegidos. Solo el autor podrá contactarte si te registras.
-                </div>
-            </div>
-        `;
+            `;
 
-        document.body.appendChild(overlay);
+            document.body.appendChild(overlay);
 
-        // Animar entrada
-        requestAnimationFrame(() => {
-            overlay.classList.add('active');
-        });
+            // Animar entrada
+            requestAnimationFrame(() => {
+                overlay.classList.add('active');
+            });
 
-        // Cerrar al hacer clic fuera
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {
-                overlay.remove();
+            // Cerrar al hacer clic fuera
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    overlay.remove();
+                }
+            });
+        }
+    };
+
+    // Revelar código en página (sin modal)
+    window.revealCodeInPage = async function (codigoId, btn) {
+        const originalContent = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+        try {
+            const response = await fetch('/ajax/registrar_vista_codigo.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ codigo_id: codigoId })
+            });
+
+            const data = await response.json();
+
+            if (data.success && data.codigo) {
+                // Encontrar el contenedor principal
+                const container = btn.closest('.code-display-container');
+                if (container) {
+                    // Ocultar wrapper de reveal (botón y blur)
+                    const revealWrapper = container.querySelector('.code-reveal-wrapper');
+                    if (revealWrapper) {
+                        revealWrapper.style.display = 'none';
+                    }
+
+                    // Mostrar sección revelada
+                    const revealedSection = container.querySelector('.code-revealed-section, #codeText');
+                    if (revealedSection) {
+                        revealedSection.style.display = 'block';
+
+                        // Si es texto (código)
+                        if (revealedSection.classList.contains('code-text')) {
+                            revealedSection.textContent = data.codigo.codigo;
+                            // Añadir botón de copiar si no existe
+                            if (!container.querySelector('.btn-copy-code')) {
+                                const copyBtn = document.createElement('button');
+                                copyBtn.className = 'btn-copy-code';
+                                const urlTrimmed = data.codigo.codigo.trim();
+                                const isUrl = urlTrimmed.startsWith('http://') || urlTrimmed.startsWith('https://');
+                                if (isUrl) {
+                                    copyBtn.innerHTML = '<i class="fas fa-external-link-alt"></i> Ir a la web';
+                                    copyBtn.onclick = function() { window.open(urlTrimmed, '_blank'); };
+                                } else {
+                                    copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copiar código';
+                                    copyBtn.onclick = window.copyCode;
+                                }
+                                container.appendChild(copyBtn);
+                            }
+                        }
+
+                        // Si es URL
+                        if (revealedSection.classList.contains('code-url-section')) {
+                            const link = revealedSection.querySelector('a');
+                            if (link) {
+                                link.href = data.codigo.codigo;
+                                const span = link.querySelector('span');
+                                if (span) span.textContent = data.codigo.codigo;
+                            }
+                            // Insertar botón de copia si no existe
+                            if (!container.querySelector('.btn-copy-code')) {
+                                const copyBtn = document.createElement('button');
+                                copyBtn.className = 'btn-copy-code';
+                                copyBtn.innerHTML = '<i class="fas fa-external-link-alt"></i> Ir a la web';
+                                copyBtn.onclick = function() { window.open(data.codigo.codigo.trim(), '_blank'); };
+                                container.appendChild(copyBtn);
+                            }
+                        }
+                    }
+                }
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+                alert(data.error || 'Error al cargar el código');
             }
-        });
+        } catch (error) {
+            console.error('Error:', error);
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+        }
     };
 
     // Revelar código para usuario logueado
@@ -384,24 +471,41 @@
             <p>Copia el código y úsalo para obtener tu beneficio</p>
         `;
 
+        const isLoggedIn = typeof currentUserId !== 'undefined' && currentUserId && currentUserId !== '';
+
+        // VIP promotion banner (only for non-VIP users)
+        const vipPromo = `
+            <div style="background: linear-gradient(135deg, rgba(255,215,0,0.1) 0%, rgba(227,6,19,0.1) 100%); border: 1px solid rgba(255,215,0,0.3); border-radius: 15px; padding: 20px; margin-bottom: 20px; text-align: center;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 12px;">
+                    <i class="fas fa-crown" style="color: #ffd700; font-size: 24px;"></i>
+                    <span style="font-weight: 800; font-size: 1.1rem; color: #1a1a2e;">¿Tienes códigos de referido?</span>
+                </div>
+                <p style="color: #555; font-size: 0.9rem; margin: 0 0 15px 0; line-height: 1.5;">
+                    Hazte <strong>VIP</strong> y contacta directamente con los usuarios que ven tus códigos. 
+                    Badge dorado + chat ilimitado + <strong>10€ de saldo gratis</strong> cada mes.
+                </p>
+                <a href="/public/suscripcion_vip.php" style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #ffd700 0%, #E30613 100%); color: white; padding: 10px 25px; border-radius: 25px; font-weight: 700; text-decoration: none; font-size: 0.95rem; transition: all 0.3s ease;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(227,6,19,0.3)'" onmouseout="this.style.transform=''; this.style.boxShadow=''">
+                    <i class="fas fa-crown"></i> Hazte VIP — 9,99€/mes
+                </a>
+            </div>
+        `;
+
+        const urlTrimmed = codigo.trim();
+        const isUrlStr = urlTrimmed.startsWith('http://') || urlTrimmed.startsWith('https://');
+        
+        let actionButton = '';
+        if (isUrlStr) {
+            actionButton = '<button class="btn-copy-revealed" onclick="window.open(\'' + urlTrimmed + '\', \'_blank\')"><i class="fas fa-external-link-alt"></i> Ir a la web</button>';
+        } else {
+            actionButton = '<button class="btn-copy-revealed" onclick="copyRevealedCode()"><i class="fas fa-copy"></i> Copiar código</button>';
+        }
+
         body.innerHTML = `
             <div class="revealed-code-container">
                 <div class="revealed-code-text" id="revealedCodeText">${codigo}</div>
-                <button class="btn-copy-revealed" onclick="copyRevealedCode()">
-                    <i class="fas fa-copy"></i> Copiar código
-                </button>
+                ${actionButton}
             </div>
-            <div class="code-reveal-benefits">
-                <div class="code-reveal-benefit">
-                    <div class="code-reveal-benefit-icon" style="background: linear-gradient(135deg, #ff8a3d 0%, #ff4f0f 100%);">
-                        <i class="fas fa-lightbulb"></i>
-                    </div>
-                    <div class="code-reveal-benefit-text">
-                        <h5>¿Necesitas ayuda?</h5>
-                        <p>Regístrate y el autor del código podrá ayudarte por chat si tienes problemas.</p>
-                    </div>
-                </div>
-            </div>
+            ${vipPromo}
             <button class="btn-reveal-continue" onclick="this.closest('.code-reveal-modal-overlay').remove()">
                 Cerrar
             </button>

@@ -9,4 +9,30 @@ Disallow: /*-del-2020
 Disallow: /*-del-2021
 Disallow: /*-del-2022
 Disallow: /*-del-2023
-Sitemap: https://www.codigoamigo.com/sitemap.xml
+
+# Permitir explícitamente bots de IA para aparecer en ChatGPT, Perplexity, etc.
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
+
+Sitemap: https://www.codigoamigo.com/sitemap.xml

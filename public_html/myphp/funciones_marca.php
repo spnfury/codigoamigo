@@ -18,6 +18,9 @@ if (!function_exists('getCollectionCodigos')) {
     include_once __DIR__ . '/funciones_codigo.php';
 }
 
+// Incluir utilidad de cache
+require_once __DIR__ . '/SimpleCache.php';
+
 /******************************************************
  *  LISTADO DE MARCAS
  * ***************************************************/
@@ -724,117 +727,108 @@ function fusionar_marcas_masiva($marcas_origen_ids, $marca_destino_id) {
  * Obtiene todas las marcas activas para mostrar en el listado
  */
 function getMarcas($limit = null, $categoria = null, $excluye = null) {
+    // Generar una clave de cache basada en los parámetros
+    $cacheKey = "getMarcas_" . ($limit ?? 'all') . "_" . ($categoria ?? 'none') . "_" . (is_array($excluye) ? implode(',', $excluye) : ($excluye ?? 'none'));
+    
+    $cachedResult = SimpleCache::get($cacheKey);
+    if ($cachedResult !== null) {
+        return $cachedResult;
+    }
+
     $array_final_marcas = array();
     $collection_marcas = getCollectionMarcas();
-    $array_skip = array(); // Inicializar variable $array_skip
+    $collection_codigos = getCollectionCodigos();
 
-    // Construir filtro de búsqueda
-    $filtro = ['estado' => 1]; // Solo marcas activas
-    
+    // Construir filtro de búsqueda para marcas
+    $filtro = ['estado' => 1]; 
     if ($categoria) {
         $filtro['categoria_clave'] = $categoria;
     }
     
     if ($excluye && !empty($excluye)) {
-        // Asegurar que $excluye sea un array
         if (is_string($excluye)) {
             $excluye = [$excluye];
-        } elseif (!is_array($excluye)) {
-            $excluye = (array)$excluye;
         }
-        
-        // Verificar que el array no esté vacío y contenga elementos válidos
-        if (!empty($excluye) && is_array($excluye)) {
-            // Filtrar elementos nulos o vacíos
-            $excluye = array_filter($excluye, function($item) {
-                return !empty($item) && is_string($item);
-            });
-            
-            // Solo aplicar $nin si hay elementos válidos
-            if (!empty($excluye)) {
-                $filtro['nombre_clave'] = ['$nin' => array_values($excluye)];
-            }
+        $excluye_valid = array_filter((array)$excluye, function($item) {
+            return !empty($item) && is_string($item);
+        });
+        if (!empty($excluye_valid)) {
+            $filtro['nombre_clave'] = ['$nin' => array_values($excluye_valid)];
         }
     }
 
-    // Opciones de consulta
-    $opciones = [];
-    // No aplicar límite aquí, lo haremos después de ordenar por códigos
-    
-    // No ordenar por nombre aquí, lo haremos después por número de códigos
+    // 1. Obtener todas las marcas que cumplen el criterio
+    $lista_marcas = $collection_marcas->find($filtro);
+    $marcas_obj = iterator_to_array($lista_marcas);
+    if (empty($marcas_obj)) {
+        return [];
+    }
 
-    $lista_marcas = $collection_marcas->find($filtro, $opciones);
-    $array_marcas = iterator_to_array($lista_marcas);
+    // 2. Obtener conteos de códigos agrupados por marca en UNA SOLA consulta (Evita N+1)
+    $pipeline = [
+        ['$match' => ['estado' => 0]], // Solo códigos activos
+        ['$group' => ['_id' => '$marca', 'count' => ['$sum' => 1]]]
+    ];
+    $cursor_counts = $collection_codigos->aggregate($pipeline);
+    $counts_map = [];
+    foreach ($cursor_counts as $doc) {
+        $counts_map[$doc['_id']] = $doc['count'];
+    }
 
-    foreach ($array_marcas as $item) {
-        $item_auxiliar = array();
-        
-        // Contar códigos activos de esta marca
-        $array_filtro = array("marca" => $item["nombre_clave"], "estado" => 0);
-        $item_auxiliar["numero_codigos"] = count_all_listado_codigos_array($array_filtro, [], 0);
+    // 3. Procesar resultados
+    foreach ($marcas_obj as $item) {
+        $marca_key = $item["nombre_clave"];
+        $num_codes = $counts_map[$marca_key] ?? 0;
 
         // Solo incluir marcas que tengan códigos activos
-        if ($item_auxiliar["numero_codigos"] > 0) {
+        if ($num_codes > 0) {
+            $item_auxiliar = array();
+            $item_auxiliar["numero_codigos"] = $num_codes;
             $item_auxiliar["id"] = $item["_id"];
-            $item_auxiliar["fecha"] = $item["fecha_publicacion"];
-            $item_auxiliar["nombre"] = $item["nombre"];
-            $item_auxiliar["nombre_clave"] = $item["nombre_clave"];
-            $item_auxiliar["categoria"] = $item["categoria"];
-            $item_auxiliar["categoria_clave"] = $item["categoria_clave"];
+            $item_auxiliar["fecha"] = $item["fecha_publicacion"] ?? '';
+            $item_auxiliar["nombre"] = $item["nombre"] ?? '';
+            $item_auxiliar["nombre_clave"] = $marca_key;
+            $item_auxiliar["categoria"] = $item["categoria"] ?? '';
+            $item_auxiliar["categoria_clave"] = $item["categoria_clave"] ?? '';
             
-            // Procesar imagen como lo hace getObjectMarca
-            $imagen_procesada = $item["imagen"] ?? '';
-            if (isset($imagen_procesada) && is_string($imagen_procesada) && !empty($imagen_procesada) && $imagen_procesada != 'Sin imagen') {
-                // Convertir http a https
-                if(strpos($imagen_procesada, 'http://') !== false){
-                    $imagen_procesada = str_replace("http://", "https://", $imagen_procesada);
+            // Imagen procesada centralizada
+            $imagen_raw = $item["imagen"] ?? '';
+            $imagen_procesada = $imagen_raw;
+            if ($imagen_raw && $imagen_raw != 'Sin imagen') {
+                $imagen_procesada = str_replace("http://", "https://", $imagen_raw);
+                // CloudFront CDN is down - convert S3/CloudFront URLs to direct server URLs
+                if (strpos($imagen_procesada, 'https://cdn-codigoamigo.s3-eu-west-1.amazonaws.com/') !== false) {
+                    $imagen_procesada = str_replace("https://cdn-codigoamigo.s3-eu-west-1.amazonaws.com/", "https://www.codigoamigo.com/img/", $imagen_procesada);
+                }
+                if (strpos($imagen_procesada, 'https://d3hcf0nbuqjt3g.cloudfront.net/') !== false) {
+                    $imagen_procesada = str_replace("https://d3hcf0nbuqjt3g.cloudfront.net/", "https://www.codigoamigo.com/img/", $imagen_procesada);
                 }
                 
-                // Convertir a CloudFront si es necesario (excepto panel_marcas)
-                if(strpos($imagen_procesada, 'https://www.codigoamigo.com/img/') !== false){
-                    if(strpos($imagen_procesada, 'https://www.codigoamigo.com/img/panel_marcas/') === false) {
-                        $imagen_procesada = str_replace("https://www.codigoamigo.com/img/","https://d3hcf0nbuqjt3g.cloudfront.net/",$imagen_procesada);
-                    }
-                } elseif(strpos($imagen_procesada, 'https://cdn-codigoamigo.s3-eu-west-1.amazonaws.com/') !== false){
-                    $imagen_procesada = str_replace("https://cdn-codigoamigo.s3-eu-west-1.amazonaws.com/","https://d3hcf0nbuqjt3g.cloudfront.net/",$imagen_procesada);
-                }
-                
-                // Si es ruta relativa, convertir a absoluta
-                $is_http = (strpos($imagen_procesada, 'http://') === 0 || strpos($imagen_procesada, 'https://') === 0);
-                if (!$is_http) {
-                    if (strpos($imagen_procesada, '/') === 0) {
-                        // Si es panel_marcas, usar directamente del servidor
-                        if (strpos($imagen_procesada, '/img/panel_marcas/') !== false) {
-                            $imagen_procesada = 'https://www.codigoamigo.com' . $imagen_procesada;
-                        } else {
-                            $imagen_procesada = 'https://www.codigoamigo.com' . $imagen_procesada;
-                        }
-                    } else {
-                        $imagen_procesada = 'https://www.codigoamigo.com/' . ltrim($imagen_procesada, '/');
-                    }
+                if (strpos($imagen_procesada, 'http') !== 0) {
+                    $imagen_procesada = 'https://www.codigoamigo.com' . (strpos($imagen_procesada, '/') === 0 ? '' : '/') . $imagen_procesada;
                 }
             } else {
                 $imagen_procesada = '';
             }
             
             $item_auxiliar["imagen"] = $imagen_procesada;
-            $item_auxiliar["descripción"] = $item["descripción"];
-            $item_auxiliar["descripción_larga"] = $item["descripción_larga"];
+            $item_auxiliar["descripción"] = $item["descripción"] ?? '';
+            $item_auxiliar["descripción_larga"] = $item["descripción_larga"] ?? '';
 
             $array_final_marcas[] = $item_auxiliar;
         }
     }
 
-    // Ordenar por número de códigos de forma descendente (más códigos primero)
+    // 4. Ordenar y limitar
     usort($array_final_marcas, function($a, $b) {
         return $b['numero_codigos'] - $a['numero_codigos'];
     });
 
-    // Aplicar el límite después del ordenamiento
     if ($limit && $limit > 0) {
         $array_final_marcas = array_slice($array_final_marcas, 0, $limit);
     }
 
+    SimpleCache::set($cacheKey, $array_final_marcas);
     return $array_final_marcas;
 }
 

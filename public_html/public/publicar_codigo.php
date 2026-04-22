@@ -190,6 +190,124 @@
             margin-top: 5px;
             display: none;
         }
+
+        /* Botón de IA Estilo Moderno */
+        .btn-ai-magic {
+            background: linear-gradient(135deg, #6e8efb, #a777e3);
+            color: white;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: 10px;
+            vertical-align: middle;
+            box-shadow: 0 2px 8px rgba(110, 142, 251, 0.3);
+        }
+
+        .btn-ai-magic:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(110, 142, 251, 0.4);
+            filter: brightness(1.1);
+        }
+
+        .btn-ai-magic i {
+            font-size: 14px;
+        }
+
+        .btn-ai-magic.loading {
+            opacity: 0.7;
+            cursor: wait;
+        }
+
+        .btn-ai-magic.loading i {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .vip-badge-mini {
+            background: #ffd700;
+            color: #333;
+            font-size: 9px;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        /* Estilos Modal VIP Moderno */
+        #modal-vip-upgrade .modal-content {
+            background: #1a1a1a;
+            color: white;
+            border-radius: 15px;
+            overflow: hidden;
+            border: 1px solid #333;
+        }
+
+        #modal-vip-upgrade .modal-header {
+            border-bottom: 1px solid #333;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2c2c2c 100%);
+            padding: 20px;
+        }
+
+        #modal-vip-upgrade .modal-title {
+            color: #ffd700;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .vip-feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .vip-feature-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 15px;
+            font-size: 15px;
+        }
+
+        .vip-feature-item i {
+            color: #ffd700;
+            margin-top: 4px;
+        }
+
+        .btn-upgrade-now {
+            background: linear-gradient(135deg, #ffd700 0%, #E30613 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 10px;
+            box-shadow: 0 4px 15px rgba(227, 6, 19, 0.3);
+        }
+
+        .btn-upgrade-now:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(227, 6, 19, 0.5);
+            color: white;
+            text-decoration: none;
+        }
         .alert {
             border-radius: 8px;
             font-size: 16px;
@@ -621,6 +739,7 @@
     ?>
     <script>
         window.superLandingsMap = <?php echo json_encode($super_landings_list); ?>;
+        window.isVipUser = <?php echo (isset($_SESSION['user_id']) && function_exists('es_usuario_vip') && es_usuario_vip($_SESSION['user_id'])) ? 'true' : 'false'; ?>;
     </script>
 </head>
 <body>
@@ -761,7 +880,13 @@
             </div>
 
              <div class="form-group">
-                 <label for="descripcion">Descripción</label>
+                 <label for="descripcion">
+                    Descripción
+                    <button type="button" id="btn-ai-descripcion" class="btn-ai-magic" title="Completar automáticamente con IA">
+                        <i class="fas fa-magic"></i> Completar con IA
+                        <span class="vip-badge-mini">VIP</span>
+                    </button>
+                 </label>
                  <textarea class="form-control" id="descripcion" name="descripcion" rows="5" placeholder="Describe tu código amigo" required><?php echo htmlspecialchars($descripcion); ?></textarea>
                  <div class="error-message" id="descripcion-error">La descripción es obligatoria</div>
              </div>
@@ -853,6 +978,46 @@
           <div class="modal-footer" style="border-top: 1px solid #555; text-align: center;">
             <button type="button" class="btn btn-default" data-dismiss="modal" style="background: transparent; color: white; border: 1px solid #999; margin-right: 10px;">Cancelar</button>
             <button type="button" class="btn btn-danger" id="btn_confirmar_reemplazo" style="background: #E30613; border-color: #E30613;">Sí, borrar anterior y publicar este</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal VIP Upgrade -->
+    <div id="modal-vip-upgrade" class="modal fade" role="dialog" style="z-index: 99999;">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" style="color: white;">&times;</button>
+            <h4 class="modal-title"><i class="fas fa-crown"></i> VENTAJAS VIP</h4>
+          </div>
+          <div class="modal-body" style="padding: 30px; text-align: center;">
+            <p style="font-size: 18px; margin-bottom: 25px;">La función de <strong>Completar con IA</strong> es exclusiva para usuarios VIP. <br><strong>¡Hazte VIP y disfruta de todas estas ventajas!</strong></p>
+            
+            <ul class="vip-feature-list">
+                <li class="vip-feature-item">
+                    <i class="fas fa-check-circle"></i>
+                    <span><strong>IA Ilimitada:</strong> Completa todas las descripciones de tus códigos con inteligencia artificial profesional.</span>
+                </li>
+                <li class="vip-feature-item">
+                    <i class="fas fa-check-circle"></i>
+                    <span><strong>Badge VIP Verificado:</strong> Gana confianza y obtén hasta un 40% más de clics en tus códigos.</span>
+                </li>
+                <li class="vip-feature-item">
+                    <i class="fas fa-check-circle"></i>
+                    <span><strong>Chat Ilimitado:</strong> Contacta directamente con los usuarios que ven tus códigos.</span>
+                </li>
+                <li class="vip-feature-item">
+                    <i class="fas fa-check-circle"></i>
+                    <span><strong>10€ de Saldo Mensual:</strong> Recibe 10€ cada mes para destacar tus códigos totalmente gratis.</span>
+                </li>
+            </ul>
+
+            <a href="/public/mis_viewers.php" class="btn-upgrade-now">
+                QUIERO SER VIP POR 9,99€
+            </a>
+            
+            <p style="margin-top: 20px; color: #888; font-size: 13px;">Cancela en cualquier momento con un solo clic.</p>
           </div>
         </div>
       </div>
@@ -1225,14 +1390,65 @@
             if (selectedValue && selectedValue !== "select") {
                 $("#categoria_valor").val(selectedText);
                 $("#categoria_clave").val(selectedValue);
-                console.log("Categoría seleccionada:", selectedText, "Clave:", selectedValue);
-                console.log("Valor guardado en categoria_valor:", $("#categoria_valor").val());
-                console.log("Valor guardado en categoria_clave:", $("#categoria_clave").val());
-            } else {
-                $("#categoria_valor").val('');
-                $("#categoria_clave").val('');
-                console.log("Categoría limpiada");
             }
+        });
+
+        // Lógica para el botón de IA
+        $('#btn-ai-descripcion').on('click', function() {
+            var btn = $(this);
+            
+            // Si NO es VIP, mostrar modal de ventajas VIP directamente
+            if (!window.isVipUser) {
+                $('#modal-vip-upgrade').modal('show');
+                return;
+            }
+            
+            var marca = $('#marca_valor').val();
+            var beneficio = $('#num_beneficio').val();
+            var tipo_beneficio = $('select[name="tipo_beneficio"]').val();
+            
+            if (!marca) {
+                alert('Por favor, selecciona una marca primero.');
+                $('#marca').select2('open');
+                return;
+            }
+
+            if (btn.hasClass('loading')) return;
+
+            btn.addClass('loading').html('<i class="fas fa-spinner"></i> Generando...');
+
+            $.ajax({
+                url: '/ajax/generate_description_ai.php',
+                type: 'POST',
+                data: {
+                    marca: marca,
+                    beneficio: beneficio,
+                    tipo_beneficio: tipo_beneficio
+                },
+                dataType: 'json',
+                success: function(response) {
+                    btn.removeClass('loading').html('<i class="fas fa-magic"></i> Completar con IA <span class="vip-badge-mini">VIP</span>');
+                    
+                    if (response.success) {
+                        $('#descripcion').val(response.description);
+                        // Trigger input event to update char count or other listeners
+                        $('#descripcion').trigger('input');
+                        
+                        // Scroll to description
+                        $('html, body').animate({
+                            scrollTop: $('#descripcion').offset().top - 150
+                        }, 500);
+                    } else if (response.show_vip_modal) {
+                        $('#modal-vip-upgrade').modal('show');
+                    } else {
+                        alert(response.error || 'Ocurrió un error al generar la descripción.');
+                    }
+                },
+                error: function() {
+                    btn.removeClass('loading').html('<i class="fas fa-magic"></i> Completar con IA <span class="vip-badge-mini">VIP</span>');
+                    alert('Error de conexión. Inténtalo de nuevo.');
+                }
+            });
         });
 
         // Permitir al usuario seleccionar una imagen

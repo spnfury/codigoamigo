@@ -25,7 +25,7 @@ if (!function_exists("manda_mensaje_bot_fatal")) {
         $mensaje = $actual_url_c.":".$mensaje;
         
         
-        $actual_url_c = $_SERVER["HTTP_HOST"].(rawurldecode($_SERVER["REQUEST_URI"]));
+        $actual_url_c = ($_SERVER["HTTP_HOST"] ?? 'cli').(rawurldecode($_SERVER["REQUEST_URI"] ?? '/'));
         
         $url = "https://api.telegram.org/bot".$botToken. "/sendMessage?chat_id=" . $chatId;
         
@@ -63,7 +63,7 @@ if (!function_exists("manda_mensaje_bot_anuncios")) {
         $mensaje = $actual_url_c.":".$mensaje;
         
         
-        $actual_url_c = $_SERVER["HTTP_HOST"].(rawurldecode($_SERVER["REQUEST_URI"]));
+        $actual_url_c = ($_SERVER["HTTP_HOST"] ?? 'cli').(rawurldecode($_SERVER["REQUEST_URI"] ?? '/'));
         
         
         //https://t.me/+G447tJvFXqQzYzY8
@@ -514,7 +514,6 @@ register_shutdown_function( "fatal_handler" );
 	        ['_id' => new MongoDB\BSON\ObjectId($user_id)],
 	        ['$set' => ['estado' => 1]]
 	    );
-		echo $updateResult;die;	
 	    return $updateResult;
 	}
 
@@ -811,6 +810,16 @@ register_shutdown_function( "fatal_handler" );
         $data['categoria_clave'] ?? null
     );
 
+	    // Validar beneficio contra el oficial de la marca
+	    $num_beneficio = floatval($data['numerobeneficio'] ?? $data['num_beneficio'] ?? 0);
+	    $tipo_beneficio = $data['tipo_descuento'] ?? $data['tipo_beneficio'] ?? 'euros';
+	    $validacion_beneficio = validarBeneficioOficial($marca_existente, $num_beneficio, $tipo_beneficio);
+	    
+	    if (!$validacion_beneficio['valid']) {
+	        $_SESSION['msg_error'] = $validacion_beneficio['mensaje'];
+	        return false;
+	    }
+
 	    // Prepare update data
 	    $update_data = array(
 	        'codigo' => $data['codigo'],
@@ -855,6 +864,45 @@ register_shutdown_function( "fatal_handler" );
 	/****************************************************
 	 ----- UNIFIED CODE CREATION -----
 	****************************************************/
+
+	/**
+	 * Valida que el beneficio de un código no supere el beneficio oficial de la marca.
+	 * @param array $marca_data Datos de la marca (debe contener 'beneficio_oficial' si existe)
+	 * @param float $num_beneficio El beneficio que el usuario quiere publicar
+	 * @param string $tipo_beneficio 'euros' o 'porcentaje'
+	 * @return array ['valid' => bool, 'max' => float|null, 'tipo' => string, 'texto' => string]
+	 */
+	function validarBeneficioOficial($marca_data, $num_beneficio, $tipo_beneficio = 'euros') {
+	    // Si la marca no tiene beneficio oficial definido, todo OK
+	    if (!isset($marca_data['beneficio_oficial']) || empty($marca_data['beneficio_oficial']['cantidad'])) {
+	        return ['valid' => true, 'max' => null, 'tipo' => '', 'texto' => ''];
+	    }
+	    
+	    $bo = $marca_data['beneficio_oficial'];
+	    $max_cantidad = floatval($bo['cantidad']);
+	    $bo_tipo = $bo['tipo'] ?? 'euros';
+	    $bo_texto = $bo['texto'] ?? '';
+	    
+	    // Solo validar si el tipo de beneficio coincide (euros con euros, % con %)
+	    if ($tipo_beneficio !== $bo_tipo) {
+	        return ['valid' => true, 'max' => $max_cantidad, 'tipo' => $bo_tipo, 'texto' => $bo_texto];
+	    }
+	    
+	    // Validar que no supere el máximo
+	    if (floatval($num_beneficio) > $max_cantidad) {
+	        $unidad = ($bo_tipo === 'euros') ? '€' : '%';
+	        return [
+	            'valid' => false, 
+	            'max' => $max_cantidad, 
+	            'tipo' => $bo_tipo, 
+	            'texto' => $bo_texto,
+	            'mensaje' => "El beneficio máximo oficial de esta marca es {$max_cantidad}{$unidad}. " .
+	                         (!empty($bo_texto) ? "Promoción actual: {$bo_texto}" : '')
+	        ];
+	    }
+	    
+	    return ['valid' => true, 'max' => $max_cantidad, 'tipo' => $bo_tipo, 'texto' => $bo_texto];
+	}
 
 	/**
 	 * Función unificada para crear códigos nuevos
@@ -905,6 +953,22 @@ register_shutdown_function( "fatal_handler" );
 	        
 	        if ($codigo_existente) {
 	            log_info("Usuario ya tiene código de esta marca", ['marca' => $marca_existente['nombre_clave'], 'user_id' => $user_id]);
+	            return false;
+	        }
+
+	        // Validar beneficio contra el oficial de la marca
+	        $num_beneficio = floatval($datos['num_beneficio'] ?? $datos['numerobeneficio'] ?? 0);
+	        $tipo_beneficio = $datos['tipo_beneficio'] ?? $datos['tipo_descuento'] ?? $datos['descuentos'] ?? 'euros';
+	        $validacion_beneficio = validarBeneficioOficial($marca_existente, $num_beneficio, $tipo_beneficio);
+	        
+	        if (!$validacion_beneficio['valid']) {
+	            $_SESSION['msg_error'] = $validacion_beneficio['mensaje'];
+	            log_warning("Beneficio rechazado por exceder oficial", [
+	                'marca' => $marca_existente['nombre_clave'],
+	                'beneficio_usuario' => $num_beneficio,
+	                'beneficio_oficial' => $validacion_beneficio['max'],
+	                'user_id' => $user_id
+	            ]);
 	            return false;
 	        }
 

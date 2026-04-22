@@ -762,199 +762,492 @@ if (!empty($url_logo_rs)) {
                 </div>
                 <?php endif; ?>
 
-                <!-- Sistema de Tabs estilo Chollometro -->
-                <div class="chollometro-tabs-container">
-                    <div class="chollometro-tabs">
-                        <button class="tab-button active" data-tab="destacados">
-                            <i class="fas fa-star"></i>
-                            Códigos Destacados
-                            <?php if (!empty($lista_codigos_patrocinados)): ?>
-                                <span class="tab-count"><?php echo count($lista_codigos_patrocinados); ?></span>
-                            <?php endif; ?>
-                        </button>
-                        <button class="tab-button" data-tab="amigos">
-                            <i class="fas fa-users"></i>
-                            Códigos Amigo
-                            <?php if (!empty($lista_codigos)): ?>
-                                <span class="tab-count"><?php echo count($lista_codigos); ?></span>
-                            <?php endif; ?>
-                        </button>
+                <!-- ============================================ -->
+                <!-- SISTEMA "OBTENER MI CÓDIGO" -->
+                <!-- ============================================ -->
+                
+                <?php
+                // Calcular total de códigos disponibles para esta marca
+                $total_codigos_marca = count($lista_codigos ?? []) + count($lista_codigos_patrocinados ?? []);
+                
+                // Determinar el mejor beneficio para mostrar en el CTA
+                $mejor_beneficio_display = '';
+                $all_codes_temp = array_merge($lista_codigos_patrocinados ?? [], $lista_codigos ?? []);
+                $max_euros = 0;
+                $max_descuento = 0;
+                foreach ($all_codes_temp as $ct) {
+                    if (is_object($ct)) $ct = (array)$ct;
+                    $nb = floatval($ct['num_beneficio'] ?? 0);
+                    $td = $ct['tipo_descuento'] ?? '';
+                    if ($td === '% de descuento' && $nb > $max_descuento) $max_descuento = $nb;
+                    elseif ($nb > $max_euros) $max_euros = $nb;
+                }
+                if ($max_euros > 0) {
+                    $mejor_beneficio_display = $max_euros . '€';
+                } elseif ($max_descuento > 0) {
+                    $mejor_beneficio_display = $max_descuento . '% dto.';
+                }
+                ?>
+                
+                <style>
+                    /* ===== Obtener Código Widget ===== */
+                    .obtener-codigo-widget {
+                        background: white;
+                        border-radius: 16px;
+                        overflow: hidden;
+                        box-shadow: 0 4px 25px rgba(0,0,0,0.08);
+                        margin-bottom: 24px;
+                    }
+                    
+                    .obtener-header {
+                        background: linear-gradient(135deg, #1e3a5f 0%, #2d5a8e 60%, #3b82f6 100%);
+                        padding: 28px 24px;
+                        text-align: center;
+                        position: relative;
+                        overflow: hidden;
+                    }
+                    
+                    .obtener-header::before {
+                        content: '';
+                        position: absolute;
+                        top: -50%;
+                        right: -20%;
+                        width: 200px;
+                        height: 200px;
+                        background: rgba(255,255,255,0.06);
+                        border-radius: 50%;
+                    }
+                    
+                    .obtener-header h3 {
+                        color: white;
+                        font-size: 1.4rem;
+                        font-weight: 700;
+                        margin: 0 0 6px 0;
+                        position: relative;
+                    }
+                    
+                    .obtener-header p {
+                        color: rgba(255,255,255,0.8);
+                        font-size: 0.95rem;
+                        margin: 0;
+                        position: relative;
+                    }
+                    
+                    .obtener-beneficio-badge {
+                        display: inline-block;
+                        background: linear-gradient(135deg, #fbbf24, #f59e0b);
+                        color: #1e3a5f;
+                        font-weight: 800;
+                        font-size: 1.3rem;
+                        padding: 8px 20px;
+                        border-radius: 50px;
+                        margin: 12px 0 4px;
+                        position: relative;
+                        box-shadow: 0 4px 15px rgba(245,158,11,0.3);
+                    }
+                    
+                    .obtener-body {
+                        padding: 28px 24px;
+                        text-align: center;
+                    }
+                    
+                    /* CTA Button */
+                    .btn-obtener-codigo {
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 10px;
+                        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                        color: white;
+                        border: none;
+                        padding: 16px 40px;
+                        font-size: 1.15rem;
+                        font-weight: 700;
+                        border-radius: 12px;
+                        cursor: pointer;
+                        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                        box-shadow: 0 6px 20px rgba(16,185,129,0.35);
+                        width: 100%;
+                        max-width: 380px;
+                        position: relative;
+                        overflow: hidden;
+                    }
+                    
+                    .btn-obtener-codigo::after {
+                        content: '';
+                        position: absolute;
+                        top: 0; left: -100%;
+                        width: 100%; height: 100%;
+                        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+                        transition: left 0.5s;
+                    }
+                    
+                    .btn-obtener-codigo:hover {
+                        transform: translateY(-3px);
+                        box-shadow: 0 10px 30px rgba(16,185,129,0.45);
+                    }
+                    
+                    .btn-obtener-codigo:hover::after {
+                        left: 100%;
+                    }
+                    
+                    .btn-obtener-codigo:active {
+                        transform: translateY(-1px);
+                    }
+                    
+                    .btn-obtener-codigo.loading {
+                        opacity: 0.8;
+                        pointer-events: none;
+                    }
+                    
+                    .obtener-meta {
+                        margin-top: 14px;
+                        color: #6b7280;
+                        font-size: 0.85rem;
+                    }
+                    
+                    .obtener-meta i {
+                        color: #10b981;
+                        margin-right: 4px;
+                    }
+                    
+                    /* ===== Code Reveal Section ===== */
+                    .codigo-revelado {
+                        display: none;
+                        animation: slideDown 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+                    }
+                    
+                    .codigo-revelado.show {
+                        display: block;
+                    }
+                    
+                    @keyframes slideDown {
+                        from { opacity: 0; transform: translateY(-15px); }
+                        to { opacity: 1; transform: translateY(0); }
+                    }
+                    
+                    .codigo-resultado {
+                        background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+                        border: 2px solid #10b981;
+                        border-radius: 14px;
+                        padding: 24px;
+                        margin-top: 20px;
+                    }
+                    
+                    .codigo-valor-container {
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 12px;
+                        margin-bottom: 16px;
+                    }
+                    
+                    .codigo-valor {
+                        background: white;
+                        border: 2px dashed #10b981;
+                        border-radius: 10px;
+                        padding: 14px 24px;
+                        font-family: 'Courier New', monospace;
+                        font-size: 1.5rem;
+                        font-weight: 700;
+                        color: #1e3a5f;
+                        letter-spacing: 2px;
+                        user-select: all;
+                        flex: 1;
+                        text-align: center;
+                    }
+                    
+                    .btn-copiar-codigo {
+                        background: linear-gradient(135deg, #3b82f6, #2563eb);
+                        color: white;
+                        border: none;
+                        padding: 14px 20px;
+                        border-radius: 10px;
+                        cursor: pointer;
+                        font-size: 1rem;
+                        font-weight: 600;
+                        transition: all 0.2s;
+                        white-space: nowrap;
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                    }
+                    
+                    .btn-copiar-codigo:hover {
+                        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+                        transform: scale(1.05);
+                    }
+                    
+                    .btn-copiar-codigo.copied {
+                        background: linear-gradient(135deg, #10b981, #059669);
+                    }
+                    
+                    /* Publisher info */
+                    .codigo-publisher {
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        padding: 14px 0;
+                        border-top: 1px solid #d1fae5;
+                        margin-top: 12px;
+                    }
+                    
+                    .publisher-avatar {
+                        width: 42px;
+                        height: 42px;
+                        border-radius: 50%;
+                        object-fit: cover;
+                        border: 2px solid #10b981;
+                    }
+                    
+                    .publisher-info {
+                        flex: 1;
+                        text-align: left;
+                    }
+                    
+                    .publisher-name {
+                        font-weight: 600;
+                        color: #1e3a5f;
+                        font-size: 0.95rem;
+                    }
+                    
+                    .trust-badge {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 5px;
+                        padding: 3px 10px;
+                        border-radius: 20px;
+                        font-size: 0.78rem;
+                        font-weight: 600;
+                    }
+                    
+                    .trust-premium { background: #fef3c7; color: #92400e; }
+                    .trust-recommended { background: #d1fae5; color: #065f46; }
+                    .trust-trusted { background: #dbeafe; color: #1e40af; }
+                    .trust-verified { background: #f3f4f6; color: #374151; }
+                    .trust-new { background: #f9fafb; color: #6b7280; }
+                    
+                    .trust-stars {
+                        font-size: 0.75rem;
+                    }
+                    
+                    .trust-stars .fas, .trust-stars .far {
+                        margin: 0 1px;
+                    }
+                    
+                    .codigo-descripcion {
+                        color: #4b5563;
+                        font-size: 0.9rem;
+                        margin-top: 6px;
+                        line-height: 1.4;
+                    }
+                    
+                    /* Actions after reveal */
+                    .codigo-acciones {
+                        display: flex;
+                        gap: 10px;
+                        margin-top: 16px;
+                        flex-wrap: wrap;
+                        justify-content: center;
+                    }
+                    
+                    .btn-prueba-otro {
+                        background: white;
+                        color: #6b7280;
+                        border: 1px solid #d1d5db;
+                        padding: 10px 18px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 0.88rem;
+                        font-weight: 500;
+                        transition: all 0.2s;
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                    }
+                    
+                    .btn-prueba-otro:hover {
+                        background: #f9fafb;
+                        border-color: #9ca3af;
+                        color: #374151;
+                    }
+                    
+                    /* ===== Ver Más Section ===== */
+                    .ver-mas-section {
+                        margin-top: 20px;
+                    }
+                    
+                    .btn-ver-mas {
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 8px;
+                        width: 100%;
+                        background: #f3f4f6;
+                        color: #374151;
+                        border: 1px solid #e5e7eb;
+                        padding: 12px;
+                        border-radius: 10px;
+                        cursor: pointer;
+                        font-size: 0.92rem;
+                        font-weight: 500;
+                        transition: all 0.2s;
+                    }
+                    
+                    .btn-ver-mas:hover {
+                        background: #e5e7eb;
+                    }
+                    
+                    .ver-mas-lista {
+                        display: none;
+                        margin-top: 16px;
+                    }
+                    
+                    .ver-mas-lista.show {
+                        display: block;
+                        animation: slideDown 0.4s ease;
+                    }
+                    
+                    .ver-mas-item {
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        padding: 14px 16px;
+                        background: white;
+                        border: 1px solid #e5e7eb;
+                        border-radius: 10px;
+                        margin-bottom: 8px;
+                        transition: all 0.2s;
+                    }
+                    
+                    .ver-mas-item:hover {
+                        border-color: #3b82f6;
+                        box-shadow: 0 2px 8px rgba(59,130,246,0.1);
+                    }
+                    
+                    .ver-mas-avatar {
+                        width: 36px;
+                        height: 36px;
+                        border-radius: 50%;
+                        object-fit: cover;
+                        border: 1px solid #e5e7eb;
+                    }
+                    
+                    .ver-mas-info {
+                        flex: 1;
+                        min-width: 0;
+                    }
+                    
+                    .ver-mas-user {
+                        font-weight: 600;
+                        font-size: 0.85rem;
+                        color: #1e3a5f;
+                    }
+                    
+                    .ver-mas-benefit {
+                        font-size: 0.8rem;
+                        color: #10b981;
+                        font-weight: 500;
+                    }
+                    
+                    .ver-mas-trust {
+                        display: flex;
+                        align-items: center;
+                        gap: 4px;
+                    }
+                    
+                    .btn-usar-este {
+                        background: linear-gradient(135deg, #3b82f6, #2563eb);
+                        color: white;
+                        border: none;
+                        padding: 8px 14px;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 0.8rem;
+                        font-weight: 600;
+                        transition: all 0.2s;
+                        white-space: nowrap;
+                    }
+                    
+                    .btn-usar-este:hover {
+                        transform: scale(1.05);
+                    }
+                    
+                    /* Mobile responsive */
+                    @media (max-width: 768px) {
+                        .obtener-header { padding: 22px 18px; }
+                        .obtener-header h3 { font-size: 1.2rem; }
+                        .obtener-body { padding: 22px 16px; }
+                        .btn-obtener-codigo { padding: 14px 24px; font-size: 1.05rem; }
+                        .codigo-valor-container { flex-direction: column; }
+                        .codigo-valor { font-size: 1.2rem; padding: 12px 16px; }
+                        .btn-copiar-codigo { width: 100%; justify-content: center; }
+                        .codigo-publisher { flex-wrap: wrap; }
+                        .codigo-acciones { flex-direction: column; }
+                        .btn-prueba-otro { width: 100%; justify-content: center; }
+                    }
+                </style>
+                
+                <div class="obtener-codigo-widget" id="obtenerCodigoWidget">
+                    <!-- Header -->
+                    <div class="obtener-header">
+                        <h3><i class="fas fa-gift"></i> Códigos de <?php echo htmlspecialchars($marca["nombre"]); ?></h3>
+                        <?php if ($mejor_beneficio_display): ?>
+                            <div class="obtener-beneficio-badge">
+                                Ahorra hasta <?php echo $mejor_beneficio_display; ?>
+                            </div>
+                        <?php endif; ?>
+                        <p><?php echo $total_codigos_marca; ?> código<?php echo $total_codigos_marca != 1 ? 's' : ''; ?> disponible<?php echo $total_codigos_marca != 1 ? 's' : ''; ?></p>
                     </div>
-                </div>
-
-                <!-- Contenido de los tabs -->
-                <div class="chollometro-content">
-                    <div class="row">
-                        <!-- Columna de filtros -->
-                        <div class="col-md-3 col-sm-12">
-                            <div class="filters-sidebar">
-                                <h4><i class="fas fa-filter"></i> Ordenar por</h4>
-                                <div class="filter-group">
-                                    <label class="filter-option">
-                                        <input type="radio" name="sort" value="fecha" checked>
-                                        <span class="filter-label">
-                                            <i class="fas fa-calendar"></i>
-                                            Fecha
-                                        </span>
-                                    </label>
-                                    <label class="filter-option">
-                                        <input type="radio" name="sort" value="visitas">
-                                        <span class="filter-label">
-                                            <i class="fas fa-eye"></i>
-                                            Visitas
-                                        </span>
-                                    </label>
-                                    <label class="filter-option">
-                                        <input type="radio" name="sort" value="votos_positivos">
-                                        <span class="filter-label">
-                                            <i class="fas fa-thumbs-up"></i>
-                                            Votos Positivos
-                                        </span>
-                                    </label>
-                                    <label class="filter-option">
-                                        <input type="radio" name="sort" value="votos_negativos">
-                                        <span class="filter-label">
-                                            <i class="fas fa-thumbs-down"></i>
-                                            Votos Negativos
-                                        </span>
-                                    </label>
+                    
+                    <!-- Body -->
+                    <div class="obtener-body">
+                        <!-- CTA Button (pre-reveal) -->
+                        <div id="obtenerCTA">
+                            <?php if ($total_codigos_marca > 0): ?>
+                                <button class="btn-obtener-codigo" id="btnObtenerCodigo" data-marca="<?php echo htmlspecialchars($marca['nombre_clave']); ?>">
+                                    <i class="fas fa-ticket-alt"></i>
+                                    Obtener mi código
+                                </button>
+                                <div class="obtener-meta">
+                                    <i class="fas fa-shield-alt"></i>
+                                    Selección inteligente entre <?php echo $total_codigos_marca; ?> códigos verificados
                                 </div>
+                            <?php else: ?>
+                                <div style="color: #6b7280; padding: 20px;">
+                                    <i class="fas fa-info-circle"></i>
+                                    No hay códigos disponibles en este momento.
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <!-- Code Reveal (post-click) -->
+                        <div class="codigo-revelado" id="codigoRevelado">
+                            <div class="codigo-resultado" id="codigoResultado">
+                                <!-- Filled by JS -->
+                            </div>
+                            
+                            <div class="codigo-acciones">
+                                <button class="btn-prueba-otro" id="btnPruebaOtro" data-marca="<?php echo htmlspecialchars($marca['nombre_clave']); ?>">
+                                    <i class="fas fa-sync-alt"></i>
+                                    ¿No funciona? Prueba otro
+                                </button>
                             </div>
                         </div>
                         
-                        <!-- Columna principal de códigos -->
-                        <div class="col-md-9 col-sm-12">
-                            <!-- Tab de Códigos Destacados -->
-                            <div class="tab-content active" id="tab-destacados">
-                                <div class="codes-list-header">
-                                    <h3><i class="fas fa-star"></i> Códigos Destacados de <?php echo $marca["nombre"]; ?></h3>
-                                    <p>Códigos promocionados y verificados</p>
-                                </div>
-                                <div class="codes-list-container">
-                                    <?php if (!empty($lista_codigos_patrocinados)): ?>
-                                        <?php foreach ($lista_codigos_patrocinados as $codigo): ?>
-                                            <?php echo generate_chollometro_code_card($codigo, true); ?>
-                                        <?php endforeach; ?>
-                                        <?php 
-                                        // Mostrar bloque "Tu código aquí" después de los códigos destacados
-                                        // Asegurar que $marca esté disponible
-                                        if (!isset($marca) || empty($marca)) {
-                                            global $marca;
-                                        }
-                                        
-                                        // Verificar si tenemos la información de marca y código existente
-                                        $marca_nombre_clave = null;
-                                        if (isset($marca)) {
-                                            if (is_array($marca) && isset($marca["nombre_clave"])) {
-                                                $marca_nombre_clave = $marca["nombre_clave"];
-                                            } elseif (is_object($marca) && isset($marca->nombre_clave)) {
-                                                $marca_nombre_clave = $marca->nombre_clave;
-                                            }
-                                        }
-                                        
-                                        // Verificar sesión directamente aquí donde sabemos que está disponible
-                                        $is_logged_in = isset($_SESSION["user_id"]) && !empty($_SESSION["user_id"]);
-                                        
-                                        // Procesar código existente
-                                        $codigo_usuario = null;
-                                        if (isset($codigo_existente) && !empty($codigo_existente)) {
-                                            // Si es un array de resultados (cursor o array numérico)
-                                            if (is_array($codigo_existente) && isset($codigo_existente[0])) {
-                                                $codigo_usuario = $codigo_existente[0];
-                                            } 
-                                            // Si es un array asociativo (un solo documento)
-                                            elseif (is_array($codigo_existente) && (isset($codigo_existente['id']) || isset($codigo_existente['_id']))) {
-                                                $codigo_usuario = $codigo_existente;
-                                            }
-                                            // Si es un objeto
-                                            elseif (is_object($codigo_existente)) {
-                                                $codigo_usuario = $codigo_existente;
-                                            }
-                                            // Fallback para otros casos o cursores iterables
-                                            elseif (is_iterable($codigo_existente)) {
-                                                foreach($codigo_existente as $c) {
-                                                    $codigo_usuario = $c;
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                        
-                                        // Pasar siempre la marca y el estado de sesión explícitamente
-                                        echo generate_empty_featured_card($marca_nombre_clave, $codigo_usuario, $is_logged_in);
-                                        ?>
-                                    <?php else: ?>
-                                        <?php 
-                                        // Mostrar bloque "Tu código aquí" cuando no hay códigos destacados
-                                        // Asegurar que $marca esté disponible
-                                        if (!isset($marca) || empty($marca)) {
-                                            global $marca;
-                                        }
-                                        
-                                        // Verificar si tenemos la información de marca y código existente
-                                        $marca_nombre_clave = null;
-                                        if (isset($marca)) {
-                                            if (is_array($marca) && isset($marca["nombre_clave"])) {
-                                                $marca_nombre_clave = $marca["nombre_clave"];
-                                            } elseif (is_object($marca) && isset($marca->nombre_clave)) {
-                                                $marca_nombre_clave = $marca->nombre_clave;
-                                            }
-                                        }
-                                        
-                                        // Verificar sesión directamente aquí donde sabemos que está disponible
-                                        $is_logged_in = isset($_SESSION["user_id"]) && !empty($_SESSION["user_id"]);
-                                        
-                                        // Procesar código existente
-                                        $codigo_usuario = null;
-                                        if (isset($codigo_existente) && !empty($codigo_existente)) {
-                                            // Si es un array de resultados (cursor o array numérico)
-                                            if (is_array($codigo_existente) && isset($codigo_existente[0])) {
-                                                $codigo_usuario = $codigo_existente[0];
-                                            } 
-                                            // Si es un array asociativo (un solo documento)
-                                            elseif (is_array($codigo_existente) && (isset($codigo_existente['id']) || isset($codigo_existente['_id']))) {
-                                                $codigo_usuario = $codigo_existente;
-                                            }
-                                            // Si es un objeto
-                                            elseif (is_object($codigo_existente)) {
-                                                $codigo_usuario = $codigo_existente;
-                                            }
-                                            // Fallback para otros casos o cursores iterables
-                                            elseif (is_iterable($codigo_existente)) {
-                                                foreach($codigo_existente as $c) {
-                                                    $codigo_usuario = $c;
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                        
-                                        // Pasar siempre la marca y el estado de sesión explícitamente
-                                        echo generate_empty_featured_card($marca_nombre_clave, $codigo_usuario, $is_logged_in);
-                                        ?>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                            
-                            <!-- Tab de Códigos Amigo -->
-                            <div class="tab-content" id="tab-amigos">
-                                <div class="codes-list-header">
-                                    <h3><i class="fas fa-users"></i> Códigos Amigo de <?php echo $marca["nombre"]; ?></h3>
-                                    <p>Códigos compartidos por la comunidad</p>
-                                </div>
-                                <div class="codes-list-container">
-                                    <?php if (!empty($lista_codigos)): ?>
-                                        <?php foreach ($lista_codigos as $codigo): ?>
-                                            <?php echo generate_chollometro_code_card($codigo, false); ?>
-                                        <?php endforeach; ?>
-                                    <?php else: ?>
-                                        <div class="no-codes-message">
-                                            <i class="fas fa-users"></i>
-                                            <h4>No hay códigos disponibles</h4>
-                                            <p>Sé el primero en compartir un código</p>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
+                        <!-- Ver más códigos -->
+                        <?php if ($total_codigos_marca > 1): ?>
+                        <div class="ver-mas-section">
+                            <button class="btn-ver-mas" id="btnVerMas" data-marca="<?php echo htmlspecialchars($marca['nombre_clave']); ?>">
+                                <i class="fas fa-list"></i>
+                                Ver los <?php echo $total_codigos_marca; ?> códigos
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                            <div class="ver-mas-lista" id="verMasLista">
+                                <!-- Filled by JS -->
                             </div>
                         </div>
+                        <?php endif; ?>
                     </div>
                 </div>
                 
@@ -1062,102 +1355,348 @@ if (!empty($url_logo_rs)) {
     </main>
 
     <script>
-        // Funcionalidad de tabs estilo Chollometro
+        // ============================================
+        // SISTEMA "OBTENER MI CÓDIGO" - JavaScript
+        // ============================================
+        
+        let currentCodigoId = null;  // Track current code for "try another"
+        let verMasLoaded = false;    // Track if "ver más" was loaded
+        
         document.addEventListener('DOMContentLoaded', function() {
-            // Manejo de tabs
-            const tabButtons = document.querySelectorAll('.tab-button');
-            const tabContents = document.querySelectorAll('.tab-content');
-
-            tabButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    const targetTab = this.getAttribute('data-tab');
-
-                    // Remover clase active de todos los botones y contenidos
-                    tabButtons.forEach(btn => btn.classList.remove('active'));
-                    tabContents.forEach(content => content.classList.remove('active'));
-
-                    // Agregar clase active al botón clickeado y su contenido
-                    this.classList.add('active');
-                    document.getElementById('tab-' + targetTab).classList.add('active');
-                });
-            });
-
-            // Manejo de filtros
-            const filterOptions = document.querySelectorAll('input[name="sort"]');
-
-            function applySorting(sortValue) {
-                const activeTab = document.querySelector('.tab-content.active');
-                const codeCards = activeTab.querySelectorAll('.chollometro-code-card');
-
-                // Convertir NodeList a Array para poder ordenar
-                const cardsArray = Array.from(codeCards);
-
-                cardsArray.sort((a, b) => {
-                    let aValue, bValue;
-
-                    switch(sortValue) {
-                        case 'fecha':
-                            aValue = new Date(a.querySelector('.stat-item:last-child span').textContent);
-                            bValue = new Date(b.querySelector('.stat-item:last-child span').textContent);
-                            return bValue - aValue; // Más reciente primero
-
-                        case 'visitas':
-                            aValue = parseInt(a.querySelector('.stat-item:first-child span').textContent) || 0;
-                            bValue = parseInt(b.querySelector('.stat-item:first-child span').textContent) || 0;
-                            return bValue - aValue; // Más visitas primero
-
-                        case 'votos_positivos':
-                            aValue = parseInt(a.querySelector('.stat-item:nth-child(2) span').textContent) || 0;
-                            bValue = parseInt(b.querySelector('.stat-item:nth-child(2) span').textContent) || 0;
-                            return bValue - aValue; // Más votos positivos primero
-
-                        case 'votos_negativos':
-                            aValue = parseInt(a.querySelector('.stat-item:nth-child(3) span').textContent) || 0;
-                            bValue = parseInt(b.querySelector('.stat-item:nth-child(3) span').textContent) || 0;
-                            return bValue - aValue; // Más votos negativos primero
-
-                        default:
-                            return 0;
-                    }
-                });
-
-                // Reorganizar las tarjetas en el DOM
-                const container = activeTab.querySelector('.codes-list-container');
-                cardsArray.forEach(card => {
-                    container.appendChild(card);
+            
+            // --- "Obtener mi código" Button ---
+            const btnObtener = document.getElementById('btnObtenerCodigo');
+            if (btnObtener) {
+                btnObtener.addEventListener('click', function() {
+                    obtenerCodigo(this.dataset.marca);
                 });
             }
-
-            // Event listeners para filtros
-            filterOptions.forEach(option => {
-                option.addEventListener('change', function() {
-                    if (this.checked) {
-                        applySorting(this.value);
-                    }
+            
+            // --- "Prueba otro" Button ---
+            const btnPruebaOtro = document.getElementById('btnPruebaOtro');
+            if (btnPruebaOtro) {
+                btnPruebaOtro.addEventListener('click', function() {
+                    obtenerCodigo(this.dataset.marca, currentCodigoId);
                 });
-            });
-
-            // Manejo de botones "Ver Código"
-            document.addEventListener('click', function(e) {
-                if (e.target.classList.contains('btn-view-code') || e.target.closest('.btn-view-code')) {
-                    const button = e.target.classList.contains('btn-view-code') ? e.target : e.target.closest('.btn-view-code');
-                    const codeId = button.getAttribute('data-code-id');
-
-                    if (codeId) {
-                        console.log('Ver código:', codeId);
-                        button.innerHTML = '<i class="fas fa-check"></i> Código Copiado';
-                        button.style.background = '#28a745';
-
-                        setTimeout(() => {
-                            button.innerHTML = '<i class="fas fa-eye"></i> Ver Código';
-                            button.style.background = '#E30613';
-                        }, 2000);
+            }
+            
+            // --- "Ver más" Button ---
+            const btnVerMas = document.getElementById('btnVerMas');
+            if (btnVerMas) {
+                btnVerMas.addEventListener('click', function() {
+                    verMasCodigos(this.dataset.marca);
+                });
+            }
+        });
+        
+        /**
+         * Obtener un código aleatorio ponderado via AJAX
+         */
+        function obtenerCodigo(marca, excludeId) {
+            const btnObtener = document.getElementById('btnObtenerCodigo');
+            const obtenerCTA = document.getElementById('obtenerCTA');
+            const codigoRevelado = document.getElementById('codigoRevelado');
+            const btnPruebaOtro = document.getElementById('btnPruebaOtro');
+            
+            // Loading state
+            if (btnObtener) {
+                btnObtener.classList.add('loading');
+                btnObtener.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Buscando el mejor código...';
+            }
+            if (btnPruebaOtro && excludeId) {
+                btnPruebaOtro.disabled = true;
+                btnPruebaOtro.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Buscando...';
+            }
+            
+            // Build form data
+            const formData = new FormData();
+            formData.append('marca', marca);
+            if (excludeId) {
+                formData.append('exclude_id', excludeId);
+            }
+            
+            fetch('/ajax/obtener_codigo.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentCodigoId = data.codigo_id;
+                    
+                    // Hide CTA, show reveal
+                    if (obtenerCTA) obtenerCTA.style.display = 'none';
+                    if (codigoRevelado) {
+                        codigoRevelado.classList.add('show');
+                        renderCodigoRevelado(data);
+                    }
+                    
+                    // Update "try another" button
+                    if (btnPruebaOtro) {
+                        btnPruebaOtro.disabled = false;
+                        btnPruebaOtro.innerHTML = '<i class="fas fa-sync-alt"></i> ¿No funciona? Prueba otro';
+                        // Hide if there's only 1 code
+                        if (data.total_codigos <= 1) {
+                            btnPruebaOtro.style.display = 'none';
+                        }
+                    }
+                } else {
+                    // No codes available
+                    if (obtenerCTA) {
+                        obtenerCTA.innerHTML = '<div style="color: #6b7280; padding: 20px;"><i class="fas fa-info-circle"></i> ' + (data.message || 'No hay códigos disponibles') + '</div>';
                     }
                 }
+            })
+            .catch(error => {
+                console.error('Error al obtener código:', error);
+                if (btnObtener) {
+                    btnObtener.classList.remove('loading');
+                    btnObtener.innerHTML = '<i class="fas fa-ticket-alt"></i> Obtener mi código';
+                }
+                if (btnPruebaOtro) {
+                    btnPruebaOtro.disabled = false;
+                    btnPruebaOtro.innerHTML = '<i class="fas fa-sync-alt"></i> ¿No funciona? Prueba otro';
+                }
             });
-        });
+        }
+        
+        /**
+         * Render the revealed code into the resultado container
+         */
+        function renderCodigoRevelado(data) {
+            const container = document.getElementById('codigoResultado');
+            if (!container) return;
+            
+            // Generate trust stars
+            let starsHTML = '';
+            for (let i = 0; i < 5; i++) {
+                if (i < data.trust_stars) {
+                    starsHTML += '<i class="fas fa-star"></i>';
+                } else {
+                    starsHTML += '<i class="far fa-star" style="color: #d1d5db;"></i>';
+                }
+            }
+            
+            // Benefit text
+            let benefitHTML = '';
+            if (data.beneficio_texto) {
+                benefitHTML = '<div style="font-size: 0.85rem; color: #10b981; font-weight: 600; margin-bottom: 10px;"><i class="fas fa-tag"></i> ' + escapeHTML(data.beneficio_texto) + '</div>';
+            }
+            
+            // Featured badge
+            let featuredHTML = '';
+            if (data.es_destacado) {
+                featuredHTML = '<div style="display: inline-block; background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #1e3a5f; font-size: 0.75rem; font-weight: 700; padding: 2px 10px; border-radius: 20px; margin-bottom: 10px;"><i class="fas fa-star"></i> Código Destacado</div><br>';
+            }
+            
+            // Description
+            let descHTML = '';
+            if (data.descripcion && data.descripcion.length > 0) {
+                descHTML = '<div class="codigo-descripcion">' + escapeHTML(data.descripcion.substring(0, 200)) + '</div>';
+            }
+            
+            container.innerHTML = `
+                ${featuredHTML}
+                ${benefitHTML}
+                <div class="codigo-valor-container">
+                    <div class="codigo-valor" id="codigoTexto">${escapeHTML(data.codigo)}</div>
+                    <button class="btn-copiar-codigo" onclick="copiarCodigoRevelado()">
+                        <i class="fas fa-copy"></i> Copiar
+                    </button>
+                </div>
+                <div class="codigo-publisher">
+                    <img src="${escapeHTML(data.usuario_img)}" alt="${escapeHTML(data.usuario_nombre)}" class="publisher-avatar" onerror="this.src='/img/user-default.png'">
+                    <div class="publisher-info">
+                        <div class="publisher-name">${escapeHTML(data.usuario_nombre)}</div>
+                        <div class="trust-badge ${escapeHTML(data.trust_class)}">
+                            <span class="trust-stars" style="color: ${escapeHTML(data.trust_color)};">${starsHTML}</span>
+                            ${escapeHTML(data.trust_label)}
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="color: #10b981; font-size: 0.8rem;">
+                            <i class="fas fa-thumbs-up"></i> ${data.votos_positivos}
+                        </div>
+                    </div>
+                </div>
+                ${descHTML}
+            `;
+            
+            // Scroll smoothly to revealed code
+            container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        
+        /**
+         * Copy the revealed code to clipboard
+         */
+        function copiarCodigoRevelado() {
+            const codigoTexto = document.getElementById('codigoTexto');
+            if (!codigoTexto) return;
+            
+            const text = codigoTexto.textContent.trim();
+            
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showCopySuccess();
+                });
+            } else {
+                // Fallback
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showCopySuccess();
+            }
+        }
+        
+        function showCopySuccess() {
+            const btn = document.querySelector('.btn-copiar-codigo');
+            if (!btn) return;
+            btn.classList.add('copied');
+            btn.innerHTML = '<i class="fas fa-check"></i> ¡Copiado!';
+            setTimeout(() => {
+                btn.classList.remove('copied');
+                btn.innerHTML = '<i class="fas fa-copy"></i> Copiar';
+            }, 2500);
+        }
+        
+        /**
+         * Load and show all codes for "Ver más"
+         */
+        function verMasCodigos(marca) {
+            const btnVerMas = document.getElementById('btnVerMas');
+            const verMasLista = document.getElementById('verMasLista');
+            
+            if (!verMasLista) return;
+            
+            // Toggle if already loaded
+            if (verMasLoaded) {
+                verMasLista.classList.toggle('show');
+                if (btnVerMas) {
+                    const icon = btnVerMas.querySelector('.fa-chevron-down, .fa-chevron-up');
+                    if (icon) {
+                        icon.classList.toggle('fa-chevron-down');
+                        icon.classList.toggle('fa-chevron-up');
+                    }
+                }
+                return;
+            }
+            
+            // Loading state
+            if (btnVerMas) {
+                btnVerMas.disabled = true;
+                btnVerMas.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando códigos...';
+            }
+            
+            const formData = new FormData();
+            formData.append('marca', marca);
+            
+            fetch('/ajax/ver_mas_codigos.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.codigos) {
+                    let html = '';
+                    data.codigos.forEach(function(c) {
+                        // Trust stars
+                        let stars = '';
+                        for (let i = 0; i < 5; i++) {
+                            if (i < c.trust_stars) {
+                                stars += '<i class="fas fa-star" style="color: ' + escapeHTML(c.trust_color) + ';"></i>';
+                            } else {
+                                stars += '<i class="far fa-star" style="color: #d1d5db;"></i>';
+                            }
+                        }
+                        
+                        let benefitText = c.beneficio_texto ? '<div class="ver-mas-benefit">' + escapeHTML(c.beneficio_texto) + '</div>' : '';
+                        let featuredIcon = c.es_destacado ? '<i class="fas fa-star" style="color: #f59e0b; margin-left: 4px;" title="Destacado"></i>' : '';
+                        
+                        html += `
+                            <div class="ver-mas-item">
+                                <img src="${escapeHTML(c.usuario_img)}" alt="${escapeHTML(c.usuario_nombre)}" class="ver-mas-avatar" onerror="this.src='/img/user-default.png'">
+                                <div class="ver-mas-info">
+                                    <div class="ver-mas-user">${escapeHTML(c.usuario_nombre)}${featuredIcon}</div>
+                                    ${benefitText}
+                                    <div class="ver-mas-trust">
+                                        <span class="trust-stars" style="font-size: 0.7rem;">${stars}</span>
+                                        <span class="trust-badge ${escapeHTML(c.trust_class)}" style="font-size: 0.7rem; padding: 1px 6px;">${escapeHTML(c.trust_label)}</span>
+                                    </div>  
+                                </div>
+                                <a href="/codigo/${escapeHTML(c.marca || marca).toLowerCase()}-${c.codigo_id.slice(-8)}" 
+                                   style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:8px;font-size:0.75rem;font-weight:600;color:#60a5fa;background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.25);text-decoration:none;margin-right:6px;white-space:nowrap;" 
+                                   title="Ver ficha detallada">
+                                    <i class="fas fa-id-card"></i> Ficha
+                                </a>
+                                <button class="btn-usar-este" onclick="usarEsteCodigo('${escapeHTML(c.codigo_id)}', '${escapeHTML(c.codigo)}', '${escapeHTML(c.usuario_nombre)}', '${escapeHTML(c.usuario_img)}', ${c.trust_stars}, '${escapeHTML(c.trust_label)}', '${escapeHTML(c.trust_class)}', '${escapeHTML(c.trust_color)}', ${c.votos_positivos}, '${escapeHTML(c.beneficio_texto)}', '${escapeHTML(c.descripcion || '')}', ${c.es_destacado ? 'true' : 'false'})">
+                                    <i class="fas fa-arrow-right"></i> Usar
+                                </button>
+                            </div>
+                        `;
+                    });
+                    
+                    verMasLista.innerHTML = html;
+                    verMasLista.classList.add('show');
+                    verMasLoaded = true;
+                    
+                    if (btnVerMas) {
+                        btnVerMas.disabled = false;
+                        btnVerMas.innerHTML = '<i class="fas fa-list"></i> Ocultar códigos <i class="fas fa-chevron-up"></i>';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error al cargar códigos:', error);
+                if (btnVerMas) {
+                    btnVerMas.disabled = false;
+                    btnVerMas.innerHTML = '<i class="fas fa-list"></i> Error al cargar, intenta de nuevo <i class="fas fa-chevron-down"></i>';
+                }
+            });
+        }
+        
+        /**
+         * Use a specific code from "ver más" list
+         */
+        function usarEsteCodigo(codigoId, codigo, userName, userImg, trustStars, trustLabel, trustClass, trustColor, votosPos, beneficio, descripcion, esDestacado) {
+            currentCodigoId = codigoId;
+            
+            const obtenerCTA = document.getElementById('obtenerCTA');
+            const codigoRevelado = document.getElementById('codigoRevelado');
+            
+            if (obtenerCTA) obtenerCTA.style.display = 'none';
+            if (codigoRevelado) codigoRevelado.classList.add('show');
+            
+            renderCodigoRevelado({
+                codigo: codigo,
+                usuario_nombre: userName,
+                usuario_img: userImg,
+                trust_stars: trustStars,
+                trust_label: trustLabel,
+                trust_class: trustClass,
+                trust_color: trustColor,
+                votos_positivos: votosPos,
+                beneficio_texto: beneficio,
+                descripcion: descripcion,
+                es_destacado: esDestacado
+            });
+        }
+        
+        /**
+         * Escape HTML to prevent XSS
+         */
+        function escapeHTML(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.appendChild(document.createTextNode(String(str)));
+            return div.innerHTML;
+        }
 
-        // Tab functionality (legacy)
+        // --- Keep existing functionality ---
+
+        // Tab functionality (legacy, for other tabs on page)
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', function() {
                 document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -1165,17 +1704,16 @@ if (!empty($url_logo_rs)) {
             });
         });
 
-        // Copy code functionality
+        // Copy code functionality (legacy, for other copy buttons)
         function copyCode(code) {
             if (navigator.clipboard) {
                 navigator.clipboard.writeText(code).then(() => {
-                    // Show success message
                     const btn = event.target.closest('.btn-copy');
+                    if (!btn) return;
                     const originalHTML = btn.innerHTML;
                     btn.innerHTML = '<i class="fas fa-check"></i>';
                     btn.style.background = 'var(--primary-green)';
                     btn.style.color = 'white';
-                    
                     setTimeout(() => {
                         btn.innerHTML = originalHTML;
                         btn.style.background = '';
@@ -1186,14 +1724,17 @@ if (!empty($url_logo_rs)) {
         }
 
         // Search functionality
-        document.querySelector('.search-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                const query = this.value.trim();
-                if (query) {
-                    window.location.href = '/buscar?q=' + encodeURIComponent(query);
+        const searchInput = document.querySelector('.search-input');
+        if (searchInput) {
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    const query = this.value.trim();
+                    if (query) {
+                        window.location.href = '/buscar?q=' + encodeURIComponent(query);
+                    }
                 }
-            }
-        });
+            });
+        }
 
         // Smooth scroll for anchor links
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -1209,28 +1750,14 @@ if (!empty($url_logo_rs)) {
             });
         });
 
-        // Add loading states
-        document.querySelectorAll('.btn-get-code').forEach(btn => {
-            btn.addEventListener('click', function() {
-                this.classList.add('loading');
-                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
-            });
-        });
-
-        // Funciones para el menú de propietario
+        // Owner menu functions (for code cards that might still exist elsewhere)
         function toggleOwnerMenu(codigoId) {
             const menu = document.getElementById('owner-menu-' + codigoId);
             if (menu) {
                 menu.classList.toggle('show');
-
-                // Cerrar otros menús abiertos
                 document.querySelectorAll('.owner-menu-dropdown.show').forEach(otherMenu => {
-                    if (otherMenu !== menu) {
-                        otherMenu.classList.remove('show');
-                    }
+                    if (otherMenu !== menu) otherMenu.classList.remove('show');
                 });
-
-                // Cerrar menú al hacer clic fuera
                 setTimeout(() => {
                     document.addEventListener('click', function closeMenu(e) {
                         if (!menu.contains(e.target) && !e.target.closest('.owner-menu-toggle')) {
@@ -1244,12 +1771,9 @@ if (!empty($url_logo_rs)) {
 
         function deleteCode(codigoId, codigoTexto) {
             if (confirm('¿Estás seguro de que quieres borrar el código "' + codigoTexto + '"?\n\nEsta acción no se puede deshacer.')) {
-                // Crear formulario y enviar petición de borrado
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.action = '/borrar_codigo/' + codigoId;
-
-                // Agregar token CSRF si existe
                 const csrfInput = document.querySelector('meta[name="csrf-token"]');
                 if (csrfInput) {
                     const tokenInput = document.createElement('input');
@@ -1258,13 +1782,11 @@ if (!empty($url_logo_rs)) {
                     tokenInput.value = csrfInput.getAttribute('content');
                     form.appendChild(tokenInput);
                 }
-
                 document.body.appendChild(form);
                 form.submit();
             }
         }
 
-        // Cerrar menús al hacer clic fuera
         document.addEventListener('click', function(e) {
             if (!e.target.closest('.owner-menu')) {
                 document.querySelectorAll('.owner-menu-dropdown.show').forEach(menu => {
@@ -1273,12 +1795,18 @@ if (!empty($url_logo_rs)) {
             }
         });
     </script>
+
+<?php
+// Modal informativo de Trust Score (clicable en badges)
+include_once __DIR__ . '/../myphp/trust_info_modal.php';
+?>
 </body>
 </html>
 
 <?php
 // Función para mostrar un elemento de código
 function show_code_item($codigo, $is_featured = false) {
+    global $url_usuario_sin_foto;
     $usuario = getObjectUser('_id', $codigo['id_usuario'] ?? null);
     $inicial = $usuario ? strtoupper(substr($usuario['nombre'], 0, 1)) : 'U';
     $nombre_usuario = $usuario ? htmlspecialchars($usuario['nombre']) : 'Usuario';
@@ -1292,6 +1820,11 @@ function show_code_item($codigo, $is_featured = false) {
     // Verificar si el código pertenece al usuario actual
     $is_owner = !empty($_SESSION["user_id"]) && isset($codigo['id_usuario']) && $codigo['id_usuario'] === $_SESSION["user_id"];
     $codigo_id = $codigo['_id'] ?? '';
+    
+    // Obtener foto del usuario
+    $usuario_img = function_exists('get_user_avatar_url') 
+        ? get_user_avatar_url($usuario, $nombre_usuario, 80) 
+        : '/img/user-default.png';
     
     // Obtener ID del usuario para el enlace
     $user_id = '';
@@ -1319,8 +1852,8 @@ function show_code_item($codigo, $is_featured = false) {
                 <?php echo htmlspecialchars($beneficio); ?>
             </div>
             <div class="code-user">
-                <div class="user-avatar">
-                    <?php echo $inicial; ?>
+                <div class="user-avatar" style="overflow: hidden;">
+                    <img src="<?php echo htmlspecialchars($usuario_img); ?>" alt="<?php echo $nombre_usuario; ?>" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" onerror="this.style.display='none'; this.parentElement.textContent='<?php echo $inicial; ?>';">
                 </div>
                 <?php if($user_link): ?>
                     <a href="<?php echo htmlspecialchars($user_link); ?>" class="user-name-link">

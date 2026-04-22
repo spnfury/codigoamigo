@@ -93,6 +93,7 @@ if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"]) || !in_array($_S
                 				<option value="0">Activo</option>
                 				<option value="-1">Desactivado por administrador</option>
                 				<option value="-2">Desactivado por usuario</option>
+                				<option value="-3">Desactivado por antigüedad</option>
                 			</select>
         				</div>
         			</div><br>

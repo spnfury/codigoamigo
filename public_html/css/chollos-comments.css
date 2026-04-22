@@ -89,6 +89,32 @@
     flex-shrink: 0;
 }
 
+.comment-form-avatar img,
+.comment-user-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.comment-user-avatar-placeholder {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 18px;
+}
+
+.comment-user-avatar-placeholder.guest-avatar {
+    background: #e0e0e0;
+    color: #999;
+}
+
 .comment-form-main {
     flex: 1;
 }

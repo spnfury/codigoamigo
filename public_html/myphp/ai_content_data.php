@@ -125,6 +125,45 @@ function get_ai_brand_content($brand_slug) {
                     'answer' => 'Además de en CodigoAmigo, Shein suele mostrar códigos activos en su propia home y app. También envían cupones exclusivos por email a los usuarios registrados.'
                 ]
             ]
+        ],
+        'yego' => [
+            'intro_html' => '<p><strong>Yego</strong> es la empresa líder en motos eléctricas compartidas (motosharing), presente en ciudades como Barcelona, Madrid, Valencia, Sevilla, Málaga y Burdeos. Con el <strong>código promocional de Yego</strong> que te ofrecemos en CodigoAmigo, podrás conseguir <strong>5€ gratis para tu primer trayecto en moto</strong> y empezar a moverte por la ciudad de una forma más ágil.</p>',
+            'description_html' => '
+                <div class="ai-content-block">
+                    <h3>🛵 5€ Gratis para tu primer trayecto en moto con Yego</h3>
+                    <p>Las motos eléctricas compartidas de Yego, con su inconfundible diseño retro, se han convertido en la forma más rápida y sostenible de moverse por la ciudad. Gracias a nuestra comunidad, puedes usar un <strong>código de descuento Yego verificado</strong> para que tus primeros minutos de viaje te salgan completamente gratis (normalmente obtienes 5€ de saldo de bienvenida al introducir el cupón promocional).</p>
+                    
+                    <h4>¿Qué pasos debo dar para acceder a los beneficios?</h4>
+                    <p>Aprovechar la promoción de bienvenida de Yego es muy sencillo. Solo necesitas seguir estos pasos:</p>
+                    <ul>
+                        <li><strong>1. Descarga la App:</strong> Busca "Yego" en la App Store (iPhone) o Google Play Store (Android).</li>
+                        <li><strong>2. Regístrate:</strong> Crea una cuenta nueva con tu correo electrónico. Necesitarás tener a mano tu carnet de conducir (B o A) y tu DNI/NIE para validarlos en la plataforma.</li>
+                        <li><strong>3. Copia tu Código Amigo de Yego:</strong> Elige uno de los códigos de usuarios VIP que encontrarás más arriba en esta misma página y cópialo al portapapeles.</li>
+                        <li><strong>4. Pega el Cupón de Referidos:</strong> Antes de añadir un método de pago y de realizar tu primer viaje, ve a la sección "Promociones" del menú de la app de Yego. Simplemente pega el código ahí.</li>
+                        <li><strong>5. ¡A rodar!:</strong> Verás reflejados automáticamente 5€ (o el saldo que indique la promoción de Yego) como créditos gratuitos. Ya puedes seleccionar una moto en el mapa, abrir el baúl (donde siempre tienes 2 cascos) y hacer tu primer viaje por tu ciudad.</li>
+                    </ul>
+
+                    <h4>¿Por qué elegir Yego frente a otros motosharing?</h4>
+                    <p>Yego destaca no solo por la estética clásica (simulando a una icónica Vespa), sino también por <strong>incluir siempre dos cascos gratis</strong> en el baúl de diferentes tamaños. Además, logran evitar que tengas que preocuparte de las recargas (el equipo de Yego cambia las baterías). Solo pagas por los minutos reales que usas e incluye el seguro a terceros. Si decides comprar bonos mensuales (Yego Packs o Yego Club), te sale aún más barato.</p>
+
+                    <h4>Condiciones de la promo de Yego, más información en:</h4>
+                    <p>La promoción de invitar a un amigo (los 5 euros gratis o minutos gratis) está siempre sujeta a las condiciones de la plataforma, que exigen que el usuario sea un nuevo registro y que nunca antes haya validado su carnet de conducir en otra cuenta Yego. Los créditos pueden tener una caducidad de 30 días, así que aprovéchalos pronto.</p>
+                </div>
+            ',
+            'faqs' => [
+                [
+                    'question' => '¿En qué consiste el plan amigo o de referidos de Yego?',
+                    'answer' => 'El sistema o plan amigo de Yego te permite obtener viajes gratis en tu monedero de la app. Al darle tu código personalizado a un nuevo usuario, éste obtiene un saldo gratuito de bienvenida (5€ habitualmente). En cuanto ese usuario referido realice su primer trayecto en la plataforma, ¡tú recibirás también 5€ automáticamente en tu cuenta!'
+                ],
+                [
+                    'question' => '¿Qué carnet de conducir necesito para usar una moto Yego?',
+                    'answer' => 'Es muy sencillo, tan solo es necesario contar con el carnet de tipo B (coche) en España con al menos 3 años de antigüedad, o tener un carnet específico de motocicletas (AM, A1, A2 o A).'
+                ],
+                [
+                    'question' => '¿Dónde está operando Yego actualmente?',
+                    'answer' => 'El servicio de motosharing pionero de Yego opera en las principales arterias de Europa, destacando ciudades en España como Barcelona, Valencia, Sevilla, Málaga y Madrid. Recuerda siempre revisar el mapa de su app para ver la zona verde delimitada y asegurar dónde puedes aparcar antes de terminar el alquiler.'
+                ]
+            ]
         ]
     ];
     

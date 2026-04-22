@@ -147,6 +147,13 @@
     margin-right: 5px;
 }
 
+.featured-badge-gold {
+    background: linear-gradient(135deg, #FFD700, #FFA500) !important;
+    color: #333 !important;
+    box-shadow: 0 4px 15px rgba(255, 165, 0, 0.4);
+    font-weight: 700;
+}
+
 .code-header {
     display: flex;
     align-items: center;

@@ -333,12 +333,14 @@ if (!isset($panel)) {
                 box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
                 overflow: hidden;
                 /* margin-top: 5px; REMOVED TO FIX SPACING */
+                font-size: 0; /* Hide any bare text nodes like "false" */
             }
             
             .easy-autocomplete-container ul {
                 list-style: none;
                 margin: 0;
                 padding: 0;
+                font-size: 14px; /* Restore font-size for actual content */
             }
             
             .easy-autocomplete-container ul li {
@@ -834,22 +836,32 @@ if (!isset($panel)) {
                                 return 0;
                             }
                         },
-                        onDrawEvent: function() {
-                            var $input = $(this);
-                            var $container = $input.siblings(".easy-autocomplete-container");
-                            var $list = $container.find("ul");
-                            if ($list.children().length === 0) {
-                                $list.append("<li class='eac-item'><div style='padding:12px 15px; color:#888; text-align:center;'>Sin resultados</div></li>");
-                                // Eliminar elemento que contenga solo el texto "false"
+                        onLoadEvent: function() {
+                            var $containers = $(".easy-autocomplete-container");
+                            $containers.each(function() {
+                                var $list = $(this).find("ul");
+                                
+                                // Eliminar elementos que contengan solo el texto "false"
                                 $list.children().each(function() {
-                                    var txt = $(this).text().trim(); if (txt === "false" || txt.toLowerCase() === "false" ) {
+                                    var txt = $(this).text().trim(); 
+                                    if (txt === "false" || txt.toLowerCase() === "false") {
                                         $(this).remove();
                                     }
                                 });
+                                // Eliminar nodos de texto sueltos con "false"
+                                $list.contents().filter(function() {
+                                    return this.nodeType === 3 && this.textContent.trim().toLowerCase() === 'false';
+                                }).remove();
+                                $(this).contents().filter(function() {
+                                    return this.nodeType === 3 && this.textContent.trim().toLowerCase() === 'false';
+                                }).remove();
 
-                                $list.show();
-                                $container.show();
-                            }
+                                if ($list.children().length === 0) {
+                                    $list.append("<li class='eac-item'><div style='padding:12px 15px; color:#888; text-align:center;'>Sin resultados</div></li>");
+                                    $list.show();
+                                    $(this).show();
+                                }
+                            });
                         }
                     }
                 };

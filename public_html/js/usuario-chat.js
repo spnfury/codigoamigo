@@ -436,12 +436,18 @@ function showMessagesArea(conv) {
     $('#chatMainPlaceholder').hide();
     $('#chatMainContent').show();
 
+    // Mobile: slide to chat view
+    if (window.innerWidth <= 768) {
+        $('.chat-layout').addClass('chat-open');
+    }
+
     $('#chatMainHeader').html(`
+        <button class="mobile-back-btn" onclick="closeMobileChat()" style="display:none;"><i class="fas fa-arrow-left"></i></button>
         <div class="chat-main-user">
             <img src="${imgUrl}" alt="${escapeHtml(conv.nombre_otro)}" class="chat-main-user-avatar" onerror="this.src='https://www.codigoamigo.com/img/utilidades/usuario_sin_foto.jpg'">
             <div class="chat-main-user-info">
                 <h2>${escapeHtml(conv.nombre_otro)} ${adminBadge}</h2>
-                <span>${secondaryLabel}</span>
+                <span style="color: var(--success, #38ef7d); font-size: 0.8rem; display: flex; align-items: center; gap: 5px;"><span style="width:7px;height:7px;background:currentColor;border-radius:50%;display:inline-block;"></span> En línea</span>
             </div>
         </div>
         <div class="chat-main-actions">
@@ -568,7 +574,8 @@ function sendMessage() {
         data: {
             action: 'enviar_mensaje',
             para_usuario_id: conv.otro_usuario_id,
-            mensaje: messageText
+            mensaje: messageText,
+            codigo_id: (() => { const p = (currentConversationId || '').split('-'); return p.length >= 3 ? p[p.length - 1] : ''; })()
         },
         dataType: 'json',
         success: function (response) {
@@ -608,7 +615,8 @@ function sendMessageToUser(otroUserId, messageText) {
         data: {
             action: 'enviar_mensaje',
             para_usuario_id: otroUserId,
-            mensaje: messageText
+            mensaje: messageText,
+            codigo_id: (() => { const p = (currentConversationId || '').split('-'); return p.length >= 3 ? p[p.length - 1] : ''; })()
         },
         dataType: 'json',
         success: function (response) {
@@ -692,26 +700,307 @@ function updateProfilePanel(conv) {
     }
 
     $('#profileName').text(conv.nombre_otro || 'Usuario');
-    $('#profileEmail').text(conv.es_con_admin ? 'Administrador • Equipo Código Amigo' : (conv.email_otro || ''));
+    $('#profileEmail').addClass('profile-email-hidden');
 
-    const link = $('#profileLink');
     const profileUrl = conv.perfil_otro || '';
     if (profileUrl) {
-        link.attr('href', profileUrl).removeClass('disabled-link');
+        $('#profileLinkAvatar, #profileLinkName').attr('href', profileUrl).removeClass('disabled-link');
     } else {
-        link.attr('href', '#').addClass('disabled-link');
+        $('#profileLinkAvatar, #profileLinkName').attr('href', '#').addClass('disabled-link');
     }
 
+    // Show loading state for meta while we fetch user details
     const metaContainer = $('#profileMeta');
-    const rawLastMessage = conv.ultimo_mensaje && conv.ultimo_mensaje.length > 0 ? conv.ultimo_mensaje : 'Sin mensajes recientes.';
-    const fechaBruta = conv.ultimo_mensaje_fecha;
-    let metaHtml = `<p><strong>Último mensaje:</strong> ${escapeHtml(rawLastMessage)}</p>`;
-    if (fechaBruta) {
-        // fechaBruta ahora es un timestamp en milisegundos
-        const fecha = new Date(fechaBruta);
-        metaHtml += `<p><strong>Última actividad:</strong> ${formatDateTime(fecha)}</p>`;
+    metaContainer.html(`
+        <div class="profile-stat-item">
+            <span class="profile-stat-label"><i class="fas fa-spinner fa-spin"></i> Cargando...</span>
+        </div>
+    `);
+
+    // Fetch detailed user info
+    fetchUserProfileDetails(conv.otro_usuario_id, metaContainer);
+
+    // Load code interactions (with timeout protection)
+    loadCodeInteractions(conv.otro_usuario_id);
+}
+
+// Fetch user profile details from API
+function fetchUserProfileDetails(otroUserId, metaContainer) {
+    // Check cache first
+    if (cachedUserProfiles[otroUserId] && cachedUserProfiles[otroUserId]._detailsFetched) {
+        const cached = cachedUserProfiles[otroUserId];
+        renderProfileMeta(cached, metaContainer);
+        return;
     }
-    metaContainer.html(metaHtml);
+
+    $.ajax({
+        url: '/api/chat_api.php',
+        method: 'GET',
+        data: {
+            action: 'get_usuario_chat',
+            usuario_id: otroUserId
+        },
+        dataType: 'json',
+        timeout: 8000,
+        success: function (response) {
+            if (response.success && response.usuario) {
+                const u = response.usuario;
+                // Cache the detailed info
+                cachedUserProfiles[otroUserId] = Object.assign(cachedUserProfiles[otroUserId] || {}, {
+                    _detailsFetched: true,
+                    tiempo_miembro: u.tiempo_miembro || '',
+                    fecha_registro: u.fecha_registro || '',
+                    codigos_count: u.codigos_count || 0,
+                    perfil_otro: u.profile_url || ''
+                });
+                renderProfileMeta(cachedUserProfiles[otroUserId], metaContainer);
+
+                // Update profile link if we got it
+                if (u.profile_url) {
+                    $('#profileLinkAvatar, #profileLinkName').attr('href', u.profile_url).removeClass('disabled-link');
+                }
+            } else {
+                metaContainer.html('');
+            }
+        },
+        error: function () {
+            metaContainer.html('');
+        }
+    });
+}
+
+// Render profile meta stats
+function renderProfileMeta(data, metaContainer) {
+    let html = '';
+
+    if (data.tiempo_miembro) {
+        html += `
+            <div class="profile-stat-item">
+                <span class="profile-stat-label"><i class="fas fa-clock"></i> Miembro</span>
+                <span class="profile-stat-value">${escapeHtml(data.tiempo_miembro)}</span>
+            </div>
+        `;
+    }
+
+    if (data.fecha_registro) {
+        html += `
+            <div class="profile-stat-item">
+                <span class="profile-stat-label"><i class="fas fa-calendar-alt"></i> Registro</span>
+                <span class="profile-stat-value">${escapeHtml(data.fecha_registro)}</span>
+            </div>
+        `;
+    }
+
+    if (typeof data.codigos_count !== 'undefined') {
+        html += `
+            <div class="profile-stat-item">
+                <span class="profile-stat-label"><i class="fas fa-tag"></i> Códigos</span>
+                <span class="profile-stat-value">${data.codigos_count}</span>
+            </div>
+        `;
+    }
+
+    metaContainer.html(html);
+}
+
+// Cargar contexto de la conversación con el otro usuario
+function loadCodeInteractions(otroUserId) {
+    let interaccionesContainer = $('#profileInteracciones');
+
+    // Si no existe el contenedor, crearlo después de profileMeta
+    if (!interaccionesContainer.length) {
+        $('#profileMeta').after(`
+            <div id="profileInteracciones" class="profile-interacciones">
+                <div class="interacciones-loading">
+                    <i class="fas fa-spinner fa-spin"></i> Cargando...
+                </div>
+            </div>
+        `);
+        interaccionesContainer = $('#profileInteracciones');
+    }
+
+    // Mostrar cargando
+    interaccionesContainer.html(`
+        <div class="interacciones-loading">
+            <i class="fas fa-spinner fa-spin"></i> Cargando contexto...
+        </div>
+    `);
+
+    $.ajax({
+        url: '/api/chat_api.php',
+        method: 'GET',
+        data: {
+            action: 'get_interacciones_codigo',
+            usuario_id: otroUserId,
+            conversacion_id: currentConversationId || ''
+        },
+        dataType: 'json',
+        timeout: 10000,
+        success: function (response) {
+            if (response.success) {
+                renderCodeInteractions(response);
+            } else {
+                interaccionesContainer.html('');
+            }
+        },
+        error: function () {
+            interaccionesContainer.html('');
+        }
+    });
+}
+
+// Renderizar contexto de la conversación - REDISEÑO CONTEXTUAL
+function renderCodeInteractions(data) {
+    const container = $('#profileInteracciones');
+    const otroUserId = $('#chatMainContent').data('otro-user-id');
+
+    // Get cached user info for name
+    const cachedUser = cachedUserProfiles[otroUserId] || {};
+    const otroNombre = cachedUser.nombre_otro || cachedUser.username || 'Usuario';
+
+    const contexto = data.contexto || 'directo';
+    const codigoInfo = data.codigo_info || null;
+    const soyOwner = data.soy_owner_codigo || false;
+    const codigoCompletado = data.codigo_completado || false;
+
+    // === CASO 1: Conversación directa sin código ===
+    if (contexto === 'directo' || !codigoInfo) {
+        container.html(`
+            <div class="interacciones-section">
+                <div class="interacciones-header">
+                    <i class="fas fa-comment-dots"></i>
+                    <span>Contexto</span>
+                </div>
+                <div class="interacciones-empty">
+                    <i class="fas fa-comments"></i>
+                    <p>Conversación directa sin código asociado.</p>
+                </div>
+            </div>
+        `);
+        return;
+    }
+
+    // === CASO 2: Hay código asociado ===
+    const marca = escapeHtml(codigoInfo.marca);
+    const beneficio = codigoInfo.beneficio || 0;
+
+    let textoContexto = '';
+    if (contexto === 'me_contactaron') {
+        if (soyOwner) {
+            textoContexto = `<strong>${escapeHtml(otroNombre)}</strong> te contactó por tu código de <strong>${marca}</strong>`;
+        } else {
+            textoContexto = `<strong>${escapeHtml(otroNombre)}</strong> te contactó por su código de <strong>${marca}</strong>`;
+        }
+    } else if (contexto === 'yo_contacte') {
+        if (soyOwner) {
+            textoContexto = `Contactaste a <strong>${escapeHtml(otroNombre)}</strong> por tu código de <strong>${marca}</strong>`;
+        } else {
+            textoContexto = `Contactaste a <strong>${escapeHtml(otroNombre)}</strong> por su código de <strong>${marca}</strong>`;
+        }
+    }
+
+    const strCodigo = codigoInfo.str_codigo ? escapeHtml(codigoInfo.str_codigo) : '';
+    const codigoUrl = codigoInfo.url ? escapeHtml(codigoInfo.url) : '';
+    const linkHref = codigoUrl ? '/codigo/' + codigoUrl : '#';
+
+    let html = `
+        <div class="interacciones-section">
+            <div class="interacciones-header">
+                <i class="fas fa-link"></i>
+                <span>Contexto</span>
+            </div>
+            <div style="padding: 1rem;">
+                <p style="font-size: 0.85rem; color: var(--text-secondary, #adb5bd); margin: 0 0 1rem 0; line-height: 1.5;">${textoContexto}</p>
+                <a href="${linkHref}" target="_blank" style="text-decoration: none; color: inherit; display: block;" class="contexto-card-link">
+                    <div class="interaccion-item" data-codigo-id="${codigoInfo.codigo_id}" data-beneficio="${beneficio}" style="display: flex; flex-direction: column; padding: 1rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; transition: all 0.2s;">
+                        
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: ${strCodigo ? '0.85rem' : '0'};">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <div style="width: 38px; height: 38px; border-radius: 8px; background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.05)); display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas fa-tag" style="font-size: 0.9rem; color: #f59e0b;"></i>
+                                </div>
+                                <div>
+                                    <div style="font-weight: 600; font-size: 1rem; color: white;">${marca}</div>
+                                    <div style="font-size: 0.8rem; color: #9ca3af;">Beneficio: <span style="color: #f59e0b; font-weight: 600;">${beneficio}€</span></div>
+                                </div>
+                            </div>
+    `;
+
+    if (soyOwner) {
+        html += `
+                            <div onclick="event.preventDefault(); event.stopPropagation();" style="display: flex; align-items: center;">
+                                <label class="apple-switch" title="${codigoCompletado ? 'Desmarcar' : '¿Ya usó tu código?'}" style="margin: 0;">
+                                    <input type="checkbox" class="interaccion-toggle" ${codigoCompletado ? 'checked' : ''}>
+                                    <span class="apple-slider"></span>
+                                </label>
+                            </div>
+        `;
+    } else {
+        html += `
+                            <i class="fas fa-external-link-alt" style="color: #6b7280; font-size: 0.85rem;"></i>
+        `;
+    }
+
+    html += `
+                        </div>
+                        
+                        ${strCodigo ? `
+                        <div style="background: rgba(0,0,0,0.3); border: 1px dashed rgba(255, 255, 255, 0.2); border-radius: 8px; padding: 0.85rem; text-align: center; margin-top: 0.25rem;">
+                            <span style="font-family: monospace; font-size: 1.25rem; font-weight: 700; color: #ff3366; letter-spacing: 2px;">${strCodigo}</span>
+                        </div>
+                        ` : ''}
+                        
+                    </div>
+                </a>
+    `;
+
+    // Mensaje contextual
+    if (soyOwner) {
+        if (codigoCompletado) {
+            html += `<p style="margin-top: 0.75rem; font-size: 0.8rem; color: #10b981; padding: 0.5rem 0.75rem; background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); border-radius: 8px;"><i class="fas fa-check-circle"></i> Marcado como completado · +${beneficio}€</p>`;
+        } else {
+            html += `<p style="margin-top: 0.75rem; font-size: 0.8rem; color: #9ca3af; padding: 0.5rem 0.75rem; background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.15); border-radius: 8px;"><i class="fas fa-lightbulb" style="color: #f59e0b;"></i> Si ya ha usado tu código, activa el toggle.</p>`;
+        }
+    } else if (contexto === 'yo_contacte') {
+        html += `<p style="margin-top: 0.75rem; font-size: 0.8rem; color: #9ca3af; padding: 0.5rem 0.75rem; background: rgba(99,102,241,0.06); border: 1px solid rgba(99,102,241,0.15); border-radius: 8px;"><i class="fas fa-info-circle" style="color: #6366f1;"></i> Si usas su código, ambos ganaréis <strong style="color: #f59e0b;">${beneficio}€</strong>.</p>`;
+    }
+
+    html += `</div></div>`;
+    container.html(html);
+
+    // Eventos toggle
+    if (soyOwner) {
+        container.find('.interaccion-toggle').on('change', function () {
+            const isChecked = $(this).is(':checked');
+            const codigoId = $(this).closest('.interaccion-item').data('codigo-id');
+            const beneficioVal = parseFloat($(this).closest('.interaccion-item').data('beneficio') || 0);
+
+            const completedKey = `completed_codes_${currentUserId}_${otroUserId}`;
+            let completedCodes = {};
+            try { completedCodes = JSON.parse(localStorage.getItem(completedKey) || '{}'); } catch (e) { completedCodes = {}; }
+
+            if (isChecked) {
+                completedCodes[codigoId] = true;
+            } else {
+                delete completedCodes[codigoId];
+            }
+            localStorage.setItem(completedKey, JSON.stringify(completedCodes));
+
+            renderCodeInteractions(Object.assign({}, data, { codigo_completado: isChecked }));
+
+            $.ajax({
+                url: '/api/chat_api.php',
+                method: 'POST',
+                data: {
+                    action: 'toggle_codigo_completado',
+                    codigo_id: codigoId,
+                    usuario_referido_id: otroUserId,
+                    completado: isChecked,
+                    beneficio: beneficioVal
+                }
+            });
+        });
+    }
 }
 
 function resetMainChatView() {
@@ -720,6 +1009,10 @@ function resetMainChatView() {
     $('#chatMainContent').data('otro-user-id', '');
     $('#chatMainContent').data('conversation-id', '');
     updateProfilePanel(null);
+}
+
+function closeMobileChat() {
+    $('.chat-layout').removeClass('chat-open');
 }
 
 // Utilidades
@@ -885,10 +1178,14 @@ function startNewConversation(otroUserId, otroUserName) {
 }
 
 // Crear ID temporal de conversación
-function crearConversacionIdTemp(user1Id, user2Id) {
+function crearConversacionIdTemp(user1Id, user2Id, codigoId) {
     const ids = [user1Id, user2Id];
     ids.sort();
-    return ids[0] + '-' + ids[1];
+    let convId = ids[0] + '-' + ids[1];
+    if (codigoId) {
+        convId += '-' + codigoId;
+    }
+    return convId;
 }
 
 // Limpiar interval al salir

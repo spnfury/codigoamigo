@@ -28,8 +28,34 @@ if (!function_exists('codigoamigo_init_sentry')) {
         $options['dsn'] = $dsn;
 
         try {
+            // Asegurar que reportamos todos los errores a Sentry
+            error_reporting(E_ALL);
+            
             \Sentry\init($options);
             $initialized = true;
+
+            // Registrar error handler para capturar warnings/notices en Sentry
+            // PHP warnings como "Undefined array key" no se capturan por defecto
+            set_error_handler(function ($severity, $message, $file, $line) {
+                // Solo capturar warnings y notices relevantes, no E_DEPRECATED
+                $capturable = [E_WARNING, E_USER_WARNING, E_NOTICE, E_USER_NOTICE];
+                if (!in_array($severity, $capturable, true)) {
+                    return false; // Dejar que el handler por defecto se encargue
+                }
+
+                // Rate limiting: max 10 warnings por request para no saturar Sentry
+                static $warningCount = 0;
+                $warningCount++;
+                if ($warningCount > 10) {
+                    return false;
+                }
+
+                // Enviar a Sentry como excepción para que aparezca en el dashboard
+                \Sentry\captureException(new \ErrorException($message, 0, $severity, $file, $line));
+
+                return false; // Continuar con el handler por defecto (log a archivo)
+            }, E_WARNING | E_NOTICE | E_USER_WARNING | E_USER_NOTICE);
+
         } catch (\Throwable $e) {
             if (function_exists('debug_log')) {
                 debug_log('Sentry initialization failed', $e);
@@ -38,14 +64,34 @@ if (!function_exists('codigoamigo_init_sentry')) {
     }
 }
 
+if (!function_exists('codigoamigo_is_sentry_initialized')) {
+    /**
+     * Verifica si Sentry ha sido inicializado correctamente.
+     */
+    function codigoamigo_is_sentry_initialized(): bool
+    {
+        if (!class_exists(SentrySdk::class)) {
+            return false;
+        }
+
+        try {
+            $hub = SentrySdk::getCurrentHub();
+            return $hub && $hub->getClient() !== null;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+}
+
 if (!function_exists('codigoamigo_sentry_capture_exception')) {
     /**
      * Envía una excepción a Sentry si el cliente está inicializado.
+     * Retorna true si se envió con éxito.
      */
-    function codigoamigo_sentry_capture_exception($exception): void
+    function codigoamigo_sentry_capture_exception($exception): bool
     {
         if (!class_exists(SentrySdk::class)) {
-            return;
+            return false;
         }
 
         try {
@@ -53,12 +99,14 @@ if (!function_exists('codigoamigo_sentry_capture_exception')) {
 
             if ($hub && $hub->getClient()) {
                 $hub->captureException($exception);
+                return true;
             }
         } catch (\Throwable $e) {
             if (function_exists('debug_log')) {
                 debug_log('Sentry capture exception failed', $e);
             }
         }
+        return false;
     }
 }
 
@@ -146,6 +194,10 @@ if (!function_exists('codigoamigo_get_sentry_browser_snippet')) {
                 'Only one \'enable_page_level_ads\' allowed per page',
                 'Unexpected non-whitespace character after JSON',
                 'Accessing domItems after disposal',
+                'sendBeacon',
+                'Failed to connect to MetaMask',
+                'Java object is gone',
+                'null is not an object (evaluating \'s.id\')',
             ],
         ];
 
@@ -209,7 +261,11 @@ function(event, hint) {
                 excValue.indexOf("enable_page_level_ads") !== -1 ||
                 excValue.indexOf("Only one 'enable_page_level_ads' allowed per page") !== -1 ||
                 excValue.indexOf("Accessing domItems after disposal") !== -1 ||
-                excValue.indexOf("domItems after disposal") !== -1
+                excValue.indexOf("domItems after disposal") !== -1 ||
+                excValue.indexOf("sendBeacon") !== -1 ||
+                excValue.indexOf("Failed to connect to MetaMask") !== -1 ||
+                excValue.indexOf("Java object is gone") !== -1 ||
+                excValue.indexOf("null is not an object (evaluating 's.id')") !== -1
             )) {
                 return null; // No enviar a Sentry
             }

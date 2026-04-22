@@ -203,6 +203,142 @@ $codigos = array_values($super_codigos);
 }
 </style>
 
+<?php
+// ============================================================
+// Schema.org Structured Data for SEO (JSON-LD)
+// ============================================================
+
+$landing_url = 'https://www.codigoamigo.com/guias/' . htmlspecialchars($landing['slug']);
+$landing_title = $landing['title'] ?? '';
+$landing_description = $landing['meta_description'] ?? '';
+$landing_image = $landing['hero_image'] ?? 'https://www.codigoamigo.com/images/logo.png';
+
+// 1. Article Schema
+$schema_article = [
+    '@context' => 'https://schema.org',
+    '@type' => 'Article',
+    'headline' => $landing_title,
+    'description' => $landing_description,
+    'image' => $landing_image,
+    'url' => $landing_url,
+    'author' => [
+        '@type' => 'Organization',
+        'name' => 'CodigoAmigo',
+        'url' => 'https://www.codigoamigo.com'
+    ],
+    'publisher' => [
+        '@type' => 'Organization',
+        'name' => 'CodigoAmigo',
+        'logo' => [
+            '@type' => 'ImageObject',
+            'url' => 'https://www.codigoamigo.com/images/logo.png'
+        ]
+    ],
+    'datePublished' => date('Y-m-d'),
+    'dateModified' => date('Y-m-d')
+];
+echo '<script type="application/ld+json">' . json_encode($schema_article, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>';
+
+// 2. BreadcrumbList Schema
+$breadcrumb_items = [
+    ['@type' => 'ListItem', 'position' => 1, 'name' => 'Inicio', 'item' => 'https://www.codigoamigo.com'],
+    ['@type' => 'ListItem', 'position' => 2, 'name' => 'Guías', 'item' => 'https://www.codigoamigo.com/guias'],
+    ['@type' => 'ListItem', 'position' => 3, 'name' => $landing_title, 'item' => $landing_url]
+];
+$schema_breadcrumb = [
+    '@context' => 'https://schema.org',
+    '@type' => 'BreadcrumbList',
+    'itemListElement' => $breadcrumb_items
+];
+echo '<script type="application/ld+json">' . json_encode($schema_breadcrumb, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>';
+
+// 3. FAQPage Schema (from sections data)
+if (!empty($landing['sections'])) {
+    $faq_entities = [];
+    $howto_steps = [];
+    
+    foreach ($landing['sections'] as $section) {
+        // Collect FAQ items
+        if ($section['type'] === 'faq' && !empty($section['faqs'])) {
+            foreach ($section['faqs'] as $faq) {
+                $faq_entities[] = [
+                    '@type' => 'Question',
+                    'name' => strip_tags($faq['question']),
+                    'acceptedAnswer' => [
+                        '@type' => 'Answer',
+                        'text' => strip_tags($faq['answer'])
+                    ]
+                ];
+            }
+        }
+        
+        // Collect HowTo steps
+        if ($section['type'] === 'steps' && !empty($section['steps'])) {
+            foreach ($section['steps'] as $idx => $step) {
+                $howto_steps[] = [
+                    '@type' => 'HowToStep',
+                    'position' => $idx + 1,
+                    'name' => strip_tags($step['title']),
+                    'text' => strip_tags($step['text'])
+                ];
+            }
+        }
+    }
+    
+    // Output FAQPage schema
+    if (!empty($faq_entities)) {
+        $schema_faq = [
+            '@context' => 'https://schema.org',
+            '@type' => 'FAQPage',
+            'mainEntity' => $faq_entities
+        ];
+        echo '<script type="application/ld+json">' . json_encode($schema_faq, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>';
+    }
+    
+    // Output HowTo schema
+    if (!empty($howto_steps)) {
+        $schema_howto = [
+            '@context' => 'https://schema.org',
+            '@type' => 'HowTo',
+            'name' => $landing_title,
+            'step' => $howto_steps
+        ];
+        echo '<script type="application/ld+json">' . json_encode($schema_howto, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>';
+    }
+}
+
+// 4. Offer Schema (from codes)
+if (!empty($all_codigos)) {
+    $offers = [];
+    foreach (array_slice($all_codigos, 0, 5) as $cod) {
+        $cod_brand = $cod['marca'] ?? '';
+        $cod_benefit = $cod['num_beneficio'] ?? 0;
+        $offers[] = [
+            '@type' => 'Offer',
+            'name' => 'Código amigo ' . $cod_brand,
+            'price' => '0',
+            'priceCurrency' => 'EUR',
+            'availability' => 'https://schema.org/InStock',
+            'description' => isset($cod['descripcion']) ? strip_tags(substr($cod['descripcion'], 0, 200)) : 'Código de descuento para ' . $cod_brand,
+            'validThrough' => date('Y-12-31')
+        ];
+    }
+    if (!empty($offers)) {
+        $schema_offers = [
+            '@context' => 'https://schema.org',
+            '@type' => 'WebPage',
+            'name' => $landing_title,
+            'url' => $landing_url,
+            'mainEntity' => [
+                '@type' => 'ItemList',
+                'itemListElement' => $offers
+            ]
+        ];
+        echo '<script type="application/ld+json">' . json_encode($schema_offers, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>';
+    }
+}
+?>
+
 <div class="super-landing-container">
     <!-- Hero Section -->
     <div class="super-landing-hero">
@@ -213,6 +349,13 @@ $codigos = array_values($super_codigos);
             <?php endif; ?>
         </div>
     </div>
+
+    <?php 
+    // AdSense Top
+    if (function_exists('get_adsense_top')) {
+        echo generate_adsense_container(get_adsense_top(), 'adsense-sl-top', 'margin-bottom: 20px;');
+    }
+    ?>
 
     <div class="container">
         <!-- Main Content Area -->
@@ -352,249 +495,445 @@ $codigos = array_values($super_codigos);
                     <?php endforeach; ?>
                 <?php endif; ?>
 
-                <!-- Active Codes Section -->
-                <?php if (!empty($codigos)): ?>
+                <?php 
+                // AdSense Entremedio
+                if (function_exists('get_adsense_entremedio')) {
+                    echo generate_adsense_container(get_adsense_entremedio(), 'adsense-sl-middle', 'margin-top: 20px; margin-bottom: 40px;');
+                }
+                ?>
+
+                <!-- Active Codes Section - Hero Layout -->
+                <?php if (!empty($all_codigos)): ?>
                     <div class="sl-section codes-section" id="codigos-activos">
-                        <h2 class="sl-section-title">Códigos Activos Verificados</h2>
+                        <h2 class="sl-section-title">Código Exclusivo del Editor</h2>
                         
                         <?php 
-                        // Note: $super_codigos and $normal_codigos are already defined at the top
+                        // Render each code as a full-width hero card
+                        foreach ($all_codigos as $codigo):
+                            $brand = isset($codigo['marca']) ? $codigo['marca'] : '';
+                            $description = isset($codigo['descripcion']) ? strip_tags($codigo['descripcion']) : '';
+                            $code_id = isset($codigo['_id']) ? (string)$codigo['_id'] : '';
+                            $benefit = isset($codigo['num_beneficio']) ? $codigo['num_beneficio'] : 0;
+                            $usuario_id = isset($codigo['id_usuario']) ? $codigo['id_usuario'] : '';
+                            $tipo_descuento = isset($codigo['tipo_descuento']) ? $codigo['tipo_descuento'] : 'euros';
+                            
+                            // Get user info
+                            $user_info = get_user_info($usuario_id);
+                            $username = $user_info['username'];
+                            $user_img = $user_info['img'];
+                            $user_id_str = isset($user_info['id']) ? (string)$user_info['id'] : (string)$usuario_id;
+                            
+                            // VIP check
+                            if (!function_exists('es_usuario_vip')) {
+                                include_once __DIR__ . '/../funciones_usuario.php';
+                            }
+                            $es_vip = es_usuario_vip($usuario_id);
+                            
+                            // Brand info
+                            $marca_info = get_brand_info($brand);
+                            $marca_imagen = $marca_info['imagen'] ?? '';
+                            $brand_slug = $marca_info['nombre_clave'] ?? generate_brand_slug($brand);
+                            
+                            // User link
+                            $user_link = link_usuario($username, $user_id_str);
+                            
+                            // Chat visibility
+                            $current_user_id = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : '';
+                            $show_chat = !empty($user_id_str) && (string)$current_user_id !== (string)$user_id_str;
                         ?>
-
-                        <!-- Super Featured Box -->
-                        <?php if (!empty($super_codigos)): ?>
-                            <div class="super-featured-box mb-5">
-                                <div class="super-featured-header">
-                                    <i class="fas fa-star text-warning"></i> Recomendados por los Editores
-                                </div>
-                                
-                                <?php if (count($super_codigos) > 1): ?>
-                                    <!-- Multiple Super Featured Codes - Carousel -->
-                                    <div class="super-carousel-wrapper">
-                                        <button class="carousel-nav prev" onclick="moveCarousel(-1)">
-                                            <i class="fas fa-chevron-left"></i>
-                                        </button>
-                                        <div class="super-carousel-container">
-                                            <div class="super-carousel-track" id="superCarouselTrack">
-                                                <?php foreach ($super_codigos as $index => $codigo): ?>
-                                                    <div class="carousel-slide <?php echo $index === 0 ? 'active' : ''; ?>">
-                                                        <?php 
-                                                        if (function_exists('generate_modern_code_cards')) {
-                                                            echo generate_modern_code_cards([$codigo]);
-                                                        }
-                                                        ?>
-                                                    </div>
-                                                <?php endforeach; ?>
-                                            </div>
-                                        </div>
-                                        <button class="carousel-nav next" onclick="moveCarousel(1)">
-                                            <i class="fas fa-chevron-right"></i>
-                                        </button>
-                                        
-                                        <!-- Carousel Indicators -->
-                                        <div class="carousel-indicators">
-                                            <?php foreach ($super_codigos as $index => $codigo): ?>
-                                                <span class="indicator <?php echo $index === 0 ? 'active' : ''; ?>" 
-                                                      onclick="goToSlide(<?php echo $index; ?>)"></span>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    </div>
-                                    
-                                    <script>
-                                    let currentSlide = 0;
-                                    const totalSlides = <?php echo count($super_codigos); ?>;
-                                    
-                                    function moveCarousel(direction) {
-                                        currentSlide += direction;
-                                        if (currentSlide < 0) currentSlide = totalSlides - 1;
-                                        if (currentSlide >= totalSlides) currentSlide = 0;
-                                        updateCarousel();
-                                    }
-                                    
-                                    function goToSlide(index) {
-                                        currentSlide = index;
-                                        updateCarousel();
-                                    }
-                                    
-                                    function updateCarousel() {
-                                        const slides = document.querySelectorAll('.carousel-slide');
-                                        const indicators = document.querySelectorAll('.indicator');
-                                        
-                                        slides.forEach((slide, index) => {
-                                            slide.classList.toggle('active', index === currentSlide);
-                                        });
-                                        
-                                        indicators.forEach((indicator, index) => {
-                                            indicator.classList.toggle('active', index === currentSlide);
-                                        });
-                                    }
-                                    
-                                    // Auto-advance carousel every 5 seconds
-                                    setInterval(() => moveCarousel(1), 5000);
-                                    </script>
-                                    
-                                <?php else: ?>
-                                    <!-- Single Super Featured Code -->
-                                    <div class="codes-grid-wrapper super-grid">
-                                        <?php 
-                                        if (function_exists('generate_modern_code_cards')) {
-                                            echo generate_modern_code_cards($super_codigos);
-                                        }
-                                        ?>
-                                    </div>
-                                <?php endif; ?>
+                        
+                        <div class="guide-hero-card">
+                            <!-- Top ribbon -->
+                            <div class="guide-hero-ribbon">
+                                <i class="fas fa-crown"></i> Recomendado por el Editor de la Guía
                             </div>
                             
-                            <style>
-                                .super-featured-box {
-                                    background: #fff9fa;
-                                    border: 2px solid #E30613;
-                                    border-radius: 12px;
-                                    padding: 20px;
-                                    position: relative;
-                                    margin-bottom: 40px;
-                                }
-                                .super-featured-header {
-                                    background: #E30613;
-                                    color: white;
-                                    display: inline-block;
-                                    padding: 5px 20px;
-                                    border-radius: 20px;
-                                    font-weight: bold;
-                                    font-size: 0.9rem;
-                                    position: absolute;
-                                    top: -15px;
-                                    left: 20px;
-                                    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                                }
-                                
-                                /* Carousel Styles */
-                                .super-carousel-wrapper {
-                                    position: relative;
-                                    padding: 20px 60px;
-                                }
-                                
-                                .super-carousel-container {
-                                    overflow: hidden;
-                                    width: 100%;
-                                }
-                                
-                                .super-carousel-track {
-                                    display: flex;
-                                    position: relative;
-                                }
-                                
-                                .carousel-slide {
-                                    min-width: 100%;
-                                    display: none;
-                                    transition: opacity 0.3s ease;
-                                }
-                                
-                                .carousel-slide.active {
-                                    display: block;
-                                }
-                                
-                                .carousel-nav {
-                                    position: absolute;
-                                    top: 50%;
-                                    transform: translateY(-50%);
-                                    background: #E30613;
-                                    color: white;
-                                    border: none;
-                                    width: 40px;
-                                    height: 40px;
-                                    border-radius: 50%;
-                                    cursor: pointer;
-                                    display: flex;
-                                    align-items: center;
-                                    justify-content: center;
-                                    font-size: 18px;
-                                    transition: all 0.3s ease;
-                                    z-index: 10;
-                                }
-                                
-                                .carousel-nav:hover {
-                                    background: #c40510;
-                                    transform: translateY(-50%) scale(1.1);
-                                }
-                                
-                                .carousel-nav.prev {
-                                    left: 10px;
-                                }
-                                
-                                .carousel-nav.next {
-                                    right: 10px;
-                                }
-                                
-                                .carousel-indicators {
-                                    display: flex;
-                                    justify-content: center;
-                                    gap: 8px;
-                                    margin-top: 15px;
-                                }
-                                
-                                .indicator {
-                                    width: 10px;
-                                    height: 10px;
-                                    border-radius: 50%;
-                                    background: #ccc;
-                                    cursor: pointer;
-                                    transition: all 0.3s ease;
-                                }
-                                
-                                .indicator.active {
-                                    background: #E30613;
-                                    width: 30px;
-                                    border-radius: 5px;
-                                }
-                                
-                                .super-grid .code-card {
-                                    border-color: #ffd700;
-                                    box-shadow: 0 10px 20px rgba(227, 6, 19, 0.1);
-                                }
-                                
-                                @media (max-width: 768px) {
-                                    .super-carousel-wrapper {
-                                        padding: 20px 50px;
-                                    }
-                                    .carousel-nav {
-                                        width: 35px;
-                                        height: 35px;
-                                        font-size: 14px;
-                                    }
-                                }
-                            </style>
-                        <?php endif; ?>
-
-
-                        <!-- Standard Codes -->
-                        <?php if (!empty($normal_codigos)): ?>
-                            <div class="codes-grid-wrapper">
-                                <?php 
-                                if (function_exists('generate_modern_code_cards')) {
-                                    echo generate_modern_code_cards($normal_codigos);
-                                }
-                                ?>
-                                <!-- Promo Card for Grid -->
-                                <div class="code-card promo-card-grid">
-                                    <div class="promo-content">
-                                        <div class="promo-icon"><i class="fas fa-plus-circle"></i></div>
-                                        <h3>¿Tu código aquí?</h3>
-                                        <p>Únete a la comunidad y gana recompensas.</p>
-                                        <a href="/nuevo_codigo?marca_preselected=<?php echo htmlspecialchars($landing_data['linked_brand_slugs'][0] ?? $landing_data['slug']); ?>" class="btn btn-outline-danger btn-sm">Publicar Código</a>
+                            <div class="guide-hero-content">
+                                <!-- Left: Brand + User -->
+                                <div class="guide-hero-left">
+                                    <!-- Brand logo -->
+                                    <div class="guide-hero-brand">
+                                        <a href="/de-<?php echo htmlspecialchars($brand_slug); ?>" title="Códigos <?php echo htmlspecialchars($brand); ?>">
+                                            <?php if ($marca_imagen): ?>
+                                                <img src="<?php echo htmlspecialchars($marca_imagen); ?>" alt="<?php echo htmlspecialchars($brand); ?>" class="guide-hero-brand-img">
+                                            <?php else: ?>
+                                                <div class="guide-hero-brand-placeholder"><i class="fas fa-tag"></i></div>
+                                            <?php endif; ?>
+                                        </a>
+                                    </div>
+                                    
+                                    <!-- Author section -->
+                                    <div class="guide-hero-author">
+                                        <div class="guide-hero-avatar">
+                                            <?php if($user_img): ?>
+                                                <img src="<?php echo htmlspecialchars($user_img); ?>" alt="<?php echo htmlspecialchars($username); ?>">
+                                            <?php else: ?>
+                                                <div class="guide-hero-avatar-placeholder">
+                                                    <?php echo strtoupper(substr($username, 0, 1)); ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="guide-hero-author-info">
+                                            <a href="<?php echo htmlspecialchars($user_link); ?>" class="guide-hero-author-name">
+                                                <?php echo htmlspecialchars($username); ?>
+                                            </a>
+                                            <?php if ($es_vip): ?>
+                                                <span class="guide-hero-vip"><i class="fas fa-crown"></i> VIP Verificado</span>
+                                            <?php endif; ?>
+                                        </div>
                                     </div>
                                 </div>
+                                
+                                <!-- Center: Description -->
+                                <div class="guide-hero-center">
+                                    <div class="guide-hero-description">
+                                        <?php echo htmlspecialchars($description); ?>
+                                    </div>
+                                    
+                                    <?php if ($benefit > 0): ?>
+                                        <div class="guide-hero-benefit">
+                                            <div class="guide-hero-benefit-icon">💰</div>
+                                            <div class="guide-hero-benefit-info">
+                                                <?php
+                                                if (!function_exists('generarHTMLPrecioConPromocion')) {
+                                                    include_once __DIR__ . '/../funciones_premium.php';
+                                                }
+                                                echo generarHTMLPrecioConPromocion($code_id, $benefit, $tipo_descuento, false);
+                                                ?>
+                                                <div class="guide-hero-benefit-label">BENEFICIO GARANTIZADO</div>
+                                            </div>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                                
+                                <!-- Right: Actions -->
+                                <div class="guide-hero-actions">
+                                    <button class="guide-hero-btn-code" onclick="viewCode('<?php echo htmlspecialchars($code_id); ?>', '<?php echo htmlspecialchars($brand_slug); ?>')">
+                                        <i class="fas fa-eye"></i> Ver Código
+                                    </button>
+                                    
+                                        <button class="guide-hero-btn-chat" onclick="openDirectChat('<?php echo htmlspecialchars($user_id_str); ?>', '<?php echo htmlspecialchars($username); ?>')">
+                                            <i class="fas fa-comments"></i> Ponte en contacto con <?php echo htmlspecialchars(explode(' ', $username)[0]); ?>
+                                        </button>
+                                        <p class="guide-hero-chat-hint">
+                                            <i class="fas fa-info-circle"></i> Habla directamente con <?php echo htmlspecialchars(explode(' ', $username)[0]); ?> para que te ayude paso a paso
+                                        </p>
+                                </div>
                             </div>
-                        <?php endif; ?>
+                        </div>
                         
+                        <?php endforeach; ?>
                     </div>
-                <?php else: ?>
+                    
+                    <style>
+                        .guide-hero-card {
+                            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+                            border: 2px solid rgba(255, 215, 0, 0.3);
+                            border-radius: 20px;
+                            overflow: hidden;
+                            position: relative;
+                            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 0 0 30px rgba(227, 6, 19, 0.1);
+                        }
+                        
+                        .guide-hero-ribbon {
+                            background: linear-gradient(135deg, #E30613, #ff4757);
+                            color: white;
+                            text-align: center;
+                            padding: 10px 20px;
+                            font-weight: 700;
+                            font-size: 0.95rem;
+                            letter-spacing: 0.5px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 8px;
+                        }
+                        
+                        .guide-hero-ribbon i {
+                            color: #ffd700;
+                        }
+                        
+                        .guide-hero-content {
+                            display: grid;
+                            grid-template-columns: 220px 1fr 280px;
+                            gap: 0;
+                            padding: 30px;
+                        }
+                        
+                        /* LEFT - Brand + Author */
+                        .guide-hero-left {
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            gap: 20px;
+                            padding-right: 25px;
+                            border-right: 1px solid rgba(255,255,255,0.1);
+                        }
+                        
+                        .guide-hero-brand {
+                            background: white;
+                            border-radius: 16px;
+                            padding: 15px;
+                            width: 160px;
+                            height: 100px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+                        }
+                        
+                        .guide-hero-brand-img {
+                            max-width: 130px;
+                            max-height: 70px;
+                            object-fit: contain;
+                        }
+                        
+                        .guide-hero-brand-placeholder {
+                            font-size: 2.5rem;
+                            color: #E30613;
+                        }
+                        
+                        .guide-hero-author {
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            gap: 8px;
+                        }
+                        
+                        .guide-hero-avatar {
+                            width: 56px;
+                            height: 56px;
+                            border-radius: 50%;
+                            overflow: hidden;
+                            border: 3px solid #ffd700;
+                            box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+                        }
+                        
+                        .guide-hero-avatar img {
+                            width: 100%;
+                            height: 100%;
+                            object-fit: cover;
+                        }
+                        
+                        .guide-hero-avatar-placeholder {
+                            width: 100%;
+                            height: 100%;
+                            background: linear-gradient(135deg, #E30613, #ff6b6b);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            color: white;
+                            font-size: 1.4rem;
+                            font-weight: 700;
+                        }
+                        
+                        .guide-hero-author-info {
+                            text-align: center;
+                        }
+                        
+                        .guide-hero-author-name {
+                            color: #fff;
+                            font-weight: 700;
+                            font-size: 1rem;
+                            text-decoration: none;
+                            display: block;
+                        }
+                        
+                        .guide-hero-author-name:hover {
+                            color: #ffd700;
+                        }
+                        
+                        .guide-hero-vip {
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 4px;
+                            background: linear-gradient(135deg, #ffd700, #ffab00);
+                            color: #1a1a2e;
+                            padding: 3px 10px;
+                            border-radius: 12px;
+                            font-size: 0.7rem;
+                            font-weight: 800;
+                            text-transform: uppercase;
+                            letter-spacing: 0.5px;
+                            margin-top: 4px;
+                        }
+                        
+                        /* CENTER - Description + Benefit */
+                        .guide-hero-center {
+                            padding: 0 25px;
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: center;
+                            gap: 18px;
+                        }
+                        
+                        .guide-hero-description {
+                            color: rgba(255,255,255,0.9);
+                            font-size: 1.05rem;
+                            line-height: 1.7;
+                        }
+                        
+                        .guide-hero-benefit {
+                            display: flex;
+                            align-items: center;
+                            gap: 14px;
+                            background: linear-gradient(135deg, rgba(40, 167, 69, 0.2), rgba(32, 201, 151, 0.15));
+                            border: 1px solid rgba(40, 167, 69, 0.4);
+                            padding: 14px 18px;
+                            border-radius: 14px;
+                        }
+                        
+                        .guide-hero-benefit-icon {
+                            font-size: 2rem;
+                        }
+                        
+                        .guide-hero-benefit-info {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 2px;
+                        }
+                        
+                        .guide-hero-benefit-info .beneficio-cantidad,
+                        .guide-hero-benefit-info .precio-con-promocion {
+                            color: #4ade80;
+                            font-size: 1.5rem;
+                            font-weight: 800;
+                        }
+                        
+                        .guide-hero-benefit-label {
+                            color: rgba(255,255,255,0.6);
+                            font-size: 0.7rem;
+                            font-weight: 700;
+                            letter-spacing: 1.5px;
+                            text-transform: uppercase;
+                        }
+                        
+                        /* RIGHT - Actions */
+                        .guide-hero-actions {
+                            display: flex;
+                            flex-direction: column;
+                            justify-content: center;
+                            gap: 12px;
+                            padding-left: 25px;
+                            border-left: 1px solid rgba(255,255,255,0.1);
+                        }
+                        
+                        .guide-hero-btn-code {
+                            background: linear-gradient(135deg, #E30613, #ff4757);
+                            color: white;
+                            border: none;
+                            border-radius: 14px;
+                            padding: 16px 24px;
+                            font-weight: 800;
+                            font-size: 1.1rem;
+                            cursor: pointer;
+                            transition: all 0.3s ease;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 10px;
+                            text-transform: uppercase;
+                            letter-spacing: 0.5px;
+                            box-shadow: 0 6px 20px rgba(227, 6, 19, 0.4);
+                            animation: heroButtonPulse 2s infinite;
+                        }
+                        
+                        .guide-hero-btn-code:hover {
+                            transform: translateY(-3px);
+                            box-shadow: 0 10px 30px rgba(227, 6, 19, 0.5);
+                        }
+                        
+                        @keyframes heroButtonPulse {
+                            0%, 100% { box-shadow: 0 6px 20px rgba(227, 6, 19, 0.4); }
+                            50% { box-shadow: 0 6px 20px rgba(227, 6, 19, 0.4), 0 0 0 8px rgba(227, 6, 19, 0); }
+                        }
+                        
+                        .guide-hero-btn-chat {
+                            background: linear-gradient(135deg, #1f8ef1, #6c5ce7);
+                            color: white;
+                            border: none;
+                            border-radius: 14px;
+                            padding: 14px 24px;
+                            font-weight: 700;
+                            font-size: 1rem;
+                            cursor: pointer;
+                            transition: all 0.3s ease;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 10px;
+                        }
+                        
+                        .guide-hero-btn-chat:hover {
+                            transform: translateY(-2px);
+                            box-shadow: 0 8px 25px rgba(31, 142, 241, 0.4);
+                            filter: brightness(1.1);
+                        }
+                        
+                        .guide-hero-chat-hint {
+                            color: rgba(255,255,255,0.5);
+                            font-size: 0.78rem;
+                            text-align: center;
+                            margin: 0;
+                            line-height: 1.4;
+                        }
+                        
+                        .guide-hero-chat-hint i {
+                            color: rgba(255,255,255,0.35);
+                        }
+                        
+                        /* Mobile responsive */
+                        @media (max-width: 992px) {
+                            .guide-hero-content {
+                                grid-template-columns: 1fr;
+                                gap: 20px;
+                                padding: 20px;
+                            }
+                            
+                            .guide-hero-left {
+                                flex-direction: row;
+                                border-right: none;
+                                border-bottom: 1px solid rgba(255,255,255,0.1);
+                                padding-right: 0;
+                                padding-bottom: 20px;
+                                justify-content: center;
+                            }
+                            
+                            .guide-hero-center {
+                                padding: 0;
+                            }
+                            
+                            .guide-hero-actions {
+                                border-left: none;
+                                border-top: 1px solid rgba(255,255,255,0.1);
+                                padding-left: 0;
+                                padding-top: 20px;
+                            }
+                        }
+                        
+                        @media (max-width: 480px) {
+                            .guide-hero-left {
+                                flex-direction: column;
+                            }
+                            .guide-hero-brand {
+                                width: 120px;
+                                height: 70px;
+                                padding: 10px;
+                            }
+                            .guide-hero-brand-img {
+                                max-width: 100px;
+                                max-height: 50px;
+                            }
+                        }
+                    </style>
+                <?php endif; ?>
+                <?php if (empty($all_codigos)): ?>
                     <div class="sl-section no-codes text-center">
                          <div class="empty-state-card">
                             <i class="fas fa-trophy empty-icon"></i>
                             <h3>¡Sé el primero en aparecer aquí!</h3>
                             <p>Esta guía es visitada por miles de usuarios buscando códigos. <br>Publica el tuyo ahora y comienza a ganar referidos.</p>
-                            <a href="/nuevo_codigo?marca_preselected=<?php echo htmlspecialchars($landing_data['linked_brand_slugs'][0] ?? $landing_data['slug']); ?>" class="btn btn-primary btn-lg pulse-button">
+                            <a href="/nuevo_codigo?marca_preselected=<?php echo htmlspecialchars($landing['linked_brand_slugs'][0] ?? $landing['slug']); ?>" class="btn btn-primary btn-lg pulse-button">
                                 <i class="fas fa-plus-circle"></i> Publicar mi código GRATIS
                             </a>
                             <p class="small text-muted mt-3"><i class="fas fa-check"></i> Registro en 1 minuto <i class="fas fa-check"></i> Sin coste</p>

@@ -6,6 +6,7 @@ include_once __DIR__ . '/../inc/includes.php';
 include_once __DIR__ . '/../myphp/funciones.php';
 include_once __DIR__ . '/../inc/funciones.php';
 include_once __DIR__ . '/admin_sidebar_menu.php';
+include_once __DIR__ . '/../myphp/_super_landing_functions.php';
 
 // Verificar permisos de administrador
 $array_codigos_acceso[] = "58bd851da54e295b8b52f702"; //thevega82@gmail.com
@@ -228,6 +229,26 @@ $ingresos_periodo = $resultado_ingresos_periodo[0]['total'] ?? 0;
 // Obtener tipos de transacciones únicos
 $tipos_transacciones = $collection_transacciones->distinct('tipo');
 $estados_transacciones = $collection_transacciones->distinct('estado');
+
+// Build marca-slug → guide-URL lookup
+$_guia_map = [];
+try {
+    if (function_exists('get_active_super_landings')) {
+        $all_guias = get_active_super_landings(100);
+        foreach ($all_guias as $g) {
+            $g_slug = $g['slug'] ?? '';
+            $g_title = $g['title'] ?? $g_slug;
+            $linked = $g['linked_brand_slugs'] ?? [];
+            if (is_object($linked)) $linked = iterator_to_array($linked);
+            foreach ($linked as $marca_slug) {
+                $_guia_map[strtolower($marca_slug)] = [
+                    'url' => '/guias/' . $g_slug,
+                    'title' => $g_title
+                ];
+            }
+        }
+    }
+} catch (Exception $e) { }
 
 // Obtener usuarios para el filtro
 $usuarios_transacciones = $collection_transacciones->distinct('usuario_id');
@@ -562,6 +583,40 @@ $title = "Gestión de Transacciones - Panel de Administración";
                                                         <br><small style="font-size: 0.7rem; opacity: 0.8;"><?php echo htmlspecialchars($transaccion['subtipo']); ?></small>
                                                     <?php endif; ?>
                                                 </span>
+                                                <?php
+                                                // Show destacado tier sub-badge
+                                                $td = $transaccion['tipo_destacado'] ?? '';
+                                                if ($td || (($transaccion['tipo'] ?? '') === 'destacado')): 
+                                                    $tier_label = 'Normal';
+                                                    $tier_color = '#6c757d';
+                                                    if ($td === 'super' || $td === 'super_landing') {
+                                                        $cantidad_val = abs($transaccion['cantidad'] ?? 0);
+                                                        if ($cantidad_val >= 9.00) {
+                                                            $tier_label = '📖 Guía';
+                                                            $tier_color = '#6f42c1';
+                                                        } else {
+                                                            $tier_label = '⭐ Super';
+                                                            $tier_color = '#e67e22';
+                                                        }
+                                                    }
+                                                ?>
+                                                    <br>
+                                                    <span class="badge" style="background:<?php echo $tier_color; ?>; font-size: 0.7rem; margin-top: 3px;">
+                                                        <?php echo $tier_label; ?>
+                                                    </span>
+                                                    <?php
+                                                    // Show guide link if applicable
+                                                    $marca_key = strtolower($transaccion['marca'] ?? '');
+                                                    if ($marca_key && isset($_guia_map[$marca_key])):
+                                                    ?>
+                                                        <br>
+                                                        <a href="<?php echo $_guia_map[$marca_key]['url']; ?>" target="_blank" 
+                                                           class="text-decoration-none" style="font-size: 0.7rem;"
+                                                           title="Ver Guía: <?php echo htmlspecialchars($_guia_map[$marca_key]['title']); ?>">
+                                                            <i class="fas fa-book"></i> <?php echo htmlspecialchars($_guia_map[$marca_key]['title']); ?>
+                                                        </a>
+                                                    <?php endif; ?>
+                                                <?php endif; ?>
                                             </td>
                                             <td>
                                                 <?php if (!empty($transaccion['codigo_id']) && !empty($transaccion['marca'])): ?>

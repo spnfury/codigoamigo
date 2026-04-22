@@ -179,7 +179,7 @@ function generate_code_detail_page($codigo) {
             $html .= '<div class="code-blurred">';
             $html .= '<div class="code-url-blurred">https://xxxx.xxx/xxxxx...</div>';
             $html .= '</div>';
-            $html .= '<button class="btn-reveal-code" onclick="showCodeRevealModal(\'' . htmlspecialchars($code_id, ENT_QUOTES, 'UTF-8') . '\', \'' . htmlspecialchars($marca_nombre, ENT_QUOTES, 'UTF-8') . '\', ' . intval($benefit) . ')">';
+            $html .= '<button class="btn-reveal-code" onclick="showCodeRevealModal(\'' . htmlspecialchars($code_id, ENT_QUOTES, 'UTF-8') . '\', \'' . htmlspecialchars($marca_nombre, ENT_QUOTES, 'UTF-8') . '\', ' . intval($benefit) . ', this)">';
             $html .= '<i class="fas fa-unlock"></i> Ver enlace';
             $html .= '</button>';
             $html .= '</div>';
@@ -201,9 +201,10 @@ function generate_code_detail_page($codigo) {
             $html .= '<span>' . htmlspecialchars($code_info['url'] ?? '') . '</span>';
             $html .= '</a>';
             $html .= '</div>';
-            $html .= '<div class="code-text" id="codeText" style="display: none;">' . htmlspecialchars($code_info['url'] ?? '') . '</div>';
-            $html .= '<button class="btn-copy-code" onclick="copyCode()">';
-            $html .= '<i class="fas fa-copy"></i> Copiar enlace';
+            $urlTrimmed = trim((string)($code_info['url'] ?? ''));
+            $html .= '<div class="code-text" id="codeText" style="display: none;">' . htmlspecialchars($urlTrimmed) . '</div>';
+            $html .= '<button class="btn-copy-code" onclick="window.open(\'' . htmlspecialchars($urlTrimmed, ENT_QUOTES, 'UTF-8') . '\', \'_blank\')">';
+            $html .= '<i class="fas fa-external-link-alt"></i> Ir a la web';
             $html .= '</button>';
         }
         $html .= '</div>';
@@ -218,7 +219,7 @@ function generate_code_detail_page($codigo) {
             $html .= '<div class="code-blurred">';
             $html .= '<div class="code-text-blurred">XXXXXX</div>';
             $html .= '</div>';
-            $html .= '<button class="btn-reveal-code" onclick="showCodeRevealModal(\'' . htmlspecialchars($code_id, ENT_QUOTES, 'UTF-8') . '\', \'' . htmlspecialchars($marca_nombre, ENT_QUOTES, 'UTF-8') . '\', ' . intval($benefit) . ')">';
+            $html .= '<button class="btn-reveal-code" onclick="showCodeRevealModal(\'' . htmlspecialchars($code_id, ENT_QUOTES, 'UTF-8') . '\', \'' . htmlspecialchars($marca_nombre, ENT_QUOTES, 'UTF-8') . '\', ' . intval($benefit) . ', this)">';
             $html .= '<i class="fas fa-unlock"></i> Ver código';
             $html .= '</button>';
             $html .= '</div>';
@@ -302,8 +303,13 @@ function generate_code_detail_page($codigo) {
     $html .= '<div class="step-item">';
     $html .= '<div class="step-number">1</div>';
     $html .= '<div class="step-content">';
-    $html .= '<h4>Copia el código</h4>';
-    $html .= '<p>Haz clic en "Copiar código" para copiarlo al portapapeles</p>';
+    if (isset($code_info['is_url']) && $code_info['is_url']) {
+        $html .= '<h4>Abre el enlace</h4>';
+        $html .= '<p>Haz clic en "Ir a la web" para acceder directamente con el enlace de invitado</p>';
+    } else {
+        $html .= '<h4>Copia el código</h4>';
+        $html .= '<p>Haz clic en "Copiar código" para copiarlo al portapapeles</p>';
+    }
     $html .= '</div>';
     $html .= '</div>';
     $html .= '<div class="step-item">';
@@ -402,42 +408,65 @@ function generate_code_detail_page($codigo) {
         $user_img_js_attr = htmlspecialchars($user_img_js, ENT_QUOTES, 'UTF-8');
         $username_title = htmlspecialchars($username, ENT_QUOTES, 'UTF-8');
         
-        $default_msg_js = json_encode("hola buenas, me ayudas con el proceso y lo hacemos juntos?");
+        $default_msg_js = json_encode("¡Hola! He visto tu código de " . $marca_nombre . " de " . $benefit . "€ y me gustaría conseguirlo. ¿Me ayudas con el proceso?");
+        
+        // Contexto del código para el chat
+        $codigo_id_js = json_encode((string)$code_id);
+        $marca_slug_js = json_encode($brand);
+        $beneficio_js = json_encode((int)$benefit);
+        $marca_nombre_js = json_encode($marca_nombre);
         
         $onclick_action = '';
         if ($usuario_logueado) {
-            $onclick_action = 'if(typeof openChatModal === \'function\') { openChatModal(' . $user_id_js_attr . ', ' . $username_js_attr . ', ' . $user_img_js_attr . ', ' . htmlspecialchars($default_msg_js, ENT_QUOTES, 'UTF-8') . '); } else { window.location.href=\'/chat?usuario=' . $user_id_js_attr . '\'; }';
+            // Pasar contexto del código: openChatModal(userId, userName, userImg, defaultMsg, codigoContexto)
+            $contexto_obj = '{codigoId:' . htmlspecialchars($codigo_id_js, ENT_QUOTES, 'UTF-8') . 
+                           ',marcaSlug:' . htmlspecialchars($marca_slug_js, ENT_QUOTES, 'UTF-8') . 
+                           ',beneficio:' . htmlspecialchars($beneficio_js, ENT_QUOTES, 'UTF-8') . 
+                           ',marcaNombre:' . htmlspecialchars($marca_nombre_js, ENT_QUOTES, 'UTF-8') . '}';
+            $onclick_action = 'if(typeof openChatModal === \'function\') { openChatModal(' . $user_id_js_attr . ', ' . $username_js_attr . ', ' . $user_img_js_attr . ', ' . htmlspecialchars($default_msg_js, ENT_QUOTES, 'UTF-8') . ', ' . $contexto_obj . '); } else { window.location.href=\'/chat?usuario=' . $user_id_js_attr . '\'; }';
         } else {
             // Si no está logueado, abrir modal de login
             $onclick_action = 'if(typeof showLoginModal === \'function\') { showLoginModal(); } else if(typeof openLoginModalWithRedirect === \'function\') { openLoginModalWithRedirect(window.location.href); } else { window.location.href=\'/login\'; } return false;';
         }
+
+        // Nueva caja de promoción de chat integrada *dentro* de la tarjeta de usuario
+        $html .= '<div class="integrated-promo-box">';
+        $html .= '<div class="promo-header"><i class="fas fa-magic"></i> ¿Quieres asegurar tus ' . $benefit . '€?</div>';
         
-        $html .= '<button class="btn-chat-user" onclick="' . $onclick_action . '" title="Chatear con ' . $username_title . '">';
-        $html .= '<i class="fas fa-comments"></i> Chatear';
+        if ($usuario_logueado) {
+            $html .= '<p class="promo-desc">El autor de este código está esperando para ayudarte. <strong>Envíale un mensaje</strong> ahora mismo para que te guíe paso a paso y no pierdas tu recompensa.</p>';
+        } else {
+            $html .= '<p class="promo-desc">Los usuarios que chatean con el autor tienen un 90% más de éxito al canjear el código.</p>';
+        }
+        
+        $html .= '<div class="chat-incentive-wrapper" style="margin-top: 15px;">';
+        $html .= '<button class="btn-chat-user pulse-chat" style="width: 100%;" onclick="' . $onclick_action . '" title="Chatear con ' . $username_title . '">';
+        $html .= '<i class="fas fa-comments"></i> Chatear con ' . htmlspecialchars($username);
         $html .= '</button>';
+        $html .= '</div>';
+        $html .= '</div>'; // closes integrated-promo-box
     }
     
     $html .= '</div>'; // closes user-info-card
-    
-    // Sección de Ayuda y Soporte (Help Awareness)
-    $html .= '<div class="help-awareness-card">';
-    $html .= '<h4><i class="fas fa-hands-helping"></i> ¿Necesitas ayuda?</h4>';
-    if ($usuario_logueado) {
-        $html .= '<p>El autor de este código puede ayudarte si tienes dudas sobre cómo canjearlo o si tienes algún problema.</p>';
-        $html .= '<div class="help-status-logged">';
-        $html .= '<i class="fas fa-check-circle"></i> Estás identificado. Puedes chatear con el autor en cualquier momento.';
+
+    // VIP Awareness Banner (solo para usuarios logueados que no son VIP)
+    $current_user_is_vip = ($usuario_logueado && function_exists('es_usuario_vip')) ? es_usuario_vip($_SESSION['user_id']) : false;
+    if ($usuario_logueado && !$current_user_is_vip) {
+        $html .= '<div class="vip-awareness-banner" style="background: linear-gradient(135deg, #ffd700 0%, #E30613 100%); padding: 20px; border-radius: 15px; margin-bottom: 20px;">';
+        $html .= '<div class="vip-awareness-content" style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">';
+        $html .= '<div style="width: 50px; height: 50px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">';
+        $html .= '<i class="fas fa-crown" style="color: white; font-size: 24px;"></i>';
         $html .= '</div>';
-    } else {
-        $html .= '<p>¿Tienes problemas con el código? Los autores suelen ayudar a quienes usan sus enlaces.</p>';
-        $html .= '<div class="help-promo-box">';
-        $html .= '<p><strong>¡Identifícate para recibir ayuda!</strong></p>';
-        $html .= '<p>Al iniciar sesión, el autor sabrá que has visto su código y podrá asesorarte a través del chat.</p>';
-        $html .= '<button class="btn-help-login" onclick="if(typeof showLoginModal === \'function\') { showLoginModal(); } else { window.location.href=\'/login\'; } return false;">';
-        $html .= '<i class="fas fa-user-plus"></i> Iniciar sesión / Registro';
-        $html .= '</button>';
+        $html .= '<div>';
+        $html .= '<h4 style="color: white; font-weight: 700; margin: 0 0 5px 0; font-size: 1rem;">¿Publicas códigos de referido?</h4>';
+        $html .= '<p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 0.85rem; line-height: 1.4;">Hazte VIP y contacta directamente con usuarios que ven tus códigos. Badge dorado + 10€/mes de saldo.</p>';
+        $html .= '</div>';
+        $html .= '</div>';
+        $html .= '<a href="/public/mis_viewers.php" class="btn-vip-cta" style="display: inline-flex; align-items: center; gap: 8px; background: white; color: #E30613; border: none; padding: 10px 20px; border-radius: 25px; font-weight: 700; cursor: pointer; text-decoration: none; font-size: 0.9rem; width: 100%; justify-content: center;">';
+        $html .= '<i class="fas fa-crown"></i> Hazte VIP — 9,99€/mes';
+        $html .= '</a>';
         $html .= '</div>';
     }
-    $html .= '</div>';
 
 
 
@@ -546,13 +575,14 @@ function generate_code_detail_page($codigo) {
         </style>';
     }
 
-    // Botón de estadísticas visible para todos
+    // Botón de estadísticas visible para todos (el gráfico es público; el dueño verá además los usuarios)
     $html .= '<div class="stats-card">';
     $html .= '<h4><i class="fas fa-chart-bar"></i> Estadísticas</h4>';
     $html .= '<button class="btn-stats" data-codigo-id="' . htmlspecialchars((string)$code_id, ENT_QUOTES, 'UTF-8') . '" onclick="viewStatsModal(\'' . htmlspecialchars((string)$code_id, ENT_QUOTES, 'UTF-8') . '\'); return false;">';
     $html .= '<i class="fas fa-chart-line"></i> Ver estadísticas';
     $html .= '</button>';
     $html .= '</div>';
+
 
     // Información adicional
     $html .= '<div class="code-info-card">';
@@ -613,9 +643,22 @@ function generate_code_detail_page($codigo) {
         }
     }
     
-    $html .= '<button class="btn-primary" onclick="copyCode()">';
-    $html .= '<i class="fas fa-copy"></i> Copiar código';
-    $html .= '</button>';
+    if (isset($code_info['is_url']) && $code_info['is_url']) {
+        if ($mostrar_reveal) {
+            $html .= '<button class="btn-primary btn-auto-reveal-url" onclick="if(document.querySelector(\'.btn-reveal-code\')){document.querySelector(\'.btn-reveal-code\').click();}">';
+            $html .= '<i class="fas fa-external-link-alt"></i> Ir a la web';
+            $html .= '</button>';
+        } else {
+            $urlTrimmed = trim((string)($code_info['url'] ?? ''));
+            $html .= '<button class="btn-primary" onclick="window.open(\'' . htmlspecialchars($urlTrimmed, ENT_QUOTES, 'UTF-8') . '\', \'_blank\')">';
+            $html .= '<i class="fas fa-external-link-alt"></i> Ir a la web';
+            $html .= '</button>';
+        }
+    } else {
+        $html .= '<button class="btn-primary" onclick="copyCode()">';
+        $html .= '<i class="fas fa-copy"></i> Copiar código';
+        $html .= '</button>';
+    }
     $html .= '<button class="btn-secondary" onclick="shareCode()">';
     $html .= '<i class="fas fa-share"></i> Compartir';
     $html .= '</button>';
@@ -1461,6 +1504,10 @@ function generate_code_detail_page($codigo) {
     
     /* Responsive */
     @media (max-width: 768px) {
+        .breadcrumb-nav {
+            display: none;
+        }
+
         .code-detail-header {
             flex-direction: column;
             text-align: center;
@@ -1473,6 +1520,11 @@ function generate_code_detail_page($codigo) {
         
         .header-text h1 {
             font-size: 2rem;
+        }
+        
+        .code-benefit-display {
+            padding: 20px;
+            margin-bottom: 25px;
         }
         
         .benefit-amount {
@@ -1499,12 +1551,26 @@ function generate_code_detail_page($codigo) {
             padding: 20px 0;
         }
         
+        .code-main-card, .code-description-card, .how-to-use-card {
+            padding: 15px;
+        }
+        
         .header-text h1 {
             font-size: 1.5rem;
         }
         
+        .code-benefit-display {
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
         .benefit-amount {
-            font-size: 2.5rem;
+            font-size: 2rem;
+            margin-bottom: 5px;
+        }
+        
+        .benefit-label {
+            font-size: 1rem;
         }
         
         .code-text {
@@ -1623,6 +1689,55 @@ function generate_code_detail_page($codigo) {
         background: #ff4f0f;
         transform: translateY(-2px);
         box-shadow: 0 5px 15px rgba(255, 122, 24, 0.3);
+    }
+    /* Estilos nuevos para la caja de promoción integrada */
+    .integrated-promo-box {
+        margin-top: 20px;
+        padding: 15px;
+        background: rgba(255, 122, 24, 0.05); /* Muy sutil fondo naranja */
+        border-radius: 12px;
+        border-left: 4px solid #E30613; /* Borde izquierdo destacado */
+    }
+
+    .integrated-promo-box .promo-header {
+        font-weight: 700;
+        color: #E30613;
+        font-size: 1.05rem;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .integrated-promo-box .promo-desc {
+        font-size: 0.9rem;
+        color: #555;
+        line-height: 1.4;
+        margin: 0;
+    }
+    
+    .integrated-promo-box .promo-desc strong {
+        color: #333;
+    }
+
+    /* Incentivos de Chat Styles */
+    .chat-incentive-wrapper {
+        position: relative;
+        width: 100%;
+    }
+
+    .pulse-chat {
+        animation: pulse-blue 2s infinite;
+        background: #007bff !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.5px;
+        box-shadow: 0 8px 20px rgba(0, 123, 255, 0.3) !important;
+    }
+
+    @keyframes pulse-blue {
+        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7); }
+        70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(0, 123, 255, 0); }
+        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 123, 255, 0); }
     }
     </style>';
     
@@ -2013,8 +2128,13 @@ function generate_code_detail_page($codigo) {
         
         if (navigator.share) {
             navigator.share({
-                title: title,
-                url: url
+                title: "Código de descuento",
+                text: "Mira este código de descuento que encontré",
+                url: window.location.href
+            }).catch(function(err) {
+                if (err.name !== "AbortError") {
+                    console.error("Error sharing:", err);
+                }
             });
         } else {
             // Fallback para navegadores que no soportan Web Share API

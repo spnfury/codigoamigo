@@ -12,7 +12,7 @@ $job_name = 'codigoamigo-fake-comments-generation';
 $job_config = <<<XML
 <?xml version='1.1' encoding='UTF-8'?>
 <flow-definition plugin="workflow-job@2.40">
-  <description>Generación automática de comentarios de usuarios fake en CodigoAmigo (cada 6 horas)</description>
+  <description>Generación automática de comentarios de usuarios fake en MalPrecio.com (cada 6 horas)</description>
   <keepDependencies>false</keepDependencies>
   <properties>
     <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
@@ -34,7 +34,7 @@ pipeline {
                 script {
                     echo 'Starting Fake Comments Generation...'
                     // Execute the PHP script
-                    sh 'php /home/admin/web/codigoamigo.com/public_html/cron/cron_fake_comments.php'
+                    sh 'php /home/admin/web/malprecio.com/public_html/cron/cron_fake_comments.php'
                 }
             }
         }

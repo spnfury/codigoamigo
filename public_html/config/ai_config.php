@@ -66,4 +66,19 @@ if (!defined('AMAZON_PAAPI_HOST')) {
     define('AMAZON_PAAPI_HOST', 'webservices.amazon.es'); // Host según región
 }
 
+// Configuración de YouTube Data API v3
+// Obtener API key gratis en: https://console.cloud.google.com/apis/credentials
+// Habilitar "YouTube Data API v3" en la consola
+if (!defined('YOUTUBE_API_KEY')) {
+    define('YOUTUBE_API_KEY', 'AIzaSyBO8kzIr4NtCVBxLxQSxGkq8Whw4kHgAqI');
+}
+
+// Puedes añadir aquí más keys para rotarlas automáticamente si una se agota
+if (!defined('YOUTUBE_API_KEYS')) {
+    define('YOUTUBE_API_KEYS', [
+        'AIzaSyBO8kzIr4NtCVBxLxQSxGkq8Whw4kHgAqI',
+        // 'OTRA_KEY_AQUI',
+    ]);
+}
+
 ?>

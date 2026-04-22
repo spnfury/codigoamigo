@@ -390,7 +390,15 @@ function optimizeUrlPath($texto , $space=false,$espacios='',$junto=''){
     }
 }
 
+// Incluir utilidad de cache
+require_once __DIR__ . '/../myphp/SimpleCache.php';
+
 function getListMarcaSpecial() {
+    $cacheKey = "getListMarcaSpecial";
+    $cached = SimpleCache::get($cacheKey);
+    if ($cached !== null) {
+        return $cached;
+    }
     
     // Obtener la lista de marcas ordenadas por número de códigos
     $lista_marcas = getMarcas(50); // Obtener más marcas para tener mejor selección
@@ -480,7 +488,9 @@ function getListMarcaSpecial() {
     }
     
     // Devolver el primer bloque si existe, o el array completo si no hay bloques
-    return !empty($array_chunk) ? $array_chunk[0] : $array_marcas;
+    $finalResult = !empty($array_chunk) ? $array_chunk[0] : $array_marcas;
+    SimpleCache::set($cacheKey, $finalResult);
+    return $finalResult;
 }
 
 

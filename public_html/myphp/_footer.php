@@ -9,7 +9,8 @@
 //$_SESSION['mi_parametro_ttl'] = 1;
 
 function get_footer_modern() {
-    ?><!-- Footer moderno -->
+    ?><style>.footer-modern{content-visibility:auto;contain-intrinsic-size:auto 600px;}</style>
+    <!-- Footer moderno -->
     <footer class="footer-modern">
         <!-- Sección de bienvenida -->
         <div class="footer-top">
@@ -28,11 +29,16 @@ function get_footer_modern() {
                                 if (!function_exists('get_usuarios_activos_footer')) {
                                     include_once __DIR__ . '/funciones_modern.php';
                                 }
+                                if (!function_exists('enlace_usuario')) {
+                                    include_once __DIR__ . '/links.php';
+                                }
                                 $usuarios_activos = get_usuarios_activos_footer(12);
                                 foreach ($usuarios_activos as $usuario): 
+                                    $profile_url = enlace_usuario($usuario['username'], $usuario['id'] ?? '');
                                 ?>
                                     <div class="avatar user-modal-trigger" 
                                          data-username="<?php echo htmlspecialchars($usuario['username']); ?>"
+                                         data-profile-url="<?php echo htmlspecialchars($profile_url); ?>"
                                          data-image="<?php echo htmlspecialchars($usuario['img']); ?>"
                                          data-joined="Top Contribuidor"
                                          data-stats-offers="<?php echo $usuario['total_codigos']; ?>"
@@ -74,8 +80,8 @@ function get_footer_modern() {
         <div class="footer-main">
             <div class="container">
                 <div class="row">
-                    <!-- Información de contacto -->
-                    <div class="col-md-3 col-sm-6">
+                    <!-- Contacto -->
+                    <div class="col-md-4 col-sm-6">
                         <div class="footer-column">
                             <div class="column-title">Contacto</div>
                             <ul class="footer-links">
@@ -87,48 +93,8 @@ function get_footer_modern() {
                         </div>
                     </div>
 
-                    <!-- Categorías populares -->
-                    <div class="col-md-3 col-sm-6">
-                        <div class="footer-column">
-                            <div class="column-title">Categorías</div>
-                            <ul class="footer-links">
-                                <?php
-                                // Obtener categorías reales de MongoDB
-                                if (!function_exists('getCategorias')) {
-                                    include_once __DIR__ . '/../inc/conexion.php';
-                                }
-                                if (!function_exists('link_categoria')) {
-                                    include_once __DIR__ . '/herramientas/links.php';
-                                }
-                                
-                                $categorias = getCategorias();
-                                $categorias_array = iterator_to_array($categorias);
-                                $categorias_mostrar = array_slice($categorias_array, 0, 4); // Mostrar solo las primeras 4
-                                
-                                foreach ($categorias_mostrar as $categoria):
-                                    $nombre_clave = $categoria['nombre_clave'] ?? '';
-                                    $nombre = $categoria['nombre'] ?? 'Categoría';
-                                    if (!empty($nombre_clave)):
-                                ?>
-                                    <li><a href="<?php echo link_categoria($nombre_clave); ?>" class="footer-link"><?php echo htmlspecialchars($nombre); ?></a></li>
-                                <?php
-                                    endif;
-                                endforeach;
-                                
-                                // Si no hay categorías, mostrar las por defecto
-                                if (empty($categorias_mostrar)):
-                                ?>
-                                    <li><a href="/tecnologia-y-electronica-comparte-y-gana" class="footer-link">Tecnología</a></li>
-                                    <li><a href="/moda-y-belleza-comparte-y-gana" class="footer-link">Moda y Belleza</a></li>
-                                    <li><a href="/hogar-y-jardin-comparte-y-gana" class="footer-link">Hogar y Jardín</a></li>
-                                    <li><a href="/deportes-y-ocio-comparte-y-gana" class="footer-link">Deportes</a></li>
-                                <?php endif; ?>
-                            </ul>
-                        </div>
-                    </div>
-
                     <!-- Recursos -->
-                    <div class="col-md-3 col-sm-6">
+                    <div class="col-md-4 col-sm-6">
                         <div class="footer-column">
                             <div class="column-title">Recursos</div>
                             <ul class="footer-links">
@@ -137,20 +103,16 @@ function get_footer_modern() {
                                 <li><a href="/listado_marcas" class="footer-link">Todas las marcas</a></li>
                                 <li><a href="/destacados" class="footer-link">Códigos destacados</a></li>
                                 <li><a href="/blog" class="footer-link">Blog</a></li>
-                                <li><a href="https://t.me/cholloscodigoamigo" class="footer-link" target="_blank" rel="noopener noreferrer">
-                                    <i class="fa-brands fa-telegram" style="margin-right: 5px;"></i>
-                                    Canal de Chollos en Telegram
-                                </a></li>
                             </ul>
                         </div>
                     </div>
 
-                    <!-- Apps / Comunidad -->
-                    <div class="col-md-3 col-sm-6">
+                    <!-- Comunidad -->
+                    <div class="col-md-4 col-sm-12">
                         <div class="footer-column">
                             <div class="column-title">Comunidad</div>
                             <p style="color: #cccccc; font-size: 0.9rem; margin-bottom: 15px;">
-                                Únete a nuestros canales y no te pierdas ninguna oferta.
+                                Únete a nuestro canal y no te pierdas ningún código.
                             </p>
                             <div style="margin-top: 15px;">
                                 <a href="https://t.me/codigoamigocom" target="_blank" 
@@ -171,160 +133,9 @@ function get_footer_modern() {
             </div>
         </div>
         
-        <!-- Sección de últimos chollos (solo si no estamos en home) -->
-        <?php
-        $es_home = (!isset($_GET["page"]) || $_GET["page"] == "") && (strpos($_SERVER['REQUEST_URI'], '/') === 0 || $_SERVER['REQUEST_URI'] == '/');
-        if (!$es_home) {
-            if (!function_exists('imprimir_seccion_ultimos_chollos')) {
-                include_once __DIR__ . '/funciones_modern.php';
-            }
-            if (function_exists('imprimir_seccion_ultimos_chollos')) {
-                imprimir_seccion_ultimos_chollos(3, 'Últimos Chollos', true);
-            }
-        }
-        ?>
+        <!-- Sección de últimos chollos eliminada - Chollos ahora en malprecio.com -->
 
-        <!-- Sección promocional de chollos -->
-        <div class="footer-chollos-section">
-            <div class="container">
-                <div class="footer-chollos-content">
-                    <div class="footer-chollos-text">
-                        <div class="footer-chollos-title">💰 Descubre los Chollos de CodigoAmigo</div>
-                        <p class="footer-chollos-description">Encuentra las mejores ofertas y descuentos exclusivos todos los días. ¡No te pierdas ninguna oportunidad!</p>
-                    </div>
-                    <div class="footer-chollos-actions">
-                        <a href="/chollos" class="footer-chollos-btn footer-chollos-btn-primary">
-                            <span>Ver Chollos</span>
-                            <i class="fas fa-arrow-right"></i>
-                        </a>
-                        <a href="https://t.me/cholloscodigoamigo" target="_blank" rel="noopener noreferrer" class="footer-chollos-btn footer-chollos-btn-telegram">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18 1.897-.962 6.502-1.359 8.627-.168.9-.5 1.201-.82 1.23-.697.064-1.226-.461-1.901-.903-1.056-.692-1.653-1.123-2.678-1.799-1.185-.781-.417-1.21.258-1.911.177-.184 3.247-2.977 3.307-3.23.007-.032.015-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.139-5.062 3.345-.479.329-.913.489-1.302.481-.428-.009-1.252-.242-1.865-.442-.752-.244-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.831-2.529 6.998-3.015 3.333-1.386 4.025-1.627 4.477-1.635.099-.002.321.023.465.141.121.099.155.232.171.326.016.094.036.308.02.475z"/>
-                            </svg>
-                            <span>Telegram</span>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <style>
-        .footer-chollos-section {
-            background: linear-gradient(135deg, #E30613 0%, #C40510 100%);
-            padding: 40px 20px;
-            margin-top: 0;
-        }
-        
-        .footer-chollos-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 30px;
-            flex-wrap: wrap;
-        }
-        
-        .footer-chollos-text {
-            flex: 1;
-            min-width: 300px;
-        }
-        
-        .footer-chollos-title {
-            color: white;
-            font-size: 1.8em;
-            font-weight: 700;
-            margin: 0 0 10px 0;
-        }
-        
-        .footer-chollos-description {
-            color: rgba(255, 255, 255, 0.95);
-            font-size: 1.1em;
-            margin: 0;
-            line-height: 1.6;
-        }
-        
-        .footer-chollos-actions {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-        
-        .footer-chollos-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            padding: 14px 28px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 1em;
-            transition: all 0.3s ease;
-            white-space: nowrap;
-        }
-        
-        .footer-chollos-btn-primary {
-            background: white;
-            color: #E30613;
-        }
-        
-        .footer-chollos-btn-primary:hover {
-            background: #f0f0f0;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            color: #E30613;
-            text-decoration: none;
-        }
-        
-        .footer-chollos-btn-telegram {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            border: 2px solid white;
-        }
-        
-        .footer-chollos-btn-telegram:hover {
-            background: white;
-            color: #0088cc;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            text-decoration: none;
-        }
-        
-        .footer-chollos-btn svg {
-            width: 18px;
-            height: 18px;
-        }
-        
-        @media (max-width: 768px) {
-            .footer-chollos-section {
-                padding: 30px 15px;
-            }
-            
-            .footer-chollos-content {
-                flex-direction: column;
-                text-align: center;
-            }
-            
-            .footer-chollos-title {
-                font-size: 1.5em;
-            }
-            
-            .footer-chollos-description {
-                font-size: 1em;
-            }
-            
-            .footer-chollos-actions {
-                width: 100%;
-                justify-content: center;
-            }
-            
-            .footer-chollos-btn {
-                flex: 1;
-                min-width: 140px;
-            }
-        }
-        </style>
+        <!-- Sección promocional de chollos eliminada - Chollos ahora en malprecio.com -->
 
         <!-- Footer bottom -->
         <div class="footer-bottom">
@@ -355,6 +166,11 @@ function get_footer_modern() {
                                 </span>
                             </div>
                         </div>
+                    </div>
+                </div>
+                <div class="row" style="margin-top: 20px; border-top: 1px solid #404040; padding-top: 15px;">
+                    <div class="col-12" style="text-align: center;">
+                        <p style="color: #888; font-size: 0.8rem; margin: 0;">También te puede interesar: <a href="https://www.malprecio.com" target="_blank" rel="noopener noreferrer" style="color: #aaa; text-decoration: underline;">Malprecio.com</a> — Chollos y ofertas</p>
                     </div>
                 </div>
             </div>
@@ -388,6 +204,61 @@ function get_footer_modern() {
     
     // Botón flotante de Telegram - DESACTIVADO (no aporta valor)
     // include_once __DIR__ . '/telegram_floating_btn.php';
+    
+    // Modal promocional de Chollos Shorts (solo en página de chollos)
+    $es_pagina_chollos = (strpos($_SERVER['REQUEST_URI'], '/chollos') !== false && strpos($_SERVER['REQUEST_URI'], '/chollos-shorts') === false);
+    if ($es_pagina_chollos):
+    ?>
+    <!-- Shorts Promo Modal -->
+    <div id="shortsPromoModal" style="display:none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 99999; justify-content: center; align-items: center;">
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 20px; padding: 40px; max-width: 420px; margin: 20px; text-align: center; position: relative; box-shadow: 0 25px 80px rgba(0,0,0,0.5); animation: modalPop 0.4s ease;">
+            <button onclick="closeShortsPromo()" style="position: absolute; top: 15px; right: 15px; background: rgba(255,255,255,0.1); border: none; color: #888; font-size: 24px; cursor: pointer; width: 36px; height: 36px; border-radius: 50%;">&times;</button>
+            
+            <div style="font-size: 60px; margin-bottom: 15px;">🎬</div>
+            <h2 style="color: white; font-size: 1.8rem; margin: 0 0 10px; font-weight: 800;">¡NUEVO! Chollos Shorts</h2>
+            <p style="color: #aaa; font-size: 1rem; line-height: 1.5; margin-bottom: 25px;">
+                Descubre las mejores ofertas en formato video.<br>
+                <span style="color: #ff6b6b;">Desliza, mira y ahorra</span> como en TikTok.
+            </p>
+            
+            <a href="https://www.malprecio.com/chollos-shorts" target="_blank" style="display: inline-flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #E30613, #ff4757); color: white; text-decoration: none; padding: 16px 35px; border-radius: 30px; font-weight: 700; font-size: 1.1rem; transition: all 0.3s ease; box-shadow: 0 8px 25px rgba(227,6,19,0.4);">
+                <i class="fas fa-play"></i>
+                Ver Chollos Shorts
+            </a>
+            
+            <p style="color: #666; font-size: 0.8rem; margin-top: 20px; cursor: pointer;" onclick="closeShortsPromo()">No, gracias. Seguir viendo chollos</p>
+        </div>
+    </div>
+    
+    <style>
+    @keyframes modalPop {
+        from { opacity: 0; transform: scale(0.8); }
+        to { opacity: 1; transform: scale(1); }
+    }
+    </style>
+    
+    <script>
+    (function() {
+        // Show modal only once per session
+        if (!sessionStorage.getItem('shortsPromoShown')) {
+            setTimeout(function() {
+                document.getElementById('shortsPromoModal').style.display = 'flex';
+                sessionStorage.setItem('shortsPromoShown', 'true');
+            }, 3000); // Show after 3 seconds
+        }
+    })();
+    
+    function closeShortsPromo() {
+        document.getElementById('shortsPromoModal').style.display = 'none';
+    }
+    
+    // Close on background click
+    document.getElementById('shortsPromoModal').addEventListener('click', function(e) {
+        if (e.target === this) closeShortsPromo();
+    });
+    </script>
+    <?php endif; ?>
+    <?php
 }
 
 function get_footer()
@@ -489,31 +360,8 @@ function get_footer()
 </div>
 <?php }*/ ?>
 
-    <script>
-        /* Author: AdGlare Ad Server (https://www.adglare.com) */
-        function hasAdblock() {
-            var a = document.createElement('div');
-            a.innerHTML = '&nbsp;';
-            a.className = 'ads ad adsbox doubleclick ad-placement carbon-ads adglare';
-            a.style = 'width: 1px !important; height: 1px !important; position: absolute !important; left: -5000px !important; top: -5000px !important;';
-            var r = false;
-            try {
-                document.body.appendChild(a);
-                var e = document.getElementsByClassName('adsbox')[0];
-                if (e.offsetHeight === 0 || e.clientHeight === 0) r = true;
-                if (window.getComputedStyle !== undefined) {
-                    var tmp = window.getComputedStyle(e, null);
-                    if (tmp && (tmp.getPropertyValue('display') == 'none' || tmp.getPropertyValue('visibility') == 'hidden')) r = true;
-                }
-                document.body.removeChild(a);
-            } catch (e) { }
-            return r;
-        }
 
-        if (hasAdblock()) {
-            alert('Adblock, detectado\n\nPara ver correctamente los códigos, por favor desactiva Adblock');
-        }
-    </script>
+
 
     <?php
 
@@ -556,7 +404,7 @@ function get_footer()
         if (isset($_SESSION["user_id"]) && $_SESSION["user_id"]) {
             ?>
 
-            <script src="https://cdn.jsdelivr.net/npm/chart.js@2.8.0"></script>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js@2.8.0" defer></script>
         <?php } ?>
 
         <?php if (isset($detect) && $detect->isMobile()) { ?>
@@ -613,7 +461,7 @@ function get_footer()
 
 
 
-        <script src="https://unpkg.com/masonry-layout@4/dist/masonry.pkgd.min.js"></script>
+        <script src="https://unpkg.com/masonry-layout@4/dist/masonry.pkgd.min.js" defer></script>
         <?php
 
         /*?>
@@ -757,7 +605,11 @@ function get_footer()
 
 
                 <?php if (!isset($_GET["codigo"])) { ?>
-                    reordena();
+                    if (typeof requestIdleCallback === 'function') {
+                        requestIdleCallback(function() { reordena(); });
+                    } else {
+                        setTimeout(function() { reordena(); }, 100);
+                    }
                 <?php } else { ?>
 
 
@@ -777,7 +629,7 @@ function get_footer()
 
         </script>
 
-        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" media="print" onload="this.media='all'">
         
         <style>
         /* Estilos responsive para la sección de Telegram */
@@ -821,163 +673,9 @@ function get_footer()
         }
         </style>
 
-    <!-- Sección promocional de chollos -->
-    <div class="footer-chollos-section">
-        <div class="container" style="max-width: 1200px; margin: 0 auto;">
-            <div class="footer-chollos-content">
-                <div class="footer-chollos-text">
-                    <h3 class="footer-chollos-title">💰 Descubre los Chollos de CodigoAmigo</h3>
-                    <p class="footer-chollos-description">Encuentra las mejores ofertas y descuentos exclusivos todos los días. ¡No te pierdas ninguna oportunidad!</p>
-                </div>
-                <div class="footer-chollos-actions">
-                    <a href="/chollos" class="footer-chollos-btn footer-chollos-btn-primary">
-                        <span>Ver Chollos</span>
-                        <i class="fas fa-arrow-right"></i>
-                    </a>
-                    <a href="https://t.me/cholloscodigoamigo" target="_blank" rel="noopener noreferrer" class="footer-chollos-btn footer-chollos-btn-telegram">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18 1.897-.962 6.502-1.359 8.627-.168.9-.5 1.201-.82 1.23-.697.064-1.226-.461-1.901-.903-1.056-.692-1.653-1.123-2.678-1.799-1.185-.781-.417-1.21.258-1.911.177-.184 3.247-2.977 3.307-3.23.007-.032.015-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.139-5.062 3.345-.479.329-.913.489-1.302.481-.428-.009-1.252-.242-1.865-.442-.752-.244-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.831-2.529 6.998-3.015 3.333-1.386 4.025-1.627 4.477-1.635.099-.002.321.023.465.141.121.099.155.232.171.326.016.094.036.308.02.475z"/>
-                        </svg>
-                        <span>Telegram</span>
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <style>
-    .footer-chollos-section {
-        background: linear-gradient(135deg, #E30613 0%, #C40510 100%);
-        padding: 40px 20px;
-        margin-top: 0;
-    }
-    
-    .footer-chollos-content {
-        max-width: 1200px;
-        margin: 0 auto;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 30px;
-        flex-wrap: wrap;
-    }
-    
-    .footer-chollos-text {
-        flex: 1;
-        min-width: 300px;
-    }
-    
-    .footer-chollos-title {
-        color: white;
-        font-size: 1.8em;
-        font-weight: 700;
-        margin: 0 0 10px 0;
-    }
-    
-    .footer-chollos-description {
-        color: rgba(255, 255, 255, 0.95);
-        font-size: 1.1em;
-        margin: 0;
-        line-height: 1.6;
-    }
-    
-    .footer-chollos-actions {
-        display: flex;
-        gap: 15px;
-        flex-wrap: wrap;
-    }
-    
-    .footer-chollos-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-        padding: 14px 28px;
-        border-radius: 8px;
-        text-decoration: none;
-        font-weight: 600;
-        font-size: 1em;
-        transition: all 0.3s ease;
-        white-space: nowrap;
-    }
-    
-    .footer-chollos-btn-primary {
-        background: white;
-        color: #E30613;
-    }
-    
-    .footer-chollos-btn-primary:hover {
-        background: #f0f0f0;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        color: #E30613;
-        text-decoration: none;
-    }
-    
-    .footer-chollos-btn-telegram {
-        background: rgba(255, 255, 255, 0.2);
-        color: white;
-        border: 2px solid white;
-    }
-    
-    .footer-chollos-btn-telegram:hover {
-        background: white;
-        color: #0088cc;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        text-decoration: none;
-    }
-    
-    .footer-chollos-btn svg {
-        width: 18px;
-        height: 18px;
-    }
-    
-    @media (max-width: 768px) {
-        .footer-chollos-section {
-            padding: 30px 15px;
-        }
-        
-        .footer-chollos-content {
-            flex-direction: column;
-            text-align: center;
-        }
-        
-        .footer-chollos-title {
-            font-size: 1.5em;
-        }
-        
-        .footer-chollos-description {
-            font-size: 1em;
-        }
-        
-        .footer-chollos-actions {
-            width: 100%;
-            justify-content: center;
-        }
-        
-        .footer-chollos-btn {
-            flex: 1;
-            min-width: 140px;
-        }
-    }
-    </style>
-
-    <!-- Sección de ayuda con Telegram -->
-    <div class="telegram-help-section" style="background: linear-gradient(135deg, #E30613, #C40510); padding: 30px 20px; margin-top: 40px; text-align: center;">
-        <div class="container" style="max-width: 1200px; margin: 0 auto;">
-            <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 15px; flex-wrap: wrap;">
-                <i class="fa-brands fa-telegram" style="font-size: 2.5rem; color: white;"></i>
-                <div>
-                    <h3 style="color: white; margin: 0; font-size: 1.8rem; font-weight: bold;">¿Necesitas ayuda?</h3>
-                    <p style="color: white; margin: 5px 0 0 0; font-size: 1.2rem; opacity: 0.9;">¡Escríbenos!</p>
-                </div>
-            </div>
-            <a href="https://t.me/spnfury" target="_blank" style="display: inline-block; background: white; color: #E30613; padding: 15px 30px; border-radius: 25px; text-decoration: none; font-weight: bold; font-size: 1.1rem; transition: all 0.3s ease; box-shadow: 0 3px 10px rgba(0,0,0,0.2);">
-                <i class="fa-brands fa-telegram" style="margin-right: 8px;"></i>
-                Contactar por Telegram
-            </a>
-        </div>
+    <!-- Mención sutil a Malprecio -->
+    <div style="text-align: center; padding: 15px 20px; background: #f5f5f5; border-top: 1px solid #e0e0e0;">
+        <p style="color: #888; font-size: 0.8rem; margin: 0;">También te puede interesar: <a href="https://www.malprecio.com" target="_blank" rel="noopener noreferrer" style="color: #999; text-decoration: underline;">Malprecio.com</a> — Chollos y ofertas</p>
     </div>
 
     </footer>
@@ -1000,27 +698,9 @@ function get_footer()
     </script>
 
     <?php
-    // Incluir funciones de AdSense si no están incluidas
-    if (!function_exists('google_adsense')) {
-        include_once __DIR__ . '/funciones_adsense.php';
-    }
-    
-    // Verificar si se debe anular AdSense
-    global $anula_adsense;
-    if (isset($GLOBALS['anula_adsense'])) {
-        $anula_adsense = $GLOBALS['anula_adsense'];
-    }
-    
-    $request_uri = $_SERVER["REQUEST_URI"];
-    if (strpos($request_uri, "registro") || strpos($request_uri, "nuevo_codigo") || strpos($request_uri, "mis-anuncios")) {
-        // No mostrar publicidad en registro, nuevo código o mis-anuncios
-    } else if ($show_adsense == 1 && !$panel && (!isset($anula_adsense) || !$anula_adsense)) {
-        // Verificar que google_adsense exista antes de llamarlo
-        if (function_exists('google_adsense')) {
-            google_adsense();
-        }
-    }
+    // AdSense desactivado - funciones_adsense.php ahora devuelve cadenas vacías
     ?>
+
 
 
     <?php /*?>
@@ -1039,147 +719,7 @@ function get_footer()
 <? */ ?>
 
 
-    <!-- Sección promocional de chollos -->
-    <div class="footer-chollos-section">
-        <div class="container">
-            <div class="footer-chollos-content">
-                <div class="footer-chollos-text">
-                    <h3 class="footer-chollos-title">💰 Descubre los Chollos de CodigoAmigo</h3>
-                    <p class="footer-chollos-description">Encuentra las mejores ofertas y descuentos exclusivos todos los días. ¡No te pierdas ninguna oportunidad!</p>
-                </div>
-                <div class="footer-chollos-actions">
-                    <a href="/chollos" class="footer-chollos-btn footer-chollos-btn-primary">
-                        <span>Ver Chollos</span>
-                        <i class="fas fa-arrow-right"></i>
-                    </a>
-                    <a href="https://t.me/cholloscodigoamigo" target="_blank" rel="noopener noreferrer" class="footer-chollos-btn footer-chollos-btn-telegram">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18 1.897-.962 6.502-1.359 8.627-.168.9-.5 1.201-.82 1.23-.697.064-1.226-.461-1.901-.903-1.056-.692-1.653-1.123-2.678-1.799-1.185-.781-.417-1.21.258-1.911.177-.184 3.247-2.977 3.307-3.23.007-.032.015-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.139-5.062 3.345-.479.329-.913.489-1.302.481-.428-.009-1.252-.242-1.865-.442-.752-.244-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.831-2.529 6.998-3.015 3.333-1.386 4.025-1.627 4.477-1.635.099-.002.321.023.465.141.121.099.155.232.171.326.016.094.036.308.02.475z"/>
-                        </svg>
-                        <span>Telegram</span>
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <style>
-    .footer-chollos-section {
-        background: linear-gradient(135deg, #E30613 0%, #C40510 100%);
-        padding: 40px 20px;
-        margin-top: 0;
-    }
-    
-    .footer-chollos-content {
-        max-width: 1200px;
-        margin: 0 auto;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 30px;
-        flex-wrap: wrap;
-    }
-    
-    .footer-chollos-text {
-        flex: 1;
-        min-width: 300px;
-    }
-    
-    .footer-chollos-title {
-        color: white;
-        font-size: 1.8em;
-        font-weight: 700;
-        margin: 0 0 10px 0;
-    }
-    
-    .footer-chollos-description {
-        color: rgba(255, 255, 255, 0.95);
-        font-size: 1.1em;
-        margin: 0;
-        line-height: 1.6;
-    }
-    
-    .footer-chollos-actions {
-        display: flex;
-        gap: 15px;
-        flex-wrap: wrap;
-    }
-    
-    .footer-chollos-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-        padding: 14px 28px;
-        border-radius: 8px;
-        text-decoration: none;
-        font-weight: 600;
-        font-size: 1em;
-        transition: all 0.3s ease;
-        white-space: nowrap;
-    }
-    
-    .footer-chollos-btn-primary {
-        background: white;
-        color: #E30613;
-    }
-    
-    .footer-chollos-btn-primary:hover {
-        background: #f0f0f0;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        color: #E30613;
-        text-decoration: none;
-    }
-    
-    .footer-chollos-btn-telegram {
-        background: rgba(255, 255, 255, 0.2);
-        color: white;
-        border: 2px solid white;
-    }
-    
-    .footer-chollos-btn-telegram:hover {
-        background: white;
-        color: #0088cc;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        text-decoration: none;
-    }
-    
-    .footer-chollos-btn svg {
-        width: 18px;
-        height: 18px;
-    }
-    
-    @media (max-width: 768px) {
-        .footer-chollos-section {
-            padding: 30px 15px;
-        }
-        
-        .footer-chollos-content {
-            flex-direction: column;
-            text-align: center;
-        }
-        
-        .footer-chollos-title {
-            font-size: 1.5em;
-        }
-        
-        .footer-chollos-description {
-            font-size: 1em;
-        }
-        
-        .footer-chollos-actions {
-            width: 100%;
-            justify-content: center;
-        }
-        
-        .footer-chollos-btn {
-            flex: 1;
-            min-width: 140px;
-        }
-    }
-    </style>
 
     </body>
 

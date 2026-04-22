@@ -10,6 +10,14 @@ require_once __DIR__ . '/myphp/funciones_amazon_services.php';
 $slug = isset($_GET['slug']) ? trim($_GET['slug']) : '';
 $slug = preg_replace('/[^a-zA-Z0-9-_]/', '', $slug); // Sanitize
 
+// Bot Detection
+require_once __DIR__ . '/myphp/bot_detection.php';
+if (isBot()) {
+    header("HTTP/1.0 404 Not Found");
+    echo "404 Not Found";
+    exit;
+}
+
 if (empty($slug)) {
     header("HTTP/1.0 404 Not Found");
     echo "Servicio no especificado.";

@@ -81,16 +81,9 @@ pipeline {
                             PYTHON_CMD="python3"
                         fi
                         
-                        # Ejecutar el script
-                        echo "Ejecutando: \${PYTHON_CMD} telegram_monitor.py"
-                        \${PYTHON_CMD} telegram_monitor.py 2>&1 | tee -a ${LOG_FILE}
-                        
-                        EXIT_CODE=\${PIPESTATUS[0]}
-                        
-                        if [ \${EXIT_CODE} -ne 0 ]; then
-                            echo "❌ Error en sincronización (código: \${EXIT_CODE})"
-                            exit \${EXIT_CODE}
-                        fi
+                        # Ejecutar el script (el script ya escribe en su propio log)
+                        echo "Ejecutando: ${PYTHON_CMD} telegram_monitor.py"
+                        ${PYTHON_BIN} telegram_monitor.py
                     """
                 }
             }

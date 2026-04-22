@@ -64,6 +64,71 @@ $email_logs = $collection_email_logs->find(
 // Procesar acciones
 if ($_POST && isset($_POST['action'])) {
     switch ($_POST['action']) {
+        case 'toggle_vip':
+            include_once __DIR__ . '/../myphp/funciones_usuario.php';
+            $accion_vip = $_POST['accion_vip'] ?? '';
+            $meses = max(1, (int)($_POST['meses'] ?? 1));
+            $cancelar_stripe = !empty($_POST['cancelar_stripe']);
+            $enviar_email_decline = !empty($_POST['enviar_email_decline']);
+            $mensajes = [];
+            try {
+                if ($accion_vip === 'activar') {
+                    $expires = new DateTime();
+                    $expires->modify("+{$meses} month");
+                    $sub_id_manual = 'direct_activation_' . time();
+                    $ok = activar_vip($user_id, $sub_id_manual, $expires);
+                    $mensajes[] = $ok
+                        ? "VIP activado manualmente hasta " . $expires->format('d/m/Y') . " (+10€ saldo bonus)"
+                        : "No se pudo activar VIP";
+                    $_SESSION[$ok ? 'success_message' : 'error_message'] = implode(' · ', $mensajes);
+                } elseif ($accion_vip === 'desactivar') {
+                    $usuario_pre = $collection_usuarios->findOne(['_id' => new MongoDB\BSON\ObjectId($user_id)]);
+                    $sub_id_actual = $usuario_pre['vip_subscription_id'] ?? '';
+                    $es_sub_real = $sub_id_actual && strpos($sub_id_actual, 'direct_activation_') !== 0;
+
+                    if ($cancelar_stripe && $es_sub_real) {
+                        include_once __DIR__ . '/../vendor/stripe/stripe-php/init.php';
+                        include_once __DIR__ . '/../config/stripe.php';
+                        try {
+                            \Stripe\Stripe::setApiKey(get_stripe_live_secret_key());
+                            $sub = \Stripe\Subscription::retrieve($sub_id_actual);
+                            if ($sub->status !== 'canceled') {
+                                $sub->cancel();
+                                $mensajes[] = "Suscripción Stripe cancelada ($sub_id_actual)";
+                            } else {
+                                $mensajes[] = "Stripe ya estaba canceled";
+                            }
+                            $invs = \Stripe\Invoice::all(['subscription' => $sub_id_actual, 'limit' => 5]);
+                            foreach ($invs->data as $inv) {
+                                if ($inv->status === 'open') {
+                                    $inv->voidInvoice();
+                                    $mensajes[] = "Factura {$inv->id} voided";
+                                }
+                            }
+                        } catch (Throwable $e) {
+                            $mensajes[] = "⚠️ Error Stripe: " . $e->getMessage();
+                        }
+                    }
+
+                    $ok = desactivar_vip($user_id);
+                    $mensajes[] = $ok ? "VIP desactivado en MongoDB" : "No se pudo desactivar VIP";
+
+                    if ($enviar_email_decline && $ok) {
+                        $usuario_post = $collection_usuarios->findOne(['_id' => new MongoDB\BSON\ObjectId($user_id)]);
+                        $motivo = $_POST['motivo_decline'] ?? 'Pago rechazado';
+                        $card_last4 = $_POST['card_last4'] ?? '';
+                        $card_brand = $_POST['card_brand'] ?? '';
+                        $res_email = enviarEmailVIPPagoFallido($usuario_post, $motivo, $card_last4, $card_brand);
+                        $mensajes[] = $res_email['success'] ? "Email decline enviado" : "⚠️ Fallo email: " . ($res_email['error'] ?? '?');
+                    }
+
+                    $_SESSION[$ok ? 'success_message' : 'error_message'] = implode(' · ', $mensajes);
+                }
+            } catch (Throwable $e) {
+                $_SESSION['error_message'] = "Error toggle VIP: " . $e->getMessage();
+            }
+            break;
+
         case 'patrocinar_codigo':
             $codigo_id = $_POST['codigo_id'];
             $tipo_destacado = $_POST['tipo_destacado']; // 'destacado' o 'destacado_social'
@@ -202,11 +267,11 @@ $estadisticas = [
     'codigos_con_marca_invalida' => 0,
     'total_vistas' => array_sum(array_column($codigos, 'totalclicks')),
     'total_recargas' => count(array_filter($transacciones, function($t) {
-        return in_array($t['tipo'] ?? '', ['recarga', 'recarga_admin']);
+        return in_array($t['tipo'] ?? '', ['recarga', 'recarga_admin', 'recarga_vip']);
     })),
     'total_saldo_recargado' => array_sum(array_column(
         array_filter($transacciones, function($t) {
-            return in_array($t['tipo'] ?? '', ['recarga', 'recarga_admin']);
+            return in_array($t['tipo'] ?? '', ['recarga', 'recarga_admin', 'recarga_vip']);
         }),
         'cantidad'
     )),
@@ -243,6 +308,7 @@ function formatearTipoTransaccion($tipo) {
     $tipos = [
         'recarga' => 'Recarga de Saldo',
         'recarga_admin' => 'Recarga Administrativa',
+        'recarga_vip' => 'Recarga Mensual VIP',
         'ajuste_admin' => 'Ajuste Administrativo',
         'destacado' => 'Patrocinio Código',
         'destacado_splash' => 'Patrocinio Masivo',
@@ -439,6 +505,178 @@ $title = "Detalle del Usuario - " . ($usuario['username'] ?? 'Usuario');
                                     </button>
                                 </div>
 
+                                <!-- Sección VIP -->
+                                <?php
+                                $es_vip_actual = !empty($usuario['is_vip']);
+                                $vip_expires = $usuario['vip_expires_at'] ?? null;
+                                if ($vip_expires instanceof MongoDB\BSON\UTCDateTime) $vip_expires = $vip_expires->toDateTime();
+                                $vip_started = $usuario['vip_started_at'] ?? null;
+                                if ($vip_started instanceof MongoDB\BSON\UTCDateTime) $vip_started = $vip_started->toDateTime();
+                                $vip_cancelled = $usuario['vip_cancelled_at'] ?? null;
+                                if ($vip_cancelled instanceof MongoDB\BSON\UTCDateTime) $vip_cancelled = $vip_cancelled->toDateTime();
+                                $vip_sub_id = $usuario['vip_subscription_id'] ?? '';
+                                $vip_cancel_pending = !empty($usuario['vip_cancel_pending']);
+                                $vip_retention = !empty($usuario['vip_retention_applied']);
+                                $es_sub_real = $vip_sub_id && strpos($vip_sub_id, 'direct_activation_') !== 0;
+                                $stripe_sub_url = $es_sub_real ? 'https://dashboard.stripe.com/subscriptions/' . urlencode($vip_sub_id) : '';
+                                ?>
+                                <div class="mb-3 p-3" style="background:linear-gradient(135deg,#fff8e1 0%,#fffaed 100%);border:1px solid #ffd700;border-radius:10px;">
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <h6 class="mb-0"><i class="fas fa-crown" style="color:#d4a017"></i> Suscripción VIP</h6>
+                                        <?php if ($es_vip_actual): ?>
+                                            <span class="badge" style="background:#d4a017;color:#fff;">ACTIVO</span>
+                                        <?php else: ?>
+                                            <span class="badge bg-secondary">Inactivo</span>
+                                        <?php endif; ?>
+                                    </div>
+
+                                    <?php if ($es_vip_actual || $vip_sub_id): ?>
+                                    <div style="font-size:12px;line-height:1.7;">
+                                        <?php if ($vip_started): ?>
+                                            <div><span class="text-muted">Desde:</span> <strong><?php echo $vip_started->format('d/m/Y'); ?></strong></div>
+                                        <?php endif; ?>
+                                        <?php if ($vip_expires): ?>
+                                            <div><span class="text-muted">Expira:</span> <strong><?php echo $vip_expires->format('d/m/Y H:i'); ?></strong></div>
+                                        <?php endif; ?>
+                                        <?php if ($vip_cancelled && !$es_vip_actual): ?>
+                                            <div><span class="text-muted">Cancelado:</span> <strong><?php echo $vip_cancelled->format('d/m/Y H:i'); ?></strong></div>
+                                        <?php endif; ?>
+                                        <?php if ($vip_sub_id): ?>
+                                            <div>
+                                                <span class="text-muted">Sub:</span>
+                                                <?php if ($es_sub_real): ?>
+                                                    <a href="<?php echo $stripe_sub_url; ?>" target="_blank" style="font-size:11px;font-family:monospace;">
+                                                        <?php echo htmlspecialchars($vip_sub_id); ?> <i class="fas fa-external-link-alt" style="font-size:9px;"></i>
+                                                    </a>
+                                                <?php else: ?>
+                                                    <code style="font-size:11px;"><?php echo htmlspecialchars($vip_sub_id); ?></code>
+                                                    <span class="badge bg-info" style="font-size:9px;">MANUAL</span>
+                                                <?php endif; ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <?php if ($vip_cancel_pending): ?>
+                                            <div class="text-warning"><i class="fas fa-clock"></i> Cancelación programada fin de período</div>
+                                        <?php endif; ?>
+                                        <?php if ($vip_retention): ?>
+                                            <div class="text-info"><i class="fas fa-gift"></i> Retención aplicada</div>
+                                        <?php endif; ?>
+                                    </div>
+                                    <?php endif; ?>
+
+                                    <div class="mt-3">
+                                    <?php if ($es_vip_actual): ?>
+                                        <button type="button" class="btn btn-sm btn-outline-danger w-100"
+                                                data-bs-toggle="modal" data-bs-target="#modalDesactivarVIP">
+                                            <i class="fas fa-times"></i> Desactivar VIP
+                                        </button>
+                                    <?php else: ?>
+                                        <button type="button" class="btn btn-sm w-100"
+                                                style="background:#d4a017;color:#fff;"
+                                                data-bs-toggle="modal" data-bs-target="#modalActivarVIP">
+                                            <i class="fas fa-crown"></i> Activar VIP manualmente
+                                        </button>
+                                    <?php endif; ?>
+                                    </div>
+                                </div>
+
+                                <!-- Modal Activar VIP -->
+                                <div class="modal fade" id="modalActivarVIP" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <form method="POST">
+                                            <div class="modal-content">
+                                                <div class="modal-header" style="background:#d4a017;color:#fff;">
+                                                    <h5 class="modal-title"><i class="fas fa-crown"></i> Activar VIP manualmente</h5>
+                                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <input type="hidden" name="action" value="toggle_vip">
+                                                    <input type="hidden" name="accion_vip" value="activar">
+                                                    <p><strong>Usuario:</strong> <?php echo htmlspecialchars($usuario['username'] ?? ''); ?> (<?php echo htmlspecialchars($usuario['mail'] ?? ''); ?>)</p>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Meses de VIP</label>
+                                                        <input type="number" name="meses" value="1" min="1" max="36" class="form-control" required>
+                                                        <small class="text-muted">Se añadirán +10€ de saldo (bonus VIP, primera vez).</small>
+                                                    </div>
+                                                    <div class="alert alert-warning" style="font-size:13px;">
+                                                        <i class="fas fa-info-circle"></i> Activación manual (no crea suscripción en Stripe). El sub_id será <code>direct_activation_&lt;timestamp&gt;</code>.
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn" style="background:#d4a017;color:#fff;">Activar VIP</button>
+                                                </div>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+
+                                <!-- Modal Desactivar VIP -->
+                                <div class="modal fade" id="modalDesactivarVIP" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <form method="POST">
+                                            <div class="modal-content">
+                                                <div class="modal-header bg-danger text-white">
+                                                    <h5 class="modal-title"><i class="fas fa-times-circle"></i> Desactivar VIP</h5>
+                                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <input type="hidden" name="action" value="toggle_vip">
+                                                    <input type="hidden" name="accion_vip" value="desactivar">
+                                                    <p><strong>Usuario:</strong> <?php echo htmlspecialchars($usuario['username'] ?? ''); ?> (<?php echo htmlspecialchars($usuario['mail'] ?? ''); ?>)</p>
+
+                                                    <?php if ($es_sub_real): ?>
+                                                    <div class="form-check mb-2">
+                                                        <input class="form-check-input" type="checkbox" name="cancelar_stripe" value="1" id="chkCancelStripe" checked>
+                                                        <label class="form-check-label" for="chkCancelStripe">
+                                                            <strong>Cancelar suscripción en Stripe</strong> (<?php echo htmlspecialchars($vip_sub_id); ?>) y anular facturas abiertas
+                                                        </label>
+                                                    </div>
+                                                    <div class="form-check mb-3">
+                                                        <input class="form-check-input" type="checkbox" name="enviar_email_decline" value="1" id="chkEmailDecline">
+                                                        <label class="form-check-label" for="chkEmailDecline">
+                                                            Enviar email de pago fallido al usuario
+                                                        </label>
+                                                    </div>
+                                                    <div id="camposEmailDecline" style="display:none; border-left:3px solid #ffc107; padding-left:12px;">
+                                                        <div class="mb-2">
+                                                            <label class="form-label" style="font-size:12px;">Motivo decline (texto banco)</label>
+                                                            <input type="text" name="motivo_decline" class="form-control form-control-sm" placeholder="Your card does not support this type of purchase">
+                                                        </div>
+                                                        <div class="row">
+                                                            <div class="col-7">
+                                                                <label class="form-label" style="font-size:12px;">Marca</label>
+                                                                <input type="text" name="card_brand" class="form-control form-control-sm" placeholder="mastercard">
+                                                            </div>
+                                                            <div class="col-5">
+                                                                <label class="form-label" style="font-size:12px;">Last4</label>
+                                                                <input type="text" name="card_last4" class="form-control form-control-sm" placeholder="1234" maxlength="4">
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <?php else: ?>
+                                                    <div class="alert alert-info" style="font-size:13px;">
+                                                        <i class="fas fa-info-circle"></i> Activación manual (sin suscripción Stripe). Solo se desactiva en MongoDB.
+                                                    </div>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-danger">Desactivar VIP</button>
+                                                </div>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                                <?php if ($es_sub_real): ?>
+                                <script>
+                                (function(){
+                                    var chk = document.getElementById('chkEmailDecline');
+                                    var box = document.getElementById('camposEmailDecline');
+                                    if (chk && box) chk.addEventListener('change', function(){ box.style.display = chk.checked ? 'block' : 'none'; });
+                                })();
+                                </script>
+                                <?php endif; ?>
+
                                 <div class="text-center">
                                     <small class="text-muted">
                                         <strong>ID:</strong> <code class="d-block"><?php echo $usuario['_id']; ?></code>
@@ -589,7 +827,7 @@ $title = "Detalle del Usuario - " . ($usuario['username'] ?? 'Usuario');
                                                     $cantidad = $transaccion['cantidad'] ?? 0;
                                                     echo $cantidad > 0 ? 'cantidad-positiva' : ($cantidad < 0 ? 'cantidad-negativa' : 'cantidad-cero');
                                                 ?>">
-                                                    <?php if (($transaccion['tipo'] ?? '') == 'recarga' || ($transaccion['tipo'] ?? '') == 'recarga_admin' || ($transaccion['tipo'] ?? '') == 'ajuste_admin'): ?>
+                                                    <?php if (($transaccion['tipo'] ?? '') == 'recarga' || ($transaccion['tipo'] ?? '') == 'recarga_admin' || ($transaccion['tipo'] ?? '') == 'ajuste_admin' || ($transaccion['tipo'] ?? '') == 'recarga_vip'): ?>
                                                         +€<?php echo number_format(abs($cantidad), 2); ?>
                                                     <?php else: ?>
                                                         €<?php echo number_format($cantidad, 2); ?>

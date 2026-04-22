@@ -51,7 +51,12 @@ if (empty($query) || strlen($query) < 1) {
                     'nombre' => $marca['nombre'],
                     'nombre_clave' => $marca['nombre_clave'] ?? normalizeMarcaName($marca['nombre']),
                     'imagen' => $marca['imagen'] ?? '/img/no_image.png',
-                    'categoria' => $marca['categoria'] ?? 'General'
+                    'categoria' => $marca['categoria'] ?? 'General',
+                    'beneficio_oficial' => isset($marca['beneficio_oficial']) && !empty($marca['beneficio_oficial']['cantidad']) ? [
+                        'cantidad' => $marca['beneficio_oficial']['cantidad'],
+                        'tipo' => $marca['beneficio_oficial']['tipo'] ?? 'euros',
+                        'texto' => $marca['beneficio_oficial']['texto'] ?? ''
+                    ] : null
                 ];
             }
         }
@@ -92,7 +97,12 @@ try {
                 'nombre' => $marca['nombre'],
                 'nombre_clave' => $marca['nombre_clave'] ?? normalizeMarcaName($marca['nombre']),
                 'imagen' => $marca['imagen'] ?? '/img/no_image.png',
-                'categoria' => $marca['categoria'] ?? 'General'
+                'categoria' => $marca['categoria'] ?? 'General',
+                'beneficio_oficial' => isset($marca['beneficio_oficial']) && !empty($marca['beneficio_oficial']['cantidad']) ? [
+                    'cantidad' => $marca['beneficio_oficial']['cantidad'],
+                    'tipo' => $marca['beneficio_oficial']['tipo'] ?? 'euros',
+                    'texto' => $marca['beneficio_oficial']['texto'] ?? ''
+                ] : null
             ];
         }
     }

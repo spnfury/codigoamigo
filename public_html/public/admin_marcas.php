@@ -3,9 +3,9 @@
 session_start();
 
 // Mostrar errores en pantalla (solo admin)
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 
 // Incluir archivos necesarios
 include_once __DIR__ . '/../inc/includes.php';
@@ -84,6 +84,18 @@ if ($_POST) {
                     'aviso' => 'Marca creada por administrador'
                 ];
                 
+                // Beneficio oficial (si se definió)
+                $bo_cantidad = trim($_POST['beneficio_oficial_cantidad'] ?? '');
+                if ($bo_cantidad !== '' && is_numeric($bo_cantidad) && floatval($bo_cantidad) > 0) {
+                    $nueva_marca['beneficio_oficial'] = [
+                        'cantidad' => floatval($bo_cantidad),
+                        'tipo' => $_POST['beneficio_oficial_tipo'] ?? 'euros',
+                        'texto' => trim($_POST['beneficio_oficial_texto'] ?? ''),
+                        'origen' => 'manual',
+                        'actualizado' => date('Y-m-d')
+                    ];
+                }
+                
                 $result = $collection_marcas->insertOne($nueva_marca);
                 if ($result->getInsertedId()) {
                     $_SESSION['success_message'] = "Marca '$nombre' creada correctamente";
@@ -144,6 +156,21 @@ if ($_POST) {
                 'destacada_home' => $destacada_home,
                 'ventajas_principales' => $ventajas_principales
             ];
+            
+            // Beneficio oficial
+            $bo_cantidad = trim($_POST['beneficio_oficial_cantidad'] ?? '');
+            if ($bo_cantidad !== '' && is_numeric($bo_cantidad) && floatval($bo_cantidad) > 0) {
+                $update_data['beneficio_oficial'] = [
+                    'cantidad' => floatval($bo_cantidad),
+                    'tipo' => $_POST['beneficio_oficial_tipo'] ?? 'euros',
+                    'texto' => trim($_POST['beneficio_oficial_texto'] ?? ''),
+                    'origen' => 'manual',
+                    'actualizado' => date('Y-m-d')
+                ];
+            } elseif ($bo_cantidad === '' || $bo_cantidad === '0') {
+                // Si se borra el campo, eliminar el beneficio oficial
+                $update_data['beneficio_oficial'] = null;
+            }
             
             // Si se marca como destacada y no tiene fecha, añadirla
             if ($destacada_home && empty($marca_actual['fecha_destacada'])) {
@@ -577,7 +604,7 @@ $redirects = get_all_redirects(50);
 // Crear mapa de redirecciones activas para mostrar indicadores en la tabla de marcas
 $active_redirects = [];
 foreach ($redirects as $redirect) {
-    if (($redirect['is_active'] ?? true)) {
+    if (($redirect['is_active'] ?? true) && isset($redirect['old_brand_key'], $redirect['new_brand_key'])) {
         $active_redirects[$redirect['old_brand_key']] = $redirect['new_brand_key'];
     }
 }
@@ -1063,7 +1090,10 @@ $title = "Gestión de Marcas - Panel de Administración";
                                                             data-marca-destacada="<?php echo isset($marca['destacada_home']) && $marca['destacada_home'] ? '1' : '0'; ?>"
                                                             data-marca-ventaja-1="<?php echo htmlspecialchars($marca['ventajas_principales'][0] ?? ''); ?>"
                                                             data-marca-ventaja-2="<?php echo htmlspecialchars($marca['ventajas_principales'][1] ?? ''); ?>"
-                                                            data-marca-ventaja-3="<?php echo htmlspecialchars($marca['ventajas_principales'][2] ?? ''); ?>">
+                                                            data-marca-ventaja-3="<?php echo htmlspecialchars($marca['ventajas_principales'][2] ?? ''); ?>"
+                                                            data-marca-bo-cantidad="<?php echo htmlspecialchars($marca['beneficio_oficial']['cantidad'] ?? ''); ?>"
+                                                            data-marca-bo-tipo="<?php echo htmlspecialchars($marca['beneficio_oficial']['tipo'] ?? 'euros'); ?>"
+                                                            data-marca-bo-texto="<?php echo htmlspecialchars($marca['beneficio_oficial']['texto'] ?? ''); ?>">
                                                         <i class="fas fa-edit"></i>
                                                     </button>
                                                     <button type="button" class="btn btn-sm btn-outline-warning" 
@@ -1425,12 +1455,12 @@ $title = "Gestión de Marcas - Panel de Administración";
                                                     <?php foreach ($redirects as $redirect): ?>
                                                     <tr>
                                                         <td>
-                                                            <strong>/de-<?php echo htmlspecialchars($redirect['old_brand_key']); ?></strong>
+                                                            <strong>/de-<?php echo htmlspecialchars($redirect['old_brand_key'] ?? 'borrada'); ?></strong>
                                                         </td>
                                                         <td>
-                                                            <a href="https://www.codigoamigo.com<?php echo htmlspecialchars($redirect['redirect_url']); ?>"
+                                                            <a href="https://www.codigoamigo.com<?php echo htmlspecialchars($redirect['redirect_url'] ?? '#'); ?>"
                                                                target="_blank" class="text-decoration-none">
-                                                                /de-<?php echo htmlspecialchars($redirect['new_brand_key']); ?>
+                                                                /de-<?php echo htmlspecialchars($redirect['new_brand_key'] ?? 'desconocida'); ?>
                                                                 <i class="fas fa-external-link-alt ms-1" style="font-size: 0.8em;"></i>
                                                             </a>
                                                         </td>
@@ -1458,7 +1488,7 @@ $title = "Gestión de Marcas - Panel de Administración";
                                                                     <i class="fas fa-toggle-<?php echo ($redirect['is_active'] ?? true) ? 'on' : 'off'; ?>"></i>
                                                                 </button>
                                                                 <button type="button" class="btn btn-sm btn-outline-danger"
-                                                                        onclick="deleteRedirect('<?php echo $redirect['_id']; ?>', '<?php echo htmlspecialchars($redirect['old_brand_key']); ?>')">
+                                                                        onclick="deleteRedirect('<?php echo $redirect['_id']; ?>', '<?php echo htmlspecialchars($redirect['old_brand_key'] ?? ''); ?>')">
                                                                     <i class="fas fa-trash"></i>
                                                                 </button>
                                                             </div>
@@ -1675,6 +1705,32 @@ $title = "Gestión de Marcas - Panel de Administración";
                                 <i class="fas fa-info-circle"></i> Si dejas las ventajas vacías, se generarán automáticamente basándose en la categoría y descripción de la marca.
                             </small>
                         </div>
+                        
+                        <!-- Beneficio Oficial -->
+                        <div class="mb-3">
+                            <label class="form-label"><i class="fas fa-shield-alt text-success"></i> Beneficio Oficial de la Marca</label>
+                            <small class="d-block text-muted mb-2">Si se define, los usuarios NO podrán publicar códigos con un beneficio superior a esta cantidad.</small>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <label class="form-label small">Cantidad máxima</label>
+                                    <input type="number" class="form-control" name="beneficio_oficial_cantidad" id="edit_bo_cantidad" placeholder="Ej: 50" step="0.01" min="0">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small">Tipo</label>
+                                    <select class="form-select" name="beneficio_oficial_tipo" id="edit_bo_tipo">
+                                        <option value="euros">€ Euros</option>
+                                        <option value="porcentaje">% Porcentaje</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-5">
+                                    <label class="form-label small">Texto promocional</label>
+                                    <input type="text" class="form-control" name="beneficio_oficial_texto" id="edit_bo_texto" placeholder="Ej: 50€ para ti y tu amigo">
+                                </div>
+                            </div>
+                            <small class="text-warning mt-1 d-block">
+                                <i class="fas fa-exclamation-triangle"></i> Déjalo vacío si no quieres limitar el beneficio para esta marca.
+                            </small>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -1786,6 +1842,11 @@ $title = "Gestión de Marcas - Panel de Administración";
             document.getElementById('edit_ventaja_1').value = button.getAttribute('data-marca-ventaja-1') || '';
             document.getElementById('edit_ventaja_2').value = button.getAttribute('data-marca-ventaja-2') || '';
             document.getElementById('edit_ventaja_3').value = button.getAttribute('data-marca-ventaja-3') || '';
+            
+            // Beneficio oficial
+            document.getElementById('edit_bo_cantidad').value = button.getAttribute('data-marca-bo-cantidad') || '';
+            document.getElementById('edit_bo_tipo').value = button.getAttribute('data-marca-bo-tipo') || 'euros';
+            document.getElementById('edit_bo_texto').value = button.getAttribute('data-marca-bo-texto') || '';
         });
 
         // Modal de fusionar
@@ -2429,6 +2490,18 @@ $title = "Gestión de Marcas - Panel de Administración";
             }
         }
     </script>
+
+
+    <!-- Amazon Link Auto-Repair Section -->
+    <div class="container-fluid mb-5">
+        <div class="row">
+            <div class="col-12" id="amazon-repair-container">
+                <!-- Se poblará vía amazon_repair.js -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/public/js/amazon_repair.js"></script>
 
 <?php get_footer(); ?>
 </body>

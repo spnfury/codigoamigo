@@ -130,8 +130,10 @@ $descripcion_marca = $marca_info['descripcion'] ?? '';
                     <?php
                     // Ordenar códigos por fecha de publicación (más reciente primero)
                     usort($codigos, function($a, $b) {
-                        $fecha_a = isset($a['fecha_publicacion']) ? strtotime($a['fecha_publicacion']) : 0;
-                        $fecha_b = isset($b['fecha_publicacion']) ? strtotime($b['fecha_publicacion']) : 0;
+                        $fp_a = isset($a['fecha_publicacion']) ? $a['fecha_publicacion'] : null;
+                        $fp_b = isset($b['fecha_publicacion']) ? $b['fecha_publicacion'] : null;
+                        $fecha_a = ($fp_a instanceof \MongoDB\BSON\UTCDateTime) ? $fp_a->toDateTime()->getTimestamp() : (is_string($fp_a) ? strtotime($fp_a) : 0);
+                        $fecha_b = ($fp_b instanceof \MongoDB\BSON\UTCDateTime) ? $fp_b->toDateTime()->getTimestamp() : (is_string($fp_b) ? strtotime($fp_b) : 0);
                         return $fecha_b - $fecha_a;
                     });
                     

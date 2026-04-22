@@ -120,7 +120,7 @@ function bloque_info_home() { ?>
         ?>
         
         <div id="listado_marcas" class="" style="margin-right: 0px; margin-left: 0px;">
-        <?
+        <?php
         
         foreach ($array_marcas as $marca) {
             
@@ -174,7 +174,7 @@ function bloque_info_home() { ?>
         </div>
             	
             	
-        <?
+        <?php
             	    	
     }
     

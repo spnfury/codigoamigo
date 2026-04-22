@@ -30,7 +30,9 @@ if (empty($codigo_id)) {
 }
 
 $user_id = $_SESSION["user_id"];
-$costo_destacado = 9.99;
+// Precios por tier (mismos que Stripe para coherencia)
+$costos_por_tier = ['normal' => 0.99, 'super' => 3.99];
+$costo_destacado = $costos_por_tier[$tipo_destacado] ?? 0.99;
 
 // Verificar saldo del usuario
 $saldo_actual = isset($data_usuario['saldo']) ? $data_usuario['saldo'] : 0;
@@ -47,10 +49,13 @@ try {
         $collection_codigos = getCollectionCodigos();
         
         // Preparar datos de actualización
+        $duracion_dias = ($tipo_destacado === 'super') ? DESTACADO_DURACION_SUPER : DESTACADO_DURACION_NORMAL;
         $update_data = [
             'destacado' => time(),
             'fecha_destacado' => date('Y-m-d H:i:s'),
-            'tipo_destacado' => $tipo_destacado
+            'tipo_destacado' => $tipo_destacado,
+            'prioridad_pago' => time(),
+            'fecha_fin_destacado' => new MongoDB\BSON\UTCDateTime((time() + ($duracion_dias * 86400)) * 1000)
         ];
         
         // Para destacado "super", establecer también destacado_social (aparece en home y tiene prioridad)
@@ -102,10 +107,13 @@ try {
         $collection_codigos = getCollectionCodigos();
         
         // Preparar datos de actualización
+        $duracion_dias = ($tipo_destacado === 'super') ? DESTACADO_DURACION_SUPER : DESTACADO_DURACION_NORMAL;
         $update_data = [
             'destacado' => time(),
             'fecha_destacado' => date('Y-m-d H:i:s'),
-            'tipo_destacado' => $tipo_destacado
+            'tipo_destacado' => $tipo_destacado,
+            'prioridad_pago' => time(),
+            'fecha_fin_destacado' => new MongoDB\BSON\UTCDateTime((time() + ($duracion_dias * 86400)) * 1000)
         ];
         
         // Para destacado "super", establecer también destacado_social (aparece en home y tiene prioridad)

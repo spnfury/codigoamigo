@@ -1,41 +1,15 @@
-# Cloudflare Bypass Configuration - ULTRA AGGRESSIVE
-# Configuración ultra agresiva para bypass de Cloudflare
-
-# FORZAR bypass de Cloudflare para TODOS los navegadores
-Header always set X-Frame-Options "SAMEORIGIN"
-Header always set X-Content-Type-Options "nosniff"
-
-# ELIMINAR TODOS los headers de Cloudflare
-Header unset CF-Ray
-Header unset CF-Cache-Status
-Header unset CF-Connecting-IP
-Header unset CF-Visitor
-Header unset CF-Country
-Header unset CF-IPCountry
-Header unset CF-Request-ID
-
-# Configuración ULTRA permisiva
-Header always set Access-Control-Allow-Origin "*"
-Header always set Access-Control-Allow-Methods "GET, POST, OPTIONS, PUT, DELETE"
-Header always set Access-Control-Allow-Headers "*"
-Header always set Access-Control-Allow-Credentials "true"
-
-# BYPASS FORZADO para TODOS los navegadores
+# FORZAR HTTPS y WWW
 RewriteEngine On
 
-# FORZAR bypass para TODOS los dominios
-RewriteCond %{HTTP_HOST} ^(www\.)?codigoamigo\.com$ [NC]
-RewriteRule ^(.*)$ - [E=FORCE_BYPASS:1]
+# 1. Redirigir http a https
+RewriteCond %{HTTPS} off
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-# Headers ULTRA agresivos para desarrollo
-<IfDefine FORCE_BYPASS>
-    Header set X-Development-Mode "ULTRA_ACTIVE"
-    Header set X-CF-Bypass "FORCED"
-    Header set X-Debug-Mode "MAXIMUM"
-    Header set X-Bypass-Status "ENABLED_FOR_ALL"
-</IfDefine>
+# 2. Redirigir non-www a www
+RewriteCond %{HTTP_HOST} ^codigoamigo\.com$ [NC]
+RewriteRule ^(.*)$ https://www.codigoamigo.com/$1 [R=301,L]
 
-# Configuración SEO-Friendly
+# Configuración SEO-Friendly y de Rendimiento
 # Cache-Control mejorado para SEO y rendimiento
 # Archivos estáticos: caché largo para mejor SEO
 <FilesMatch "\.(jpg|jpeg|png|gif|webp|ico|css|js|woff|woff2|ttf|svg)$">
@@ -48,30 +22,28 @@ RewriteRule ^(.*)$ - [E=FORCE_BYPASS:1]
     Header set Vary "Accept-Encoding"
 </FilesMatch>
 
-# BYPASS FORZADO para TODOS los user agents
-RewriteCond %{HTTP_USER_AGENT} ".*" [NC]
-RewriteRule ^(.*)$ - [E=BYPASS_ALL:1]
+# Compresión GZIP para reducir tamaño de transferencia (60-80% menos)
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css
+    AddOutputFilterByType DEFLATE text/javascript application/javascript application/x-javascript
+    AddOutputFilterByType DEFLATE application/json application/ld+json
+    AddOutputFilterByType DEFLATE application/xml application/xhtml+xml
+    AddOutputFilterByType DEFLATE font/woff font/woff2 font/ttf font/otf
+    AddOutputFilterByType DEFLATE image/svg+xml image/x-icon
+</IfModule>
 
-<IfDefine BYPASS_ALL>
-    Header set X-CF-Bypass-Enabled "FORCED_FOR_ALL"
-    Header set X-Universal-Bypass "ACTIVE"
-</IfDefine>
-
-# Configuración adicional para navegadores específicos
-RewriteCond %{HTTP_USER_AGENT} "Chrome" [NC,OR]
-RewriteCond %{HTTP_USER_AGENT} "Firefox" [NC,OR]
-RewriteCond %{HTTP_USER_AGENT} "Safari" [NC,OR]
-RewriteCond %{HTTP_USER_AGENT} "Edge" [NC]
-RewriteRule ^(.*)$ - [E=BROWSER_BYPASS:1]
-
-<IfDefine BROWSER_BYPASS>
-    Header set X-Browser-Bypass "ENABLED"
-    Header set X-CF-Browser-Bypass "ACTIVE"
-</IfDefine>
+# Security & Performance headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
 
 # URL Rewriting para páginas amigables
 # Redirigir todas las URLs que no sean archivos existentes a index.php
+RewriteRule ^test-rw/([^/]+)/?$ test_rewrite.php?slug=$1 [L,QSA]
 RewriteRule ^go/(.*)$ redirect_amazon.php?slug=$1 [L,QSA]
+RewriteRule ^amazon/([^/]+)/?$ amazon_service_detail.php?slug=$1 [L,QSA]
 RewriteRule ^amazon/?$ amazon_services.php [L,QSA]
 
 RewriteCond %{REQUEST_FILENAME} !-f

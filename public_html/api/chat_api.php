@@ -64,8 +64,8 @@ try {
                 log_info("get_conversaciones_usuario: Migración ejecutada, mensajes migrados: $migrados");
             }
             
-            // Intentar obtener conversaciones
-            $conversaciones = obtenerConversacionesUsuario($user_id);
+            $tab = $_REQUEST['tab'] ?? 'inbox';
+            $conversaciones = obtenerConversacionesUsuario($user_id, $tab);
             $count = count($conversaciones);
             
             // Si no hay conversaciones, verificar si hay mensajes sin conversacion_id y migrarlos automáticamente
@@ -107,7 +107,7 @@ try {
                             $migrados = migrarMensajesSinConversacionId();
                             log_info("get_conversaciones_usuario: Migración automática ejecutada, mensajes migrados: $migrados");
                             // Intentar obtener conversaciones nuevamente después de la migración
-                            $conversaciones = obtenerConversacionesUsuario($user_id);
+                            $conversaciones = obtenerConversacionesUsuario($user_id, $tab);
                             $count = count($conversaciones);
                         } else {
                             // Si hay mensajes pero todos tienen conversacion_id, puede ser un problema de agregación
@@ -319,13 +319,18 @@ try {
             $para_usuario_id = $_REQUEST["para_usuario_id"] ?? '';
             $mensaje_texto = $_REQUEST["mensaje"] ?? '';
             
+            // Parámetros de contexto del código (opcionales)
+            $codigo_id = $_REQUEST["codigo_id"] ?? '';
+            $marca_slug = $_REQUEST["marca_slug"] ?? '';
+            $beneficio = isset($_REQUEST["beneficio"]) ? (int)$_REQUEST["beneficio"] : 0;
+            
             if (empty($para_usuario_id) || empty($mensaje_texto)) {
                 echo json_encode(['success' => false, 'error' => 'para_usuario_id y mensaje requeridos']);
                 exit;
             }
             
             // Sanitizar mensaje
-            $mensaje_texto = htmlspecialchars(trim($mensaje_texto), ENT_QUOTES, 'UTF-8');
+            $mensaje_texto = trim($mensaje_texto);
             if (strlen($mensaje_texto) > 2000) {
                 $mensaje_texto = substr($mensaje_texto, 0, 2000);
             }
@@ -347,7 +352,7 @@ try {
             }
             
             if (isset($_REQUEST['solo_obtener_id']) && $_REQUEST['solo_obtener_id'] === 'true') {
-                 $conv_id = crearConversacionId($user_id, $para_usuario_id);
+                 $conv_id = crearConversacionId($user_id, $para_usuario_id, !empty($codigo_id) ? $codigo_id : null);
                  echo json_encode([
                     'success' => true,
                     'mensaje_id' => null,
@@ -356,13 +361,74 @@ try {
                  exit;
             }
 
-            $mensaje_id = enviarMensaje($user_id, $para_usuario_id, $mensaje_texto, $es_admin);
+            // Preparar contexto del código si existe
+            $contexto = [];
+            if (!empty($codigo_id) && preg_match('/^[a-f\d]{24}$/i', $codigo_id)) {
+                $contexto = [
+                    'codigo_id' => $codigo_id,
+                    'marca_slug' => $marca_slug,
+                    'beneficio' => $beneficio
+                ];
+            }
+
+            // Validar que el usuario no envíe mensajes consecutivos sin respuesta del destinatario
+            // (aplica a TODOS los usuarios, incluidos admins, para evitar spam)
+            {
+                // Obtener el ID de la conversación
+                $conversacion_id_actual = crearConversacionId($user_id, $para_usuario_id, !empty($codigo_id) ? $codigo_id : null);
+                
+                $collection_mensajes = getCollectionMensajes();
+                if ($collection_mensajes) {
+                    // Verificar restricción VIP: no-VIP no puede iniciar conversaciones nuevas
+                    if (!$es_admin) {
+                        if (!function_exists('es_usuario_vip')) {
+                            include_once __DIR__ . '/../myphp/funciones_usuario.php';
+                        }
+                        $es_vip_remitente = es_usuario_vip($user_id);
+                        
+                        if (!$es_vip_remitente) {
+                            $existing_count = $collection_mensajes->countDocuments(['conversacion_id' => $conversacion_id_actual]);
+                            if ($existing_count === 0) {
+                                // No hay mensajes previos = sería iniciar una conversación nueva
+                                echo json_encode(['success' => false, 'error' => 'Solo los usuarios VIP pueden iniciar conversaciones. Hazte VIP para contactar directamente.']);
+                                exit;
+                            }
+                        }
+                    }
+                    
+                    // Verificar si el destinatario ya ha contestado alguna vez
+                    $ha_contestado = $collection_mensajes->countDocuments([
+                        'conversacion_id' => $conversacion_id_actual,
+                        'de_usuario_id' => ['$in' => [(string)$para_usuario_id, new MongoDB\BSON\ObjectId($para_usuario_id)]]
+                    ]);
+
+                    // Si nunca ha contestado, se mantiene el límite de un solo mensaje esperando respuesta
+                    if ($ha_contestado === 0) {
+                        // Obtener el último mensaje de la conversación
+                        $ultimo_mensaje = $collection_mensajes->findOne(
+                            ['conversacion_id' => $conversacion_id_actual],
+                            ['sort' => ['fecha' => -1], 'projection' => ['de_usuario_id' => 1]]
+                        );
+                        
+                        // Si el último mensaje fue enviado por el usuario actual, bloquear
+                        if ($ultimo_mensaje && (string)$ultimo_mensaje['de_usuario_id'] === $user_id) {
+                            echo json_encode(['success' => false, 'error' => 'Debes esperar a que el usuario te conteste por primera vez antes de enviarle otro mensaje.']);
+                            exit;
+                        }
+                    }
+                }
+            }
+
+            $mensaje_id = enviarMensaje($user_id, $para_usuario_id, $mensaje_texto, $es_admin, $contexto);
             
             if ($mensaje_id) {
+                // Si el mensaje se envió con éxito, marcar al viewer como contactado
+                marcar_viewer_contactado($user_id, $para_usuario_id);
+                
                 echo json_encode([
                     'success' => true,
                     'mensaje_id' => (string)$mensaje_id,
-                    'conversacion_id' => crearConversacionId($user_id, $para_usuario_id)
+                    'conversacion_id' => crearConversacionId($user_id, $para_usuario_id, !empty($codigo_id) ? $codigo_id : null)
                 ]);
             } else {
                 echo json_encode(['success' => false, 'error' => 'Error al enviar mensaje']);
@@ -523,6 +589,117 @@ try {
             echo json_encode(['success' => true, 'usuario' => $respuesta_usuario]);
             break;
             
+        case 'get_interacciones_codigo':
+            // Obtener contexto de la conversación: quién contactó a quién y por qué código
+            $usuario_objetivo_id = $_REQUEST['usuario_id'] ?? '';
+            $conversacion_id_ctx = $_REQUEST['conversacion_id'] ?? '';
+            
+            if (empty($usuario_objetivo_id) || !preg_match('/^[a-f\\d]{24}$/i', $usuario_objetivo_id)) {
+                echo json_encode(['success' => false, 'error' => 'usuario_id inválido']);
+                exit;
+            }
+            
+            try {
+                $resultado_ctx = [
+                    'success' => true,
+                    'contexto' => 'directo', // directo, yo_contacte, me_contactaron
+                    'codigo_info' => null,
+                    'soy_owner_codigo' => false,
+                    'quien_inicio' => null, // ID del usuario que envió el primer mensaje
+                    'interacciones' => [],  // Mantener retrocompatibilidad
+                    'total' => 0,
+                    'total_potencial' => 0
+                ];
+                
+                // 1. Determinar si hay un código asociado a la conversación
+                $codigo_id_conv = null;
+                if (!empty($conversacion_id_ctx)) {
+                    $parts_conv = explode('-', $conversacion_id_ctx);
+                    // Formato: userA(24)-userB(24)-codigoId(24)
+                    if (count($parts_conv) >= 3) {
+                        $last_part = end($parts_conv);
+                        if (strlen($last_part) === 24 && ctype_xdigit($last_part)) {
+                            $codigo_id_conv = $last_part;
+                        }
+                    }
+                }
+                
+                // 2. Si hay código, obtener su info
+                if ($codigo_id_conv) {
+                    $collection_codigos = getCollectionCodigos();
+                    $codigo_obj = $collection_codigos->findOne(['_id' => new MongoDB\BSON\ObjectId($codigo_id_conv)]);
+                    
+                    if ($codigo_obj) {
+                        $codigo_owner_id = (string)$codigo_obj['id_usuario'];
+                        $soy_owner = ($codigo_owner_id === $user_id);
+                        
+                        $resultado_ctx['codigo_info'] = [
+                            'codigo_id' => $codigo_id_conv,
+                            'marca' => ucfirst($codigo_obj['marca'] ?? 'Desconocida'),
+                            'beneficio' => $codigo_obj['num_beneficio'] ?? 0,
+                            'owner_id' => $codigo_owner_id,
+                            'str_codigo' => $codigo_obj['codigo'] ?? null,
+                            'url' => $codigo_obj['url'] ?? null
+                        ];
+                        $resultado_ctx['soy_owner_codigo'] = $soy_owner;
+                        
+                        // Mantener retrocompatibilidad con frontend antiguo
+                        $resultado_ctx['interacciones'] = [[
+                            'codigo_id' => $codigo_id_conv,
+                            'marca' => ucfirst($codigo_obj['marca'] ?? 'Desconocida'),
+                            'beneficio' => $codigo_obj['num_beneficio'] ?? 0
+                        ]];
+                        $resultado_ctx['total'] = 1;
+                        $resultado_ctx['total_potencial'] = $codigo_obj['num_beneficio'] ?? 0;
+                    }
+                }
+                
+                // 3. Determinar quién inició la conversación (primer mensaje)
+                if (!empty($conversacion_id_ctx)) {
+                    $collection_mensajes = getCollectionMensajes();
+                    if ($collection_mensajes) {
+                        $primer_mensaje = $collection_mensajes->findOne(
+                            ['conversacion_id' => $conversacion_id_ctx],
+                            ['sort' => ['fecha' => 1], 'projection' => ['de_usuario_id' => 1]]
+                        );
+                        
+                        if ($primer_mensaje) {
+                            $quien_inicio_id = (string)$primer_mensaje['de_usuario_id'];
+                            $resultado_ctx['quien_inicio'] = $quien_inicio_id;
+                            
+                            if ($quien_inicio_id === $user_id) {
+                                $resultado_ctx['contexto'] = 'yo_contacte';
+                            } else {
+                                $resultado_ctx['contexto'] = 'me_contactaron';
+                            }
+                        }
+                    }
+                }
+                
+                // 4. Si no hay código en la conversación, sin contexto de código → directo
+                if (!$codigo_id_conv) {
+                    $resultado_ctx['contexto'] = 'directo';
+                }
+                
+                // 5. Verificar estado completado en la DB
+                if ($codigo_id_conv) {
+                    $db = createConnection();
+                    $collection_completados = $db->selectCollection('codigos_completados');
+                    $completado_doc = $collection_completados->findOne([
+                        'owner_id' => new MongoDB\BSON\ObjectId($resultado_ctx['soy_owner_codigo'] ? $user_id : $usuario_objetivo_id),
+                        'viewer_id' => new MongoDB\BSON\ObjectId($resultado_ctx['soy_owner_codigo'] ? $usuario_objetivo_id : $user_id),
+                        'codigo_id' => new MongoDB\BSON\ObjectId($codigo_id_conv)
+                    ]);
+                    $resultado_ctx['codigo_completado'] = $completado_doc ? true : false;
+                }
+                
+                echo json_encode($resultado_ctx);
+            } catch (Throwable $e) {
+                error_log("Error en get_interacciones_codigo: " . $e->getMessage());
+                echo json_encode(['success' => false, 'error' => 'Error interno del servidor']);
+            }
+            break;
+            
         case 'get_websocket_token':
             // Generar token temporal para autenticación WebSocket
             // El token expira en 1 hora
@@ -557,6 +734,53 @@ try {
                 'ws_url' => $ws_url
             ]);
             break;
+
+        case 'toggle_codigo_completado':
+             $codigo_id = $_REQUEST['codigo_id'] ?? '';
+             $usuario_referido_id = $_REQUEST['usuario_referido_id'] ?? '';
+             $completado = isset($_REQUEST['completado']) && ($_REQUEST['completado'] === 'true' || $_REQUEST['completado'] === '1');
+             $beneficio = isset($_REQUEST['beneficio']) ? (float)$_REQUEST['beneficio'] : 0;
+
+             if (empty($codigo_id) || empty($usuario_referido_id)) {
+                 echo json_encode(['success' => false, 'error' => 'Parámetros insuficientes']);
+                 exit;
+             }
+
+             try {
+                 $db = createConnection();
+                 $collection = $db->selectCollection('codigos_completados');
+                 
+                 if ($completado) {
+                     // Insertar o actualizar
+                     $collection->updateOne(
+                         [
+                             'owner_id' => new MongoDB\BSON\ObjectId($user_id),
+                             'viewer_id' => new MongoDB\BSON\ObjectId($usuario_referido_id),
+                             'codigo_id' => new MongoDB\BSON\ObjectId($codigo_id)
+                         ],
+                         [
+                             '$set' => [
+                                 'completado' => true,
+                                 'fecha_completado' => new MongoDB\BSON\UTCDateTime(),
+                                 'beneficio' => $beneficio
+                             ]
+                         ],
+                         ['upsert' => true]
+                     );
+                 } else {
+                     // Eliminar
+                     $collection->deleteOne([
+                         'owner_id' => new MongoDB\BSON\ObjectId($user_id),
+                         'viewer_id' => new MongoDB\BSON\ObjectId($usuario_referido_id),
+                         'codigo_id' => new MongoDB\BSON\ObjectId($codigo_id)
+                     ]);
+                 }
+                 echo json_encode(['success' => true]);
+             } catch (Throwable $e) {
+                 error_log("Error en toggle_codigo_completado: " . $e->getMessage());
+                 echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+             }
+             break;
             
         case 'search_mensajes':
             $conversacion_id = $_REQUEST['conversacion_id'] ?? '';
@@ -620,6 +844,83 @@ try {
             echo json_encode(['success' => true, 'stats' => $stats]);
             break;
             
+        case 'archive_conversation':
+            $conversacion_id = $_REQUEST['conversacion_id'] ?? '';
+            if (empty($conversacion_id)) {
+                echo json_encode(['success' => false, 'error' => 'conversacion_id requerido']);
+                exit;
+            }
+            $result = archivarConversacion($user_id, $conversacion_id);
+            echo json_encode(['success' => $result]);
+            break;
+
+        case 'unarchive_conversation':
+            $conversacion_id = $_REQUEST['conversacion_id'] ?? '';
+            if (empty($conversacion_id)) {
+                echo json_encode(['success' => false, 'error' => 'conversacion_id requerido']);
+                exit;
+            }
+            $result = desarchivarConversacion($user_id, $conversacion_id);
+            echo json_encode(['success' => $result]);
+            break;
+
+        case 'pin_conversation':
+            $conversacion_id = $_REQUEST['conversacion_id'] ?? '';
+            if (empty($conversacion_id)) {
+                echo json_encode(['success' => false, 'error' => 'conversacion_id requerido']);
+                exit;
+            }
+            $result = fijarConversacion($user_id, $conversacion_id);
+            if (!$result) {
+                echo json_encode(['success' => false, 'error' => 'No se pudo fijar. Máximo 3 conversaciones fijadas.']);
+                exit;
+            }
+            echo json_encode(['success' => true]);
+            break;
+
+        case 'unpin_conversation':
+            $conversacion_id = $_REQUEST['conversacion_id'] ?? '';
+            if (empty($conversacion_id)) {
+                echo json_encode(['success' => false, 'error' => 'conversacion_id requerido']);
+                exit;
+            }
+            $result = desfijarConversacion($user_id, $conversacion_id);
+            echo json_encode(['success' => $result]);
+            break;
+
+        case 'delete_conversation':
+            $conversacion_id = $_REQUEST['conversacion_id'] ?? '';
+            if (empty($conversacion_id)) {
+                echo json_encode(['success' => false, 'error' => 'conversacion_id requerido']);
+                exit;
+            }
+            $result = eliminarConversacion($user_id, $conversacion_id);
+            echo json_encode(['success' => $result]);
+            break;
+
+        case 'subscribe_push':
+            $subscription = $_REQUEST['subscription'] ?? '';
+            if (is_string($subscription)) {
+                $subscription = json_decode($subscription, true);
+            }
+            if (empty($subscription) || empty($subscription['endpoint'])) {
+                echo json_encode(['success' => false, 'error' => 'Subscription inválida']);
+                exit;
+            }
+            $result = guardarPushSubscription($user_id, $subscription);
+            echo json_encode(['success' => $result]);
+            break;
+
+        case 'unsubscribe_push':
+            $endpoint = $_REQUEST['endpoint'] ?? '';
+            if (empty($endpoint)) {
+                echo json_encode(['success' => false, 'error' => 'Endpoint requerido']);
+                exit;
+            }
+            $result = eliminarPushSubscription($user_id, $endpoint);
+            echo json_encode(['success' => $result]);
+            break;
+
         default:
             echo json_encode(['success' => false, 'error' => 'Acción no válida']);
             break;

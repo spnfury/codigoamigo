@@ -3,6 +3,12 @@
     /* MONGO DB */
 	require '/home/admin/web/codigoamigo.com/public_html'.'/vendor/autoload.php';
 	
+	/* SENTRY */
+	include_once '/home/admin/web/codigoamigo.com/public_html'.'/inc/sentry_bootstrap.php';
+	if (function_exists('codigoamigo_init_sentry')) {
+		codigoamigo_init_sentry();
+	}
+	
 
 	/* LIBRERIAS */
 	include_once '/home/admin/web/codigoamigo.com/public_html'.'/myphp/librerias/Mobile_Detect.php';
@@ -36,5 +42,16 @@
 
 	include_once '/home/admin/web/codigoamigo.com/public_html' . '/inc/conexion.php';
 	
-	
+	/**********************************************************
+	 *  DESTACADOS: Duraciones y precios por tier
+	 *********************************************************/
+	if (!defined('DESTACADO_DURACION_NORMAL')) {
+		define('DESTACADO_DURACION_NORMAL', 7);    // días
+		define('DESTACADO_DURACION_SUPER', 14);    // días
+		define('DESTACADO_DURACION_GUIA', 30);     // días
+		define('DESTACADO_PRECIO_NORMAL', 0.99);   // euros
+		define('DESTACADO_PRECIO_SUPER', 3.99);    // euros
+		define('DESTACADO_PRECIO_GUIA', 9.99);     // euros
+	}
+
 ?>

@@ -76,17 +76,25 @@ if ($metodo === 'tarjeta' && !empty($session_id)) {
         
         // Actualizar el código para destacarlo
         $collection_codigos = getCollectionCodigos();
-        $duracion_dias = $tipo === 'normal' ? 30 : 60;
+        $duracion_dias = $tipo === 'normal' ? DESTACADO_DURACION_NORMAL : DESTACADO_DURACION_SUPER;
         $fecha_fin = new DateTime();
         $fecha_fin->add(new DateInterval('P' . $duracion_dias . 'D'));
         
         // Preparar datos de actualización
+        $auto_renovar = true; // Por defecto, habilitar auto-renovación para nuevos destacados
+        if (isset($session->metadata) && isset($session->metadata->auto_renovar) && $session->metadata->auto_renovar === '0') {
+            $auto_renovar = false;
+        }
         $update_data = [
+            'estado' => 0, // Reactivar código si estaba desactivado/caducado (-2/-3)
             'destacado' => time(), // Usar timestamp en lugar de true para consistencia
             'tipo_destacado' => $tipo,
             'fecha_destacado' => new MongoDB\BSON\UTCDateTime(),
             'fecha_fin_destacado' => new MongoDB\BSON\UTCDateTime($fecha_fin->getTimestamp() * 1000),
-            'prioridad_pago' => time() // Nueva prioridad para que "quien paga manda"
+            'prioridad_pago' => time(),
+            'auto_renovar_destacado' => $auto_renovar,
+            'aviso_expiracion_enviado' => false,
+            'aviso_expirado_enviado' => false
         ];
         
         // Para destacado "super", establecer también destacado_social (aparece en home y tiene prioridad)
@@ -114,6 +122,16 @@ if ($metodo === 'tarjeta' && !empty($session_id)) {
                     );
                     error_log("Notificaciones de competencia home enviadas: $emails_enviados");
                 }
+            }
+            
+            // Notificar a usuarios con códigos destacados activos en la misma marca
+            if (!function_exists('notificarCompetenciaDestacado')) {
+                require_once __DIR__ . '/../myphp/funciones_destacados_email.php';
+            }
+            $marca_clave = $codigo['marca'] ?? '';
+            if ($marca_clave) {
+                $notifs = notificarCompetenciaDestacado($marca_clave, $_SESSION["user_id"], $tipo);
+                error_log("Notificaciones competencia marca ($marca_clave): $notifs enviadas");
             }
             
             // Verificar que se actualizó correctamente
@@ -220,10 +238,12 @@ if (!$pago_exitoso) {
 // Configurar información para la página
 $titulo_destacado = $tipo === 'normal' ? 'Destacado Normal' : 'Destacado Super';
 $precio_destacado = $tipo === 'normal' ? '0,99€' : '3,99€';
-$duracion_destacado = 'Ilimitada (modelo puja)';
+$duracion_dias = $tipo === 'normal' ? DESTACADO_DURACION_NORMAL : DESTACADO_DURACION_SUPER;
+$fecha_expiracion = date('d/m/Y', time() + ($duracion_dias * 86400));
+$duracion_destacado = $duracion_dias . ' días (hasta el ' . $fecha_expiracion . ')';
 $descripcion_destacado = $tipo === 'normal' 
-    ? 'Aparece en primera posición con badge "Destacado"'
-    : 'Aparece en primera posición con badge dorado y en página principal';
+    ? 'Badge "Destacado" en la página de la marca durante ' . $duracion_dias . ' días'
+    : 'Badge dorado "Super Destacado" en la marca + carrusel de la página principal durante ' . $duracion_dias . ' días';
 
 $title = "¡Código destacado exitosamente! - Código Amigo";
 $description = "Tu código de " . $marca_nombre . " ha sido destacado correctamente";
@@ -393,6 +413,16 @@ p {
         <p>Duración: <strong><?php echo $duracion_destacado; ?></strong></p>
         <p>Beneficios: <strong><?php echo $descripcion_destacado; ?></strong></p>
         <p>Fecha: <strong><?php echo date('d/m/Y H:i'); ?></strong></p>
+    </div>
+    
+    <div style="background: rgba(255, 255, 255, 0.15); border-radius: 10px; padding: 20px; margin-top: 20px; text-align: left; border-left: 4px solid #fff;">
+        <h3 style="margin: 0 0 10px 0; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-sync-alt"></i> Renovación Automática Activada
+        </h3>
+        <p style="margin: 0; font-size: 0.95em; line-height: 1.5; color: rgba(255,255,255,0.9);">
+            Tu código se ha configurado para auto-renovarse garantizando que no pierdas su posición. 
+            <strong>💡 El truco definitivo:</strong> Si te haces <strong><a href="/vip" style="color: #fff; font-weight: bold; text-decoration: underline;">Usuario VIP</a></strong>, recibirás saldo gratis automáticamente cada mes para que tus destacados se paguen solos. ¡Nunca más tendrás que recargar a mano!
+        </p>
     </div>
     
     <div class="btn-group">

@@ -10,7 +10,7 @@ require_once __DIR__ . '/../myphp/funciones_chollos_helpers.php';
 require_once __DIR__ . '/../myphp/funciones_sitemaps.php'; // Necesario para generarSitemapMarcas
 
 function generarSitemapChollosCron() {
-    $base_url = 'https://www.codigoamigo.com';
+    $base_url = 'https://www.malprecio.com';
     $path_sitemaps = dirname(__DIR__); // public_html raíz
     
     // 0. Regenerar Sitemap de Marcas
@@ -154,13 +154,13 @@ function pingSearchEnginesCron($sitemap_url) {
     
     $indexnow_url = "https://www.bing.com/indexnow";
     $data = [
-        "host" => "www.codigoamigo.com",
+        "host" => "www.malprecio.com",
         "key" => $key,
-        "keyLocation" => "https://www.codigoamigo.com/indexnow_key.txt",
+        "keyLocation" => "https://www.malprecio.com/indexnow_key.txt",
         "urlList" => [
-            "https://www.codigoamigo.com/sitemap.xml",
-            "https://www.codigoamigo.com/sitemap_chollos_detalle.xml",
-            "https://www.codigoamigo.com/chollos"
+            "https://www.malprecio.com/sitemap.xml",
+            "https://www.malprecio.com/sitemap_chollos_detalle.xml",
+            "https://www.malprecio.com/chollos"
         ]
     ];
     

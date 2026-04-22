@@ -20,6 +20,21 @@ if (!$codigo) {
     exit;
 }
 
+// Determinar si el usuario logueado es el propietario del código
+// NOTA: Solo el propietario real del código puede ver "Usuarios Detectados".
+// No existe bypass de admin para esta sección — ni el admin del sitio debe
+// ver los usuarios detectados de códigos ajenos.
+$codigo_id_usuario_str = is_object($codigo['id_usuario'])
+    ? (string)$codigo['id_usuario']
+    : (string)($codigo['id_usuario'] ?? '');
+
+$es_propietario_codigo = (
+    isset($_SESSION['user_id']) &&
+    !empty($_SESSION['user_id']) &&
+    $codigo_id_usuario_str === (string)$_SESSION['user_id']
+);
+
+
 // Obtener información de la marca
 $marca = getObjectMarca('nombre_clave', $codigo["marca"]);
 $marca_nombre = $marca['nombre'] ?? $codigo['marca'];
@@ -34,6 +49,29 @@ $total_visitas_detalle = count($visitas);
 
 // Calcular tasa de conversión: (clicks / impresiones) * 100
 $conversion_rate = $total_impressions > 0 ? round(($total_clicks / $total_impressions) * 100, 2) : 0;
+
+// Verificar si el usuario es VIP (para mensaje masivo)
+if (!function_exists('es_usuario_vip')) {
+    include_once __DIR__ . '/../myphp/funciones_usuario.php';
+}
+$is_vip_user = isset($_SESSION['user_id']) ? es_usuario_vip($_SESSION['user_id']) : false;
+$beneficio_codigo = isset($codigo['num_beneficio']) ? floatval($codigo['num_beneficio']) : 0;
+
+// Recopilar IDs de usuarios para mensaje masivo
+$viewer_ids = [];
+if (!empty($visitas)) {
+    foreach ($visitas as $v) {
+        if (isset($v['id_usuario']) && !empty($v['id_usuario'])) {
+            $viewer_ids[] = (string)$v['id_usuario'];
+        }
+    }
+    // Eliminar duplicados y el propio usuario
+    $viewer_ids = array_unique($viewer_ids);
+    if (isset($_SESSION['user_id'])) {
+        $viewer_ids = array_diff($viewer_ids, [$_SESSION['user_id']]);
+    }
+    $viewer_ids = array_values($viewer_ids);
+}
 
 // Obtener fecha de patrocinado/destacado
 $fecha_patrocinado = null;
@@ -978,7 +1016,7 @@ body {
                 </div>
             </div>
             <div class="daily-stats">
-                <?php foreach ($estadisticas['estadisticas_diarias'] as $dia): ?>
+                <?php foreach (array_reverse($estadisticas['estadisticas_diarias']) as $dia): ?>
                 <div class="daily-stat-item">
                     <div class="daily-stat-date"><?php echo date('d/m/Y', strtotime($dia['fecha'])); ?></div>
                     <div class="daily-stat-values">
@@ -991,9 +1029,17 @@ body {
         </div>
     </div>
 
-    <?php if (!empty($visitas)): ?>
+    <?php if ($es_propietario_codigo && !empty($visitas)): ?>
     <div class="visitas-identificadas-section" style="margin-top: 30px; margin-bottom: 20px;">
-        <h3 class="chart-title"><i class="fas fa-users" style="color: #E30613; margin-right: 8px;"></i> Usuarios Detectados (Clicks)</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 class="chart-title" style="margin-bottom: 0;"><i class="fas fa-users" style="color: #E30613; margin-right: 8px;"></i> Usuarios Detectados (Clicks)</h3>
+            <?php if (count($viewer_ids) > 0): ?>
+            <button onclick='initMassMessageModal(<?php echo json_encode($viewer_ids); ?>, <?php echo $beneficio_codigo > 0 ? $beneficio_codigo : 5; ?>, <?php echo count($viewer_ids) * ($beneficio_codigo > 0 ? $beneficio_codigo : 5); ?>)' 
+                class="btn btn-sm btn-primary shadow-sm" style="background: linear-gradient(135deg, #E30613 0%, #ff4d4d 100%); border: none; font-weight: bold; border-radius: 20px; padding: 8px 20px;">
+                <i class="fas fa-paper-plane mr-2"></i> Mensaje Masivo a Todos
+            </button>
+            <?php endif; ?>
+        </div>
         <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">Estos usuarios han visto tu código detalladamente. Puedes contactarles para ayudarles.</p>
         <div class="visitas-table-wrapper" style="background: white; border-radius: 15px; border: 2px solid #e9ecef; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
             <table class="table" style="width: 100%; border-collapse: collapse; margin: 0;">
@@ -1412,4 +1458,8 @@ function navegarPeriodo(fechaInicio, periodo) {
 // Hacer las funciones disponibles globalmente
 window.cambiarPeriodo = cambiarPeriodo;
 window.navegarPeriodo = navegarPeriodo;
+
+// Set VIP status for mass message script
+window.userIsVip = <?php echo $is_vip_user ? 'true' : 'false'; ?>;
 </script>
+<script src="/js/mass-message.js?v=<?php echo time(); ?>"></script>

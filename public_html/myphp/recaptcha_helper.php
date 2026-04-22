@@ -4,7 +4,7 @@
  */
 
 // Clave secreta de reCAPTCHA
-define('RECAPTCHA_SECRET_KEY', '6Lf6p-srAAAAAHbhf7Yrcw7Y-dNg0fLEzsU3UhbK');
+define('RECAPTCHA_SECRET_KEY', '6LfyTegrAAAAAOnDI2_LSnJWf-knMy92ntWngpTQ');
 
 /**
  * Valida el token de reCAPTCHA con Google
@@ -71,11 +71,9 @@ function validarRecaptcha($recaptcha_response, $remote_ip = null) {
         // Para v3, incluir el score en el resultado
         if (isset($response_data['score'])) {
             $resultado['score'] = $response_data['score'];
-            error_log("reCAPTCHA score: " . $response_data['score']);
         }
         if (isset($response_data['action'])) {
             $resultado['action'] = $response_data['action'];
-            error_log("reCAPTCHA action: " . $response_data['action']);
         }
     } else {
         $resultado['error'] = 'Verificación de reCAPTCHA fallida';
@@ -84,9 +82,14 @@ function validarRecaptcha($recaptcha_response, $remote_ip = null) {
         if (isset($response_data['error-codes']) && is_array($response_data['error-codes'])) {
             $error_codes = implode(', ', $response_data['error-codes']);
             $resultado['error'] .= ' - Códigos de error: ' . $error_codes;
-            error_log("reCAPTCHA error codes: " . $error_codes);
+            error_log("Google reCAPTCHA error codes: " . $error_codes . " (IP: " . ($remote_ip ?? 'N/A') . ")");
+        } else {
+            error_log("Google reCAPTCHA failed without error codes. Response: " . $response);
         }
     }
+
+    // Incluir respuesta completa para el llamador si es necesario (debugging)
+    $resultado['full_response'] = $response_data;
     
     return $resultado;
 }

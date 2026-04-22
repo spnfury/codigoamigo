@@ -94,6 +94,17 @@ if (!function_exists('get_super_landing_codes')) {
         $collection_codigos = $db->selectCollection('codigos');
         
         $filter = ['estado' => 0];
+
+        // Filtrar por autor de la guía si existe
+        if (isset($landing_data['author_id']) && !empty($landing_data['author_id'])) {
+            $author_str = (string)$landing_data['author_id'];
+            // id_usuario puede estar almacenado como string o como ObjectId
+            $author_variants = [$author_str];
+            if (strlen($author_str) === 24 && ctype_xdigit($author_str)) {
+                $author_variants[] = new \MongoDB\BSON\ObjectId($author_str);
+            }
+            $filter['id_usuario'] = ['$in' => $author_variants];
+        }
         
         $or_conditions = [];
 

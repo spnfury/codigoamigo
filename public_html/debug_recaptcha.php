@@ -29,7 +29,7 @@
         <div class="section info">
             <h3>📋 Información de Configuración</h3>
             <p><strong>Site Key:</strong> <code>6LfyTegrAAAAAEGfm7q5Huhcej7EQFEIM9yCU8JS</code></p>
-            <p><strong>Secret Key:</strong> <code>6Lf6p-srAAAAAHbhf7Yrcw7Y-dNg0fLEzsU3UhbK</code></p>
+            <p><strong>Secret Key:</strong> <code>6LfyTegrAAAAAOnDI2_LSnJWf-knMy92ntWngpTQ</code></p>
             <p><strong>IP del servidor:</strong> <code><?php echo $_SERVER['SERVER_ADDR'] ?? 'Desconocida'; ?></code></p>
         </div>
 

@@ -6,15 +6,19 @@ let currentChatConversationId = null;
 let chatPollingInterval = null;
 let lastChatMessageId = null;
 
+// Variables de contexto del código
+let currentChatCodigoContexto = null; // {codigoId, marcaSlug, beneficio, marcaNombre}
+
 // Inicializar modal de chat
-function initChatModal(userId, userName, userImg, defaultMessage = null) {
+function initChatModal(userId, userName, userImg, defaultMessage = null, codigoContexto = null) {
     try {
-        console.log('[Chat] initChatModal start', { userId, userName });
+        console.log('[Chat] initChatModal start', { userId, userName, codigoContexto });
     } catch (logError) { }
     currentChatUserId = userId;
     currentChatUserName = userName;
     currentChatConversationId = null;
     lastChatMessageId = null;
+    currentChatCodigoContexto = codigoContexto;
 
     // Crear modal si no existe
     if (!document.getElementById('modal_chat_overlay')) {
@@ -45,6 +49,24 @@ function initChatModal(userId, userName, userImg, defaultMessage = null) {
         if (placeholder) {
             placeholder.style.display = 'flex';
             placeholder.textContent = userName ? userName.substring(0, 2).toUpperCase() : 'U';
+        }
+    }
+
+    // Configurar banner de contexto
+    const banner = document.getElementById('chatCodigoContextoBanner');
+    const bannerText = document.getElementById('chatCodigoContextoText');
+    if (banner && bannerText) {
+        if (codigoContexto && codigoContexto.codigoId) {
+            banner.style.background = 'linear-gradient(135deg, #00c853, #b2ff59)'; // Verde éxito
+            banner.style.color = '#000';
+            banner.style.fontWeight = '700';
+            bannerText.innerHTML = `<i class="fas fa-gift"></i> ¡Asegura tus <strong>${codigoContexto.beneficio || 0}€</strong> de ${codigoContexto.marcaNombre}! Chatea ahora.`;
+            banner.style.display = 'block';
+
+            // Efecto de brillo suave en el banner
+            banner.style.boxShadow = 'inset 0 0 15px rgba(255,255,255,0.5)';
+        } else {
+            banner.style.display = 'none';
         }
     }
 
@@ -101,6 +123,7 @@ function closeChatModal() {
         currentChatUserId = null;
         currentChatUserName = null;
         currentChatConversationId = null;
+        currentChatCodigoContexto = null;
     }, 300);
 }
 
@@ -122,6 +145,13 @@ function createChatModal() {
                         </div>
                     </div>
                     <button class="login-modal-close">&times;</button>
+                </div>
+                
+                <!-- Banner de contexto del código -->
+                <div id="chatCodigoContextoBanner" style="display: none; background: linear-gradient(135deg, #ff7a18, #ff4f0f); padding: 10px 15px; color: white; font-size: 0.85rem; cursor: pointer;" onclick="window.open('/de-' + (currentChatCodigoContexto?.marcaSlug || ''), '_blank')">
+                    <i class="fas fa-tag"></i> 
+                    <span id="chatCodigoContextoText">Código vinculado</span>
+                    <i class="fas fa-external-link-alt" style="float: right; opacity: 0.8; margin-top: 2px;"></i>
                 </div>
                 
                 <div class="modal-body" style="flex: 1; overflow-y: auto; padding: 20px; background: #f8f9fa;" id="chatModalMessages">
@@ -238,7 +268,7 @@ function isChatUserLoggedIn() {
     return typeof window.codigoAmigoChatLoggedIn !== 'undefined' ? !!window.codigoAmigoChatLoggedIn : false;
 }
 
-function openChatModal(userId, userName, userImg, defaultMessage = null) {
+function openChatModal(userId, userName, userImg, defaultMessage = null, codigoContexto = null) {
     // Si no hay usuario logueado, usar el sistema de login existente
     if (!isChatUserLoggedIn()) {
         if (typeof showLoginModal === 'function') {
@@ -254,8 +284,8 @@ function openChatModal(userId, userName, userImg, defaultMessage = null) {
         return;
     }
 
-    // Inicializar y mostrar
-    initChatModal(userId, userName, userImg, defaultMessage);
+    // Inicializar y mostrar con contexto del código
+    initChatModal(userId, userName, userImg, defaultMessage, codigoContexto);
 }
 
 window.openChatModal = openChatModal;
@@ -272,8 +302,9 @@ function loadOrCreateConversation(userId) {
 
     messagesContainer.innerHTML = '<div class="text-center text-muted p-4"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>';
 
-    // Buscar conversación existente (temp ID logic)
-    const conversacionIdTemp = crearConversacionIdTemp(currentUserId, userId);
+    // Buscar conversación existente (temp ID logic, incluir codigo_id si hay contexto)
+    const codigoIdForConv = currentChatCodigoContexto && currentChatCodigoContexto.codigoId ? currentChatCodigoContexto.codigoId : null;
+    const conversacionIdTemp = crearConversacionIdTemp(currentUserId, userId, codigoIdForConv);
     currentChatConversationId = conversacionIdTemp; // Establecer ID temporalmente
 
     // Intentar cargar mensajes existentes
@@ -372,14 +403,23 @@ function sendChatMessage(event) {
     messagesContainer.insertAdjacentHTML('beforeend', messageHTML);
     scrollChatToBottom();
 
+    const ajaxData = {
+        action: 'enviar_mensaje',
+        para_usuario_id: currentChatUserId,
+        mensaje: messageText
+    };
+
+    // Añadir contexto del código si existe
+    if (currentChatCodigoContexto && currentChatCodigoContexto.codigoId) {
+        ajaxData.codigo_id = currentChatCodigoContexto.codigoId;
+        ajaxData.marca_slug = currentChatCodigoContexto.marcaSlug;
+        ajaxData.beneficio = currentChatCodigoContexto.beneficio;
+    }
+
     $.ajax({
         url: '/api/chat_api.php',
         method: 'POST',
-        data: {
-            action: 'enviar_mensaje',
-            para_usuario_id: currentChatUserId,
-            mensaje: messageText
-        },
+        data: ajaxData,
         dataType: 'json',
         success: function (response) {
             sendBtn.disabled = false;
@@ -489,10 +529,14 @@ function formatChatDateTime(date) {
     return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 }
 
-function crearConversacionIdTemp(user1Id, user2Id) {
+function crearConversacionIdTemp(user1Id, user2Id, codigoId) {
     const ids = [user1Id, user2Id];
     ids.sort();
-    return ids[0] + '-' + ids[1];
+    let convId = ids[0] + '-' + ids[1];
+    if (codigoId) {
+        convId += '-' + codigoId;
+    }
+    return convId;
 }
 
 function escapeHtml(text) {

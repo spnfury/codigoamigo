@@ -56,9 +56,10 @@ $numero_codigos_format = number_format($numero_codigos, 0, ',', '.');
                             $datos_usuario = $usuario ? get_array_de_usuario($usuario) : array();
                     ?>
                         <div class="code-card featured">
-                            <div class="featured-badge">
-                                <i class="fas fa-star"></i> Destacado
-                            </div>
+                            <div class="featured-badge <?php echo ($item['tipo_destacado'] ?? '') === 'super' ? 'featured-badge-gold' : ''; ?>">
+                            <i class="fas fa-<?php echo ($item['tipo_destacado'] ?? '') === 'super' ? 'crown' : 'star'; ?>"></i>
+                            <?php echo ($item['tipo_destacado'] ?? '') === 'super' ? 'Super Destacado' : 'Destacado'; ?>
+                        </div>
                             
                             <div class="code-header">
                                 <img src="<?php echo $datos_usuario["img"] ?? '/assets/img/default-avatar.png'; ?>" 

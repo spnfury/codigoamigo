@@ -55,7 +55,21 @@ function renderConversations(convs) {
         // conv.ultimo_mensaje_fecha ahora es un timestamp en milisegundos
         const fecha = conv.ultimo_mensaje_fecha ? new Date(conv.ultimo_mensaje_fecha) : new Date();
         const timeStr = formatTime(fecha);
-        const preview = conv.ultimo_mensaje.length > 40 ? conv.ultimo_mensaje.substring(0, 40) + '...' : conv.ultimo_mensaje;
+        
+        // Prefix "Tú: " si el último mensaje es del admin
+        let previewText = conv.ultimo_mensaje;
+        let readReceiptHtml = '';
+        if (conv.es_admin_ultimo) {
+            previewText = 'Tú: ' + previewText;
+            // Mostrar check de lectura: ✓✓ azul si leído, ✓✓ gris si no
+            if (conv.ultimo_leido) {
+                readReceiptHtml = '<span style="color: #3b82f6; font-size: 11px; margin-right: 3px;" title="Leído">✓✓</span>';
+            } else {
+                readReceiptHtml = '<span style="color: #aaa; font-size: 11px; margin-right: 3px;" title="No leído">✓✓</span>';
+            }
+        }
+        
+        const preview = previewText.length > 40 ? previewText.substring(0, 40) + '...' : previewText;
         const imgUrl = conv.usuario_img || 'https://www.codigoamigo.com/img/utilidades/usuario_sin_foto.jpg';
         const activeClass = currentConversationId === conv.conversacion_id ? 'active' : '';
         const badgeHtml = conv.no_leidos > 0 ? `<span class="conversation-badge">${conv.no_leidos}</span>` : '';
@@ -65,7 +79,7 @@ function renderConversations(convs) {
                 <img src="${imgUrl}" alt="${conv.usuario_nombre}" class="conversation-avatar" onerror="this.src='https://www.codigoamigo.com/img/utilidades/usuario_sin_foto.jpg'">
                 <div class="conversation-info">
                     <div class="conversation-name">${escapeHtml(conv.usuario_nombre)}</div>
-                    <div class="conversation-preview">${escapeHtml(preview)}</div>
+                    <div class="conversation-preview">${readReceiptHtml}${escapeHtml(preview)}</div>
                 </div>
                 <div class="conversation-meta">
                     <div class="conversation-time">${timeStr}</div>
@@ -206,11 +220,21 @@ function renderMessages(mensajes, replace = false) {
         const isAdmin = msg.es_admin;
         const messageClass = isAdmin ? 'admin' : 'user';
         
+        // Read receipt for admin messages
+        let readReceipt = '';
+        if (isAdmin) {
+            if (msg.leido) {
+                readReceipt = '<span style="color: #3b82f6; font-size: 11px; margin-left: 5px;" title="Leído">✓✓</span>';
+            } else {
+                readReceipt = '<span style="color: rgba(255,255,255,0.5); font-size: 11px; margin-left: 5px;" title="No leído">✓✓</span>';
+            }
+        }
+        
         html += `
             <div class="message-item ${messageClass}">
                 <div>
                     <div class="message-bubble">${escapeHtml(msg.mensaje)}</div>
-                    <div class="message-time">${timeStr}</div>
+                    <div class="message-time">${timeStr}${readReceipt}</div>
                 </div>
             </div>
         `;

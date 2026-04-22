@@ -40,7 +40,7 @@ if (!$codigo) {
 }
 
 // Check ownership
-if ((string)$codigo['id_usuario'] !== $user_id && $codigo['usuario_creador'] !== $user_id) {
+if ((string)($codigo['id_usuario'] ?? '') !== $user_id && ($codigo['usuario_creador'] ?? '') !== $user_id) {
     $_SESSION['msg_error'] = "No tienes permiso para modificar este código";
     header('Location: /mis-anuncios');
     exit;
@@ -116,8 +116,8 @@ get_header_modern('Destacar Código Super - Código Amigo', 'Destaca tu código 
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
                     <div>
                         <p style="margin: 5px 0; color: #333;"><strong>Marca:</strong> <?php echo htmlspecialchars($codigo['marca_nombre'] ?? $codigo['marca']); ?></p>
-                        <p style="margin: 5px 0; color: #333;"><strong>Beneficio:</strong> <?php echo htmlspecialchars($codigo['num_beneficio']); ?> <?php echo $codigo['descuento'] === 'euros' ? '€' : '%'; ?></p>
-                        <p style="margin: 5px 0; color: #333;"><strong>Código:</strong> <code><?php echo htmlspecialchars($codigo['codigo']); ?></code></p>
+                        <p style="margin: 5px 0; color: #333;"><strong>Beneficio:</strong> <?php echo htmlspecialchars($codigo['num_beneficio'] ?? ''); ?> <?php echo (isset($codigo['descuento']) && $codigo['descuento'] === 'euros') ? '€' : '%'; ?></p>
+                        <p style="margin: 5px 0; color: #333;"><strong>Código:</strong> <code><?php echo htmlspecialchars($codigo['codigo'] ?? ''); ?></code></p>
                     </div>
                     <div>
                         <?php if (isset($codigo['tipo_destacado']) && $codigo['tipo_destacado'] === 'super'): ?>

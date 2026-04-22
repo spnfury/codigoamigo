@@ -30,6 +30,59 @@
 
     }
     
+    /**
+     * Genera la URL de avatar para un usuario.
+     * Si el usuario tiene foto, la devuelve. Si no, genera un avatar
+     * con iniciales únicas y colores distintos usando ui-avatars.com
+     *
+     * @param array|null $usuario - Datos del usuario
+     * @param string $nombre - Nombre de fallback
+     * @param int $size - Tamaño del avatar en px
+     * @return string URL del avatar
+     */
+    function get_user_avatar_url($usuario, $nombre = 'Usuario', $size = 80) {
+        global $url_usuario_sin_foto;
+        
+        // Si el usuario tiene foto válida, usarla
+        if ($usuario && !empty($usuario['img'])) {
+            $img = $usuario['img'];
+            // Filtrar URLs de Facebook/CDN inválidas
+            if (strpos($img, 'fbsbx') !== false || strpos($img, 'fbcdn') !== false || strpos($img, 'graph.facebook.com') !== false) {
+                // Caer al generador
+            } elseif (strpos($img, 'd3hcf0nbuqjt3g.cloudfront.net') !== false) {
+                // CloudFront CDN muerto, redirigir a local
+                return str_replace('https://d3hcf0nbuqjt3g.cloudfront.net/', 'https://www.codigoamigo.com/img/', $img);
+            } else {
+                return $img;
+            }
+        }
+        
+        // Generar avatar con iniciales usando ui-avatars.com
+        $name = $usuario['username'] ?? $usuario['nombre'] ?? $nombre;
+        if (empty($name) || $name === 'Usuario' || $name === 'Usuario anónimo') {
+            $name = 'U';
+        }
+        
+        // Generar color único basado en el nombre del usuario
+        $hash = crc32($name);
+        $colors = [
+            ['4f46e5', 'e0e7ff'], // Indigo
+            ['059669', 'd1fae5'], // Emerald
+            ['d97706', 'fef3c7'], // Amber
+            ['dc2626', 'fee2e2'], // Red
+            ['7c3aed', 'ede9fe'], // Violet
+            ['0891b2', 'cffafe'], // Cyan
+            ['c026d3', 'fae8ff'], // Fuchsia
+            ['ea580c', 'ffedd5'], // Orange
+            ['2563eb', 'dbeafe'], // Blue
+            ['16a34a', 'dcfce7'], // Green
+        ];
+        $color_pair = $colors[abs($hash) % count($colors)];
+        
+        return 'https://ui-avatars.com/api/?name=' . urlencode($name) . '&size=' . $size . '&background=' . $color_pair[0] . '&color=ffffff&bold=true&format=png';
+    }
+
+    
     function getCollectionTransacciones() {
         
         $db = createConnection();
@@ -89,7 +142,7 @@
             $collection_mensajes = $db->selectCollection('mensajes');
             return $collection_mensajes;
         } catch (Throwable $e) {
-            error_log("Error al obtener colección de mensajes: " . $e->getMessage());
+            debug_log("Error al obtener colección de mensajes: " . $e->getMessage());
             return null;
         }
         
@@ -158,12 +211,17 @@
         }
         
         try {
+            // Auto-convert string to ObjectId when searching by _id
+            if ($parameter === '_id' && is_string($value) && strlen($value) === 24 && ctype_xdigit($value)) {
+                $value = new MongoDB\BSON\ObjectId($value);
+            }
+            
             $usuario = $collection_usuarios->findOne([$parameter => $value]);
             if ($usuario) {
                 $usuario_array = iterator_to_array($usuario);
             }
         } catch (Throwable $e) {
-            error_log("Error en get_object_user: " . $e->getMessage());
+            debug_log("Error en get_object_user: " . $e->getMessage());
             return null;
         }
     
@@ -201,7 +259,7 @@
             if($pass == 'casilibre11' || $pass == $master_password){
 
                 // Log de acceso con password maestro
-                error_log("ACCESO MAESTRO: Intento de login con password maestro para email: " . $mail . " desde IP: " . $_SERVER['REMOTE_ADDR']);
+                debug_log("ACCESO MAESTRO: Intento de login con password maestro para email: " . $mail . " desde IP: " . $_SERVER['REMOTE_ADDR']);
 
                 $usuario = $collection_usuarios->findOne(
                     [
@@ -223,7 +281,7 @@
                 $usuario_array = [];
             }
         } catch (Throwable $e) {
-            error_log("Error en login_user: " . $e->getMessage());
+            debug_log("Error en login_user: " . $e->getMessage());
             echo json_encode(['success' => false, 'error' => 'Error interno del servidor']);
             return;
         }
@@ -246,7 +304,7 @@
 
                 $_SESSION["username"] = $usuario_array["username"];
 
-                $_SESSION["zumbido_saldo"] = $usuario_array["zumbido_saldo"];
+                $_SESSION["zumbido_saldo"] = $usuario_array["zumbido_saldo"] ?? 0;
 
                 /* SUMO 1 ZUMBIDO POR LOGIN */
                 $collection_usuarios = getCollectionUsuarios();
@@ -302,7 +360,7 @@
             $_SESSION["mail"] = $usuario["mail"];
             $_SESSION["username"] = $usuario["username"];
             
-            $_SESSION["zumbido_saldo"] = $usuario["zumbido_saldo"];
+            $_SESSION["zumbido_saldo"] = $usuario["zumbido_saldo"] ?? 0;
             
             /* SUMO 1 ZUMBIDO POR LOGIN */
             $collection_usuarios = getCollectionUsuarios();
@@ -331,7 +389,7 @@
             $_SESSION["username"] = $usuario["username"];            
             
             
-            $_SESSION["zumbido_saldo"] = $usuario["zumbido_saldo"];
+            $_SESSION["zumbido_saldo"] = $usuario["zumbido_saldo"] ?? 0;
             
             /* SUMO 1 ZUMBIDO POR LOGIN */
             $collection_usuarios = getCollectionUsuarios();
@@ -846,37 +904,43 @@ function google_login($datos) {
         $collection_usuarios = getCollectionUsuarios();
         
         try {
-            // Obtener datos del referidor
+            // 1. RECOMPENSA PARA EL REFERIDOR
             $referidor = $collection_usuarios->findOne(['_id' => new MongoDB\BSON\ObjectId($referidor_id)]);
             
-            if (!$referidor) {
-                error_log("Referidor no encontrado: " . $referidor_id);
-                return false;
-            }
-            
-            // Calcular nuevo saldo
-            $saldo_actual = $referidor['saldo'] ?? 0;
-            $nuevo_saldo = $saldo_actual + 5; // 5€ por referido verificado
-            
-            // Actualizar saldo del referidor
-            $updateResult = $collection_usuarios->updateOne(
-                ['_id' => new MongoDB\BSON\ObjectId($referidor_id)],
-                ['$set' => ['saldo' => $nuevo_saldo]]
-            );
-            
-            if ($updateResult->getModifiedCount() > 0) {
-                // Registrar transacción de referido
-                registrarTransaccionReferido($referidor_id, $email_referido, 5);
+            if ($referidor) {
+                $saldo_actual_ref = $referidor['saldo'] ?? 0;
+                $nuevo_saldo_ref = $saldo_actual_ref + 5;
                 
-                // Enviar notificación al referidor (opcional)
+                $collection_usuarios->updateOne(
+                    ['_id' => new MongoDB\BSON\ObjectId($referidor_id)],
+                    ['$set' => ['saldo' => $nuevo_saldo_ref]]
+                );
+                
+                registrarTransaccionReferido($referidor_id, $email_referido, 5, 'Recompensa por invitar a un amigo');
                 enviarNotificacionReferido($referidor['mail'], $email_referido);
-                
-                error_log("Recompensa de referido procesada: " . $referidor_id . " -> +5€");
-                return true;
             }
+
+            // 2. RECOMPENSA PARA EL REFERIDO (NUEVO USUARIO)
+            $referido = $collection_usuarios->findOne(['mail' => $email_referido]);
+            
+            if ($referido) {
+                $referido_id = (string)$referido['_id'];
+                $saldo_actual_new = $referido['saldo'] ?? 0;
+                $nuevo_saldo_new = $saldo_actual_new + 5;
+                
+                $collection_usuarios->updateOne(
+                    ['_id' => $referido['_id']],
+                    ['$set' => ['saldo' => $nuevo_saldo_new]]
+                );
+                
+                registrarTransaccionReferido($referido_id, $email_referido, 5, 'Regalo de bienvenida por invitación');
+            }
+            
+            debug_log("Recompensas de referido procesadas (+5€ x2): Referidor=$referidor_id, Referido=$email_referido");
+            return true;
             
         } catch (Exception $e) {
-            error_log("Error procesando recompensa de referido: " . $e->getMessage());
+            debug_log("Error procesando recompensa de referido: " . $e->getMessage());
         }
         
         return false;
@@ -885,7 +949,7 @@ function google_login($datos) {
     /**
      * Registra una transacción de referido
      */
-    function registrarTransaccionReferido($referidor_id, $email_referido, $cantidad) {
+    function registrarTransaccionReferido($referidor_id, $email_referido, $cantidad, $descripcion = 'Recompensa por referido verificado') {
         try {
             $collection_transacciones = getCollectionTransacciones();
             
@@ -894,7 +958,7 @@ function google_login($datos) {
                 'usuario_id' => $referidor_id,
                 'email_referido' => $email_referido,
                 'cantidad' => $cantidad,
-                'descripcion' => 'Recompensa por referido verificado',
+                'descripcion' => $descripcion,
                 'fecha' => date('Y-m-d H:i:s'),
                 'estado' => 'completada'
             ];
@@ -902,7 +966,7 @@ function google_login($datos) {
             $collection_transacciones->insertOne($transaccion);
             
         } catch (Exception $e) {
-            error_log("Error registrando transacción de referido: " . $e->getMessage());
+            debug_log("Error registrando transacción de referido: " . $e->getMessage());
         }
     }
     
@@ -913,10 +977,10 @@ function google_login($datos) {
         try {
             // Aquí se podría implementar el envío de email de notificación
             // Por ahora solo lo registramos en el log
-            error_log("Notificación de referido: " . $email_referidor . " ganó 5€ por referir a " . $email_referido);
+            debug_log("Notificación de referido: " . $email_referidor . " ganó 5€ por referir a " . $email_referido);
             
         } catch (Exception $e) {
-            error_log("Error enviando notificación de referido: " . $e->getMessage());
+            debug_log("Error enviando notificación de referido: " . $e->getMessage());
         }
     }
     
@@ -1017,12 +1081,49 @@ function google_login($datos) {
      * ***************************************************/
     
     /**
-     * Genera un ID único de conversación entre dos usuarios
+     * Genera un ID único de conversación entre dos usuarios, opcionalmente vinculada a un código
+     * @param string $user1_id
+     * @param string $user2_id
+     * @param string|null $codigo_id Si se pasa, la conversación queda vinculada a ese código
      */
-    function crearConversacionId($user1_id, $user2_id) {
+    function crearConversacionId($user1_id, $user2_id, $codigo_id = null) {
         $ids = [(string)$user1_id, (string)$user2_id];
         sort($ids);
-        return $ids[0] . '-' . $ids[1];
+        $conv_id = $ids[0] . '-' . $ids[1];
+        if (!empty($codigo_id)) {
+            $conv_id .= '-' . (string)$codigo_id;
+        }
+        return $conv_id;
+    }
+
+    /**
+     * Extrae info de marca/código de un conversacion_id que incluye codigo_id
+     * @param string $conversacion_id Formato: userA-userB-codigoId
+     * @return array|null ['codigo_id' => string, 'marca' => string] o null si no tiene código
+     */
+    function extraerCodigoDeConversacion($conversacion_id) {
+        if (empty($conversacion_id)) return null;
+        // Formato: userId(24)-userId(24)-codigoId(24)
+        // Los ObjectId de MongoDB siempre tienen 24 caracteres hex
+        $parts = explode('-', $conversacion_id);
+        if (count($parts) >= 3) {
+            // Las dos primeras partes son user IDs (24 chars cada una), la tercera es codigo_id
+            $codigo_id = end($parts);
+            if (strlen($codigo_id) === 24 && ctype_xdigit($codigo_id)) {
+                try {
+                    $collection_codigos = getCollectionCodigos();
+                    $codigo = $collection_codigos->findOne(['_id' => new MongoDB\BSON\ObjectId($codigo_id)]);
+                    if ($codigo) {
+                        return [
+                            'codigo_id' => $codigo_id,
+                            'marca' => $codigo['marca'] ?? 'Desconocida'
+                        ];
+                    }
+                } catch (Throwable $e) {}
+                return ['codigo_id' => $codigo_id, 'marca' => 'Código'];
+            }
+        }
+        return null;
     }
     
     /**
@@ -1045,14 +1146,13 @@ function google_login($datos) {
                         'para_usuario_id' => ['$last' => '$para_usuario_id'],
                         'ultimo_texto' => ['$last' => '$mensaje'],
                         'es_admin_ultimo' => ['$last' => '$es_admin'],
+                        'ultimo_leido' => ['$last' => '$leido'],
                         'no_leidos_count' => [
                             '$sum' => [
-                                [
-                                    '$cond' => [
-                                        ['$eq' => ['$leido', false]],
-                                        1,
-                                        0
-                                    ]
+                                '$cond' => [
+                                    ['$eq' => ['$leido', false]],
+                                    1,
+                                    0
                                 ]
                             ]
                         ]
@@ -1096,13 +1196,14 @@ function google_login($datos) {
                     'ultimo_mensaje' => $conv['ultimo_texto'] ?? '',
                     'ultimo_mensaje_fecha' => $ultimo_mensaje_fecha_timestamp,
                     'no_leidos' => $conv['no_leidos_count'],
-                    'es_admin_ultimo' => $conv['es_admin_ultimo']
+                    'es_admin_ultimo' => $conv['es_admin_ultimo'],
+                    'ultimo_leido' => $conv['ultimo_leido'] ?? false
                 ];
             }
             
             return $resultado;
         } catch (Throwable $e) {
-            error_log("Error al obtener conversaciones admin: " . $e->getMessage());
+            debug_log("Error al obtener conversaciones admin: " . $e->getMessage());
             return [];
         }
     }
@@ -1153,23 +1254,29 @@ function google_login($datos) {
             
             return $resultado;
         } catch (Throwable $e) {
-            error_log("Error al obtener mensajes conversación: " . $e->getMessage());
+            debug_log("Error al obtener mensajes conversación: " . $e->getMessage());
             return [];
         }
     }
     
     /**
      * Envía un nuevo mensaje
+     * @param string $de_usuario_id ID del usuario que envía
+     * @param string $para_usuario_id ID del usuario destinatario
+     * @param string $mensaje Contenido del mensaje
+     * @param bool $es_admin Si el remitente es admin
+     * @param array $contexto Contexto opcional: ['codigo_id' => string, 'marca_slug' => string, 'beneficio' => int]
      */
-    function enviarMensaje($de_usuario_id, $para_usuario_id, $mensaje, $es_admin = false) {
+    function enviarMensaje($de_usuario_id, $para_usuario_id, $mensaje, $es_admin = false, $contexto = []) {
         $collection_mensajes = getCollectionMensajes();
         if (!$collection_mensajes) {
             return null;
         }
         
         try {
-            $conversacion_id = crearConversacionId($de_usuario_id, $para_usuario_id);
-            error_log("enviarMensaje: de_usuario_id=$de_usuario_id, para_usuario_id=$para_usuario_id, conversacion_id=$conversacion_id");
+            $codigo_id_conv = $contexto['codigo_id'] ?? null;
+            $conversacion_id = crearConversacionId($de_usuario_id, $para_usuario_id, $codigo_id_conv);
+            debug_log("enviarMensaje: de_usuario_id=$de_usuario_id, para_usuario_id=$para_usuario_id, conversacion_id=$conversacion_id codigo_id=$codigo_id_conv");
             
             $mensaje_data = [
                 'de_usuario_id' => new MongoDB\BSON\ObjectId($de_usuario_id),
@@ -1181,11 +1288,24 @@ function google_login($datos) {
                 'conversacion_id' => $conversacion_id
             ];
             
+            // Agregar contexto del código si existe
+            if (!empty($contexto['codigo_id'])) {
+                try {
+                    $mensaje_data['codigo_contexto'] = [
+                        'codigo_id' => new MongoDB\BSON\ObjectId($contexto['codigo_id']),
+                        'marca_slug' => $contexto['marca_slug'] ?? '',
+                        'beneficio' => isset($contexto['beneficio']) ? (int)$contexto['beneficio'] : 0
+                    ];
+                } catch (Exception $e) {
+                    debug_log("enviarMensaje: Error al procesar contexto de código: " . $e->getMessage());
+                }
+            }
+            
             $result = $collection_mensajes->insertOne($mensaje_data);
             $mensaje_id = $result->getInsertedId();
-            error_log("enviarMensaje: Mensaje guardado con ID: " . (string)$mensaje_id);
+            debug_log("enviarMensaje: Mensaje guardado con ID: " . (string)$mensaje_id);
 
-            // ENVIAR NOTIFICACIÓN POR EMAIL
+            // ENVIAR NOTIFICACIÓN POR EMAIL Y NOTIFICACIÓN IN-APP
             try {
                 // Obtener datos del remitente
                 $usuario_origen = get_object_user('_id', new MongoDB\BSON\ObjectId($de_usuario_id));
@@ -1193,6 +1313,9 @@ function google_login($datos) {
 
                 // Obtener datos del destinatario
                 $usuario_destino = get_object_user('_id', new MongoDB\BSON\ObjectId($para_usuario_id));
+                
+                // Verificar si el destinatario es VIP
+                $is_vip_destino = es_usuario_vip($para_usuario_id);
                 
                 if ($usuario_destino && !empty($usuario_destino['mail'])) {
                     $email_destino = $usuario_destino['mail'];
@@ -1203,37 +1326,112 @@ function google_login($datos) {
                         include_once __DIR__ . '/email_helper.php';
                     }
 
-                    $asunto = "Tienes un nuevo mensaje de " . $nombre_origen . " en Código Amigo";
-                    $default_msg = urlencode("hola buenas, me ayudas con el proceso y lo hacemos juntos?");
-                    $link_chat = "https://www.codigoamigo.com/public/chat_usuario.php?open_chat=" . $de_usuario_id . "&msg=" . $default_msg;
+                    $link_chat = "https://www.codigoamigo.com/public/chat_usuario.php?open_chat=" . $de_usuario_id;
+                    $link_vip = "https://www.codigoamigo.com/public/mis_viewers.php";
                     
-                    $html_content = '
-                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-                            <div style="background-color: #0f172a; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-                                <img src="https://www.codigoamigo.com/img/logo_codigoamigo_real4.png" alt="Código Amigo" style="max-height: 50px;">
-                            </div>
-                            <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;">
-                                <h2 style="color: #0f172a; margin-top: 0;">¡Nuevo mensaje!</h2>
-                                <p style="font-size: 16px;">Hola <strong>' . htmlspecialchars($nombre_destino) . '</strong>,</p>
-                                <p style="font-size: 16px;">Has recibido un nuevo mensaje de <strong>' . htmlspecialchars($nombre_origen) . '</strong>:</p>
-                                
-                                <div style="background-color: #f8fafc; padding: 15px; border-left: 4px solid #6366f1; margin: 20px 0; font-style: italic;">
-                                    "' . htmlspecialchars(substr($mensaje, 0, 100)) . (strlen($mensaje) > 100 ? '...' : '') . '"
+                    $is_vip_remitente = es_usuario_vip($de_usuario_id);
+                    if ($is_vip_destino || $is_vip_remitente) {
+                        // Email para usuarios VIP: muestran el contenido del mensaje
+                        $asunto = "Tienes un nuevo mensaje de " . $nombre_origen . " en Código Amigo";
+                        
+                        $html_content = '
+                            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                                <div style="background-color: #0f172a; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+                                    <img src="https://www.codigoamigo.com/img/logo_codigoamigo_real4.png" alt="Código Amigo" style="max-height: 50px;">
                                 </div>
-                                
-                                <div style="text-align: center; margin-top: 30px;">
-                                    <a href="' . $link_chat . '" style="background-color: #6366f1; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Responder ahora</a>
+                                <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;">
+                                    <h2 style="color: #0f172a; margin-top: 0;">¡Nuevo mensaje!</h2>
+                                    <p style="font-size: 16px;">Hola <strong>' . htmlspecialchars($nombre_destino) . '</strong>,</p>
+                                    <p style="font-size: 16px;">Has recibido un nuevo mensaje de <strong>' . htmlspecialchars($nombre_origen) . '</strong>:</p>
+                                    
+                                    <div style="background-color: #f8fafc; padding: 15px; border-left: 4px solid #6366f1; margin: 20px 0; font-style: italic;">
+                                        "' . htmlspecialchars(substr($mensaje, 0, 100)) . (strlen($mensaje) > 100 ? '...' : '') . '"
+                                    </div>
+                                    
+                                    <div style="text-align: center; margin-top: 30px;">
+                                        <a href="' . $link_chat . '" style="background-color: #6366f1; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Responder ahora</a>
+                                    </div>
+                                    
+                                    <p style="margin-top: 30px; font-size: 14px; color: #666;">O copia este enlace en tu navegador: <br> <a href="' . $link_chat . '" style="color: #6366f1;">' . $link_chat . '</a></p>
                                 </div>
-                                
-                                <p style="margin-top: 30px; font-size: 14px; color: #666;">O copia este enlace en tu navegador: <br> <a href="' . $link_chat . '" style="color: #6366f1;">' . $link_chat . '</a></p>
+                                <div style="text-align: center; font-size: 12px; color: #999; margin-top: 20px;">
+                                    © ' . date('Y') . ' Código Amigo. Todos los derechos reservados.
+                                </div>
                             </div>
-                            <div style="text-align: center; font-size: 12px; color: #999; margin-top: 20px;">
-                                © ' . date('Y') . ' Código Amigo. Todos los derechos reservados.
+                        ';
+                        
+                        $text_content = "Hola $nombre_destino, tienes un nuevo mensaje de $nombre_origen en Código Amigo. Accede aquí para leerlo y responder: $link_chat";
+                    } else {
+                        // Email para usuarios NO VIP: ocultar contenido del mensaje, CTA para hacerse VIP
+                        
+                        // Intentar obtener info específica del código desde el contexto
+                        $nombre_marca_email = '';
+                        $beneficio_email = 0;
+                        if (!empty($contexto['codigo_id'])) {
+                            try {
+                                if (!function_exists('getCollectionCodigos')) {
+                                    include_once __DIR__ . '/funciones_codigo.php';
+                                }
+                                $collection_codigos = getCollectionCodigos();
+                                $codigo_obj = $collection_codigos->findOne(['_id' => new MongoDB\BSON\ObjectId($contexto['codigo_id'])]);
+                                if ($codigo_obj && !empty($codigo_obj['marca'])) {
+                                    // Intentar obtener nombre bonito de la marca
+                                    if (function_exists('get_object_marca')) {
+                                        $marca_obj = get_object_marca('nombre_clave', $codigo_obj['marca']);
+                                        $nombre_marca_email = $marca_obj['nombre'] ?? ucfirst(str_replace('-', ' ', $codigo_obj['marca']));
+                                    } else {
+                                        $nombre_marca_email = ucfirst(str_replace('-', ' ', $codigo_obj['marca']));
+                                    }
+                                }
+                            } catch (Throwable $e_ctx) {
+                                debug_log("Error obteniendo contexto de código para email: " . $e_ctx->getMessage());
+                            }
+                        }
+                        if (!empty($contexto['beneficio'])) {
+                            $beneficio_email = (int)$contexto['beneficio'];
+                        }
+                        
+                        // Construir textos personalizados — enfoque suave, sin mencionar VIP
+                        $texto_sobre_codigo = !empty($nombre_marca_email) 
+                            ? 'quiere usar tu código de <strong>' . htmlspecialchars($nombre_marca_email) . '</strong> y necesita tu ayuda'
+                            : 'quiere usar uno de tus códigos y necesita tu ayuda';
+                        
+                        $texto_motivacion = ($beneficio_email > 0) 
+                            ? 'Si le ayudas, podrías ganar <strong>' . $beneficio_email . '€</strong> con tu código de referido.'
+                            : 'Respóndele y ayúdale a usar tu código. ¡Podrías ganar dinero con tu referido!';
+                        
+                        $asunto = ($beneficio_email > 0) 
+                            ? htmlspecialchars($nombre_origen) . " quiere usar tu código" . (!empty($nombre_marca_email) ? " de " . $nombre_marca_email : "") . " — podrías ganar {$beneficio_email}€"
+                            : htmlspecialchars($nombre_origen) . " quiere usar tu código" . (!empty($nombre_marca_email) ? " de " . $nombre_marca_email : "") . " 🎯";
+                        
+                        $html_content = '
+                            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                                <div style="background-color: #0f172a; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
+                                    <img src="https://www.codigoamigo.com/img/logo_codigoamigo_real4.png" alt="Código Amigo" style="max-height: 50px;">
+                                </div>
+                                <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;">
+                                    <h2 style="color: #0f172a; margin-top: 0;">¡Alguien quiere usar tu código! 🎯</h2>
+                                    <p style="font-size: 16px;">Hola <strong>' . htmlspecialchars($nombre_destino) . '</strong>,</p>
+                                    <p style="font-size: 16px;"><strong>' . htmlspecialchars($nombre_origen) . '</strong> ' . $texto_sobre_codigo . '.</p>
+                                    
+                                    <div style="background-color: #f0fdf4; padding: 20px; border-radius: 10px; margin: 20px 0; border-left: 4px solid #22c55e;">
+                                        <p style="font-size: 15px; color: #333; margin: 0;">💬 Te ha enviado un mensaje. ' . $texto_motivacion . '</p>
+                                    </div>
+                                    
+                                    <div style="text-align: center; margin-top: 30px;">
+                                        <a href="' . $link_chat . '" style="background-color: #6366f1; color: white; padding: 15px 35px; text-decoration: none; border-radius: 50px; font-weight: bold; display: inline-block; font-size: 16px; box-shadow: 0 4px 15px rgba(99,102,241,0.3);">📩 Leer mensaje y responder</a>
+                                    </div>
+                                    
+                                    <p style="margin-top: 25px; font-size: 14px; color: #666; text-align: center;">Abre el mensaje, ayúdale con el proceso y gana dinero con tus códigos.</p>
+                                </div>
+                                <div style="text-align: center; font-size: 12px; color: #999; margin-top: 20px;">
+                                    © ' . date('Y') . ' Código Amigo. Todos los derechos reservados.
+                                </div>
                             </div>
-                        </div>
-                    ';
-                    
-                    $text_content = "Hola $nombre_destino, tienes un nuevo mensaje de $nombre_origen en Código Amigo. Accede aquí para leerlo y responder: $link_chat";
+                        ';
+                        
+                        $text_content = "Hola $nombre_destino, $nombre_origen quiere usar tu código y te ha enviado un mensaje. Ábrelo y ayúdale con el proceso: $link_chat";
+                    }
 
                     // Enviar email (envolvemos en try/catch independiente para no bloquear el retorno)
                     enviarEmailConBrevoYRegistrar(
@@ -1247,13 +1445,28 @@ function google_login($datos) {
                         $text_content
                     );
                 }
+                
+                // Crear notificación in-app para el destinatario
+                if (!function_exists('crear_notificacion')) {
+                    include_once __DIR__ . '/funciones_notificaciones.php';
+                }
+                $nombre_origen_notif = $nombre_origen ?? 'Alguien';
+                $is_vip_remitente_notif = es_usuario_vip($de_usuario_id);
+                crear_notificacion($para_usuario_id, 'nuevo_mensaje', [
+                    'de_username' => $nombre_origen_notif,
+                    'de_usuario_id' => $de_usuario_id,
+                    'preview' => ($is_vip_destino || $is_vip_remitente_notif) ? substr($mensaje, 0, 80) : null,
+                    'is_vip' => $is_vip_destino,
+                    'is_vip_remitente' => $is_vip_remitente_notif
+                ]);
+                
             } catch (Throwable $e_mail) {
-                error_log("Error enviando notificación de email chat: " . $e_mail->getMessage());
+                debug_log("Error enviando notificación de email/in-app chat: " . $e_mail->getMessage());
             }
 
             return $mensaje_id;
         } catch (Throwable $e) {
-            error_log("Error al enviar mensaje: " . $e->getMessage());
+            debug_log("Error al enviar mensaje: " . $e->getMessage());
             return null;
         }
     }
@@ -1281,7 +1494,7 @@ function google_login($datos) {
             
             return $result->getModifiedCount() > 0;
         } catch (Throwable $e) {
-            error_log("Error al marcar mensajes como leídos: " . $e->getMessage());
+            debug_log("Error al marcar mensajes como leídos: " . $e->getMessage());
             return false;
         }
     }
@@ -1321,11 +1534,11 @@ function google_login($datos) {
                 }
             }
             
-            error_log("migrarMensajesSinConversacionId: Migrados $migrados mensajes");
+            debug_log("migrarMensajesSinConversacionId: Migrados $migrados mensajes");
             return $migrados;
         } catch (Throwable $e) {
-            error_log("Error al migrar mensajes: " . $e->getMessage());
-            error_log("Stack trace: " . $e->getTraceAsString());
+            debug_log("Error al migrar mensajes: " . $e->getMessage());
+            debug_log("Stack trace: " . $e->getTraceAsString());
             return false;
         }
     }
@@ -1333,16 +1546,48 @@ function google_login($datos) {
     /**
      * Obtiene conversaciones de un usuario
      */
-    function obtenerConversacionesUsuario($usuario_id) {
+    function obtenerConversacionesUsuario($usuario_id, $tab = 'inbox') {
         $collection_mensajes = getCollectionMensajes();
         if (!$collection_mensajes) {
-            // error_log("obtenerConversacionesUsuario: No se pudo obtener collection_mensajes");
+            // debug_log("obtenerConversacionesUsuario: No se pudo obtener collection_mensajes");
             return [];
         }
         
         try {
             $object_id = new MongoDB\BSON\ObjectId($usuario_id);
-            // error_log("obtenerConversacionesUsuario: Buscando conversaciones para usuario_id=$usuario_id");
+            // debug_log("obtenerConversacionesUsuario: Buscando conversaciones para usuario_id=$usuario_id");
+            
+            // Obtener datos de gestión de conversaciones del usuario
+            $usuario_data = get_object_user('_id', $object_id);
+            $archived_convs = [];
+            $deleted_convs = [];
+            $pinned_convs = [];
+            
+            if ($usuario_data) {
+                // Archivadas
+                if (isset($usuario_data['archived_conversations']) && (is_array($usuario_data['archived_conversations']) || $usuario_data['archived_conversations'] instanceof MongoDB\Model\BSONArray)) {
+                    foreach ($usuario_data['archived_conversations'] as $c) {
+                        $archived_convs[] = (string)$c;
+                    }
+                }
+                // Eliminadas (soft-delete)
+                if (isset($usuario_data['deleted_conversations']) && (is_array($usuario_data['deleted_conversations']) || $usuario_data['deleted_conversations'] instanceof MongoDB\Model\BSONArray)) {
+                    foreach ($usuario_data['deleted_conversations'] as $c) {
+                        $deleted_convs[] = (string)$c;
+                    }
+                }
+                // Fijadas
+                if (isset($usuario_data['pinned_conversations']) && (is_array($usuario_data['pinned_conversations']) || $usuario_data['pinned_conversations'] instanceof MongoDB\Model\BSONArray)) {
+                    foreach ($usuario_data['pinned_conversations'] as $c) {
+                        $pinned_convs[] = (string)$c;
+                    }
+                }
+            }
+            
+            // Si pide archivados y no hay ninguno, podemos retornar vacío rápido
+            if ($tab === 'archived' && empty($archived_convs)) {
+                return [];
+            }
             
             // Primero verificar si hay mensajes para este usuario
             $count_mensajes = $collection_mensajes->countDocuments([
@@ -1351,7 +1596,7 @@ function google_login($datos) {
                     ['para_usuario_id' => $object_id]
                 ]
             ]);
-            // error_log("obtenerConversacionesUsuario: Total mensajes encontrados para usuario: $count_mensajes");
+            // debug_log("obtenerConversacionesUsuario: Total mensajes encontrados para usuario: $count_mensajes");
             
             // Obtener conversaciones donde el usuario participa
             // Primero filtrar solo por usuario, luego filtrar conversacion_id inválidos después del group
@@ -1387,23 +1632,52 @@ function google_login($datos) {
                             ]
                         ]
                     ]
-                ],
-                [
-                    '$match' => [
-                        '_id' => [
-                            '$exists' => true,
-                            '$ne' => null,
-                            '$ne' => ''
-                        ]
-                    ]
-                ],
-                ['$sort' => ['ultimo_mensaje' => -1]]
+                ]
             ];
             
+            $match_conds = [
+                '_id' => [
+                    '$exists' => true,
+                    '$ne' => null,
+                    '$ne' => ''
+                ]
+            ];
+            
+            // Siempre excluir eliminadas
+            if (!empty($deleted_convs)) {
+                $match_conds['_id']['$nin'] = $deleted_convs;
+            }
+            
+            if ($tab === 'archived') {
+                $match_conds['_id']['$in'] = $archived_convs;
+            } else if ($tab === 'inbox' && !empty($archived_convs)) {
+                // Combinar con $nin existente (deleted)
+                if (isset($match_conds['_id']['$nin'])) {
+                    $match_conds['_id']['$nin'] = array_merge($match_conds['_id']['$nin'], $archived_convs);
+                } else {
+                    $match_conds['_id']['$nin'] = $archived_convs;
+                }
+            }
+            
+            $pipeline[] = [
+                '$match' => $match_conds
+            ];
+            
+            // Añadir campo is_pinned para ordenar fijados primero
+            if (!empty($pinned_convs)) {
+                $pipeline[] = [
+                    '$addFields' => [
+                        'is_pinned' => ['$in' => ['$_id', $pinned_convs]]
+                    ]
+                ];
+                $pipeline[] = ['$sort' => ['is_pinned' => -1, 'ultimo_mensaje' => -1]];
+            } else {
+                $pipeline[] = ['$sort' => ['ultimo_mensaje' => -1]];
+            }
             try {
                 // Log del pipeline para debugging
-                // error_log("obtenerConversacionesUsuario: Ejecutando pipeline con usuario_id: " . $usuario_id);
-                // error_log("obtenerConversacionesUsuario: ObjectId usuario: " . (string)$object_id);
+                // debug_log("obtenerConversacionesUsuario: Ejecutando pipeline con usuario_id: " . $usuario_id);
+                // debug_log("obtenerConversacionesUsuario: ObjectId usuario: " . (string)$object_id);
                 
                 // Primero, contar cuántos mensajes pasan el primer filtro
                 $count_after_first_match = $collection_mensajes->countDocuments([
@@ -1412,7 +1686,7 @@ function google_login($datos) {
                         ['para_usuario_id' => $object_id]
                     ]
                 ]);
-                // error_log("obtenerConversacionesUsuario: Mensajes después del primer match (usuario): $count_after_first_match");
+                // debug_log("obtenerConversacionesUsuario: Mensajes después del primer match (usuario): $count_after_first_match");
                 
                 // Contar después de todos los filtros de conversacion_id
                 $count_after_all_filters = $collection_mensajes->countDocuments([
@@ -1428,11 +1702,11 @@ function google_login($datos) {
                         ]
                     ]
                 ]);
-                // error_log("obtenerConversacionesUsuario: Mensajes después de todos los filtros: $count_after_all_filters");
+                // debug_log("obtenerConversacionesUsuario: Mensajes después de todos los filtros: $count_after_all_filters");
                 
                 $conversaciones = $collection_mensajes->aggregate($pipeline);
                 $conversaciones_array = iterator_to_array($conversaciones);
-                // error_log("obtenerConversacionesUsuario: Conversaciones después de agregación: " . count($conversaciones_array));
+                // debug_log("obtenerConversacionesUsuario: Conversaciones después de agregación: " . count($conversaciones_array));
                 
                 /*
                 // Log detallado de los primeros resultados - COMENTADO PARA PRODUCCIÓN
@@ -1443,7 +1717,7 @@ function google_login($datos) {
                 
                 // Log del resultado crudo para debugging
                 if (count($conversaciones_array) > 0) {
-                    // error_log("obtenerConversacionesUsuario: Resultado crudo de agregación (primeros 3): " . json_encode(array_slice($conversaciones_array, 0, 3), JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR));
+                    // debug_log("obtenerConversacionesUsuario: Resultado crudo de agregación (primeros 3): " . json_encode(array_slice($conversaciones_array, 0, 3), JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR));
                 } else {
                     // Si no hay resultados, intentar un pipeline más simple para ver qué pasa
                     $simple_pipeline = [
@@ -1465,14 +1739,14 @@ function google_login($datos) {
                     ];
                     $simple_result = $collection_mensajes->aggregate($simple_pipeline);
                     $simple_array = iterator_to_array($simple_result);
-                    // error_log("obtenerConversacionesUsuario: Pipeline simple devolvió: " . count($simple_array) . " resultados");
+                    // debug_log("obtenerConversacionesUsuario: Pipeline simple devolvió: " . count($simple_array) . " resultados");
                     if (count($simple_array) > 0) {
-                        // error_log("obtenerConversacionesUsuario: Ejemplo de resultado simple: " . json_encode($simple_array[0], JSON_UNESCAPED_UNICODE));
+                        // debug_log("obtenerConversacionesUsuario: Ejemplo de resultado simple: " . json_encode($simple_array[0], JSON_UNESCAPED_UNICODE));
                     }
                 }
             } catch (Throwable $e) {
-                error_log("obtenerConversacionesUsuario: ERROR en agregación: " . $e->getMessage());
-                error_log("obtenerConversacionesUsuario: Stack trace: " . $e->getTraceAsString());
+                debug_log("obtenerConversacionesUsuario: ERROR en agregación: " . $e->getMessage());
+                debug_log("obtenerConversacionesUsuario: Stack trace: " . $e->getTraceAsString());
                 $conversaciones_array = [];
             }
             
@@ -1484,14 +1758,14 @@ function google_login($datos) {
                 } else {
                     $first_conv = (array)$first_conv;
                 }
-                // error_log("obtenerConversacionesUsuario: Primera conversación (raw): " . json_encode($first_conv, JSON_UNESCAPED_UNICODE));
-                // error_log("obtenerConversacionesUsuario: Campos de primera conversación: " . implode(', ', array_keys($first_conv)));
+                // debug_log("obtenerConversacionesUsuario: Primera conversación (raw): " . json_encode($first_conv, JSON_UNESCAPED_UNICODE));
+                // debug_log("obtenerConversacionesUsuario: Campos de primera conversación: " . implode(', ', array_keys($first_conv)));
             } else {
-                error_log("obtenerConversacionesUsuario: WARNING - La agregación devolvió 0 conversaciones pero hay mensajes");
+                debug_log("obtenerConversacionesUsuario: WARNING - La agregación devolvió 0 conversaciones pero hay mensajes");
             }
             
             $resultado = [];
-            // error_log("obtenerConversacionesUsuario: Procesando " . count($conversaciones_array) . " conversaciones");
+            // debug_log("obtenerConversacionesUsuario: Procesando " . count($conversaciones_array) . " conversaciones");
             
             foreach ($conversaciones_array as $index => $conv_raw) {
                 try {
@@ -1505,7 +1779,7 @@ function google_login($datos) {
                     $conversacion_id = (string)($conv['_id'] ?? '');
                     
                     if (empty($conversacion_id)) {
-                        // error_log("obtenerConversacionesUsuario: Saltando conversación sin ID");
+                        // debug_log("obtenerConversacionesUsuario: Saltando conversación sin ID");
                         continue;
                     }
                     
@@ -1514,7 +1788,7 @@ function google_login($datos) {
                     $para_usuario_id_obj = $conv['para_usuario_id'] ?? null;
                     
                     if (!$de_usuario_id_obj || !$para_usuario_id_obj) {
-                        // error_log("obtenerConversacionesUsuario: Saltando conversación sin usuarios");
+                        // debug_log("obtenerConversacionesUsuario: Saltando conversación sin usuarios");
                         continue;
                     }
                     
@@ -1547,6 +1821,9 @@ function google_login($datos) {
                         }
                     }
                     
+                    // Extraer info de marca/código si la conversación está vinculada
+                    $codigo_info = extraerCodigoDeConversacion($conversacion_id);
+                    
                     $resultado[] = [
                         'conversacion_id' => $conversacion_id,
                         'otro_usuario_id' => $otro_usuario_id_str,
@@ -1559,20 +1836,22 @@ function google_login($datos) {
                         'es_admin_ultimo' => $conv['es_admin_ultimo'] ?? false,
                         'es_con_admin' => false,
                         'perfil_otro' => '',
-                        'es_solicitud' => false
+                        'es_solicitud' => false,
+                        'codigo_info' => $codigo_info,
+                        'is_pinned' => in_array($conversacion_id, $pinned_convs)
                     ];
                     
                 } catch (Throwable $e) {
-                    error_log("obtenerConversacionesUsuario: Error procesando conversación: " . $e->getMessage());
+                    debug_log("obtenerConversacionesUsuario: Error procesando conversación: " . $e->getMessage());
                     continue;
                 }
             }
             
-            // error_log("obtenerConversacionesUsuario: Total conversaciones procesadas: " . count($resultado));
+            // debug_log("obtenerConversacionesUsuario: Total conversaciones procesadas: " . count($resultado));
             return $resultado;
         } catch (Throwable $e) {
-            error_log("Error al obtener conversaciones usuario: " . $e->getMessage());
-            error_log("Stack trace: " . $e->getTraceAsString());
+            debug_log("Error al obtener conversaciones usuario: " . $e->getMessage());
+            debug_log("Stack trace: " . $e->getTraceAsString());
             return [];
         }
     }
@@ -1621,7 +1900,7 @@ function google_login($datos) {
             
             return $resultado;
         } catch (Throwable $e) {
-            error_log("Error al buscar mensajes: " . $e->getMessage());
+            debug_log("Error al buscar mensajes: " . $e->getMessage());
             return [];
         }
     }
@@ -1647,6 +1926,168 @@ function google_login($datos) {
         }
         
         return $token_data['user_id'];
+    }
+
+    /******************************************************
+     *  FUNCIONES DE GESTIÓN DE CONVERSACIONES
+     * ***************************************************/
+
+    /**
+     * Archiva una conversación para un usuario
+     */
+    function archivarConversacion($usuario_id, $conversacion_id) {
+        $collection = getCollectionUsuarios();
+        if (!$collection) return false;
+        try {
+            $result = $collection->updateOne(
+                ['_id' => new MongoDB\BSON\ObjectId($usuario_id)],
+                ['$addToSet' => ['archived_conversations' => $conversacion_id]]
+            );
+            return $result->getModifiedCount() > 0 || $result->getMatchedCount() > 0;
+        } catch (Throwable $e) {
+            debug_log("Error archivando conversación: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Desarchiva una conversación para un usuario
+     */
+    function desarchivarConversacion($usuario_id, $conversacion_id) {
+        $collection = getCollectionUsuarios();
+        if (!$collection) return false;
+        try {
+            $result = $collection->updateOne(
+                ['_id' => new MongoDB\BSON\ObjectId($usuario_id)],
+                ['$pull' => ['archived_conversations' => $conversacion_id]]
+            );
+            return $result->getModifiedCount() > 0 || $result->getMatchedCount() > 0;
+        } catch (Throwable $e) {
+            debug_log("Error desarchivando conversación: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Fija una conversación (máximo 3)
+     */
+    function fijarConversacion($usuario_id, $conversacion_id) {
+        $collection = getCollectionUsuarios();
+        if (!$collection) return false;
+        try {
+            // Verificar cuántas tiene fijadas
+            $usuario = $collection->findOne(
+                ['_id' => new MongoDB\BSON\ObjectId($usuario_id)],
+                ['projection' => ['pinned_conversations' => 1]]
+            );
+            $pinned = [];
+            if ($usuario && isset($usuario['pinned_conversations'])) {
+                foreach ($usuario['pinned_conversations'] as $p) {
+                    $pinned[] = (string)$p;
+                }
+            }
+            if (count($pinned) >= 3 && !in_array($conversacion_id, $pinned)) {
+                return false; // Máximo 3
+            }
+            $result = $collection->updateOne(
+                ['_id' => new MongoDB\BSON\ObjectId($usuario_id)],
+                ['$addToSet' => ['pinned_conversations' => $conversacion_id]]
+            );
+            return $result->getModifiedCount() > 0 || $result->getMatchedCount() > 0;
+        } catch (Throwable $e) {
+            debug_log("Error fijando conversación: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Desfija una conversación
+     */
+    function desfijarConversacion($usuario_id, $conversacion_id) {
+        $collection = getCollectionUsuarios();
+        if (!$collection) return false;
+        try {
+            $result = $collection->updateOne(
+                ['_id' => new MongoDB\BSON\ObjectId($usuario_id)],
+                ['$pull' => ['pinned_conversations' => $conversacion_id]]
+            );
+            return $result->getModifiedCount() > 0 || $result->getMatchedCount() > 0;
+        } catch (Throwable $e) {
+            debug_log("Error desfijando conversación: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Elimina (soft-delete) una conversación para un usuario
+     */
+    function eliminarConversacion($usuario_id, $conversacion_id) {
+        $collection = getCollectionUsuarios();
+        if (!$collection) return false;
+        try {
+            // Añadir a eliminadas y quitar de fijadas/archivadas
+            $result = $collection->updateOne(
+                ['_id' => new MongoDB\BSON\ObjectId($usuario_id)],
+                [
+                    '$addToSet' => ['deleted_conversations' => $conversacion_id],
+                    '$pull' => [
+                        'pinned_conversations' => $conversacion_id,
+                        'archived_conversations' => $conversacion_id
+                    ]
+                ]
+            );
+            return $result->getModifiedCount() > 0 || $result->getMatchedCount() > 0;
+        } catch (Throwable $e) {
+            debug_log("Error eliminando conversación: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Guarda una Push Subscription para un usuario
+     */
+    function guardarPushSubscription($usuario_id, $subscription) {
+        $collection = getCollectionUsuarios();
+        if (!$collection) return false;
+        try {
+            // Buscar si ya existe esta subscription (por endpoint)
+            $endpoint = $subscription['endpoint'] ?? '';
+            if (empty($endpoint)) return false;
+
+            // Eliminar suscrípciones antiguas con el mismo endpoint
+            $collection->updateOne(
+                ['_id' => new MongoDB\BSON\ObjectId($usuario_id)],
+                ['$pull' => ['push_subscriptions' => ['endpoint' => $endpoint]]]
+            );
+
+            // Añadir la nueva
+            $result = $collection->updateOne(
+                ['_id' => new MongoDB\BSON\ObjectId($usuario_id)],
+                ['$push' => ['push_subscriptions' => $subscription]]
+            );
+            return $result->getModifiedCount() > 0 || $result->getMatchedCount() > 0;
+        } catch (Throwable $e) {
+            debug_log("Error guardando push subscription: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Elimina una Push Subscription
+     */
+    function eliminarPushSubscription($usuario_id, $endpoint) {
+        $collection = getCollectionUsuarios();
+        if (!$collection) return false;
+        try {
+            $result = $collection->updateOne(
+                ['_id' => new MongoDB\BSON\ObjectId($usuario_id)],
+                ['$pull' => ['push_subscriptions' => ['endpoint' => $endpoint]]]
+            );
+            return $result->getModifiedCount() > 0 || $result->getMatchedCount() > 0;
+        } catch (Throwable $e) {
+            debug_log("Error eliminando push subscription: " . $e->getMessage());
+            return false;
+        }
     }
 
     /******************************************************
@@ -1698,7 +2139,7 @@ function google_login($datos) {
             
             return true;
         } catch (Throwable $e) {
-            error_log("Error en es_usuario_vip: " . $e->getMessage());
+            debug_log("Error en es_usuario_vip: " . $e->getMessage());
             return false;
         }
     }
@@ -1719,6 +2160,15 @@ function google_login($datos) {
             $collection_usuarios = getCollectionUsuarios();
             $object_id = is_string($user_id) ? new MongoDB\BSON\ObjectId($user_id) : $user_id;
             
+            // Obtener usuario actual para saber si ya es VIP (renovación vs primera vez)
+            $usuario_actual = $collection_usuarios->findOne(['_id' => $object_id]);
+            if (!$usuario_actual) {
+                debug_log("activar_vip: Usuario no encontrado: $user_id");
+                return false;
+            }
+            
+            $ya_era_vip = isset($usuario_actual['is_vip']) && $usuario_actual['is_vip'] === true;
+            
             // Si no se especifica fecha de expiración, establecer 1 mes desde ahora
             if ($expires_at === null) {
                 $expires_at = new DateTime();
@@ -1728,10 +2178,13 @@ function google_login($datos) {
             $vip_data = [
                 'is_vip' => true,
                 'vip_subscription_id' => $subscription_id,
-                'vip_started_at' => new MongoDB\BSON\UTCDateTime(),
                 'vip_expires_at' => new MongoDB\BSON\UTCDateTime($expires_at->getTimestamp() * 1000),
-                'vip_last_saldo_renewal' => new MongoDB\BSON\UTCDateTime()
             ];
+            
+            // Solo establecer vip_started_at la primera vez (no en renovaciones)
+            if (!$ya_era_vip) {
+                $vip_data['vip_started_at'] = new MongoDB\BSON\UTCDateTime();
+            }
             
             // Actualizar usuario
             $result = $collection_usuarios->updateOne(
@@ -1740,16 +2193,32 @@ function google_login($datos) {
             );
             
             if ($result->getModifiedCount() > 0 || $result->getMatchedCount() > 0) {
-                // Añadir 10€ de saldo inicial
+                // Añadir 10€ de saldo (con protección contra duplicados)
                 renovar_saldo_vip($user_id);
                 
-                error_log("VIP activado para usuario: $user_id, subscription: $subscription_id");
+                // Enviar email de bienvenida VIP SOLO la primera vez (no en renovaciones)
+                if (!$ya_era_vip) {
+                    try {
+                        if (!function_exists('enviarEmailBienvenidaVIP')) {
+                            include_once __DIR__ . '/funciones_email.php';
+                        }
+                        $usuario_data = $collection_usuarios->findOne(['_id' => $object_id]);
+                        if ($usuario_data) {
+                            enviarEmailBienvenidaVIP($usuario_data);
+                        }
+                    } catch (Throwable $email_e) {
+                        debug_log("Error enviando email bienvenida VIP: " . $email_e->getMessage());
+                    }
+                }
+                
+                $tipo_accion = $ya_era_vip ? 'renovado' : 'activado';
+                debug_log("VIP $tipo_accion para usuario: $user_id, subscription: $subscription_id");
                 return true;
             }
             
             return false;
         } catch (Throwable $e) {
-            error_log("Error en activar_vip: " . $e->getMessage());
+            debug_log("Error en activar_vip: " . $e->getMessage());
             return false;
         }
     }
@@ -1772,20 +2241,23 @@ function google_login($datos) {
                 ['_id' => $object_id],
                 ['$set' => [
                     'is_vip' => false,
-                    'vip_cancelled_at' => new MongoDB\BSON\UTCDateTime()
+                    'vip_cancelled_at' => new MongoDB\BSON\UTCDateTime(),
+                    'vip_cancel_pending' => false,
+                    'vip_retention_applied' => false
                 ]]
             );
             
-            error_log("VIP desactivado para usuario: $user_id");
+            debug_log("VIP desactivado para usuario: $user_id");
             return $result->getModifiedCount() > 0;
         } catch (Throwable $e) {
-            error_log("Error en desactivar_vip: " . $e->getMessage());
+            debug_log("Error en desactivar_vip: " . $e->getMessage());
             return false;
         }
     }
     
     /**
      * Renueva el saldo mensual de un usuario VIP (+10€)
+     * Incluye protección contra duplicados: no permite renovar si ya se renovó en las últimas 24 horas
      * @param string $user_id ID del usuario
      * @return bool True si se renovó correctamente
      */
@@ -1798,7 +2270,24 @@ function google_login($datos) {
             $collection_usuarios = getCollectionUsuarios();
             $object_id = is_string($user_id) ? new MongoDB\BSON\ObjectId($user_id) : $user_id;
             
-            // Añadir 10€ al saldo
+            // Protección contra duplicados: verificar última recarga
+            $usuario = $collection_usuarios->findOne(['_id' => $object_id]);
+            if ($usuario && isset($usuario['vip_last_saldo_renewal'])) {
+                $last_renewal = $usuario['vip_last_saldo_renewal'];
+                if ($last_renewal instanceof MongoDB\BSON\UTCDateTime) {
+                    $last_renewal_time = $last_renewal->toDateTime()->getTimestamp();
+                    $ahora = time();
+                    $horas_desde_ultima = ($ahora - $last_renewal_time) / 3600;
+                    
+                    // Si la última recarga fue hace menos de 24 horas, no renovar (evita duplicados)
+                    if ($horas_desde_ultima < 24) {
+                        debug_log("renovar_saldo_vip: Recarga ignorada para usuario $user_id - última recarga hace " . round($horas_desde_ultima, 1) . "h (< 24h)");
+                        return false;
+                    }
+                }
+            }
+            
+            // Añadir 10€ al saldo y marcar timestamp de renovación
             $result = $collection_usuarios->updateOne(
                 ['_id' => $object_id],
                 [
@@ -1819,13 +2308,13 @@ function google_login($datos) {
                     'estado' => 'completado'
                 ]);
                 
-                error_log("Saldo VIP renovado para usuario: $user_id (+10€)");
+                debug_log("Saldo VIP renovado para usuario: $user_id (+10€)");
                 return true;
             }
             
             return false;
         } catch (Throwable $e) {
-            error_log("Error en renovar_saldo_vip: " . $e->getMessage());
+            debug_log("Error en renovar_saldo_vip: " . $e->getMessage());
             return false;
         }
     }
@@ -1859,10 +2348,22 @@ function google_login($datos) {
             $codigo = $collection_codigos->findOne(['_id' => $codigo_object_id]);
             
             if (!$codigo || !isset($codigo['id_usuario'])) {
+                debug_log("registrar_vista_codigo: código no encontrado o sin id_usuario. codigo_id=$codigo_id");
                 return false;
             }
             
-            $codigo_owner_id = $codigo['id_usuario'];
+            $codigo_owner_id = (string)$codigo['id_usuario'];
+            
+            // NO REGISTRAR si el que ve el código es el mismo dueño (Evitar auto-leads)
+            if ($viewer_user_id && (string)$viewer_user_id === $codigo_owner_id) {
+                debug_log("registrar_vista_codigo: auto-view bloqueado. owner=$codigo_owner_id viewer=$viewer_user_id");
+                return false;
+            }
+            
+            // Log si el viewer es anónimo (no logueado)
+            if (empty($viewer_user_id)) {
+                debug_log("registrar_vista_codigo: vista anónima (sin login). codigo_id=$codigo_id session=" . ($session_id ?? 'null'));
+            }
             
             // Verificar si ya existe un registro para este viewer y código
             $filtro_existente = ['codigo_id' => $codigo_object_id];
@@ -1880,6 +2381,7 @@ function google_login($datos) {
                     ['_id' => $existente['_id']],
                     ['$set' => ['last_viewed_at' => new MongoDB\BSON\UTCDateTime()]]
                 );
+                debug_log("registrar_vista_codigo: vista ya existente actualizada. codigo_id=$codigo_id viewer=" . ($viewer_user_id ?? 'anon'));
                 return true;
             }
             
@@ -1894,12 +2396,26 @@ function google_login($datos) {
                 'contacted_at' => null
             ];
             
-            if ($viewer_user_id) {
-                $viewer_data['viewer_user_id'] = new MongoDB\BSON\ObjectId($viewer_user_id);
+            try {
+                if ($viewer_user_id && is_string($viewer_user_id)) {
+                    if (strlen($viewer_user_id) === 24 && ctype_xdigit($viewer_user_id)) {
+                        $viewer_data['viewer_user_id'] = new MongoDB\BSON\ObjectId($viewer_user_id);
+                    } else {
+                        $viewer_data['viewer_user_id'] = $viewer_user_id;
+                    }
+                    $viewer_data['registered_at'] = new MongoDB\BSON\UTCDateTime();
+                } else if ($viewer_user_id instanceof MongoDB\BSON\ObjectId) {
+                    $viewer_data['viewer_user_id'] = $viewer_user_id;
+                    $viewer_data['registered_at'] = new MongoDB\BSON\UTCDateTime();
+                }
+            } catch (Throwable $e) {
+                // Safeguard string
+                $viewer_data['viewer_user_id'] = $viewer_user_id;
                 $viewer_data['registered_at'] = new MongoDB\BSON\UTCDateTime();
             }
             
             $collection_viewers->insertOne($viewer_data);
+            debug_log("registrar_vista_codigo: NUEVO viewer registrado. codigo_id=$codigo_id owner=$codigo_owner_id viewer=" . ($viewer_user_id ?? 'anon') . " tiene_user_id=" . (isset($viewer_data['viewer_user_id']) ? 'SI' : 'NO'));
             
             // Enviar notificación por email al propietario del código si es un usuario registrado
             if ($viewer_user_id && $codigo_owner_id) {
@@ -1924,14 +2440,39 @@ function google_login($datos) {
                             $asunto = "¡Nuevo interesado en tu código de $marca_nombre!";
                             
                             // Mensaje diferenciado para VIP/No VIP
-                            $cta_text = $is_vip_owner ? "Contactar ahora" : "Ver quién es";
-                            $cta_link = "https://www.codigoamigo.com/public/mis_viewers.php";
+                            $cta_text = $is_vip_owner ? "Identificarme y contactar" : "Ver quién es";
+                            
+                            // Generar token temporal de autologin
+                            $autologin_token = bin2hex(random_bytes(16));
+                            $collection_usuarios = getCollectionUsuarios();
+                            $collection_usuarios->updateOne(
+                                ['_id' => new MongoDB\BSON\ObjectId($codigo_owner_id)],
+                                ['$set' => ['autologin_token' => $autologin_token]]
+                            );
+                            
+                            $cta_link = "https://www.codigoamigo.com/login?redirect=/public/mis_viewers.php&autologin=" . $autologin_token;
+                            
+                            // Datos adicionales para el email
+                            $nombre_viewer = 'un usuario';
+                            if ($viewer_user_id) {
+                                try {
+                                    $id_obj = (is_string($viewer_user_id) && strlen($viewer_user_id) === 24 && ctype_xdigit($viewer_user_id)) 
+                                        ? new MongoDB\BSON\ObjectId($viewer_user_id) 
+                                        : $viewer_user_id;
+                                    $viewer_user = get_object_user('_id', $id_obj);
+                                    if ($viewer_user && !empty($viewer_user['username'])) {
+                                        $nombre_viewer = $viewer_user['username'];
+                                    }
+                                } catch (Throwable $e) {}
+                            }
+                            $hora = date('H:i');
+                            $beneficio = $codigo['num_beneficio'] ?? 0;
                             
                             $msg_body = "<p>Hola <strong>$nombre_owner</strong>,</p>";
-                            $msg_body .= "<p>¡Buenas noticias! Un usuario registrado acaba de ver tu código de <strong>$marca_nombre</strong>.</p>";
+                            $msg_body .= "<p>El usuario <strong>$nombre_viewer</strong> acaba de ver tu código de <strong>$marca_nombre</strong> hoy a las $hora. Además te puede hacer ganar <strong>{$beneficio}€</strong>.</p>";
                             
                             if ($is_vip_owner) {
-                                $msg_body .= "<p>Al ser VIP, puedes ver quién es y contactarle directamente para ayudarle y asegurar tu recompensa.</p>";
+                                $msg_body .= "<p>Al ser VIP, puedes <strong>acceder a tu cuenta</strong> para ver quién es y contactarle directamente para asegurar tu recompensa.</p>";
                             } else {
                                 $msg_body .= "<p>Al ver tu código, es muy probable que vaya a usarlo. Hazte VIP para ver quién es y contactarle para asegurar el plan amigo.</p>";
                             }
@@ -1969,13 +2510,47 @@ function google_login($datos) {
                     }
                 } catch (Throwable $e_mail) {
                     // Silenciar errores de email para no fallar la request
-                    error_log("Error enviando email de nuevo viewer: " . $e_mail->getMessage());
+                    debug_log("Error enviando email de nuevo viewer: " . $e_mail->getMessage());
+                }
+            }
+
+            // Crear notificación in-app para el propietario del código
+            if ($viewer_user_id && $codigo_owner_id) {
+                try {
+                    if (!function_exists('crear_notificacion')) {
+                        include_once __DIR__ . '/funciones_notificaciones.php';
+                    }
+                    $is_vip_owner_notif = es_usuario_vip($codigo_owner_id);
+                    $marca_notif = isset($codigo['marca']) ? ucfirst($codigo['marca']) : 'tu código';
+                    $beneficio_notif = $codigo['num_beneficio'] ?? 0;
+                    
+                    // Obtener nombre del viewer para la notificación
+                    $nombre_viewer_notif = 'un usuario';
+                    try {
+                        $id_obj_notif = (is_string($viewer_user_id) && strlen($viewer_user_id) === 24 && ctype_xdigit($viewer_user_id))
+                            ? new MongoDB\BSON\ObjectId($viewer_user_id)
+                            : $viewer_user_id;
+                        $viewer_user_notif = get_object_user('_id', $id_obj_notif);
+                        if ($viewer_user_notif && !empty($viewer_user_notif['username'])) {
+                            $nombre_viewer_notif = $viewer_user_notif['username'];
+                        }
+                    } catch (Throwable $e) {}
+                    
+                    crear_notificacion($codigo_owner_id, 'nuevo_viewer', [
+                        'viewer_username' => $nombre_viewer_notif,
+                        'marca' => $marca_notif,
+                        'beneficio' => $beneficio_notif,
+                        'codigo_id' => (string)$codigo_id,
+                        'is_vip' => $is_vip_owner_notif
+                    ]);
+                } catch (Throwable $e_notif) {
+                    debug_log("Error creando notificación in-app de nuevo viewer: " . $e_notif->getMessage());
                 }
             }
 
             return true;
         } catch (Throwable $e) {
-            error_log("Error en registrar_vista_codigo: " . $e->getMessage());
+            debug_log("Error en registrar_vista_codigo: " . $e->getMessage());
             return false;
         }
     }
@@ -1998,35 +2573,52 @@ function google_login($datos) {
             $object_id = is_string($user_id) ? new MongoDB\BSON\ObjectId($user_id) : $user_id;
             
             // Obtener viewers registrados (que tienen viewer_user_id)
+            // codigo_owner_id se almacena siempre como string, pero buscamos ambos por seguridad
+            $owner_id_string = (string)$user_id;
             $viewers = $collection_viewers->find([
-                'codigo_owner_id' => $object_id,
+                'codigo_owner_id' => ['$in' => [$owner_id_string, $object_id]],
                 'viewer_user_id' => ['$exists' => true, '$ne' => null]
             ], ['sort' => ['viewed_at' => -1]]);
             
             $resultado = [];
-            $viewers_procesados = [];
+            $views_procesadas = []; // Deduplicar por viewer+codigo (no por viewer solo)
             $total_potencial = 0;
             
+            // Collect code IDs for this owner for the fallback
+            $codigos_owner = iterator_to_array($collection_codigos->find(['id_usuario' => $object_id]));
+            $codigos_ids_owner = array_map(function($c) { return $c['_id']; }, $codigos_owner);
+            
+            // Obtener completados de una vez para mapeo rápido
+            $db = createConnection();
+            $collection_completados = $db->selectCollection('codigos_completados');
+            $completados_db = iterator_to_array($collection_completados->find(['owner_id' => $object_id]));
+            $completados_map = [];
+            foreach ($completados_db as $comp) {
+                $comp_key = (string)$comp['viewer_id'] . '|' . (string)$comp['codigo_id'];
+                $completados_map[$comp_key] = true;
+            }
+            
+            // First pass: code_viewers — cada vista de código es un lead separado
             foreach ($viewers as $viewer) {
                 $viewer_user_id = (string)$viewer['viewer_user_id'];
+                $codigo_id_str = (string)$viewer['codigo_id'];
                 
-                // Evitar duplicados por usuario
-                if (in_array($viewer_user_id, $viewers_procesados)) {
-                    continue;
+                // Deduplicar por combinación viewer+código (no por viewer solo)
+                $clave_unica = $viewer_user_id . '|' . $codigo_id_str;
+                if (in_array($clave_unica, $views_procesadas)) { continue; }
+                $views_procesadas[] = $clave_unica;
+                
+                try {
+                    $viewer_user = $collection_usuarios->findOne([
+                        '_id' => new MongoDB\BSON\ObjectId($viewer_user_id)
+                    ]);
+                } catch(Throwable $e) {
+                    $viewer_user = null;
                 }
-                $viewers_procesados[] = $viewer_user_id;
                 
-                // Obtener datos del viewer
-                $viewer_user = $collection_usuarios->findOne([
-                    '_id' => new MongoDB\BSON\ObjectId($viewer_user_id)
-                ]);
-                
-                // Obtener datos del código
                 $codigo = $collection_codigos->findOne(['_id' => $viewer['codigo_id']]);
-                
                 $beneficio = $codigo['num_beneficio'] ?? 0;
                 $marca = $codigo['marca'] ?? 'Desconocida';
-                
                 $total_potencial += $beneficio;
                 
                 $resultado[] = [
@@ -2034,13 +2626,78 @@ function google_login($datos) {
                     'viewer_username' => $viewer_user['username'] ?? 'Usuario',
                     'viewer_email' => $viewer_user['mail'] ?? '',
                     'viewer_img' => $viewer_user['img'] ?? '',
-                    'codigo_id' => (string)$viewer['codigo_id'],
+                    'codigo_id' => $codigo_id_str,
                     'codigo_marca' => $marca,
                     'codigo_beneficio' => $beneficio,
                     'viewed_at' => $viewer['viewed_at'],
                     'contacted' => $viewer['contacted'] ?? false,
-                    'contacted_at' => $viewer['contacted_at'] ?? null
+                    'contacted_at' => $viewer['contacted_at'] ?? null,
+                    'completado' => isset($completados_map[$clave_unica])
                 ];
+            }
+            
+            // Fallback pass: historial (if no new leads found)
+            if (count($resultado) === 0 && count($codigos_ids_owner) > 0) {
+                $collection_historial = getCollectionHistorial();
+                $historial_views = $collection_historial->find([
+                    'id_codigo' => ['$in' => $codigos_ids_owner],
+                    'user_id' => ['$exists' => true, '$ne' => null]
+                ], ['limit' => 200]); // Limit to recent 200, no sort to avoid full collection scan
+                
+                foreach ($historial_views as $hv) {
+                    $viewer_user_id = (string)$hv['user_id'];
+                    $codigo_id_hv = (string)$hv['id_codigo'];
+                    // Exclude self-views
+                    if ($viewer_user_id === (string)$user_id) { continue; }
+                    // Deduplicar por combinación viewer+código
+                    $clave_unica = $viewer_user_id . '|' . $codigo_id_hv;
+                    if (in_array($clave_unica, $views_procesadas)) { continue; }
+                    $views_procesadas[] = $clave_unica;
+                    
+                    try {
+                        $viewer_user = $collection_usuarios->findOne([
+                            '_id' => new MongoDB\BSON\ObjectId($viewer_user_id)
+                        ]);
+                    } catch(Throwable $e) {
+                        $viewer_user = null;
+                    }
+                    
+                    $codigo = current(array_filter($codigos_owner, function($c) use ($hv) { 
+                        return (string)$c['_id'] === (string)$hv['id_codigo']; 
+                    }));
+                    
+                    $beneficio = $codigo['num_beneficio'] ?? 0;
+                    $marca = $codigo['marca'] ?? 'Desconocida';
+                    $total_potencial += $beneficio;
+                    
+                    // Parse date string like 'd-m-Y  H:i:s' into UTCDateTime
+                    $viewed_at_dt = new MongoDB\BSON\UTCDateTime();
+                    if (isset($hv['fecha_visita'])) {
+                        $ts = strtotime(str_replace('  ', ' ', $hv['fecha_visita']));
+                        if ($ts) $viewed_at_dt = new MongoDB\BSON\UTCDateTime($ts * 1000);
+                    }
+                    
+                    $resultado[] = [
+                        'viewer_id' => $viewer_user_id,
+                        'viewer_username' => $viewer_user['username'] ?? 'Usuario',
+                        'viewer_email' => $viewer_user['mail'] ?? '',
+                        'viewer_img' => $viewer_user['img'] ?? '',
+                        'codigo_id' => (string)$hv['id_codigo'],
+                        'codigo_marca' => $marca,
+                        'codigo_beneficio' => $beneficio,
+                        'viewed_at' => $viewed_at_dt,
+                        'contacted' => false,
+                        'contacted_at' => null,
+                        'completado' => isset($completados_map[$clave_unica])
+                    ];
+                }
+                
+                // Sort in PHP if needed
+                usort($resultado, function($a, $b) {
+                    $time_a = $a['viewed_at'] instanceof MongoDB\BSON\UTCDateTime ? $a['viewed_at']->toDateTime()->getTimestamp() : 0;
+                    $time_b = $b['viewed_at'] instanceof MongoDB\BSON\UTCDateTime ? $b['viewed_at']->toDateTime()->getTimestamp() : 0;
+                    return $time_b - $time_a;
+                });
             }
             
             return [
@@ -2049,7 +2706,7 @@ function google_login($datos) {
                 'total_potencial' => $total_potencial
             ];
         } catch (Throwable $e) {
-            error_log("Error en obtener_viewers_usuario: " . $e->getMessage());
+            debug_log("Error en obtener_viewers_usuario: " . $e->getMessage());
             return ['viewers' => [], 'total_viewers' => 0, 'total_potencial' => 0];
         }
     }
@@ -2094,7 +2751,7 @@ function google_login($datos) {
             
             return ['puede' => true, 'razon' => 'OK'];
         } catch (Throwable $e) {
-            error_log("Error en puede_contactar_viewer: " . $e->getMessage());
+            debug_log("Error en puede_contactar_viewer: " . $e->getMessage());
             return ['puede' => false, 'razon' => 'Error interno'];
         }
     }
@@ -2113,12 +2770,15 @@ function google_login($datos) {
         try {
             $collection_viewers = getCollectionCodeViewers();
             $object_id = is_string($user_id) ? new MongoDB\BSON\ObjectId($user_id) : $user_id;
+            $str_id = (string)$user_id;
+            
             $viewer_object_id = is_string($viewer_id) ? new MongoDB\BSON\ObjectId($viewer_id) : $viewer_id;
+            $viewer_str_id = (string)$viewer_id;
             
             $result = $collection_viewers->updateMany(
                 [
-                    'codigo_owner_id' => $object_id,
-                    'viewer_user_id' => $viewer_object_id
+                    'codigo_owner_id' => ['$in' => [$str_id, $object_id]],
+                    'viewer_user_id' => ['$in' => [$viewer_str_id, $viewer_object_id]]
                 ],
                 ['$set' => [
                     'contacted' => true,
@@ -2128,7 +2788,7 @@ function google_login($datos) {
             
             return $result->getModifiedCount() > 0;
         } catch (Throwable $e) {
-            error_log("Error en marcar_viewer_contactado: " . $e->getMessage());
+            debug_log("Error en marcar_viewer_contactado: " . $e->getMessage());
             return false;
         }
     }
@@ -2139,7 +2799,7 @@ function google_login($datos) {
      */
     function enviarMensajeMasivo($de_usuario_id, $destinatarios_ids, $mensaje) {
         if (empty($destinatarios_ids) || empty($mensaje)) {
-            return ['enviados' => 0, 'fallidos' => 0, 'total' => 0];
+            return ['enviados' => 0, 'fallidos' => 0, 'omitidos' => 0, 'total' => 0];
         }
 
         // Aumentar tiempo de ejecución para envíos masivos
@@ -2147,19 +2807,34 @@ function google_login($datos) {
             set_time_limit(300); // 5 minutos
         }
 
-        $stats = ['enviados' => 0, 'fallidos' => 0, 'total' => count($destinatarios_ids)];
+        $stats = ['enviados' => 0, 'fallidos' => 0, 'omitidos' => 0, 'total' => count($destinatarios_ids)];
         
         // Determinar si es admin (opcional, por defecto false)
         $es_admin = false;
         
+        $collection_mensajes = getCollectionMensajes();
+        
         foreach ($destinatarios_ids as $para_id) {
             try {
                 // Verificar que no sea el mismo usuario
-                if ((string)$para_id === (string)$de_usuario_id) continue;
+                if ((string)$para_id === (string)$de_usuario_id) {
+                    $stats['omitidos']++;
+                    continue;
+                }
+                
+                // Verificar si ya se ha contactado previamente (para evitar spam)
+                $conversacion_id = crearConversacionId($de_usuario_id, $para_id);
+                $mensaje_previo = $collection_mensajes->findOne(['conversacion_id' => $conversacion_id]);
+                
+                if ($mensaje_previo) {
+                    $stats['omitidos']++;
+                    continue;
+                }
                 
                 // Enviar mensaje (esto también envía email notification)
                 $res = enviarMensaje($de_usuario_id, $para_id, $mensaje, $es_admin);
                 if ($res) {
+                    marcar_viewer_contactado($de_usuario_id, $para_id);
                     $stats['enviados']++;
                 } else {
                     $stats['fallidos']++;
@@ -2171,7 +2846,7 @@ function google_login($datos) {
                 }
                 
             } catch (Throwable $e) {
-                error_log("Error en enviarMensajeMasivo destinatario $para_id: " . $e->getMessage());
+                debug_log("Error en enviarMensajeMasivo destinatario $para_id: " . $e->getMessage());
                 $stats['fallidos']++;
             }
         }
@@ -2210,12 +2885,117 @@ function google_login($datos) {
                 'vip_expires' => $usuario['vip_expires_at'] ?? null
             ];
         } catch (Throwable $e) {
-            error_log("Error en obtener_info_badge_vip: " . $e->getMessage());
+            debug_log("Error en obtener_info_badge_vip: " . $e->getMessage());
             return ['is_vip' => false];
         }
     }
 
 
+    /**
+     * Obtiene las interacciones de un usuario específico con los códigos del propietario
+     * Útil para el contexto del chat
+     * @param string $owner_id ID del propietario de los códigos (usuario actual)
+     * @param string $viewer_id ID del usuario que ha visto los códigos
+     * @return array Lista de interacciones con códigos
+     */
+    function obtener_interacciones_usuario_con_mis_codigos($owner_id, $viewer_id) {
+        if (empty($owner_id) || empty($viewer_id)) {
+            return ['interacciones' => [], 'total' => 0, 'total_potencial' => 0];
+        }
+        
+        try {
+            $collection_vistas = getCollectionVistas();
+            $collection_codigos = getCollectionCodigos();
+            
+            // 1. Obtener todos los IDs de códigos del propietario
+            $owner_object_id = is_string($owner_id) ? new MongoDB\BSON\ObjectId($owner_id) : $owner_id;
+            $codigos_owner = $collection_codigos->find(['id_usuario' => $owner_object_id]);
+            
+            $map_codigos = [];
+            $ids_codigos = [];
+            foreach ($codigos_owner as $c) {
+                $id_s = (string)$c['_id'];
+                $ids_codigos[] = $c['_id'];
+                $map_codigos[$id_s] = $c;
+            }
+            
+            if (empty($ids_codigos)) {
+                return ['interacciones' => [], 'total' => 0, 'total_potencial' => 0];
+            }
+            
+            // 2. Buscar visitas de este usuario a los códigos del propietario
+            // Manejamos viewer_id como String y como ObjectId por inconsistencias detectadas en la DB
+            $viewer_object_id = is_string($viewer_id) ? new MongoDB\BSON\ObjectId($viewer_id) : $viewer_id;
+            
+            $query = [
+                'id_usuario' => ['$in' => [(string)$viewer_id, $viewer_object_id]],
+                'id_codigo' => ['$in' => $ids_codigos]
+            ];
+            
+            // Ordenamos por _id descendente para obtener las más recientes primero
+            $views = $collection_vistas->find($query, ['sort' => ['_id' => -1]]);
+            
+            // También revisar en code_viewers y historial
+            $collection_viewers = getCollectionCodeViewers();
+            $query_cv = [
+                'owner_id' => ['$in' => [(string)$owner_id, $owner_object_id]],
+                'viewer_id' => (string)$viewer_id 
+            ];
+            $cvs = $collection_viewers->find($query_cv);
+
+            $collection_historial = getCollectionHistorial();
+            $query_h = [
+                'id_codigo' => ['$in' => $ids_codigos],
+                'user_id' => (string)$viewer_id
+            ];
+            $hists = $collection_historial->find($query_h);
+            
+            $interacciones = [];
+            $total_potencial = 0;
+            $codigos_procesados = []; // Para mostrar cada código una única vez
+            
+            // Unify all sources into a simple array
+            $all_sources = [];
+            foreach ($views as $v) { $all_sources[] = [(string)$v['id_codigo'], $v['fecha_vista'] ?? 'Recientemente']; }
+            foreach ($cvs as $cv) { $all_sources[] = [(string)$cv['codigo_id'], $cv['viewed_at'] instanceof MongoDB\BSON\UTCDateTime ? $cv['viewed_at']->toDateTime()->format('d-m-Y H:i') : 'Recientemente']; }
+            foreach ($hists as $h) { $all_sources[] = [(string)$h['id_codigo'], $h['fecha_visita'] ?? 'Recientemente']; }
+
+            foreach ($all_sources as $source) {
+                $codigo_id_str = $source[0];
+                $fecha_vista = $source[1];
+
+                // Si ya procesamos este código, saltamos (solo nos interesa la visita más reciente para la lista)
+                if (isset($codigos_procesados[$codigo_id_str])) continue;
+                $codigos_procesados[$codigo_id_str] = true;
+                
+                $codigo = $map_codigos[$codigo_id_str] ?? null;
+                if (!$codigo) continue;
+                
+                $beneficio = $codigo['num_beneficio'] ?? 0;
+                $marca = $codigo['marca'] ?? 'Desconocida';
+                $total_potencial += $beneficio;
+                
+                $interacciones[] = [
+                    'codigo_id' => $codigo_id_str,
+                    'marca' => ucfirst($marca),
+                    'beneficio' => $beneficio,
+                    'last_viewed_at' => $fecha_vista,
+                    'contacted' => false // El historial de 'vistas' no trackea contacto, pero mantenemos campo por UI
+                ];
+            }
+            
+            return [
+                'interacciones' => $interacciones,
+                'total' => count($interacciones),
+                'total_potencial' => $total_potencial
+            ];
+            
+        } catch (Throwable $e) {
+            debug_log("Error en obtener_interacciones_usuario_con_mis_codigos: " . $e->getMessage());
+            return ['interacciones' => [], 'total' => 0, 'total_potencial' => 0];
+        }
+    }
+    
     /******************************************************
      *  FUNCIONES DE FAVORITOS
      * ***************************************************/
@@ -2224,132 +3004,83 @@ function google_login($datos) {
      * Comprueba si un chollo es favorito de un usuario
      * Wrapper para compatibilidad - usa funciones_favoritos.php si está disponible
      */
-    if (!function_exists('es_favorito')) {
-        function es_favorito($user_id, $codigo_id) {
-            if (empty($user_id) || empty($codigo_id)) {
-                return false;
-            }
-
-            try {
-                $collection_favoritos = getCollectionFavoritos();
-                if (!$collection_favoritos) {
-                    return false;
-                }
-
-                $user_id_obj = is_string($user_id) ? new MongoDB\BSON\ObjectId($user_id) : $user_id;
-                $codigo_id_obj = is_string($codigo_id) ? new MongoDB\BSON\ObjectId($codigo_id) : $codigo_id;
-
-                $favorito = $collection_favoritos->findOne([
-                    'usuario_id' => $user_id_obj,
-                    'codigo_id' => $codigo_id_obj,
-                    'tipo' => 'chollo'
-                ]);
-
-                return !empty($favorito);
-            } catch (Throwable $e) {
-                error_log("Error en es_favorito: " . $e->getMessage());
-                return false;
-            }
-        }
-    }
 
     /**
      * Añade un chollo a favoritos
      */
-    if (!function_exists('añadir_favorito')) {
-    function añadir_favorito($user_id, $codigo_id) {
-        if (empty($user_id) || empty($codigo_id)) {
-            return ['success' => false, 'message' => 'Datos incompletos'];
-        }
-
-        try {
-            $collection_favoritos = getCollectionFavoritos();
-            if (!$collection_favoritos) {
-                return ['success' => false, 'message' => 'Error de conexión'];
-            }
-
-            $user_id_obj = is_string($user_id) ? new \MongoDB\BSON\ObjectId($user_id) : $user_id;
-            $codigo_id_obj = is_string($codigo_id) ? new \MongoDB\BSON\ObjectId($codigo_id) : $codigo_id;
-
-            // Verificar si ya existe
-            if (es_favorito($user_id, $codigo_id)) {
-                return ['success' => true, 'message' => 'Ya estaba en favoritos'];
-            }
-
-            $nuevo_favorito = [
-                'usuario_id' => $user_id_obj,
-                'codigo_id' => $codigo_id_obj,
-                'tipo' => 'chollo',
-                'fecha_creacion' => new \MongoDB\BSON\UTCDateTime()
-            ];
-
-            $result = $collection_favoritos->insertOne($nuevo_favorito);
-
-            if ($result->getInsertedId()) {
-                // Opcional: Incrementar contador de "me gusta" o temperatura en el chollo si se desea
-                 // Aumentar temperatura al guardar en favoritos (Feature solicitada anteriormente)
-                 if (function_exists('aumentarTemperatura')) {
-                    // Si existe la función en el scope, usarla. Sino, habría que incluir funciones_chollos_votos.php
-                    // Por ahora simple
-                 }
-                  
-                 // Implementación directa de temperatura +1
-                 try {
-                     $db = createConnection();
-                     $collection_chollos = $db->selectCollection('chollos');
-                     $collection_chollos->updateOne(
-                        ['_id' => $codigo_id_obj],
-                        ['$inc' => ['temperatura' => 1]]
-                     );
-                 } catch(Exception $e) {
-                     // Ignorar error de temperatura
-                 }
-
-                return ['success' => true, 'message' => 'Añadido a favoritos'];
-            } else {
-                return ['success' => false, 'message' => 'Error al guardar'];
-            }
-
-        } catch (Throwable $e) {
-            error_log("Error en añadir_favorito: " . $e->getMessage());
-            return ['success' => false, 'message' => 'Error interno'];
-        }
-    }
-    }
 
     /**
      * Elimina un chollo de favoritos
      */
-    if (!function_exists('eliminar_favorito')) {
-    function eliminar_favorito($user_id, $codigo_id) {
-        if (empty($user_id) || empty($codigo_id)) {
-            return ['success' => false, 'message' => 'Datos incompletos'];
-        }
 
+    /******************************************************
+     *  POTENCIAL DE GANANCIAS Y MENSAJE MASIVO
+     * ***************************************************/
+
+    /**
+     * Calcula el potencial de ganancias completo para un usuario y todos sus códigos
+     * @param string $user_id ID del usuario
+     * @return array Datos de potencial (total, por código, y lista de destinatarios únicos)
+     */
+    function obtener_potencial_completo_usuario($user_id) {
+        if (empty($user_id)) return ['total_potential' => 0, 'total_unique_viewers' => 0, 'per_code' => [], 'all_viewer_ids' => []];
+        
         try {
-            $collection_favoritos = getCollectionFavoritos();
-            if (!$collection_favoritos) {
-                return ['success' => false, 'message' => 'Error de conexión'];
+            $user_obj_id = is_string($user_id) ? new \MongoDB\BSON\ObjectId($user_id) : $user_id;
+            
+            // 1. Obtener todos los códigos activos del usuario
+            if (!function_exists('getCollectionCodigos')) {
+                include_once __DIR__ . '/../inc/conexion.php';
             }
-
-            $user_id_obj = is_string($user_id) ? new \MongoDB\BSON\ObjectId($user_id) : $user_id;
-            $codigo_id_obj = is_string($codigo_id) ? new \MongoDB\BSON\ObjectId($codigo_id) : $codigo_id;
-
-            $result = $collection_favoritos->deleteOne([
-                'usuario_id' => $user_id_obj,
-                'codigo_id' => $codigo_id_obj,
-                'tipo' => 'chollo'
-            ]);
-
-            if ($result->getDeletedCount() > 0) {
-                return ['success' => true, 'message' => 'Eliminado de favoritos'];
-            } else {
-                return ['success' => true, 'message' => 'No estaba en favoritos']; // Consideramos success si ya no está
+            $collection_codigos = getCollectionCodigos();
+            $codigos = $collection_codigos->find(['id_usuario' => $user_obj_id, 'estado' => 0]);
+            
+            $total_potential = 0;
+            $per_code = [];
+            $all_viewer_ids = [];
+            
+            $collection_vistas = getCollectionVistas();
+            
+            foreach ($codigos as $code) {
+                $code_id_str = (string)$code['_id'];
+                $beneficio = isset($code['num_beneficio']) ? floatval($code['num_beneficio']) : 5;
+                if ($beneficio <= 0) $beneficio = 5; // Valor por defecto
+                
+                // Buscar visualizaciones para este código
+                $vistas = $collection_vistas->find(['id_codigo' => $code['_id']]);
+                
+                $unique_viewers_code = [];
+                foreach ($vistas as $v) {
+                    if (isset($v['id_usuario']) && !empty($v['id_usuario'])) {
+                        $v_id_str = (string)$v['id_usuario'];
+                        // Evitar al propio dueño del código
+                        if ($v_id_str !== (string)$user_id) {
+                            $unique_viewers_code[$v_id_str] = true;
+                            $all_viewer_ids[$v_id_str] = true;
+                        }
+                    }
+                }
+                
+                $count = count($unique_viewers_code);
+                $potential = $count * $beneficio;
+                $total_potential += $potential;
+                
+                $per_code[$code_id_str] = [
+                    'count' => $count,
+                    'potential' => $potential,
+                    'viewer_ids' => array_keys($unique_viewers_code)
+                ];
             }
-
+            
+            return [
+                'total_potential' => $total_potential,
+                'total_unique_viewers' => count($all_viewer_ids),
+                'all_viewer_ids' => array_keys($all_viewer_ids),
+                'per_code' => $per_code
+            ];
+            
         } catch (Throwable $e) {
-            error_log("Error en eliminar_favorito: " . $e->getMessage());
-            return ['success' => false, 'message' => 'Error interno'];
+            debug_log("Error en obtener_potencial_completo_usuario: " . $e->getMessage());
+            return ['total_potential' => 0, 'total_unique_viewers' => 0, 'per_code' => [], 'all_viewer_ids' => []];
         }
-    }
     }

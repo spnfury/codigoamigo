@@ -64,7 +64,7 @@ function obtenerHistorialSitemaps($limite = 50) {
     }
 }
 
-function generarSitemapPrincipal($incluir_codigos = false, $incluir_chollos = true) {
+function generarSitemapPrincipal($incluir_codigos = false) {
     $hoy = date("Y-m-d");
     $base_url = "https://www.codigoamigo.com";
     $xml_dir = __DIR__ . '/xml';
@@ -76,6 +76,7 @@ function generarSitemapPrincipal($incluir_codigos = false, $incluir_chollos = tr
     $sitemapindex = $xml->appendChild($sitemapindex);
     $sitemapindex->setAttribute("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9");
     
+    // Sitemap de marcas
     $sitemap = $xml->createElement("sitemap");
     $sitemap = $sitemapindex->appendChild($sitemap);
     $loc = $xml->createElement("loc", $base_url . "/myphp/xml/sitemap_marcas.xml");
@@ -83,6 +84,7 @@ function generarSitemapPrincipal($incluir_codigos = false, $incluir_chollos = tr
     $lastmod = $xml->createElement("lastmod", $hoy);
     $sitemap->appendChild($lastmod);
     
+    // Sitemap de categorías
     $sitemap = $xml->createElement("sitemap");
     $sitemap = $sitemapindex->appendChild($sitemap);
     $loc = $xml->createElement("loc", $base_url . "/myphp/xml/sitemap_categorias.xml");
@@ -90,6 +92,31 @@ function generarSitemapPrincipal($incluir_codigos = false, $incluir_chollos = tr
     $lastmod = $xml->createElement("lastmod", $hoy);
     $sitemap->appendChild($lastmod);
     
+    // Sitemap de comparativas
+    $sitemap = $xml->createElement("sitemap");
+    $sitemap = $sitemapindex->appendChild($sitemap);
+    $loc = $xml->createElement("loc", $base_url . "/myphp/xml/sitemap_comparativas.xml");
+    $sitemap->appendChild($loc);
+    $lastmod = $xml->createElement("lastmod", $hoy);
+    $sitemap->appendChild($lastmod);
+    
+    // Sitemap de guías
+    $sitemap = $xml->createElement("sitemap");
+    $sitemap = $sitemapindex->appendChild($sitemap);
+    $loc = $xml->createElement("loc", $base_url . "/myphp/xml/sitemap_guias.xml");
+    $sitemap->appendChild($loc);
+    $lastmod = $xml->createElement("lastmod", $hoy);
+    $sitemap->appendChild($lastmod);
+    
+    // Sitemap de páginas estáticas
+    $sitemap = $xml->createElement("sitemap");
+    $sitemap = $sitemapindex->appendChild($sitemap);
+    $loc = $xml->createElement("loc", $base_url . "/myphp/xml/sitemap_estaticas.xml");
+    $sitemap->appendChild($loc);
+    $lastmod = $xml->createElement("lastmod", $hoy);
+    $sitemap->appendChild($lastmod);
+    
+    // Sitemap de códigos (opcional, puede ser muy grande)
     if ($incluir_codigos) {
         $sitemap = $xml->createElement("sitemap");
         $sitemap = $sitemapindex->appendChild($sitemap);
@@ -98,22 +125,6 @@ function generarSitemapPrincipal($incluir_codigos = false, $incluir_chollos = tr
         $lastmod = $xml->createElement("lastmod", $hoy);
         $sitemap->appendChild($lastmod);
     }
-    
-    if ($incluir_chollos) {
-        $sitemap = $xml->createElement("sitemap");
-        $sitemap = $sitemapindex->appendChild($sitemap);
-        $loc = $xml->createElement("loc", $base_url . "/myphp/xml/sitemap_chollos.xml");
-        $sitemap->appendChild($loc);
-        $lastmod = $xml->createElement("lastmod", $hoy);
-        $sitemap->appendChild($lastmod);
-    }
-    
-    $sitemap = $xml->createElement("sitemap");
-    $sitemap = $sitemapindex->appendChild($sitemap);
-    $loc = $xml->createElement("loc", $base_url . "/myphp/xml/sitemap_estaticas.xml");
-    $sitemap->appendChild($loc);
-    $lastmod = $xml->createElement("lastmod", $hoy);
-    $sitemap->appendChild($lastmod);
     
     $sitemap_path = __DIR__ . '/../sitemap.xml';
     $xml->save($sitemap_path);
@@ -256,21 +267,103 @@ function generarSitemapCodigos($limite = 10000) {
     }
 }
 
-function generarSitemapChollos($limite = 5000) {
+/**
+ * Genera sitemap de comparativas (/comparar/marca1-vs-marca2).
+ * Solo incluye marcas activas (estado=1) con categoría asignada.
+ * Pares únicos dentro de la misma categoría, sin duplicados inversos.
+ */
+function generarSitemapComparativas($limite = 5000) {
     $hoy = date("Y-m-d");
     $base_url = "https://www.codigoamigo.com";
     $xml_dir = __DIR__ . '/xml';
     if (!is_dir($xml_dir)) mkdir($xml_dir, 0755, true);
     
-    $collection_chollos = getCollectionChollos();
-    if (!$collection_chollos) return ['success' => false, 'error' => 'Error de conexión'];
+    $db = createConnection();
+    if (!$db) return ['success' => false, 'error' => 'Error de conexión'];
     
     try {
-        $fecha_actual = date('Y-m-d H:i:s');
-        $chollos = $collection_chollos->find([
-            'estado' => 1,
-            '$or' => [['fecha_fin' => null], ['fecha_fin' => ['$gte' => $fecha_actual]]]
-        ], ['sort' => ['fecha_creacion' => -1], 'limit' => $limite]);
+        // Obtener marcas activas (estado=1) que tienen categoria_clave
+        $col_marcas = $db->selectCollection('marcas');
+        $cursor = $col_marcas->find(
+            [
+                'estado'         => 1,
+                'categoria_clave'=> ['$exists' => true, '$ne' => '']
+            ],
+            ['projection' => ['nombre_clave' => 1, 'categoria_clave' => 1]]
+        );
+        
+        // Agrupar por categoría
+        $por_categoria = [];
+        foreach ($cursor as $m) {
+            $nc  = $m['nombre_clave']   ?? '';
+            $cat = $m['categoria_clave'] ?? '';
+            if (empty($nc) || empty($cat)) continue;
+            $por_categoria[$cat][] = $nc;
+        }
+        
+        // Generar XML con pares dentro de la misma categoría
+        $xml = new DOMDocument("1.0", "UTF-8");
+        $xml->formatOutput = true;
+        $urlset = $xml->createElement("urlset");
+        $urlset = $xml->appendChild($urlset);
+        $urlset->setAttribute("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9");
+        
+        $total = 0;
+        foreach ($por_categoria as $cat => $marcas_cat) {
+            if (count($marcas_cat) < 2) continue;
+            $n = count($marcas_cat);
+            for ($i = 0; $i < $n - 1; $i++) {
+                for ($j = $i + 1; $j < $n; $j++) {
+                    if ($total >= $limite) break 3;
+                    $slug_a = $marcas_cat[$i];
+                    $slug_b = $marcas_cat[$j];
+                    $url_comparativa = $base_url . "/comparar/" . $slug_a . "-vs-" . $slug_b;
+                    $url = $xml->createElement("url");
+                    $url = $urlset->appendChild($url);
+                    $loc = $xml->createElement("loc", $url_comparativa);
+                    $url->appendChild($loc);
+                    $lastmod = $xml->createElement("lastmod", $hoy);
+                    $url->appendChild($lastmod);
+                    $changefreq = $xml->createElement("changefreq", "weekly");
+                    $url->appendChild($changefreq);
+                    $priority = $xml->createElement("priority", "0.85");
+                    $url->appendChild($priority);
+                    $total++;
+                }
+            }
+        }
+        
+        $sitemap_path = $xml_dir . '/sitemap_comparativas.xml';
+        $xml->save($sitemap_path);
+        return ['success' => true, 'archivo' => $sitemap_path, 'url' => $base_url . '/myphp/xml/sitemap_comparativas.xml', 'total_urls' => $total, 'fecha' => $hoy];
+    } catch (Throwable $e) {
+        error_log("Error al generar sitemap de comparativas: " . $e->getMessage());
+        return ['success' => false, 'error' => $e->getMessage()];
+    }
+}
+
+/**
+ * Genera sitemap de guías / super landings (/guias/{slug}).
+ */
+function generarSitemapGuias() {
+    $hoy = date("Y-m-d");
+    $base_url = "https://www.codigoamigo.com";
+    $xml_dir = __DIR__ . '/xml';
+    if (!is_dir($xml_dir)) mkdir($xml_dir, 0755, true);
+    
+    $db = createConnection();
+    if (!$db) return ['success' => false, 'error' => 'Error de conexión'];
+    
+    try {
+        $collection = $db->selectCollection('super_landings');
+        // La colección usa 'status' (inglés) — buscamos en ambos campos por compatibilidad
+        $guias = $collection->find(
+            ['$or' => [
+                ['estado' => ['$in' => ['activo', 'active']]],
+                ['status' => ['$in' => ['activo', 'active']]]
+            ]],
+            ['sort' => ['_id' => -1], 'projection' => ['slug' => 1, 'updated_at' => 1, 'fecha_actualizacion' => 1]]
+        );
         
         $xml = new DOMDocument("1.0", "UTF-8");
         $xml->formatOutput = true;
@@ -279,29 +372,37 @@ function generarSitemapChollos($limite = 5000) {
         $urlset->setAttribute("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9");
         
         $total = 0;
-        foreach ($chollos as $chollo) {
-            $chollo_id = (string)($chollo['_id'] ?? '');
-            if (empty($chollo_id)) continue;
+        foreach ($guias as $guia) {
+            $slug = $guia['slug'] ?? '';
+            if (empty($slug)) continue;
             
-            $url_chollo = $base_url . "/chollos_detalle.php?id=" . $chollo_id;
+            // Fecha de última modificación
+            $lastmod_date = $hoy;
+            if (isset($guia['fecha_actualizacion']) && $guia['fecha_actualizacion'] instanceof MongoDB\BSON\UTCDateTime) {
+                $lastmod_date = $guia['fecha_actualizacion']->toDateTime()->format('Y-m-d');
+            } elseif (isset($guia['updated_at']) && $guia['updated_at'] instanceof MongoDB\BSON\UTCDateTime) {
+                $lastmod_date = $guia['updated_at']->toDateTime()->format('Y-m-d');
+            }
+            
+            $url_guia = $base_url . "/guias/" . $slug;
             $url = $xml->createElement("url");
             $url = $urlset->appendChild($url);
-            $loc = $xml->createElement("loc", $url_chollo);
+            $loc = $xml->createElement("loc", $url_guia);
             $url->appendChild($loc);
-            $lastmod = $xml->createElement("lastmod", $hoy);
+            $lastmod = $xml->createElement("lastmod", $lastmod_date);
             $url->appendChild($lastmod);
-            $changefreq = $xml->createElement("changefreq", "daily");
+            $changefreq = $xml->createElement("changefreq", "monthly");
             $url->appendChild($changefreq);
             $priority = $xml->createElement("priority", "0.8");
             $url->appendChild($priority);
             $total++;
         }
         
-        $sitemap_path = $xml_dir . '/sitemap_chollos.xml';
+        $sitemap_path = $xml_dir . '/sitemap_guias.xml';
         $xml->save($sitemap_path);
-        return ['success' => true, 'archivo' => $sitemap_path, 'url' => $base_url . '/myphp/xml/sitemap_chollos.xml', 'total_urls' => $total, 'fecha' => $hoy];
+        return ['success' => true, 'archivo' => $sitemap_path, 'url' => $base_url . '/myphp/xml/sitemap_guias.xml', 'total_urls' => $total, 'fecha' => $hoy];
     } catch (Throwable $e) {
-        error_log("Error al generar sitemap de chollos: " . $e->getMessage());
+        error_log("Error al generar sitemap de guías: " . $e->getMessage());
         return ['success' => false, 'error' => $e->getMessage()];
     }
 }
@@ -316,12 +417,14 @@ function generarSitemapEstaticas() {
         ['url' => $base_url . '/', 'priority' => '1.0', 'changefreq' => 'daily'],
         ['url' => $base_url . '/listado-marcas', 'priority' => '0.9', 'changefreq' => 'daily'],
         ['url' => $base_url . '/listado-categorias', 'priority' => '0.9', 'changefreq' => 'weekly'],
-        ['url' => $base_url . '/chollos_listado.php', 'priority' => '0.9', 'changefreq' => 'daily'],
+        ['url' => $base_url . '/ultimos-codigos', 'priority' => '0.85', 'changefreq' => 'daily'],
+        ['url' => $base_url . '/comparar', 'priority' => '0.7', 'changefreq' => 'monthly'],
+        ['url' => $base_url . '/registro', 'priority' => '0.7', 'changefreq' => 'monthly'],
+        ['url' => $base_url . '/sobre_nosotros', 'priority' => '0.5', 'changefreq' => 'monthly'],
         ['url' => $base_url . '/contacto', 'priority' => '0.5', 'changefreq' => 'monthly'],
         ['url' => $base_url . '/aviso_legal', 'priority' => '0.3', 'changefreq' => 'yearly'],
         ['url' => $base_url . '/politica_de_privacidad', 'priority' => '0.3', 'changefreq' => 'yearly'],
-        ['url' => $base_url . '/sobre_nosotros', 'priority' => '0.5', 'changefreq' => 'monthly'],
-        ['url' => $base_url . '/registro', 'priority' => '0.7', 'changefreq' => 'monthly'],
+        ['url' => $base_url . '/politica_de_cookies', 'priority' => '0.2', 'changefreq' => 'yearly'],
     ];
     
     try {
@@ -355,13 +458,12 @@ function generarSitemapEstaticas() {
 
 function generarTodosLosSitemaps($opciones = []) {
     $incluir_codigos = $opciones['incluir_codigos'] ?? false;
-    $incluir_chollos = $opciones['incluir_chollos'] ?? true;
     $limite_codigos = $opciones['limite_codigos'] ?? 10000;
-    $limite_chollos = $opciones['limite_chollos'] ?? 5000;
+    $limite_comparativas = $opciones['limite_comparativas'] ?? 3000;
     
     $resultados = ['fecha_inicio' => date('Y-m-d H:i:s'), 'sitemaps' => []];
     
-    $resultado_principal = generarSitemapPrincipal($incluir_codigos, $incluir_chollos);
+    $resultado_principal = generarSitemapPrincipal($incluir_codigos);
     $resultados['sitemaps']['principal'] = $resultado_principal;
     
     $resultado_marcas = generarSitemapMarcas();
@@ -370,18 +472,23 @@ function generarTodosLosSitemaps($opciones = []) {
     $resultado_categorias = generarSitemapCategorias();
     $resultados['sitemaps']['categorias'] = $resultado_categorias;
     
+    // Comparativas: pares de marcas de la misma categoría
+    $resultado_comparativas = generarSitemapComparativas($limite_comparativas);
+    $resultados['sitemaps']['comparativas'] = $resultado_comparativas;
+    
+    // Guías / Super Landings
+    $resultado_guias = generarSitemapGuias();
+    $resultados['sitemaps']['guias'] = $resultado_guias;
+    
+    // Páginas estáticas actualizadas
+    $resultado_estaticas = generarSitemapEstaticas();
+    $resultados['sitemaps']['estaticas'] = $resultado_estaticas;
+    
+    // Códigos (opcional, puede ser muy grande)
     if ($incluir_codigos) {
         $resultado_codigos = generarSitemapCodigos($limite_codigos);
         $resultados['sitemaps']['codigos'] = $resultado_codigos;
     }
-    
-    if ($incluir_chollos) {
-        $resultado_chollos = generarSitemapChollos($limite_chollos);
-        $resultados['sitemaps']['chollos'] = $resultado_chollos;
-    }
-    
-    $resultado_estaticas = generarSitemapEstaticas();
-    $resultados['sitemaps']['estaticas'] = $resultado_estaticas;
     
     $resultados['fecha_fin'] = date('Y-m-d H:i:s');
     
@@ -430,11 +537,12 @@ function obtenerEstadisticasSitemaps() {
     }
     
     $tipos_urls = [
-        'marcas' => $base_url . '/myphp/xml/sitemap_marcas.xml',
-        'categorias' => $base_url . '/myphp/xml/sitemap_categorias.xml',
-        'codigos' => $base_url . '/myphp/xml/sitemap_codigos.xml',
-        'chollos' => $base_url . '/myphp/xml/sitemap_chollos.xml',
-        'estaticas' => $base_url . '/myphp/xml/sitemap_estaticas.xml'
+        'marcas'        => $base_url . '/myphp/xml/sitemap_marcas.xml',
+        'categorias'    => $base_url . '/myphp/xml/sitemap_categorias.xml',
+        'comparativas'  => $base_url . '/myphp/xml/sitemap_comparativas.xml',
+        'guias'         => $base_url . '/myphp/xml/sitemap_guias.xml',
+        'estaticas'     => $base_url . '/myphp/xml/sitemap_estaticas.xml',
+        'codigos'       => $base_url . '/myphp/xml/sitemap_codigos.xml',
     ];
     
     foreach ($tipos_urls as $tipo => $url) {

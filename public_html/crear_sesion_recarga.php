@@ -51,7 +51,7 @@ try {
     // Crear sesión de Stripe
     $stripe = new \Stripe\StripeClient($stripe_secret_key);
     
-    if (function_exists('log_info')) { log_info("Creando sesión Stripe para paquete: $paquete, precio: $precio, saldo: $saldo"); }
+    error_log("Creando sesión Stripe para paquete: $paquete, precio: $precio, saldo: $saldo");
     
     $session = $stripe->checkout->sessions->create([
         'payment_method_types' => ['card'],

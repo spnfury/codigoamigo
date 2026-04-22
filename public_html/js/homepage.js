@@ -539,26 +539,10 @@
     window.closeMobileMenus = closeMobileMenus;
 
     function initMobileSearch() {
-        var searchToggle = document.getElementById('mobile-search-toggle');
-        var searchClose = document.getElementById('mobile-search-close');
-        var searchContainer = document.getElementById('mobile-search-container');
-        var searchInput = document.getElementById('mobile-search-input');
-
-        if (searchToggle && searchContainer && searchInput) {
-            searchToggle.addEventListener('click', function (event) {
-                event.preventDefault();
-                searchContainer.classList.add('show');
-                setTimeout(function () {
-                    searchInput.focus();
-                }, 100);
-            });
-        }
-
-        if (searchClose && searchContainer) {
-            searchClose.addEventListener('click', function (event) {
-                event.preventDefault();
-                searchContainer.classList.remove('show');
-            });
+        // La búsqueda ahora es permanente en el header móvil, no necesita toggle de visibilidad
+        var searchInput = document.getElementById('mobile-search-input-header');
+        if (searchInput) {
+            // Lógica adicional para el campo de búsqueda permanente si fuera necesaria
         }
     }
 

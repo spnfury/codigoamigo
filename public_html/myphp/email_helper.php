@@ -49,6 +49,7 @@ function enviarEmailSMTPBrevo($to_email, $to_name, $subject, $html_content, $tex
         
         // Configuración de charset
         $mail->CharSet = 'UTF-8';
+        $mail->Encoding = 'base64'; // Evitar corrupción de caracteres largos en SMTP 8bit
         
         // Configurar remitente
         $mail->setFrom($from_email, $from_name);
@@ -85,6 +86,27 @@ function enviarEmailSMTPBrevo($to_email, $to_name, $subject, $html_content, $tex
 // Función wrapper que registra en el log después del envío
 function enviarEmailConBrevoYRegistrar($to_email, $to_name, $subject, $html_content, $tipo, $usuario_id = null, $detalles = [], $text_content = '', $from_email = 'noreply@codigoamigo.com', $from_name = 'Código Amigo') {
     
+    // Añadir footer de desuscripción a emails no transaccionales
+    $tipos_transaccionales = ['activacion_usuario', 'recuperacion_password', 'contacto_form', 'codigo_publicado'];
+    if (!in_array($tipo, $tipos_transaccionales)) {
+        $unsub_footer = '<hr style="border:none;border-top:1px solid #eee;margin:30px 0 15px;">'
+            . '<p style="font-size:12px;color:#999;text-align:center;margin:0;">'
+            . 'Si no deseas recibir estos correos, puedes '
+            . '<a href="https://www.codigoamigo.com/usuario#preferencias" style="color:#E30613;text-decoration:underline;">configurar tus preferencias de notificación</a>'
+            . ' en tu perfil.</p>';
+        
+        // Insertar antes de </body> si existe, si no al final
+        if (stripos($html_content, '</body>') !== false) {
+            $html_content = str_ireplace('</body>', $unsub_footer . '</body>', $html_content);
+        } else {
+            $html_content .= $unsub_footer;
+        }
+        
+        // También añadir al texto plano
+        $unsub_text = "\n\n---\nSi no deseas recibir estos correos, configura tus preferencias en: https://www.codigoamigo.com/usuario";
+        $text_content .= $unsub_text;
+    }
+    
     // Enviar el email
     $resultado = enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text_content, $from_email, $from_name);
     
@@ -107,6 +129,75 @@ function enviarEmailConBrevoYRegistrar($to_email, $to_name, $subject, $html_cont
     );
     
     return $resultado;
+}
+
+/**
+ * Comprueba si un usuario acepta recibir un tipo de email determinado.
+ * Los emails transaccionales (activación, recuperación password, contacto, publicación) siempre se envían.
+ * 
+ * @param string $usuario_id ID del usuario en MongoDB
+ * @param string $tipo_email Tipo de email (competencia, apertura_codigo, destacado_expira_pronto, etc.)
+ * @return bool true si el usuario acepta (o no tiene preferencia definida), false si ha desactivado ese tipo
+ */
+function usuarioAceptaEmail($usuario_id, $tipo_email) {
+    // Emails transaccionales: siempre se envían
+    $transaccionales = [
+        'activacion_usuario',
+        'recuperacion_password',
+        'contacto_form',
+        'codigo_publicado',
+    ];
+    
+    if (in_array($tipo_email, $transaccionales)) {
+        return true;
+    }
+    
+    // Mapeo de tipo de email a campo de preferencia del usuario
+    $mapa_preferencias = [
+        // Competencia
+        'competencia' => 'email_competencia',
+        'competencia_home' => 'email_competencia',
+        'competencia_home_super' => 'email_competencia',
+        'destacado_competencia' => 'email_competencia',
+        // Aperturas / uso de código
+        'apertura_codigo' => 'email_aperturas',
+        // Destacados (ciclo de vida)
+        'destacado_expira_pronto' => 'email_destacados',
+        'destacado_expirado' => 'email_destacados',
+        'destacado_auto_renovado' => 'email_destacados',
+        'destacado_saldo_insuficiente' => 'email_destacados',
+    ];
+    
+    $campo = $mapa_preferencias[$tipo_email] ?? null;
+    
+    // Si el tipo no está mapeado, enviar por defecto
+    if (!$campo) {
+        return true;
+    }
+    
+    // Buscar preferencia del usuario
+    try {
+        $collection_usuarios = getCollectionUsuarios();
+        $usuario = $collection_usuarios->findOne(
+            ['_id' => new \MongoDB\BSON\ObjectId($usuario_id)],
+            ['projection' => [$campo => 1]]
+        );
+        
+        if (!$usuario) {
+            return true; // usuario no encontrado, enviar por defecto
+        }
+        
+        // Si el campo no existe en el documento, default = 1 (activo)
+        if (!isset($usuario[$campo])) {
+            return true;
+        }
+        
+        return (int)$usuario[$campo] === 1;
+        
+    } catch (\Exception $e) {
+        error_log("Error comprobando preferencia email ($tipo_email) para usuario $usuario_id: " . $e->getMessage());
+        return true; // En caso de error, enviar por defecto
+    }
 }
 
 /**
@@ -298,12 +389,23 @@ function enviarEmailContacto($datos, $url_logo_web) {
                    "<li><b>Teléfono: </b>" . htmlspecialchars($datos["telefono"]) . "</li><br>" .
                    "<li><b>Mensaje: </b>" . htmlspecialchars($datos["mensaje"]) . "</li><br>" .
                    "</ul>";
+    
+    // Añadir nota de sistema si existe (para fallback de reCAPTCHA)
+    if (!empty($datos['_sistema_nota'])) {
+        $html_content .= "<hr style='border: 1px dashed #ccc; margin: 20px 0;'>" .
+                         "<p style='color: #999; font-size: 12px; font-style: italic;'>⚠️ Nota interna: " . 
+                         htmlspecialchars($datos['_sistema_nota']) . "</p>";
+    }
 
     $text_content = "Nuevo contacto desde el formulario " . $datos["origin"] . ":\n\n" .
                    "Nombre: " . $datos["nombre"] . "\n" .
                    "Correo: " . $datos["correo"] . "\n" .
                    "Teléfono: " . $datos["telefono"] . "\n" .
                    "Mensaje: " . $datos["mensaje"];
+    
+    if (!empty($datos['_sistema_nota'])) {
+        $text_content .= "\n\n---\nNota interna: " . $datos['_sistema_nota'];
+    }
 
     // Datos para logging
     $usuario_id = $_SESSION['user_id'] ?? null;
@@ -323,6 +425,69 @@ function enviarEmailContacto($datos, $url_logo_web) {
         $detalles,
         $text_content,
         "info@codigoamigo.com",
+        "Código Amigo"
+    );
+}
+
+/**
+ * Envía un email notificando a los seguidores que un usuario ha publicado algo
+ */
+function enviarEmailNotificacionPublicacionUsuario($to_email, $to_name, $usuario_autor_nombre, $item_tipo, $item_titulo, $item_url, $item_imagen = null) {
+    if (!$to_email) return false;
+    
+    $tipo_label = $item_tipo === 'chollo' ? 'chollo' : 'código';
+    $subject = "¡Novedades! $usuario_autor_nombre ha publicado un nuevo $tipo_label";
+    
+    $html_content = '
+        <html>
+            <head>
+                <title>' . $subject . '</title>
+            </head>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f9f9f9; padding: 20px;">
+                <div style="max-width: 600px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <img src="https://www.codigoamigo.com/img/logo_codigoamigo.png" alt="Código Amigo" style="max-width: 150px;">
+                    </div>
+                    <h2 style="color: #E30613; text-align: center;">¡Nuevas publicaciones!</h2>
+                    <p>Hola <strong>' . htmlspecialchars($to_name) . '</strong>,</p>
+                    <p>El usuario <strong>' . htmlspecialchars($usuario_autor_nombre) . '</strong> al que sigues acaba de publicar un nuevo ' . $tipo_label . ' que podría interesarte.</p>
+                    
+                    <div style="background: #f5f5f5; border-left: 4px solid #E30613; padding: 15px; margin: 20px 0; border-radius: 4px;">
+                        <h3 style="margin-top: 0; color: #333;">' . htmlspecialchars($item_titulo) . '</h3>';
+    
+    if ($item_imagen) {
+        $html_content .= '<div style="text-align:center; margin: 15px 0;"><img src="' . htmlspecialchars($item_imagen) . '" style="max-width: 100%; max-height: 200px; border-radius: 8px;"></div>';
+    }
+    
+    $html_content .= '</div>
+                    
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="' . htmlspecialchars($item_url) . '" style="background-color: #E30613; color: white; padding: 12px 25px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Ver ' . ucfirst($tipo_label) . '</a>
+                    </div>
+                    
+                    <p style="color: #666; font-size: 14px; text-align: center; margin-top: 40px;">
+                        Has recibido este email porque sigues a ' . htmlspecialchars($usuario_autor_nombre) . ' en <a href="https://www.codigoamigo.com">Código Amigo</a>.
+                    </p>
+                </div>
+            </body>
+        </html>
+    ';
+    
+    $text_content = "¡Novedades! " . $usuario_autor_nombre . " ha publicado un nuevo " . $tipo_label . "\n\n" .
+                   "Hola " . $to_name . ",\n\n" .
+                   "El usuario " . $usuario_autor_nombre . " al que sigues acaba de publicar un nuevo " . $tipo_label . ".\n\n" .
+                   "Título: " . $item_titulo . "\n" .
+                   "Puedes verlo aquí: " . $item_url . "\n\n" .
+                   "-----------------------------------\n" .
+                   "Has recibido este email porque sigues a " . $usuario_autor_nombre . " en Código Amigo.";
+    
+    return enviarEmailConBrevo(
+        $to_email,
+        $to_name,
+        $subject,
+        $html_content,
+        $text_content,
+        "noreply@codigoamigo.com",
         "Código Amigo"
     );
 }

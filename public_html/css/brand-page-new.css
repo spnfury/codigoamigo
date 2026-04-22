@@ -11,7 +11,9 @@
     --text-dark: #333333;
     --success-green: #28a745;
     --border-gray: #E0E0E0;
-    --shadow: 0 4px 15px rgba(0,0,0,0.1);
+    --shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    --flash-promo-bg: #E8F5E9;
+    --flash-promo-border: #28a745;
 }
 
 /* Layout principal */
@@ -85,7 +87,7 @@
     height: 80px;
     border-radius: 12px;
     object-fit: cover;
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
     transition: transform 0.3s ease;
 }
 
@@ -189,7 +191,7 @@
     background: white;
     border-radius: 12px;
     padding: 25px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
     transition: all 0.3s ease;
     position: relative;
     border: 1px solid var(--border-gray);
@@ -208,24 +210,71 @@
     height: 40px;
     border-radius: 8px;
     object-fit: cover;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     transition: transform 0.3s ease;
 }
 
 .brand-logo-small:hover {
     transform: scale(1.1);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .code-card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
 }
 
 .code-card.featured {
     border-left: 5px solid #ffd700;
     background: linear-gradient(135deg, #fff9e6 0%, #ffffff 100%);
 }
+
+/* Flash Promo Card Specific Styles */
+.code-card.flash-promo {
+    border: 2px solid var(--flash-promo-border);
+    background: linear-gradient(135deg, var(--flash-promo-bg) 0%, #ffffff 100%);
+    box-shadow: 0 8px 25px rgba(40, 167, 69, 0.15);
+}
+
+.flash-promo-badge {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: linear-gradient(135deg, var(--success-green), #20c997);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+    z-index: 10;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.code-card.flash-promo .code-title {
+    color: #1b5e20;
+}
+
+.code-card.flash-promo .btn-primary {
+    background: linear-gradient(135deg, var(--success-green), #218838);
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+.code-card.flash-promo .btn-primary:hover {
+    box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+}
+
+.verified-brand-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--success-green);
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
 
 .featured-badge {
     position: absolute;
@@ -244,13 +293,22 @@
 
 /* Ajustar posición del featured badge si hay logo de marca */
 .code-card.featured .featured-badge {
-    right: 65px; /* Más a la derecha para evitar el logo */
+    right: 65px;
+    /* Más a la derecha para evitar el logo */
 }
 
 @keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
 }
 
 .featured-badge i {
@@ -260,7 +318,8 @@
 /* Header del código */
 .code-header {
     margin-bottom: 20px;
-    margin-top: 10px; /* Espacio adicional para el logo */
+    margin-top: 10px;
+    /* Espacio adicional para el logo */
 }
 
 .user-info {
@@ -343,7 +402,7 @@
     left: -50%;
     width: 200%;
     height: 200%;
-    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+    background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
     transform: rotate(45deg);
     transition: all 0.6s;
 }
@@ -353,8 +412,13 @@
 }
 
 @keyframes shine {
-    0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
-    100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+    0% {
+        transform: translateX(-100%) translateY(-100%) rotate(45deg);
+    }
+
+    100% {
+        transform: translateX(100%) translateY(100%) rotate(45deg);
+    }
 }
 
 .benefit-amount {
@@ -403,7 +467,7 @@
     left: -100%;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
     transition: left 0.5s;
 }
 
@@ -604,7 +668,7 @@
     padding: 12px;
     background: white;
     border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .stats-list .stat-item i {
@@ -649,12 +713,12 @@
     border-radius: 8px;
     text-decoration: none;
     transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .related-brand:hover {
     transform: translateX(5px);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     text-decoration: none;
 }
 
@@ -677,7 +741,7 @@
         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
         gap: 20px;
     }
-    
+
     .brand-logo-section {
         flex-direction: column;
         text-align: center;
@@ -688,7 +752,7 @@
     .sidebar-content {
         margin-top: 30px;
     }
-    
+
     .container-fluid {
         padding: 15px;
     }
@@ -698,31 +762,31 @@
     .brand-page-wrapper {
         padding-top: 70px;
     }
-    
+
     .container-fluid {
         padding: 10px;
     }
-    
+
     .brand-header-card,
     .codes-section {
         padding: 20px;
         margin-bottom: 20px;
     }
-    
+
     .brand-title {
         font-size: 2rem;
     }
-    
+
     .brand-logo {
         width: 60px;
         height: 60px;
     }
-    
+
     .codes-grid {
         grid-template-columns: 1fr;
         gap: 15px;
     }
-    
+
     .code-card {
         padding: 20px;
     }
@@ -743,15 +807,15 @@
         font-size: 0.75rem;
         padding: 4px 8px;
     }
-    
+
     .section-title {
         font-size: 1.5rem;
     }
-    
+
     .benefit-amount {
         font-size: 1.5rem;
     }
-    
+
     .stats-widget,
     .related-brands-widget,
     .ad-widget {
@@ -763,7 +827,7 @@
     .brand-title {
         font-size: 1.5rem;
     }
-    
+
     .code-card {
         padding: 15px;
     }
@@ -784,22 +848,22 @@
         font-size: 0.7rem;
         padding: 3px 6px;
     }
-    
+
     .benefit-amount {
         font-size: 1.3rem;
     }
-    
+
     .btn {
         padding: 10px 15px;
         font-size: 0.9rem;
     }
-    
+
     .user-info {
         flex-direction: column;
         text-align: center;
         gap: 10px;
     }
-    
+
     .brand-stats {
         flex-direction: column;
         gap: 10px;
@@ -812,6 +876,7 @@
         opacity: 0;
         transform: translateY(30px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -823,6 +888,7 @@
         opacity: 0;
         transform: translateX(-30px);
     }
+
     to {
         opacity: 1;
         transform: translateX(0);
@@ -834,6 +900,7 @@
         opacity: 0;
         transform: translateX(30px);
     }
+
     to {
         opacity: 1;
         transform: translateX(0);
@@ -874,8 +941,13 @@
 }
 
 @keyframes spin {
-    0% { transform: translate(-50%, -50%) rotate(0deg); }
-    100% { transform: translate(-50%, -50%) rotate(360deg); }
+    0% {
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+
+    100% {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
 }
 
 /* Mejoras para accesibilidad */
@@ -918,19 +990,19 @@
     .brand-page-wrapper {
         background: white;
     }
-    
+
     .btn,
     .vote-btn {
         background: #f8f9fa !important;
         color: #000 !important;
         border: 1px solid #000 !important;
     }
-    
+
     .featured-badge {
         background: #f8f9fa !important;
         color: #000 !important;
     }
-    
+
     .sidebar-content {
         display: none;
     }

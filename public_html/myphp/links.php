@@ -92,4 +92,37 @@
         }
     }
     
+    /**
+     * Genera la URL SEO-friendly para la ficha individual de un código.
+     * Formato: /codigo/{marca}-{shortId}
+     * Ejemplo: /codigo/trading212-670a1b2c
+     */
+    if (!function_exists('link_ficha_codigo')) {
+        function link_ficha_codigo($clave_marca, $codigo_id) {
+            $website = isset($GLOBALS["website"]) ? $GLOBALS["website"] : "https://www.codigoamigo.com/";
+            $id_str = (string)$codigo_id;
+            // Usar los últimos 8 caracteres del ObjectId para un slug corto
+            $short_id = substr($id_str, -8);
+            return $website . "codigo/" . strtolower($clave_marca) . "-" . $short_id;
+        }
+    }
+    
+    /**
+     * Parsea el slug de la URL /codigo/{slug} para extraer marca y ObjectId completo.
+     * Busca el código en MongoDB por los últimos 8 chars del _id.
+     */
+    if (!function_exists('parse_ficha_codigo_slug')) {
+        function parse_ficha_codigo_slug($slug) {
+            // El slug tiene formato: {marca}-{8ultimos_chars_id}
+            // Encontrar la última ocurrencia de '-' seguida de exactamente 8 chars hex
+            if (preg_match('/^(.+)-([a-f0-9]{8})$/i', $slug, $matches)) {
+                return [
+                    'marca' => $matches[1],
+                    'short_id' => $matches[2]
+                ];
+            }
+            return null;
+        }
+    }
+    
 ?>

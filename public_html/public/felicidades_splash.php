@@ -7,6 +7,7 @@ ini_set("display_errors", "on");
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/stripe.php';
 $stripe_live_secret_key = get_stripe_secret_key(null, $_SESSION['user_id'] ?? null);
+// Publishable keys (públicas por diseño; dejar hardcodeadas mientras no se añadan al helper)
 $is_sandbox_admin = in_array($_SESSION['user_id'] ?? null, ['639899bc6321ee0d0e4010d2', '58bd851da54e295b8b52f702', '5db1af3a2f55c82b47342172'], true);
 $stripe_live_publishable_key = $is_sandbox_admin ? "pk_test_yU61XXQMBvqVt4Ah9XD5uk6V" : "pk_live_HvgqlImI22optTnSvHKFKDiG00VQ0EZdE9";
 

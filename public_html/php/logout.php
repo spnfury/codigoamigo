@@ -100,17 +100,39 @@
     </div>
 
     <script>
-        // Redirigir al home después de 3 segundos
+        // Limpiar almacenamiento local y de sesión para evitar el "usuario zombie"
+        try {
+            localStorage.removeItem('userData');
+            sessionStorage.removeItem('userData');
+            localStorage.removeItem('user_session_changed');
+            localStorage.removeItem('redirectAfterLogin');
+            
+            // Si el header moderno usa otras claves, limpiarlas también
+            localStorage.clear(); // Limpiar todo para estar seguros en el logout
+            sessionStorage.clear();
+            
+            // Resetear variables globales
+            window.currentUserId = '';
+            window.currentUserIdVar = '';
+            if (window.serverUserData) window.serverUserData = null;
+            if (window.serverUserDataBasic) window.serverUserDataBasic = null;
+        } catch (e) {
+            console.error("Error al limpiar almacenamiento:", e);
+        }
+
+        // Redirigir al home después de 2 segundos (antes 3)
         setTimeout(function() {
             window.location.href = '<?php echo $GLOBALS["website"]; ?>';
-        }, 3000);
+        }, 2000);
 
         // Animación de los puntos
         let dots = 0;
         setInterval(function() {
             const dotsElement = document.querySelector('.loading-dots');
-            dots = (dots + 1) % 4;
-            dotsElement.textContent = '.'.repeat(dots) + ' '.repeat(3 - dots);
+            if (dotsElement) {
+                dots = (dots + 1) % 4;
+                dotsElement.textContent = '.'.repeat(dots) + ' '.repeat(3 - dots);
+            }
         }, 500);
     </script>
 </body>

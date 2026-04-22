@@ -9,6 +9,7 @@ $codigo = getCodeByID($codigo_id); // Esta función ya existe en el sistema
 $marca = getObjectMarca('nombre_clave', $codigo["marca"]);
 $marca_nombre = htmlspecialchars($codigo['marca']); // Obtenemos la marca directamente del código
 
+$GLOBALS['header_modern_used'] = true; // Forzar el uso del footer moderno
 get_header_new($title, $description, $title_social, $description_social, $imagen_social);
 
 
@@ -131,8 +132,8 @@ unset($_SESSION["compra_lead_sin_validar"]);
 <style>
 /* Modern typography and spacing */
 :root {
-    --primary-color: #4CAF50;
-    --primary-dark: #388E3C;
+    --primary-color: #E30613;
+    --primary-dark: #C40510;
     --text-dark: #2C3E50;
     --text-light: #7F8C8D;
     --spacing: 2rem;
@@ -269,7 +270,7 @@ body {
 }
 
 .header-preview {
-    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    background: linear-gradient(135deg, #1f1f1f 0%, #0d0d0d 100%);
     color: white;
     padding: 4rem 0;
     margin-bottom: 3rem;
@@ -283,7 +284,7 @@ body {
 }
 
 .header-preview .marca {
-    color: #FFD700;
+    color: #E30613;
     font-weight: 700;
 }
 
@@ -568,6 +569,17 @@ body {
             <button id="checkout-button-super" class="pricing-button">
                 Destacar Código Premium
             </button>
+        </div>
+    </div>
+
+    <div style="background: #fdf3f4; padding: 20px; border-radius: 12px; border-left: 5px solid #E30613; margin: 30px 0; display: flex; align-items: flex-start; gap: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+        <i class="fas fa-magic" style="color: #E30613; font-size: 24px; margin-top: 5px;"></i>
+        <div>
+            <h3 style="margin: 0 0 8px 0; color: #a94442; font-size: 1.1rem;">Renovación Automática por Defecto</h3>
+            <p style="margin: 0; color: #333; font-size: 0.95rem; line-height: 1.5;">
+                Para que nunca pierdas visibilidad, activaremos la auto-renovación.<br>
+                <strong>💡 El truco definitivo:</strong> <a href="/vip" style="color: #E30613; font-weight: bold; text-decoration: underline;">Hazte Usuario VIP</a> para recibir saldo gratis todos los meses. ¡Tus códigos se renovarán solos sin que tengas que preocuparte de recargar!
+            </p>
         </div>
     </div>
 

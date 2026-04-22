@@ -358,7 +358,3 @@ function obtenerEstadisticasFuentes() {
         return [];
     }
 }
-
-
-
-

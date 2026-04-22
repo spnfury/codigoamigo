@@ -6,9 +6,9 @@ if (session_status() === PHP_SESSION_NONE) {
 
 
 // HABILITAR VISUALIZACIÓN DE ERRORES PHP (solo en desarrollo)
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 
 // Add error popup handling after session_start()
 if (isset($_SESSION['msg_error'])) {
@@ -628,6 +628,9 @@ $app->get('/ofertas/{termino}', function ($request, $respon, $args) {
             array('destacado_social' => 0)
         ))
     );
+    // Excluir códigos con fecha_validez expirada
+    $filtro_exp = get_filtro_no_expirados();
+    $array_filtro_normales['$and'][] = $filtro_exp;
     
     $array_opciones_normales = array(
         'limit' => 50,  // Aumentar límite
@@ -724,12 +727,12 @@ $app->get('/', function ($request, $respon) {
         }
     }
 
-    $sort_order_destacados = array('destacado_social' => -1);
+    $sort_order_destacados = array('destacado_social' => -1, '_id' => -1);
 
 
     /* Listado PATROCINADOS */
     $array_filtro = array("estado" => 0);
-    $array_filtro = array_merge($array_filtro, array("destacado_social" => array('$exists' => true)));
+    $array_filtro = array_merge($array_filtro, array("destacado_social" => array('$gt' => 0)));
 
     $array_skip = array("limit" => $limit);
     $array_skip = array_merge($array_skip, array("skip" => $skip_patrocinados));
@@ -745,6 +748,8 @@ $app->get('/', function ($request, $respon) {
     $array_filtro = array_merge($array_filtro, array("estado" => 0));
     $array_filtro = array_merge($array_filtro, array("destacado" => 0));
     $array_filtro = array_merge($array_filtro, array("destacado_social" => array('$exists' => false)));
+    // Excluir códigos con fecha_validez expirada
+    $array_filtro = array_merge($array_filtro, get_filtro_no_expirados());
 
     $array_skip = array("limit" => $limit2);
     $array_skip = array_merge($array_skip, array("skip" => $skip));
@@ -996,6 +1001,20 @@ $app->get('/destaca', function ($request, $respon, $args) {
     include_once $_SERVER['DOCUMENT_ROOT'] . '/public/destaca.php';
     $show_addthis = 0;
     $show_adsense = 0;
+
+});
+
+$app->any('/renovar-destacado', function ($request, $respon, $args) {
+
+    global $author_web, $data_usuario;
+    global $anula_adsense;
+
+    $anula_adsense = true;
+
+    $title = "Renueva tu destacado con descuento";
+    $description = "Renueva tu código destacado con un 50% de descuento exclusivo";
+
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/renovar_destacado.php';
 
 });
 
@@ -1431,14 +1450,15 @@ $app->get('/de-{marca}', function ($request, $respon, $args) {
 
         if (!filter_input(INPUT_GET, "codigo", FILTER_SANITIZE_STRING)) {
 
-            /* Listado PATROCINADOS */
+            /* Listado PATROCINADOS — solo los activos (no expirados), hasta 3, Super primero */
             $array_filtro = array("marca" => $marca["nombre_clave"]);
             $array_filtro = array_merge($array_filtro, array("estado" => 0));
             $array_filtro = array_merge($array_filtro, array("destacado" => array('$ne' => 0)));
+            $array_filtro = array_merge($array_filtro, array("fecha_fin_destacado" => array('$gt' => new MongoDB\BSON\UTCDateTime())));
 
-            $array_skip = array("limit" => 7);
+            $array_skip = array("limit" => 3);
             $array_skip = array_merge($array_skip, array("skip" => $skip_patrocinados));
-            $array_skip = array_merge($array_skip, array("sort" => array('destacado' => -1)));
+            $array_skip = array_merge($array_skip, array("sort" => array('tipo_destacado' => -1, 'prioridad_pago' => -1)));
 
             $lista_codigos_patrocinados_pre = get_all_listado_codigos_array($array_filtro, $array_skip);
             $lista_codigos_patrocinados = $lista_codigos_patrocinados_pre["results"];
@@ -1455,6 +1475,8 @@ $app->get('/de-{marca}', function ($request, $respon, $args) {
             $array_filtro = array("marca" => $marca["nombre_clave"]);
             $array_filtro = array_merge($array_filtro, array("estado" => 0));
             $array_filtro = array_merge($array_filtro, array("destacado" => 0));
+            // Excluir códigos con fecha_validez expirada
+            $array_filtro = array_merge($array_filtro, get_filtro_no_expirados());
 
 
             $array_skip = array("limit" => (30 + $skip_patrocinados));
@@ -1476,7 +1498,7 @@ $app->get('/de-{marca}', function ($request, $respon, $args) {
 
 
             if ($lista_codigos_patrocinados) {
-                $lista_codigos = array_merge(array_slice($lista_codigos_patrocinados, 0, 1), $lista_codigos);
+                $lista_codigos = array_merge(array_slice($lista_codigos_patrocinados, 0, 3), $lista_codigos);
             }
 
             $imagen_social = $marca["imagen"];

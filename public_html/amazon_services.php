@@ -38,143 +38,202 @@ get_header_modern(
 // Estilos específicos
 echo '
 <style>
+    :root {
+        --amazon-orange: #FF9900;
+        --amazon-dark: #131921;
+        --amazon-blue: #232f3e;
+        --text-main: #111;
+        --text-muted: #4a5568;
+        --bg-light: #f8f9fa;
+    }
+
     .amazon-hero {
-        background: linear-gradient(135deg, #131921 0%, #232f3e 100%);
+        background: linear-gradient(135deg, var(--amazon-dark) 0%, var(--amazon-blue) 100%);
         color: white;
         padding: 100px 0 80px;
         text-align: center;
         position: relative;
         overflow: hidden;
     }
+    
     .amazon-hero::after {
         content: "";
         position: absolute;
         top: 0; right: 0; bottom: 0; left: 0;
         background: url("https://upload.wikimedia.org/wikipedia/commons/a/a9/Amazon_logo.svg") no-repeat center center;
-        opacity: 0.05;
-        background-size: 50%;
-        transform: rotate(-10deg) scale(1.5);
+        opacity: 0.03;
+        background-size: 40%;
+        transform: rotate(-5deg) scale(1.2);
         pointer-events: none;
     }
+
     .amazon-hero .container { position: relative; z-index: 2; }
-    .amazon-hero h1 { font-weight: 800; margin-bottom: 20px; font-size: 3.5rem; color: #fff; }
-    .amazon-hero p { font-size: 1.4rem; opacity: 0.95; max-width: 800px; margin: 0 auto 40px; color: #eee; }
+    .amazon-hero h1 { 
+        font-weight: 800; 
+        margin-bottom: 24px; 
+        font-size: clamp(2.5rem, 5vw, 3.8rem); 
+        color: #fff;
+        letter-spacing: -1px;
+    }
+    .amazon-hero p { 
+        font-size: clamp(1.1rem, 2vw, 1.35rem); 
+        opacity: 0.9; 
+        max-width: 700px; 
+        margin: 0 auto 40px; 
+        color: #e2e8f0;
+        line-height: 1.6;
+    }
     
+    .services-wrapper {
+        background-color: var(--bg-light);
+        padding: 80px 0;
+    }
     .service-card {
         border: none;
-        border-radius: 20px;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border-radius: 24px;
+        transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
         height: 100%;
+        min-height: 700px; /* Increased to ensure better alignment across rows */
         background: white;
         overflow: hidden;
-        border: 1px solid #eef0f2;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        border: 1px solid rgba(0,0,0,0.05);
+        box-shadow: 0 10px 30px -10px rgba(0,0,0,0.08);
         display: flex;
         flex-direction: column;
     }
+
     .service-card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-        border-color: #FF9900;
+        transform: translateY(-10px);
+        box-shadow: 0 30px 60px -12px rgba(0,0,0,0.15);
+        border-color: var(--amazon-orange);
     }
+
     .service-logo-container {
         height: 180px;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #fff;
-        padding: 0;
-        border-bottom: 1px solid #f8f9fa;
+        background: #fafbfc; /* Subtly different from card background */
+        padding: 40px;
+        border-bottom: 1px solid #f1f3f5;
         overflow: hidden;
-        flex-shrink: 0; /* Prevent logo shrinking */
+        flex-shrink: 0;
+        position: relative;
     }
+    
+    .service-logo-container::before {
+        content: "";
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: radial-gradient(circle at center, rgba(255,153,0,0.03) 0%, transparent 70%);
+        pointer-events: none;
+    }
+
     .service-logo {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        transition: transform 0.5s ease;
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        transition: transform 0.6s cubic-bezier(0.165, 0.84, 0.44, 1);
     }
+
     .service-card:hover .service-logo {
-        transform: scale(1.05);
+        transform: scale(1.08);
     }
     .service-body { 
-        padding: 30px; 
+        padding: 35px; 
         display: flex; 
         flex-direction: column; 
         flex: 1; 
-        /* Removed fixed min-height to allow natural flow */
     }
+
     .service-title { 
         font-weight: 800; 
-        font-size: 1.6rem; 
-        margin-bottom: 20px; 
-        color: #111; 
-        min-height: 2.4em; /* Force at least 2 lines of height for alignment */
-        display: flex;
-        align-items: center;
+        font-size: 1.5rem; 
+        margin-bottom: 25px; 
+        color: var(--amazon-dark); 
+        line-height: 1.3;
+        display: block; /* Changed from flex for better min-height behavior */
+        min-height: 2.6em; /* Ensure alignment of bullets regardless of title length */
     }
+
     .service-bullets {
         list-style: none;
         padding: 0;
-        margin-bottom: 30px;
-        font-size: 1.1rem;
-        color: #444;
-        flex-grow: 1; /* Pushes button to bottom */
+        margin-bottom: 35px;
+        font-size: 1.05rem;
+        color: var(--text-muted);
+        flex-grow: 1;
     }
+
     .service-bullets li {
-        margin-bottom: 12px;
-        padding-left: 28px;
+        margin-bottom: 16px;
+        padding-left: 32px;
         position: relative;
-        line-height: 1.4;
+        line-height: 1.5;
     }
+
     .service-bullets li::before {
-        content: "\f00c";
+        content: "\f058";
         font-family: "Font Awesome 6 Free";
         font-weight: 900;
-        color: #FF9900;
+        color: var(--amazon-orange);
         position: absolute;
         left: 0;
-        font-size: 0.9rem;
-        top: 3px;
+        font-size: 1.1rem;
+        top: 2px;
     }
     .btn-amazon {
-        background-color: #FF9900;
+        background-color: var(--amazon-orange);
         border: none;
-        color: #111 !important;
+        color: var(--amazon-dark) !important;
         font-weight: 800;
         width: 100%;
-        padding: 16px;
-        border-radius: 12px;
-        transition: all 0.2s;
+        padding: 18px;
+        border-radius: 16px;
+        transition: all 0.3s;
         text-transform: uppercase;
-        font-size: 1.1rem;
-        letter-spacing: 0.5px;
+        font-size: 1rem;
+        letter-spacing: 1px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 4px 15px rgba(255, 153, 0, 0.2);
-        margin-top: auto; /* Ensure it sticks to bottom if parent flex changes */
+        box-shadow: 0 6px 20px rgba(255, 153, 0, 0.25);
+        margin-top: auto;
     }
+
     .btn-amazon:hover {
-        background-color: #232f3e;
+        background-color: var(--amazon-blue);
         color: #fff !important;
         transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(35, 47, 62, 0.3);
+        box-shadow: 0 12px 30px rgba(35, 47, 62, 0.3);
     }
     
-    .faq-section { background-color: #f4f6f8; padding: 120px 0; }
-    .faq-section h2 { color: #1a1a1a; font-weight: 800; font-size: 3rem; margin-bottom: 60px; }
+    .faq-section { background-color: white; padding: 100px 0; border-top: 1px solid #f1f3f5; }
+    .faq-section h2 { color: var(--amazon-dark); font-weight: 800; font-size: clamp(2rem, 4vw, 3rem); margin-bottom: 60px; }
 
-    .faq-item { background: white; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #eef0f2; overflow: hidden; }
-    .faq-question { padding: 25px 30px; cursor: pointer; font-weight: 700; font-size: 1.15rem; display: flex; justify-content: space-between; align-items: center; color: #131921; transition: background 0.2s; }
-    .faq-question:hover { background: #fcfcfc; }
-    .faq-answer { padding: 0 30px 25px; display: none; color: #4a5568; line-height: 1.8; font-size: 1.05rem; }
-    .faq-question.active { color: #FF9900; }
+    .faq-item { background: var(--bg-light); border-radius: 16px; margin-bottom: 20px; border: 1px solid transparent; transition: all 0.3s; }
+    .faq-item:hover { border-color: rgba(255, 153, 0, 0.3); background: white; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+    
+    .faq-question { padding: 25px 35px; cursor: pointer; font-weight: 700; font-size: 1.2rem; display: flex; justify-content: space-between; align-items: center; color: var(--amazon-dark); transition: all 0.3s; }
+    .faq-answer { padding: 0 35px 30px; display: none; color: var(--text-muted); line-height: 1.8; font-size: 1.1rem; }
+    
+    .faq-question.active { color: var(--amazon-orange); }
     .faq-question.active + .faq-answer { display: block; }
-    .faq-toggle { transition: transform 0.3s; color: #a0aec0; }
-    .faq-question.active .faq-toggle { transform: rotate(180deg); color: #FF9900; }
+    .faq-toggle { transition: transform 0.3s; color: #cbd5e0; }
+    .faq-question.active .faq-toggle { transform: rotate(180deg); color: var(--amazon-orange); }
 
-    .disclosure-text { font-size: 0.9rem; color: #718096; text-align: center; padding: 40px 0; max-width: 800px; margin: 0 auto; line-height: 1.6; }
+    .disclosure-text { font-size: 0.95rem; color: #94a3b8; text-align: center; padding: 60px 0; max-width: 800px; margin: 0 auto; line-height: 1.7; font-style: italic; }
+
+    .hover-orange:hover {
+        color: var(--amazon-orange) !important;
+        text-decoration: underline !important;
+    }
+
+    @media (max-width: 768px) {
+        .amazon-hero { padding: 80px 0 60px; }
+        .service-body { padding: 25px; }
+        .service-logo-container { height: 140px; padding: 20px; }
+    }
 </style>
 ';
 
@@ -190,11 +249,12 @@ echo '
 ';
 
 // Grid Servicios
-echo '<div class="container py-5 mb-5" id="servicios">';
+echo '<div class="services-wrapper" id="servicios">';
+echo '<div class="container">';
 if (empty($services)) {
     echo '<div class="text-center py-5 text-muted"><h3>Próximamente agregaremos los mejores servicios.</h3></div>';
 } else {
-    echo '<div class="row g-5">';
+    echo '<div class="row g-4 justify-content-center">'; // Centered grid items
     foreach ($services as $srv) {
         // Parsear descripción (separar por · o nueva línea)
         $bullets_raw = $srv['description'];
@@ -203,14 +263,12 @@ if (empty($services)) {
         
         $img_src = !empty($srv['image_url']) ? $srv['image_url'] : 'https://placehold.co/400x200?text=' . urlencode($srv['title']);
         
-        // CAMBIO SISTEMA: Enlace directo + JS tracking
-        // Anteriormente: $link = "/go/" . $srv['slug'] . "?origin=landing_card";
         $link = $srv['destination_url']; 
         $slug = $srv['slug'];
 
         echo '
-        <div class="col-md-6 col-lg-4 d-flex">
-            <div class="service-card">
+        <div class="col-md-6 col-lg-4 d-flex mb-4">
+            <div class="service-card w-100">
                 <div class="service-logo-container">
                     <img src="' . htmlspecialchars($img_src) . '" alt="' . htmlspecialchars($srv['title']) . '" class="service-logo">
                 </div>
@@ -221,6 +279,9 @@ if (empty($services)) {
                             echo '<li>' . htmlspecialchars($b) . '</li>';
                         }
         echo '      </ul>
+                    <a href="/amazon/' . htmlspecialchars($slug) . '" class="text-decoration-none text-muted mb-4 d-inline-block hover-orange">
+                        <i class="fas fa-info-circle me-1"></i> Ver más detalles y opiniones
+                    </a>
                     <a href="' . htmlspecialchars($link) . '" 
                        class="btn btn-amazon track-amazon" 
                        data-slug="' . htmlspecialchars($slug) . '" 
@@ -236,6 +297,7 @@ if (empty($services)) {
     echo '</div>';
 }
 echo '</div>'; // Container
+echo '</div>'; // services-wrapper
 
 // FAQ Section
 echo '

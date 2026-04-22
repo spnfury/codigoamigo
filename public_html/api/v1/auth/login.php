@@ -67,7 +67,9 @@ try {
     
     // Check user status
     if (isset($usuario['estado'])) {
-        if ($usuario['estado'] == -2) {
+        if ($usuario['estado'] == -3) {
+            ApiResponse::error('This account has been deleted', 'ACCOUNT_DELETED', 403);
+        } elseif ($usuario['estado'] == -2) {
             ApiResponse::error('Account permanently banned', 'ACCOUNT_BANNED', 403);
         } elseif ($usuario['estado'] == -1) {
             ApiResponse::error('Account temporarily suspended', 'ACCOUNT_SUSPENDED', 403);

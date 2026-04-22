@@ -53,10 +53,11 @@ class TelegramMonitor:
         self.api_token = API_TOKEN
         self.bot_token = TELEGRAM_BOT_TOKEN
         
-        # Detectar si estamos en el mismo servidor (usar localhost para bypass de Cloudflare)
-        # Si la URL contiene el dominio, reemplazar por localhost
+        # Detectar si estamos en el mismo servidor (usar IP directa para bypass de Cloudflare)
+        self.direct_ip = '78.46.100.91'
         if 'www.codigoamigo.com' in self.api_url or 'codigoamigo.com' in self.api_url:
-            self.api_url_localhost = self.api_url.replace('https://www.codigoamigo.com', 'http://localhost').replace('https://codigoamigo.com', 'http://localhost')
+            # Usar HTTPS y la IP directa para el bypass de Cloudflare
+            self.api_url_localhost = self.api_url.replace('https://www.codigoamigo.com', f'https://{self.direct_ip}').replace('https://codigoamigo.com', f'https://{self.direct_ip}')
         else:
             self.api_url_localhost = None
         
@@ -242,10 +243,11 @@ class TelegramMonitor:
             
             if is_html_response:
                 logger.warning("Cloudflare está bloqueando la petición (respuesta HTML detectada)")
-                logger.info("Intentando con localhost (bypass de Cloudflare)...")
+                logger.info("Intentando con IP directa (bypass de Cloudflare)...")
                 
-                # Intentar con localhost usando header Host para el virtual host correcto
-                localhost_url = f"http://localhost/api/get-sources.php?tipo={tipo}"
+                # Intentar con la IP directa usando HTTPS (bypass de Cloudflare)
+                # El header Host es crucial para que Nginx use el virtual host correcto
+                localhost_url = f"https://{self.direct_ip}/api/get-sources.php?tipo={tipo}"
                 localhost_headers = headers.copy()
                 localhost_headers['Host'] = 'www.codigoamigo.com'
                 try:
@@ -253,11 +255,12 @@ class TelegramMonitor:
                         localhost_url,
                         headers=localhost_headers,
                         timeout=30,
-                        allow_redirects=True
+                        allow_redirects=True,
+                        verify=False # Importante: ignorar error de certificado al usar IP
                     )
-                    logger.info("✓ Conexión exitosa usando localhost")
+                    logger.info("✓ Conexión exitosa usando IP directa")
                 except requests.exceptions.RequestException as e:
-                    logger.error(f"Error al conectar con localhost: {e}")
+                    logger.error(f"Error al conectar con IP directa: {e}")
                     return []
             else:
                 logger.info("✓ Conexión exitosa usando dominio normal")
@@ -283,23 +286,24 @@ class TelegramMonitor:
                 
         except requests.exceptions.RequestException as e:
             logger.error(f"Error al obtener fuentes desde API: {e}")
-            # Intentar con localhost como último recurso (bypass de Cloudflare)
-            logger.info("Intentando con localhost como fallback (bypass de Cloudflare)...")
+            # Intentar con IP directa como último recurso (bypass de Cloudflare)
+            logger.info("Intentando con IP directa como fallback (bypass de Cloudflare)...")
             try:
-                localhost_url = f"http://localhost/api/get-sources.php?tipo={tipo}"
+                localhost_url = f"https://{self.direct_ip}/api/get-sources.php?tipo={tipo}"
                 localhost_headers = headers.copy()
                 localhost_headers['Host'] = 'www.codigoamigo.com'
                 response = requests.get(
                     localhost_url,
                     headers=localhost_headers,
                     timeout=30,
-                    allow_redirects=True
+                    allow_redirects=True,
+                    verify=False
                 )
                 if response.status_code == 200:
                     try:
                         result = response.json()
                         if result.get('success'):
-                            logger.info(f"✓ Obtenidas {len(result.get('sources', []))} fuentes activas usando localhost")
+                            logger.info(f"✓ Obtenidas {len(result.get('sources', []))} fuentes activas usando IP directa")
                             return result.get('sources', [])
                     except (ValueError, json.JSONDecodeError):
                         pass
@@ -358,9 +362,10 @@ class TelegramMonitor:
                     self.api_url_localhost,
                     json=payload,
                     timeout=300,
-                    headers=localhost_headers
+                    headers=localhost_headers,
+                    verify=False # Ignorar errores de certificado al usar IP directa
                 )
-                logger.debug("✓ Petición enviada usando localhost")
+                logger.debug("✓ Petición enviada usando IP directa")
             else:
                 # Si no hay URL de localhost, usar el dominio normal
                 response = requests.post(

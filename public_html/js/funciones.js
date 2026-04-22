@@ -3,6 +3,36 @@
 // Definir variable url global
 var url = window.location.href;
 
+// ── Non-blocking Toast Notification (INP optimisation) ──
+(function () {
+	var toastContainer = null;
+	function ensureContainer() {
+		if (toastContainer) return toastContainer;
+		toastContainer = document.createElement('div');
+		toastContainer.id = 'ca-toast-container';
+		toastContainer.style.cssText = 'position:fixed;top:20px;right:20px;z-index:999999;display:flex;flex-direction:column;gap:10px;pointer-events:none;';
+		document.body.appendChild(toastContainer);
+		return toastContainer;
+	}
+	window.showToast = function (message, type) {
+		var container = ensureContainer();
+		var toast = document.createElement('div');
+		var bg = type === 'error' ? '#dc3545' : type === 'warning' ? '#fd7e14' : '#28a745';
+		toast.style.cssText = 'pointer-events:auto;max-width:340px;padding:14px 20px;border-radius:10px;color:#fff;font-size:14px;font-family:inherit;box-shadow:0 4px 20px rgba(0,0,0,.25);opacity:0;transform:translateX(40px);transition:opacity .3s ease,transform .3s ease;background:' + bg + ';';
+		toast.textContent = message;
+		container.appendChild(toast);
+		requestAnimationFrame(function () {
+			toast.style.opacity = '1';
+			toast.style.transform = 'translateX(0)';
+		});
+		setTimeout(function () {
+			toast.style.opacity = '0';
+			toast.style.transform = 'translateX(40px)';
+			setTimeout(function () { toast.remove(); }, 350);
+		}, 3500);
+	};
+})();
+
 // Definir función global openLoginModalWithRedirect si no existe (para evitar errores)
 if (typeof window.openLoginModalWithRedirect !== 'function') {
 	window.openLoginModalWithRedirect = function (targetUrl) {
@@ -120,7 +150,7 @@ function googleLoginEndpoint(googleUser) {
 
 	function showLoginError(message) {
 		var finalMessage = message || 'Error al procesar el inicio de sesión. Inténtalo de nuevo.';
-		alert(finalMessage);
+		showToast(finalMessage, 'error');
 	}
 
 	// Use jQuery AJAX to call /api/login.php (same as _header_modern.php)
@@ -198,6 +228,36 @@ function googleLoginEndpoint(googleUser) {
 		showLoginError('Error al procesar el login con Google. Inténtalo de nuevo.');
 	});
 }
+
+// Toggle auto-renovar destacado
+function toggleAutoRenovar(el) {
+    var codigoId = el.getAttribute('data-codigo-id');
+    el.style.opacity = '0.5';
+    $.ajax({
+        url: '/myphp/ajax_actions.php',
+        method: 'POST',
+        data: { metodo: 'toggle_auto_renovar', codigo_id: codigoId },
+        success: function(resp) {
+            el.style.opacity = '1';
+            let jsonResp = typeof resp === 'string' ? JSON.parse(resp) : resp;
+            if (jsonResp.success) {
+                if (jsonResp.auto_renovar) {
+                    el.style.background = 'linear-gradient(135deg,#28a745,#20c997)';
+                    el.style.color = 'white';
+                    el.innerHTML = '🔄 Auto ON';
+                    el.title = 'Auto-renovación activada: se renovará desde tu saldo al expirar';
+                } else {
+                    el.style.background = '#e9ecef';
+                    el.style.color = '#666';
+                    el.innerHTML = '🔄 Auto OFF';
+                    el.title = 'Activa la auto-renovación para renovar automáticamente desde tu saldo';
+                }
+            }
+        },
+        error: function() { el.style.opacity = '1'; }
+    });
+}
+
 
 document.addEventListener("DOMContentLoaded", function () {
 	var form = document.querySelector("form[name='busqueda_marca2']");
@@ -402,11 +462,11 @@ $(document).ready(function () {
 
 				if (data >= 0) {
 
-					alert('zumbido enviado al usuario\nte quedan disponibles ' + data + ' zumbidos');
+					showToast('Zumbido enviado al usuario. Te quedan ' + data + ' zumbidos disponibles');
 					boton.hide();
 
 				} else {
-					alert('Zumbido no enviado, no te queda saldo de zumbidos\n Puedes generar saldo haciendo login cada dia en codigoamigo.com\n 1 Zumbido por día');
+					showToast('Zumbido no enviado. No te queda saldo de zumbidos. Puedes generar saldo haciendo login cada día.', 'warning');
 
 				}
 				//$("#modal_statistics").html(data);
@@ -469,7 +529,11 @@ $(document).ready(function () {
 	});
 
 
-	$("#modal_2").modal();
+
+	if ($.fn.modal && $("#modal_2").length > 0) {
+		$("#modal_2").modal();
+	}
+
 
 	$(document).on('click', '.dialogo', function (event) {
 		$(".last_codigo_final").val($(this).attr("data-codigo"));
@@ -613,16 +677,16 @@ $(document).ready(function () {
 
 					if (response.success === false) {
 						if (response.error == "no_trobat") {
-							alert("El usuario y contraseña introducidos no aparecen en nuestra base de datos");
+							showToast('El usuario y contraseña introducidos no aparecen en nuestra base de datos', 'error');
 						} else if (response.error == "no_verificado") {
 							// Mostrar modal de activación en lugar de alert
 							if (typeof showActivationModal === 'function') {
 								showActivationModal();
 							} else {
-								alert("Es necesario que actives tu usuario desde el correo que has recibido al registrarte para poder acceder a tu cuenta.");
+								showToast('Es necesario que actives tu usuario desde el correo que has recibido al registrarte para poder acceder a tu cuenta.', 'warning');
 							}
 						} else {
-							alert('Error: ' + response.error);
+							showToast('Error: ' + response.error, 'error');
 						}
 					} else if (response.success === true) {
 						var redirectUrl = localStorage.getItem('redirectAfterLogin');
@@ -642,12 +706,12 @@ $(document).ready(function () {
 				} catch (e) {
 					console.error('Error procesando respuesta:', e);
 					console.log('Data received:', data);
-					alert('Error al procesar la respuesta del servidor. Inténtalo de nuevo.');
+					showToast('Error al procesar la respuesta del servidor. Inténtalo de nuevo.', 'error');
 				}
 			},
 			error: function (xhr, status, error) {
 				console.log('Error en AJAX:', error);
-				alert('Error al procesar el login. Inténtalo de nuevo.');
+				showToast('Error al procesar el login. Inténtalo de nuevo.', 'error');
 			},
 			complete: function () {
 				// Rehabilitar el botón en cualquier caso
@@ -710,12 +774,12 @@ $(document).ready(function () {
 					// Mostrar mensaje de éxito
 					actual.parent().html('<span style="color: green;">✓ Votado</span>');
 				} else {
-					alert(response.message || 'Error al votar');
+					showToast(response.message || 'Error al votar', 'error');
 					actual.prop('disabled', false);
 				}
 			},
 			error: function () {
-				alert('Error de conexión. Inténtalo de nuevo.');
+				showToast('Error de conexión. Inténtalo de nuevo.', 'error');
 				actual.prop('disabled', false);
 			}
 		});
@@ -813,13 +877,15 @@ $(document).ready(function () {
 		},
 	};
 
-	/* Aplicar autocompletado a campos de búsqueda - Solo si Select2 no está presente */
+	/* Aplicar autocompletado a campos de búsqueda - Solo si Select2 no está presente 
+	   COMENTADO PARA EVITAR CONFLICTO CON header_base.php QUE TIENE UNA CONFIGURACIÓN MÁS COMPLETA
 	if (typeof $.fn.select2 === 'undefined') {
 		$("#busqueda_marca,#busqueda_marca2").easyAutocomplete(options_busqueda);
 		console.log("EasyAutocomplete aplicado a campos de búsqueda (Select2 no disponible)");
 	} else {
 		console.log("Select2 está disponible, omitiendo EasyAutocomplete para campos de búsqueda");
 	}
+	*/
 
 	/************************************************
 	 * FORMULARIO CONTACTO
@@ -862,22 +928,22 @@ $(document).ready(function () {
 					cache: false,
 					success: function (data) {
 						if (data.trim() === "success") {
-							alert("Mensaje enviado correctamente");
+							showToast('Mensaje enviado correctamente');
 							$("#contacto_usuarios")[0].reset();
 							contactoUsuariosEnProgreso = false;
 							if ($btn.length) { $btn.prop('disabled', false).val('Enviar Mensaje'); }
 						} else if (data.trim() === "recaptcha_error") {
-							alert("Error de verificación reCAPTCHA. Por favor, inténtalo de nuevo.");
+							showToast('Error de verificación reCAPTCHA. Por favor, inténtalo de nuevo.', 'error');
 							contactoUsuariosEnProgreso = false;
 							if ($btn.length) { $btn.prop('disabled', false).val('Enviar Mensaje'); }
 						} else {
-							alert("Error al enviar el mensaje. Por favor, inténtalo de nuevo.");
+							showToast('Error al enviar el mensaje. Por favor, inténtalo de nuevo.', 'error');
 							contactoUsuariosEnProgreso = false;
 							if ($btn.length) { $btn.prop('disabled', false).val('Enviar Mensaje'); }
 						}
 					},
 					error: function (xhr, status, error) {
-						alert("Error al enviar el mensaje. Por favor, inténtalo de nuevo.");
+						showToast('Error al enviar el mensaje. Por favor, inténtalo de nuevo.', 'error');
 						console.error('Error en AJAX:', error);
 						contactoUsuariosEnProgreso = false;
 						if ($btn.length) { $btn.prop('disabled', false).val('Enviar Mensaje'); }
@@ -889,19 +955,19 @@ $(document).ready(function () {
 
 		// Fallback v2 (checkbox) si execute no está disponible
 		if (typeof grecaptcha === 'undefined') {
-			alert("El sistema de verificación no está disponible. Por favor, contacta directamente a info@codigoamigo.com");
+			showToast('El sistema de verificación no está disponible. Por favor, contacta directamente a info@codigoamigo.com', 'error');
 			return false;
 		}
 
 		var recaptchaWidget = document.querySelector('.g-recaptcha');
 		if (!recaptchaWidget || !recaptchaWidget.hasAttribute('data-widget-id')) {
-			alert("El widget de verificación no está disponible. Por favor, contacta directamente a info@codigoamigo.com");
+			showToast('El widget de verificación no está disponible. Por favor, contacta directamente a info@codigoamigo.com', 'error');
 			return false;
 		}
 
 		var recaptchaResponse = grecaptcha.getResponse();
 		if (recaptchaResponse.length === 0) {
-			alert("Por favor, completa el reCAPTCHA antes de enviar el formulario.");
+			showToast('Por favor, completa el reCAPTCHA antes de enviar el formulario.', 'warning');
 			return false;
 		}
 
@@ -920,25 +986,25 @@ $(document).ready(function () {
 			cache: false,
 			success: function (data) {
 				if (data.trim() === "success") {
-					alert("Mensaje enviado correctamente");
+					showToast('Mensaje enviado correctamente');
 					grecaptcha.reset();
 					contactoUsuariosEnProgreso = false;
 					if ($btn.length) { $btn.prop('disabled', false).val('Enviar Mensaje'); }
 					location.reload();
 				} else if (data.trim() === "recaptcha_error") {
-					alert("Error de verificación reCAPTCHA. Por favor, inténtalo de nuevo.");
+					showToast('Error de verificación reCAPTCHA. Por favor, inténtalo de nuevo.', 'error');
 					grecaptcha.reset();
 					contactoUsuariosEnProgreso = false;
 					if ($btn.length) { $btn.prop('disabled', false).val('Enviar Mensaje'); }
 				} else {
-					alert("Error al enviar el mensaje. Por favor, inténtalo de nuevo.");
+					showToast('Error al enviar el mensaje. Por favor, inténtalo de nuevo.', 'error');
 					grecaptcha.reset();
 					contactoUsuariosEnProgreso = false;
 					if ($btn.length) { $btn.prop('disabled', false).val('Enviar Mensaje'); }
 				}
 			},
 			error: function (xhr, status, error) {
-				alert("Error al enviar el mensaje. Por favor, inténtalo de nuevo.");
+				showToast('Error al enviar el mensaje. Por favor, inténtalo de nuevo.', 'error');
 				grecaptcha.reset();
 				console.error('Error en AJAX:', error);
 				contactoUsuariosEnProgreso = false;
@@ -983,22 +1049,22 @@ $(document).ready(function () {
 					cache: false,
 					success: function (data) {
 						if (data.trim() === "success") {
-							alert("Mensaje enviado correctamente");
+							showToast('Mensaje enviado correctamente');
 							$("#contacto_empresas")[0].reset();
 							contactoEmpresasEnProgreso = false;
 							if ($btnE.length) { $btnE.prop('disabled', false).val('Enviar Mensaje'); }
 						} else if (data.trim() === "recaptcha_error") {
-							alert("Error de verificación reCAPTCHA. Por favor, inténtalo de nuevo.");
+							showToast('Error de verificación reCAPTCHA. Por favor, inténtalo de nuevo.', 'error');
 							contactoEmpresasEnProgreso = false;
 							if ($btnE.length) { $btnE.prop('disabled', false).val('Enviar Mensaje'); }
 						} else {
-							alert("Error al enviar el mensaje. Por favor, inténtalo de nuevo.");
+							showToast('Error al enviar el mensaje. Por favor, inténtalo de nuevo.', 'error');
 							contactoEmpresasEnProgreso = false;
 							if ($btnE.length) { $btnE.prop('disabled', false).val('Enviar Mensaje'); }
 						}
 					},
 					error: function (xhr, status, error) {
-						alert("Error al enviar el mensaje. Por favor, inténtalo de nuevo.");
+						showToast('Error al enviar el mensaje. Por favor, inténtalo de nuevo.', 'error');
 						console.error('Error en AJAX:', error);
 						contactoEmpresasEnProgreso = false;
 						if ($btnE.length) { $btnE.prop('disabled', false).val('Enviar Mensaje'); }
@@ -1010,19 +1076,19 @@ $(document).ready(function () {
 
 		// Fallback v2
 		if (typeof grecaptcha === 'undefined') {
-			alert("El sistema de verificación no está disponible. Por favor, contacta directamente a info@codigoamigo.com");
+			showToast('El sistema de verificación no está disponible. Por favor, contacta directamente a info@codigoamigo.com', 'error');
 			return false;
 		}
 
 		var recaptchaWidget = document.querySelector('.g-recaptcha');
 		if (!recaptchaWidget || !recaptchaWidget.hasAttribute('data-widget-id')) {
-			alert("El widget de verificación no está disponible. Por favor, contacta directamente a info@codigoamigo.com");
+			showToast('El widget de verificación no está disponible. Por favor, contacta directamente a info@codigoamigo.com', 'error');
 			return false;
 		}
 
 		var recaptchaResponse = grecaptcha.getResponse();
 		if (recaptchaResponse.length === 0) {
-			alert("Por favor, completa el reCAPTCHA antes de enviar el formulario.");
+			showToast('Por favor, completa el reCAPTCHA antes de enviar el formulario.', 'warning');
 			return false;
 		}
 
@@ -1041,25 +1107,25 @@ $(document).ready(function () {
 			cache: false,
 			success: function (data) {
 				if (data.trim() === "success") {
-					alert("Mensaje enviado correctamente");
+					showToast('Mensaje enviado correctamente');
 					grecaptcha.reset();
 					contactoEmpresasEnProgreso = false;
 					if ($btnE.length) { $btnE.prop('disabled', false).val('Enviar Mensaje'); }
 					location.reload();
 				} else if (data.trim() === "recaptcha_error") {
-					alert("Error de verificación reCAPTCHA. Por favor, inténtalo de nuevo.");
+					showToast('Error de verificación reCAPTCHA. Por favor, inténtalo de nuevo.', 'error');
 					grecaptcha.reset();
 					contactoEmpresasEnProgreso = false;
 					if ($btnE.length) { $btnE.prop('disabled', false).val('Enviar Mensaje'); }
 				} else {
-					alert("Error al enviar el mensaje. Por favor, inténtalo de nuevo.");
+					showToast('Error al enviar el mensaje. Por favor, inténtalo de nuevo.', 'error');
 					grecaptcha.reset();
 					contactoEmpresasEnProgreso = false;
 					if ($btnE.length) { $btnE.prop('disabled', false).val('Enviar Mensaje'); }
 				}
 			},
 			error: function (xhr, status, error) {
-				alert("Error al enviar el mensaje. Por favor, inténtalo de nuevo.");
+				showToast('Error al enviar el mensaje. Por favor, inténtalo de nuevo.', 'error');
 				grecaptcha.reset();
 				console.error('Error en AJAX:', error);
 				contactoEmpresasEnProgreso = false;
@@ -1138,7 +1204,7 @@ $(document).ready(function () {
 				},
 				cache: false,
 				success: function (data) {
-					alert("Mensaje enviado correctamente");
+					showToast('Mensaje enviado correctamente');
 					location.reload();
 				}
 			});
@@ -1399,8 +1465,8 @@ function login_user_facebook() {
 				});
 			});
 		} else if (response.status == 'not_authorized') {
-			alert('Debes autorizar la app!');
-		} else { alert('Debes ingresar a tu cuenta de Facebook!'); }
+			showToast('Debes autorizar la app!', 'warning');
+		} else { showToast('Debes ingresar a tu cuenta de Facebook!', 'warning'); }
 
 	}, { scope: 'email' });
 
@@ -1412,21 +1478,38 @@ function login_user_facebook() {
 
 function executeCopy(text, element) {
 
-	var input = document.createElement('textarea');
-	document.body.appendChild(input);
-	input.value = text;
-	input.select();
-	document.execCommand('Copy');
-	input.remove();
+	function afterCopy() {
+		try {
+			ga('send', {
+				hitType: 'event',
+				eventCategory: 'Clicks',
+				eventAction: 'enlace_copiado_al_portapapeles',
+				eventLabel: ''
+			});
+		} catch (e) {}
+		showToast('Código copiado en el portapapeles ✓');
+	}
 
-	ga('send', {
-		hitType: 'event',
-		eventCategory: 'Clicks',
-		eventAction: 'enlace_copiado_al_portapapeles',
-		eventLabel: ''
-	});
-
-	alert("Código copiado en el portapapeles");
+	if (navigator.clipboard && navigator.clipboard.writeText) {
+		navigator.clipboard.writeText(text).then(afterCopy).catch(function () {
+			// Fallback para contextos sin permisos
+			var input = document.createElement('textarea');
+			document.body.appendChild(input);
+			input.value = text;
+			input.select();
+			document.execCommand('Copy');
+			input.remove();
+			afterCopy();
+		});
+	} else {
+		var input = document.createElement('textarea');
+		document.body.appendChild(input);
+		input.value = text;
+		input.select();
+		document.execCommand('Copy');
+		input.remove();
+		afterCopy();
+	}
 
 	return false;
 
@@ -1438,18 +1521,35 @@ function executeCopy(text, element) {
 /* ------------------------------------------------------------------------ */
 /*  SCROLL TO TOP
  /* ------------------------------------------------------------------------ */
-//Check to see if the window is top if not then display button
-var scroll_top = $('.scrolltop-btn');
-$(window).on("scroll", function () {
-	if ($(this).scrollTop() > 100) {
-		scroll_top.fadeIn(1000);
-	} else {
-		scroll_top.fadeOut(1000);
-	}
-});
+// ── Scroll-to-top with rAF throttle (INP optimisation) ──
+(function () {
+	var scrollBtn = document.querySelector('.scrolltop-btn');
+	if (!scrollBtn) return;
+	var ticking = false;
+	var isVisible = false;
+	scrollBtn.style.transition = 'opacity .4s ease, visibility .4s ease';
+	scrollBtn.style.opacity = '0';
+	scrollBtn.style.visibility = 'hidden';
+	window.addEventListener('scroll', function () {
+		if (ticking) return;
+		ticking = true;
+		requestAnimationFrame(function () {
+			var shouldShow = window.scrollY > 100;
+			if (shouldShow !== isVisible) {
+				isVisible = shouldShow;
+				scrollBtn.style.opacity = shouldShow ? '1' : '0';
+				scrollBtn.style.visibility = shouldShow ? 'visible' : 'hidden';
+			}
+			ticking = false;
+		});
+	}, { passive: true });
 
-$(".back-top").on('click', function () {
-	$("html, body").animate({ scrollTop: 0 }, "slow");
-	return false;
-});
+	var backTopBtn = document.querySelector('.back-top');
+	if (backTopBtn) {
+		backTopBtn.addEventListener('click', function (e) {
+			e.preventDefault();
+			window.scrollTo({ top: 0, behavior: 'smooth' });
+		});
+	}
+})();
 

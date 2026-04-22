@@ -165,6 +165,54 @@ try {
             'descripcion' => $descripcion
         ];
 
+        // --- NOTIFICACIÓN A SEGUIDORES ---
+        try {
+            if (!function_exists('enviarEmailNotificacionPublicacionUsuario')) {
+                include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/email_helper.php';
+            }
+            if (!function_exists('getCollectionFavoritos')) {
+                include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_favoritos.php';
+            }
+            if (!function_exists('getCollectionUsuarios')) {
+                include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_usuario.php';
+            }
+            
+            $collection_favoritos = getCollectionFavoritos();
+            $collection_usuarios = getCollectionUsuarios();
+            
+            // Buscar la información básica del autor
+            $autor = $collection_usuarios->findOne(['_id' => new MongoDB\BSON\ObjectId($_SESSION["user_id"])]);
+            $autor_nombre = $autor['username'] ?? 'Un usuario';
+            
+            // Buscar todos los seguidores
+            $seguidores = $collection_favoritos->find([
+                'codigo_id' => new MongoDB\BSON\ObjectId($_SESSION["user_id"]),
+                'tipo' => 'usuario'
+            ]);
+            
+            $marca_slug = strtolower(str_replace(' ', '-', $marca));
+            $url_codigo = "https://www.codigoamigo.com/de-" . $marca_slug . "?codigo=" . $codigo_id;
+            
+            foreach ($seguidores as $seg) {
+                $seguidor = $collection_usuarios->findOne(['_id' => $seg['usuario_id']]);
+                if ($seguidor && !empty($seguidor['mail'])) {
+                    // Enviar notificacion asincronamente si fuera posible, sino síncrono.
+                    enviarEmailNotificacionPublicacionUsuario(
+                        $seguidor['mail'],
+                        $seguidor['username'] ?? 'Usuario',
+                        $autor_nombre,
+                        'código',
+                        "Se ha publicado un nuevo código para la marca " . $marca,
+                        $url_codigo,
+                        null
+                    );
+                }
+            }
+        } catch (Exception $e) {
+            error_log("Error al notificar a seguidores sobre nuevo código: " . $e->getMessage());
+        }
+        // --- FIN NOTIFICACIÓN ---
+
         // Redirigir a la página de felicitaciones
         header("Location: /codigo-publicado");
         exit;

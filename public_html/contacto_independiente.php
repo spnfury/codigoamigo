@@ -99,64 +99,7 @@ get_header_new($title, $description);
     </div>
 </div>
 
-<script>
-// Envío con reCAPTCHA v3 (invisible)
-document.addEventListener('DOMContentLoaded', function() {
-    var form = document.getElementById('contacto_usuarios');
-    if (!form) { return; }
-
-    var submitBtn = form.querySelector('input[type="submit"]');
-    var fallbackDiv = document.getElementById('recaptcha-fallback');
-
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
-
-        if (typeof grecaptcha === 'undefined' || typeof grecaptcha.execute !== 'function') {
-            if (fallbackDiv) fallbackDiv.style.display = 'block';
-            alert('El sistema de verificación no está disponible. Por favor, contacta a info@codigoamigo.com');
-            return false;
-        }
-
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.value = 'Enviando...';
-        }
-
-        grecaptcha.execute('6LfyTegrAAAAAEGfm7q5Huhcej7EQFEIM9yCU8JS', { action: 'contact' }).then(function(token) {
-            // Enviar vía AJAX al endpoint existente (ajax_actions.php)
-            $.ajax({
-                type: 'POST',
-                url: '/myphp/ajax_actions.php',
-                data: {
-                    metodo: 'formulario_contacto',
-                    nombre: $('#nombre').val(),
-                    correo: $('#correo').val(),
-                    telefono: $('#telefono').val(),
-                    mensaje: $('#mensaje').val(),
-                    origin: 'Formulario contacto usuarios (v3)',
-                    recaptcha_response: token
-                },
-                cache: false,
-                success: function(data) {
-                    if (submitBtn) { submitBtn.disabled = false; submitBtn.value = 'Enviar Mensaje'; }
-                    if (data.trim() === 'success') {
-                        alert('Mensaje enviado correctamente');
-                        form.reset();
-                    } else if (data.trim() === 'recaptcha_error') {
-                        alert('Error de verificación reCAPTCHA. Por favor, inténtalo de nuevo.');
-                    } else {
-                        alert('Error al enviar el mensaje. Por favor, inténtalo de nuevo.');
-                    }
-                },
-                error: function() {
-                    if (submitBtn) { submitBtn.disabled = false; submitBtn.value = 'Enviar Mensaje'; }
-                    alert('Error al enviar el mensaje. Por favor, inténtalo de nuevo.');
-                }
-            });
-        });
-    });
-});
-</script>
+<!-- El manejo del envío se realiza en js/funciones.js -->
 
 <?php get_footer(); ?>
 

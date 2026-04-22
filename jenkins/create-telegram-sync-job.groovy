@@ -96,11 +96,7 @@ pipeline {
                         else
                             PYTHON_CMD="python3"
                         fi
-                        \${PYTHON_CMD} telegram_monitor.py 2>&1 | tee -a ${LOG_FILE}
-                        EXIT_CODE=\${PIPESTATUS[0]}
-                        if [ \${EXIT_CODE} -ne 0 ]; then
-                            exit \${EXIT_CODE}
-                        fi
+                        \${PYTHON_CMD} telegram_monitor.py
                     """
                 }
             }

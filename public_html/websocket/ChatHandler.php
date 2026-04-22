@@ -177,6 +177,7 @@ class ChatHandler implements MessageComponentInterface {
         $de_usuario_id = $from->user_id;
         $para_usuario_id = $data['para_usuario_id'] ?? null;
         $mensaje = $data['mensaje'] ?? '';
+        $codigo_id = $data['codigo_id'] ?? null;
         
         if (!$para_usuario_id || !$mensaje) {
             return;
@@ -188,7 +189,14 @@ class ChatHandler implements MessageComponentInterface {
             require_once __DIR__ . '/../myphp/funciones_usuario.php';
         }
         
-        $mensaje_id = enviarMensaje($de_usuario_id, $para_usuario_id, $mensaje);
+        $contexto = [];
+        if (!empty($codigo_id)) {
+            $contexto['codigo_id'] = $codigo_id;
+        }
+        
+        $mensaje_id = enviarMensaje($de_usuario_id, $para_usuario_id, $mensaje, false, $contexto);
+        
+        $conversacion_id = $this->crearConversacionId($de_usuario_id, $para_usuario_id, $codigo_id);
         
         // Enviar a destinatario
         $this->sendToUser($para_usuario_id, [
@@ -197,7 +205,7 @@ class ChatHandler implements MessageComponentInterface {
             'de_usuario_id' => $de_usuario_id,
             'para_usuario_id' => $para_usuario_id,
             'mensaje' => $mensaje,
-            'conversacion_id' => $this->crearConversacionId($de_usuario_id, $para_usuario_id),
+            'conversacion_id' => $conversacion_id,
             'timestamp' => time() * 1000
         ]);
         
@@ -205,8 +213,17 @@ class ChatHandler implements MessageComponentInterface {
         $from->send(json_encode([
             'type' => 'message_sent',
             'para_usuario_id' => $para_usuario_id,
-            'mensaje' => $mensaje
+            'mensaje' => $mensaje,
+            'conversacion_id' => $conversacion_id
         ]));
+        
+        // Notificar a ambos que la lista de conversaciones ha cambiado
+        $update_event = [
+            'type' => 'conversation_updated',
+            'conversacion_id' => $conversacion_id
+        ];
+        $this->sendToUser($para_usuario_id, $update_event);
+        $this->sendToUser($de_usuario_id, $update_event);
     }
     
     /**
@@ -257,14 +274,17 @@ class ChatHandler implements MessageComponentInterface {
         }
         
         // Notificar al otro usuario que sus mensajes fueron leídos
+        // El conversacion_id puede tener formato: userA-userB o userA-userB-codigoId
         $parts = explode('-', $conversacion_id);
-        $other_user_id = ($parts[0] === $usuario_id) ? $parts[1] : $parts[0];
+        $other_user_id = ($parts[0] === $usuario_id) ? ($parts[1] ?? '') : $parts[0];
         
-        $this->sendToUser($other_user_id, [
-            'type' => 'messages_read',
-            'conversacion_id' => $conversacion_id,
-            'usuario_id' => $usuario_id
-        ]);
+        if (!empty($other_user_id)) {
+            $this->sendToUser($other_user_id, [
+                'type' => 'messages_read',
+                'conversacion_id' => $conversacion_id,
+                'usuario_id' => $usuario_id
+            ]);
+        }
     }
     
     /**
@@ -304,12 +324,16 @@ class ChatHandler implements MessageComponentInterface {
     }
     
     /**
-     * Crea un ID de conversación
+     * Crea un ID de conversación, opcionalmente vinculada a un código
      */
-    protected function crearConversacionId($user1_id, $user2_id) {
+    protected function crearConversacionId($user1_id, $user2_id, $codigo_id = null) {
         $ids = [$user1_id, $user2_id];
         sort($ids);
-        return $ids[0] . '-' . $ids[1];
+        $conv_id = $ids[0] . '-' . $ids[1];
+        if (!empty($codigo_id)) {
+            $conv_id .= '-' . $codigo_id;
+        }
+        return $conv_id;
     }
 }
 

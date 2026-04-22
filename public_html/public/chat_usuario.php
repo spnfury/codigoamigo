@@ -24,6 +24,7 @@ $array_admins = [
     "5c8a10ce2f55c86d6e707d82"
 ];
 $es_admin_chat = in_array($user_id, $array_admins);
+$es_vip_chat = es_usuario_vip($user_id);
 
 // Obtener datos del usuario
 $data_usuario = get_object_user('_id', new MongoDB\BSON\ObjectId($user_id));
@@ -42,33 +43,18 @@ include_once __DIR__ . '/../myphp/_header_modern.php';
 $GLOBALS['header_modern_used'] = true;
 
 // Renderizar header
-get_header_modern($title, $description, '', '', '', true);
+get_header_modern($title, $description, '', '', '', false);
 ?>
 
 <link href="/css/chat-modern-v2.css?v=<?php echo time(); ?>" rel="stylesheet">
 <link href="/css/usuario-chat.css?v=<?php echo time(); ?>" rel="stylesheet">
 <style>
-    .chat-connection-status {
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        z-index: 1000;
+    body {
+        /* Remove full-screen forced overrides so standard header shows */
     }
 </style>
-<div class="chat-connection-status offline" id="connectionStatus"></div>
 
 <div class="chat-usuario-container">
-    <?php if ($es_admin_chat) { ?>
-        <div class="chat-quick-actions">
-            <a href="/admin_chat" class="btn btn-sm btn-warning">
-                <i class="fas fa-toolbox me-1"></i>Panel admin
-            </a>
-        </div>
-    <?php } ?>
-
     <div class="chat-layout">
         <aside class="chat-sidebar">
             <div class="chat-sidebar-top">
@@ -77,20 +63,22 @@ get_header_modern($title, $description, '', '', '', true);
                         <span class="sidebar-label">Bandeja de entrada</span>
                         <p class="sidebar-helper">Mensajes que recibes de la comunidad</p>
                     </div>
+                    <?php if($es_vip_chat || $es_admin_chat): ?>
                     <button class="btn btn-sm btn-primary" id="newConversationBtn" title="Nueva conversación" style="display: block;">
                         <i class="fas fa-plus"></i>
                     </button>
+                    <?php endif; ?>
                 </div>
                 <div class="chat-tabs">
                     <button type="button" class="chat-tab active" data-tab="inbox">Mensajes</button>
+                    <button type="button" class="chat-tab" data-tab="archived">
+                        <i class="fas fa-archive" style="font-size: 0.75rem;"></i> Archivados
+                        <span class="chat-tab-badge" id="archivedBadge" hidden>0</span>
+                    </button>
                     <button type="button" class="chat-tab" data-tab="requests">
                         Solicitudes ocultas
                         <span class="chat-tab-badge" id="requestsBadge" hidden>0</span>
                     </button>
-                </div>
-                <div class="chat-search">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="searchConversations" placeholder="Buscar conversación o usuario...">
                 </div>
             </div>
 
@@ -134,17 +122,17 @@ get_header_modern($title, $description, '', '', '', true);
                 <p>Elige un chat para ver los detalles del usuario y acceder rápidamente a su perfil público.</p>
             </div>
             <div class="profile-content" id="profileContent" style="display: none;">
-                <div class="profile-avatar-wrapper">
-                    <img id="profileAvatar" src="" alt="Avatar" class="profile-avatar" hidden>
-                    <div class="profile-initials" id="profileInitials" hidden></div>
-                </div>
-                <h2 id="profileName"></h2>
+                <a href="#" target="_blank" rel="noopener" id="profileLinkAvatar" class="profile-link-wrapper">
+                    <div class="profile-avatar-wrapper">
+                        <img id="profileAvatar" src="" alt="Avatar" class="profile-avatar" hidden onerror="this.style.display='none'; document.getElementById('profileInitials').style.display='flex'; document.getElementById('profileInitials').innerText=document.getElementById('profileInitials').innerText || 'U';">
+                        <div class="profile-initials" id="profileInitials" hidden></div>
+                    </div>
+                </a>
+                <a href="#" target="_blank" rel="noopener" id="profileLinkName" class="profile-link-wrapper">
+                    <h2 id="profileName"></h2>
+                </a>
                 <p id="profileEmail"></p>
-                <div class="profile-actions">
-                    <a href="#" target="_blank" rel="noopener" id="profileLink" class="btn btn-outline-light">
-                        <i class="fas fa-external-link-alt me-1"></i>Ver perfil público
-                    </a>
-                </div>
+                
                 <div class="profile-meta" id="profileMeta"></div>
             </div>
         </aside>
@@ -184,6 +172,20 @@ get_header_modern($title, $description, '', '', '', true);
                 </div>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Menú contextual para conversaciones -->
+<div id="chatContextMenu" class="chat-context-menu" style="display: none;">
+    <div class="context-menu-item" data-action="pin">
+        <i class="fas fa-thumbtack"></i> <span>Fijar conversación</span>
+    </div>
+    <div class="context-menu-item" data-action="archive">
+        <i class="fas fa-archive"></i> <span>Archivar conversación</span>
+    </div>
+    <div class="context-menu-divider"></div>
+    <div class="context-menu-item context-menu-danger" data-action="delete">
+        <i class="fas fa-trash-alt"></i> <span>Eliminar conversación</span>
     </div>
 </div>
 

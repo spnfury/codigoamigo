@@ -21,10 +21,11 @@ if (!$release) {
 
 return [
     'dsn' => 'https://5d64a3afc75a3b86dc15bd6ad35ac508@o231422.ingest.us.sentry.io/4510326275964928',
+    'auth_token' => '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',
+    'org_slug' => 'sergi-rodriguez',
     'options' => [
         'environment' => $environment,
         'release' => $release,
-        'enable_auto_session_tracking' => true,
         'traces_sample_rate' => 0.0,
         'profiles_sample_rate' => 0.0,
         'send_default_pii' => false,
@@ -91,15 +92,6 @@ return [
             
             return $event;
         },
-        // Para errores del navegador (JavaScript)
-        'ignore_errors' => [
-            'adsbygoogle.push() error',
-            'All \'ins\' elements in the DOM with class=adsbygoogle already have ads in them',
-            'enable_page_level_ads',
-            'Only one \'enable_page_level_ads\' allowed per page',
-            'Unexpected non-whitespace character after JSON',
-            'Accessing domItems after disposal',
-        ],
     ],
 ];
 

@@ -9,7 +9,7 @@
     // Verificar si el usuario está autenticado
     const isAuthenticated = typeof currentUserId !== 'undefined' && currentUserId;
     let currentCholloId = null;
-    let currentSortOrder = 'antiguos';
+    let currentSortOrder = 'nuevos';
 
     /**
      * Inicializa el sistema de comentarios

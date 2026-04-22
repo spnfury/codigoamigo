@@ -1,13 +1,18 @@
 <?php
 
+/**
+ * Funciones generales para la gestión de chollos
+ */
+
 // Incluir funciones de conexión a MongoDB
 if (!function_exists('createConnection')) {
     include_once __DIR__ . '/funciones.php';
 }
 
-/******************************************************
- *  FUNCIONES PARA GESTIÓN DE CHOLLOS
- * ***************************************************/
+// Incluir configuración de IA
+if (file_exists(__DIR__ . '/../config/ai_config.php')) {
+    include_once __DIR__ . '/../config/ai_config.php';
+}
 
 /**
  * Obtiene la colección de chollos
@@ -19,8 +24,8 @@ function getCollectionChollos() {
     }
 
     try {
-        $collection_chollos = $db->selectCollection('chollos');
-        return $collection_chollos;
+        $collection = $db->selectCollection('chollos');
+        return $collection;
     } catch (Throwable $e) {
         error_log("Error al obtener colección de chollos: " . $e->getMessage());
         return null;
@@ -28,7 +33,7 @@ function getCollectionChollos() {
 }
 
 /**
- * Crea un nuevo chollo
+ * Crea un nuevo chollo en la base de datos
  */
 function crearChollo($datos) {
     $collection = getCollectionChollos();
@@ -42,32 +47,6 @@ function crearChollo($datos) {
             return ['success' => false, 'error' => 'Título y enlace son obligatorios'];
         }
 
-        // Pre-procesar enlace de Amazon si corresponde
-        if (!empty($datos['enlace'])) {
-            // Cargar funciones de Amazon si no están cargadas
-            if (!function_exists('esEnlaceAmazon')) {
-                require_once __DIR__ . '/funciones_chollos_amazon.php';
-            }
-            
-            if (esEnlaceAmazon($datos['enlace'])) {
-                // Intentar expandir shorteners
-                $url_expandida = expandirAcortadorAmazon($datos['enlace']);
-                if ($url_expandida !== $datos['enlace'] && esEnlaceAmazon($url_expandida)) {
-                    $datos['enlace_expandido'] = $url_expandida;
-                    $datos['fecha_expansion'] = new MongoDB\BSON\UTCDateTime();
-                }
-                
-                // Extraer ASIN si no está ya proporcionado
-                if (empty($datos['asin'])) {
-                    $asin_extraido = extraerASIN($datos['enlace_expandido'] ?? $datos['enlace']);
-                    if ($asin_extraido) {
-                        $datos['asin'] = $asin_extraido;
-                        error_log("crearChollo - ASIN extraído: $asin_extraido para "  . substr($datos['titulo'], 0, 50));
-                    }
-                }
-            }
-        }
-
         $documento = [
             'titulo' => $datos['titulo'],
             'descripcion' => $datos['descripcion'] ?? '',
@@ -76,80 +55,87 @@ function crearChollo($datos) {
             'porcentaje_descuento' => isset($datos['porcentaje_descuento']) ? intval($datos['porcentaje_descuento']) : null,
             'enlace' => $datos['enlace'],
             'enlace_original' => $datos['enlace_original'] ?? $datos['enlace'],
-            'enlace_expandido' => $datos['enlace_expandido'] ?? null,
-            'fecha_expansion' => $datos['fecha_expansion'] ?? null,
             'asin' => $datos['asin'] ?? null,
             'imagen' => $datos['imagen'] ?? '',
-            'categoria' => (function() use ($datos) {
-                // Aceptar tanto string como array
-                if (isset($datos['categoria'])) {
-                    if (is_array($datos['categoria'])) {
-                        return $datos['categoria'];
-                    }
-                    return [$datos['categoria']]; // Convertir string a array
-                }
-                return ['general']; // Por defecto
-            })(),
-            'fecha_inicio' => isset($datos['fecha_inicio']) ? $datos['fecha_inicio'] : date('Y-m-d H:i:s'),
+            'categoria' => $datos['categoria'] ?? ['General'],
+            'fecha_inicio' => $datos['fecha_inicio'] ?? new MongoDB\BSON\UTCDateTime(),
             'fecha_fin' => $datos['fecha_fin'] ?? null,
             'fuente' => $datos['fuente'] ?? 'manual',
-            'fuente_id' => (function() use ($datos) {
-                if (!isset($datos['fuente_id']) || empty($datos['fuente_id'])) {
-                    return null;
-                }
-                try {
-                    return new MongoDB\BSON\ObjectId($datos['fuente_id']);
-                } catch (Exception $e) {
-                    return null;
-                }
-            })(),
+            'fuente_id' => isset($datos['fuente_id']) ? new MongoDB\BSON\ObjectId($datos['fuente_id']) : null,
             'mensaje_original_id' => $datos['mensaje_original_id'] ?? null,
-            'estado' => isset($datos['estado']) ? intval($datos['estado']) : 1, // 1 = activo, 0 = inactivo
+            'estado' => $datos['estado'] ?? 1,
             'texto_reescrito' => $datos['texto_reescrito'] ?? false,
             'fecha_creacion' => new MongoDB\BSON\UTCDateTime(),
             'fecha_actualizacion' => new MongoDB\BSON\UTCDateTime(),
             'clicks' => 0,
             'publicado_telegram' => false,
-            'fecha_publicacion_telegram' => null
+            'votos_positivos' => 0,
+            'votos_negativos' => 0,
+            'temperatura' => 0,
+            'total_comentarios' => 0
         ];
-        
-        // Verificar duplicados si hay fuente_id y mensaje_original_id
-        if ($documento['fuente_id'] && $documento['mensaje_original_id'] !== null) {
-            $duplicado = $collection->findOne([
-                'fuente_id' => $documento['fuente_id'],
-                'mensaje_original_id' => $documento['mensaje_original_id']
-            ]);
-            
-            if ($duplicado) {
-                return ['success' => false, 'error' => 'Este chollo ya existe (duplicado)', 'duplicado' => true, 'id' => (string)$duplicado['_id']];
-            }
-        }
 
         $resultado = $collection->insertOne($documento);
         
         if ($resultado->getInsertedId()) {
-            $chollo_id = (string)$resultado->getInsertedId();
             
-            // Si el chollo está activo (estado = 1), enviarlo automáticamente a Telegram
-            if ($documento['estado'] == 1) {
-                // Incluir función de Telegram si no está incluida
-                if (!function_exists('publicarCholloEnTelegram')) {
-                    include_once __DIR__ . '/telegram_chollos_bot.php';
-                }
-                
-                // Intentar publicar en Telegram (no fallar si no está configurado)
-                try {
-                    $chat_id_salida = defined('TELEGRAM_CHOLLOS_CHAT_ID_SALIDA') ? TELEGRAM_CHOLLOS_CHAT_ID_SALIDA : '';
-                    if (!empty($chat_id_salida)) {
-                        publicarCholloEnTelegram($chollo_id, $chat_id_salida);
+            // --- NOTIFICACIÓN A SEGUIDORES (Si el chollo tiene un autor) ---
+            try {
+                if (isset($documento['fuente_id']) && $documento['fuente_id'] instanceof MongoDB\BSON\ObjectId) {
+                    if (!function_exists('enviarEmailNotificacionPublicacionUsuario')) {
+                        include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/email_helper.php';
                     }
-                } catch (Throwable $e) {
-                    // No fallar la creación del chollo si falla el envío a Telegram
-                    error_log("Error al publicar chollo en Telegram: " . $e->getMessage());
+                    if (!function_exists('getCollectionFavoritos')) {
+                        include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_favoritos.php';
+                    }
+                    if (!function_exists('getCollectionUsuarios')) {
+                        include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_usuario.php';
+                    }
+                    
+                    $collection_favoritos = getCollectionFavoritos();
+                    $collection_usuarios = getCollectionUsuarios();
+                    
+                    $autor = $collection_usuarios->findOne(['_id' => $documento['fuente_id']]);
+                    if ($autor) {
+                        $autor_nombre = $autor['username'] ?? 'Un usuario';
+                        
+                        $seguidores = $collection_favoritos->find([
+                            'codigo_id' => $documento['fuente_id'],
+                            'tipo' => 'usuario'
+                        ]);
+                        
+                        // Generar slug de categoría
+                        $cat_slug = 'general';
+                        if (!empty($documento['categoria']) && is_array($documento['categoria'])) {
+                            $cat_slug = strtolower(str_replace(' ', '-', $documento['categoria'][0]));
+                        } elseif (!empty($documento['categoria']) && is_string($documento['categoria'])) {
+                            $cat_slug = strtolower(str_replace(' ', '-', $documento['categoria']));
+                        }
+                        
+                        $url_chollo = "https://www.malprecio.com/chollos/" . $cat_slug . "/" . (string)$resultado->getInsertedId();
+                        
+                        foreach ($seguidores as $seg) {
+                            $seguidor = $collection_usuarios->findOne(['_id' => $seg['usuario_id']]);
+                            if ($seguidor && !empty($seguidor['mail'])) {
+                                enviarEmailNotificacionPublicacionUsuario(
+                                    $seguidor['mail'],
+                                    $seguidor['username'] ?? 'Usuario',
+                                    $autor_nombre,
+                                    'chollo',
+                                    $documento['titulo'],
+                                    $url_chollo,
+                                    $documento['imagen'] ?? null
+                                );
+                            }
+                        }
+                    }
                 }
+            } catch (Exception $e) {
+                error_log("Error al notificar a seguidores sobre nuevo chollo: " . $e->getMessage());
             }
-            
-            return ['success' => true, 'id' => $chollo_id];
+            // --- FIN NOTIFICACIÓN ---
+
+            return ['success' => true, 'id' => (string)$resultado->getInsertedId()];
         } else {
             return ['success' => false, 'error' => 'Error al insertar chollo'];
         }
@@ -160,7 +146,7 @@ function crearChollo($datos) {
 }
 
 /**
- * Obtiene chollos con filtros
+ * Obtiene chollos con filtros y paginación
  */
 function obtenerChollos($filtros = []) {
     $collection = getCollectionChollos();
@@ -171,101 +157,16 @@ function obtenerChollos($filtros = []) {
     try {
         $query = [];
 
-        // Filtro por categoría (soporta arrays de categorías en los documentos)
-        if (!empty($filtros['categoria'])) {
-            $categoria_filtro = $filtros['categoria'];
-            $categoria_conditions = [];
-            
-            // Si la categoría es un string, buscar en arrays de categorías
-            if (is_string($categoria_filtro)) {
-                // Buscar documentos donde la categoría (que puede ser array o string) contenga esta categoría
-                $categoria_conditions = [
-                    ['categoria' => $categoria_filtro], // Para compatibilidad con strings antiguos
-                    ['categoria' => ['$in' => [$categoria_filtro]]] // Para arrays
-                ];
-                
-                // Si es videojuegos, también buscar en títulos/descripciones para chollos mal categorizados
-                if ($categoria_filtro === 'videojuegos') {
-                    $palabras_videojuegos = ['playstation', 'ps5', 'ps4', 'xbox', 'nintendo', 'switch', 'videojuego', 'gaming', 'gamer', 'consola', 'steam', 'epic games', 'fifa', 'call of duty', 'ea sports'];
-                    $texto_conditions = [];
-                    foreach ($palabras_videojuegos as $palabra) {
-                        $texto_conditions[] = ['titulo' => ['$regex' => $palabra, '$options' => 'i']];
-                        $texto_conditions[] = ['descripcion' => ['$regex' => $palabra, '$options' => 'i']];
-                    }
-                    if (!empty($texto_conditions)) {
-                        $categoria_conditions[] = ['$or' => $texto_conditions];
-                    }
-                }
-                
-                // Si es amazon, también buscar en enlaces y títulos para chollos mal categorizados
-                if ($categoria_filtro === 'amazon') {
-                    $amazon_conditions = [
-                        ['enlace' => ['$regex' => 'amazon', '$options' => 'i']],
-                        ['enlace_original' => ['$regex' => 'amazon', '$options' => 'i']],
-                        ['titulo' => ['$regex' => 'amazon', '$options' => 'i']],
-                        ['descripcion' => ['$regex' => 'amazon', '$options' => 'i']]
-                    ];
-                    $categoria_conditions[] = ['$or' => $amazon_conditions];
-                }
-                
-                // Si es deportes, también buscar en títulos/descripciones para chollos mal categorizados
-                if ($categoria_filtro === 'deportes') {
-                    $palabras_deportes = ['deporte', 'deportes', 'gimnasio', 'running', 'fútbol', 'futbol', 'baloncesto', 'tenis', 'natación', 'natacion', 'bicicleta', 'bike', 'pesas', 'yoga', 'pilates', 'zapatillas deportivas', 'adidas', 'nike', 'puma', 'zapatillas', 'zapatilla'];
-                    $texto_conditions = [];
-                    foreach ($palabras_deportes as $palabra) {
-                        $texto_conditions[] = ['titulo' => ['$regex' => $palabra, '$options' => 'i']];
-                        $texto_conditions[] = ['descripcion' => ['$regex' => $palabra, '$options' => 'i']];
-                    }
-                    if (!empty($texto_conditions)) {
-                        $categoria_conditions[] = ['$or' => $texto_conditions];
-                    }
-                }
-                
-                // Si es libros, también buscar en títulos/descripciones para chollos mal categorizados
-                if ($categoria_filtro === 'libros') {
-                    $palabras_libros = ['libro', 'libros', 'ebook', 'ebooks', 'kindle', 'lectura', 'novela', 'cuento', 'manual', 'literatura', 'bestseller'];
-                    $texto_conditions = [];
-                    foreach ($palabras_libros as $palabra) {
-                        $texto_conditions[] = ['titulo' => ['$regex' => $palabra, '$options' => 'i']];
-                        $texto_conditions[] = ['descripcion' => ['$regex' => $palabra, '$options' => 'i']];
-                    }
-                    if (!empty($texto_conditions)) {
-                        $categoria_conditions[] = ['$or' => $texto_conditions];
-                    }
-                }
-            } elseif (is_array($categoria_filtro)) {
-                // Si el filtro es un array, buscar documentos que contengan cualquiera de esas categorías
-                foreach ($categoria_filtro as $cat) {
-                    if ($cat instanceof \MongoDB\BSON\Regex) {
-                         // Si es Regex, aplicar directamente (soporta strings y arrays de strings en el documento)
-                         $categoria_conditions[] = ['categoria' => $cat];
-                    } else {
-                         $categoria_conditions[] = ['categoria' => $cat]; // Strings antiguos
-                         $categoria_conditions[] = ['categoria' => ['$in' => [$cat]]]; // Arrays
-                    }
-                }
-            }
-            
-            if (!empty($categoria_conditions)) {
-                // Si ya hay $or en la query, usar $and
-                if (isset($query['$or'])) {
-                    $query['$and'] = [
-                        ['$or' => $query['$or']],
-                        ['$or' => $categoria_conditions]
-                    ];
-                    unset($query['$or']);
-                } else {
-                    $query['$or'] = $categoria_conditions;
-                }
-            }
-        }
-
         // Filtro por estado
         if (isset($filtros['estado'])) {
             $query['estado'] = intval($filtros['estado']);
         } else {
-            // Por defecto solo activos
-            $query['estado'] = 1;
+            $query['estado'] = 1; // Por defecto solo activos
+        }
+
+        // Filtro por categoría (es un array en BD)
+        if (!empty($filtros['categoria'])) {
+            $query['categoria'] = $filtros['categoria'];
         }
 
         // Filtro por fuente
@@ -273,96 +174,18 @@ function obtenerChollos($filtros = []) {
             $query['fuente'] = $filtros['fuente'];
         }
 
-        // Filtro por búsqueda en título/descripción
-        if (!empty($filtros['busqueda'])) {
+        // Búsqueda por texto
+        if (!empty($filtros['q'])) {
             $query['$or'] = [
-                ['titulo' => ['$regex' => $filtros['busqueda'], '$options' => 'i']],
-                ['descripcion' => ['$regex' => $filtros['busqueda'], '$options' => 'i']]
+                ['titulo' => ['$regex' => $filtros['q'], '$options' => 'i']],
+                ['descripcion' => ['$regex' => $filtros['q'], '$options' => 'i']]
             ];
         }
 
-        // Filtro por fecha (chollos activos) - solo si no hay búsqueda
-        // Si hay búsqueda, no aplicamos filtro de fecha para que la búsqueda sea más amplia
-        // Solo aplicar si el estado es 1 (activo) o no se especifica estado
-        if (empty($filtros['busqueda']) && (!isset($filtros['estado']) || $filtros['estado'] == 1)) {
-            $fecha_actual = date('Y-m-d H:i:s');
-            $fecha_or = [
-                ['fecha_fin' => null],
-                ['fecha_fin' => ['$gte' => $fecha_actual]]
-            ];
-            
-            // Si ya hay $or (de categoría), usar $and
-            if (isset($query['$or'])) {
-                if (isset($query['$and'])) {
-                    $query['$and'][] = ['$or' => $fecha_or];
-                } else {
-                    $query['$and'] = [
-                        ['$or' => $query['$or']],
-                        ['$or' => $fecha_or]
-                    ];
-                    unset($query['$or']);
-                }
-            } else {
-                $query['$or'] = $fecha_or;
-            }
-        }
-
-        // Filtro por precio (rango)
-        if (isset($filtros['min_price']) || isset($filtros['max_price'])) {
-            $price_query = [];
-            if (isset($filtros['min_price']) && is_numeric($filtros['min_price'])) {
-                $price_query['$gte'] = floatval($filtros['min_price']);
-            }
-            if (isset($filtros['max_price']) && is_numeric($filtros['max_price'])) {
-                $price_query['$lte'] = floatval($filtros['max_price']);
-            }
-            if (!empty($price_query)) {
-                $query['precio_descuento'] = $price_query;
-            }
-        }
-
-        // Filtro por marca
-        if (!empty($filtros['marca'])) {
-            $marca_filter = $filtros['marca'];
-            if (is_array($marca_filter)) {
-                 $query['marca'] = ['$in' => $marca_filter];
-            } else {
-                 $query['marca'] = ['$regex' => $marca_filter, '$options' => 'i'];
-            }
-        }
-        // Filtro por descuento mínimo
-        if (isset($filtros['min_discount']) && is_numeric($filtros['min_discount'])) {
-            $query['porcentaje_descuento'] = ['$gte' => intval($filtros['min_discount'])];
-        }
-
-        $opciones = []; 
-        
-        // Sorting Logic
-        $sort_param = $filtros['sort'] ?? 'recientes';
-        switch ($sort_param) {
-            case 'antiguos':
-                $opciones['sort'] = ['fecha_creacion' => 1];
-                break;
-            case 'precio_asc':
-                $opciones['sort'] = ['precio_descuento' => 1];
-                break;
-            case 'precio_desc':
-                $opciones['sort'] = ['precio_descuento' => -1];
-                break;
-            case 'populares': // Por temperatura
-                $opciones['sort'] = ['temperatura' => -1];
-                break;
-            case 'tendencia': // Por clicks recientes o generales (usamos clicks por ahora)
-                $opciones['sort'] = ['clicks' => -1];
-                break; 
-            case 'valorados': // Por votos positivos
-                $opciones['sort'] = ['votos_positivos' => -1];
-                break;
-            case 'recientes':
-            default:
-                $opciones['sort'] = ['fecha_creacion' => -1];
-                break;
-        }
+        // Opciones de consulta
+        $opciones = [
+            'sort' => ['fecha_creacion' => -1]
+        ];
 
         // Paginación
         if (isset($filtros['limite'])) {
@@ -376,40 +199,6 @@ function obtenerChollos($filtros = []) {
         $chollos = [];
 
         foreach ($cursor as $doc) {
-            // Convertir categoría de BSONArray a array PHP antes de agregar al array
-            $categoria = $doc['categoria'] ?? 'general';
-            
-            // Si es BSONArray, convertir a array
-            if (is_object($categoria)) {
-                if (method_exists($categoria, 'toArray')) {
-                    $categoria = $categoria->toArray();
-                } else {
-                    // Si no tiene toArray, intentar convertir directamente
-                    $categoria = (array)$categoria;
-                }
-            }
-            
-            // Asegurar que sea array
-            if (!is_array($categoria)) {
-                $categoria = [$categoria];
-            }
-            
-            // Convertir cada elemento a string (puede haber objetos BSON dentro)
-            $categoria = array_map(function($cat) {
-                if (is_object($cat)) {
-                    // Si es objeto, intentar convertir a string
-                    if (method_exists($cat, '__toString')) {
-                        return (string)$cat;
-                    }
-                    if (method_exists($cat, 'toArray')) {
-                        $arr = $cat->toArray();
-                        return is_array($arr) ? implode(',', $arr) : (string)$arr;
-                    }
-                    return (string)$cat;
-                }
-                return (string)$cat;
-            }, array_values($categoria));
-            
             $chollos[] = [
                 'id' => (string)$doc['_id'],
                 'titulo' => $doc['titulo'] ?? '',
@@ -419,16 +208,13 @@ function obtenerChollos($filtros = []) {
                 'porcentaje_descuento' => $doc['porcentaje_descuento'] ?? null,
                 'enlace' => $doc['enlace'] ?? '',
                 'enlace_original' => $doc['enlace_original'] ?? '',
+                'asin' => $doc['asin'] ?? null,
                 'imagen' => $doc['imagen'] ?? '',
-                'categoria' => $categoria,
-                'fecha_inicio' => $doc['fecha_inicio'] ?? '',
-                'fecha_fin' => $doc['fecha_fin'] ?? null,
+                'categoria' => $doc['categoria'] ?? ['General'],
+                'fecha_inicio' => isset($doc['fecha_inicio']) && $doc['fecha_inicio'] instanceof MongoDB\BSON\UTCDateTime ? $doc['fecha_inicio']->toDateTime()->format('Y-m-d H:i:s') : '',
                 'fuente' => $doc['fuente'] ?? 'manual',
-                'fuente_id' => isset($doc['fuente_id']) ? (string)$doc['fuente_id'] : null,
-                'mensaje_original_id' => $doc['mensaje_original_id'] ?? null,
                 'estado' => $doc['estado'] ?? 1,
-                'texto_reescrito' => $doc['texto_reescrito'] ?? false,
-                'fecha_creacion' => isset($doc['fecha_creacion']) ? $doc['fecha_creacion']->toDateTime()->format('Y-m-d H:i:s') : '',
+                'fecha_creacion' => isset($doc['fecha_creacion']) && $doc['fecha_creacion'] instanceof MongoDB\BSON\UTCDateTime ? $doc['fecha_creacion']->toDateTime()->format('Y-m-d H:i:s') : '',
                 'clicks' => $doc['clicks'] ?? 0,
                 'publicado_telegram' => $doc['publicado_telegram'] ?? false,
                 'votos_positivos' => $doc['votos_positivos'] ?? 0,
@@ -446,232 +232,9 @@ function obtenerChollos($filtros = []) {
 }
 
 /**
- * Cuenta el total de chollos según los filtros
+ * Obtiene un chollo por su ID
  */
-function contarChollos($filtros = []) {
-    $collection = getCollectionChollos();
-    if (!$collection) {
-        return 0;
-    }
-
-    try {
-        $query = [];
-
-        // Filtro por categoría (mismo código que en obtenerChollos)
-        if (!empty($filtros['categoria'])) {
-            $categoria_filtro = $filtros['categoria'];
-            $categoria_conditions = [];
-            
-            if (is_string($categoria_filtro)) {
-                $categoria_conditions = [
-                    ['categoria' => $categoria_filtro],
-                    ['categoria' => ['$in' => [$categoria_filtro]]]
-                ];
-                
-                // Si es videojuegos, también buscar en títulos/descripciones para chollos mal categorizados
-                if ($categoria_filtro === 'videojuegos') {
-                    $palabras_videojuegos = ['playstation', 'ps5', 'ps4', 'xbox', 'nintendo', 'switch', 'videojuego', 'gaming', 'gamer', 'consola', 'steam', 'epic games', 'fifa', 'call of duty', 'ea sports'];
-                    $texto_conditions = [];
-                    foreach ($palabras_videojuegos as $palabra) {
-                        $texto_conditions[] = ['titulo' => ['$regex' => $palabra, '$options' => 'i']];
-                        $texto_conditions[] = ['descripcion' => ['$regex' => $palabra, '$options' => 'i']];
-                    }
-                    if (!empty($texto_conditions)) {
-                        $categoria_conditions[] = ['$or' => $texto_conditions];
-                    }
-                }
-                
-                // Si es amazon, también buscar en enlaces y títulos para chollos mal categorizados
-                if ($categoria_filtro === 'amazon') {
-                    $amazon_conditions = [
-                        ['enlace' => ['$regex' => 'amazon', '$options' => 'i']],
-                        ['enlace_original' => ['$regex' => 'amazon', '$options' => 'i']],
-                        ['titulo' => ['$regex' => 'amazon', '$options' => 'i']],
-                        ['descripcion' => ['$regex' => 'amazon', '$options' => 'i']]
-                    ];
-                    $categoria_conditions[] = ['$or' => $amazon_conditions];
-                }
-                
-                // Si es deportes, también buscar en títulos/descripciones para chollos mal categorizados
-                if ($categoria_filtro === 'deportes') {
-                    $palabras_deportes = ['deporte', 'deportes', 'gimnasio', 'running', 'fútbol', 'futbol', 'baloncesto', 'tenis', 'natación', 'natacion', 'bicicleta', 'bike', 'pesas', 'yoga', 'pilates', 'zapatillas deportivas', 'adidas', 'nike', 'puma', 'zapatillas', 'zapatilla'];
-                    $texto_conditions = [];
-                    foreach ($palabras_deportes as $palabra) {
-                        $texto_conditions[] = ['titulo' => ['$regex' => $palabra, '$options' => 'i']];
-                        $texto_conditions[] = ['descripcion' => ['$regex' => $palabra, '$options' => 'i']];
-                    }
-                    if (!empty($texto_conditions)) {
-                        $categoria_conditions[] = ['$or' => $texto_conditions];
-                    }
-                }
-                
-                // Si es libros, también buscar en títulos/descripciones para chollos mal categorizados
-                if ($categoria_filtro === 'libros') {
-                    $palabras_libros = ['libro', 'libros', 'ebook', 'ebooks', 'kindle', 'lectura', 'novela', 'cuento', 'manual', 'literatura', 'bestseller'];
-                    $texto_conditions = [];
-                    foreach ($palabras_libros as $palabra) {
-                        $texto_conditions[] = ['titulo' => ['$regex' => $palabra, '$options' => 'i']];
-                        $texto_conditions[] = ['descripcion' => ['$regex' => $palabra, '$options' => 'i']];
-                    }
-                    if (!empty($texto_conditions)) {
-                        $categoria_conditions[] = ['$or' => $texto_conditions];
-                    }
-                }
-                
-                // Si es electronica, también buscar en títulos/descripciones para chollos mal categorizados
-                if ($categoria_filtro === 'electronica') {
-                    $palabras_electronica = ['iphone', 'samsung', 'android', 'smartphone', 'móvil', 'celular', 'tablet', 'portátil', 'laptop', 'notebook', 'pc', 'ordenador', 'macbook', 'auriculares', 'headphones', 'altavoz', 'altavoces', 'speaker', 'airpods', 'tv', 'televisor', 'televisión', 'monitor', 'pantalla', 'display', 'ratón', 'mouse', 'teclado', 'keyboard', 'webcam', 'cámara web', 'cámara', 'camara', 'wifi', 'router', 'bluetooth', 'usb', 'cable', 'cargador', 'batería', 'smartwatch', 'reloj inteligente', 'fitness tracker', 'drone', 'impresora', 'scanner', 'proyector', 'chromecast', 'fire tv', 'roku'];
-                    $texto_conditions = [];
-                    foreach ($palabras_electronica as $palabra) {
-                        $texto_conditions[] = ['titulo' => ['$regex' => $palabra, '$options' => 'i']];
-                        $texto_conditions[] = ['descripcion' => ['$regex' => $palabra, '$options' => 'i']];
-                    }
-                    if (!empty($texto_conditions)) {
-                        $categoria_conditions[] = ['$or' => $texto_conditions];
-                    }
-                }
-                
-                // Si es moda, también buscar en títulos/descripciones para chollos mal categorizados
-                if ($categoria_filtro === 'moda') {
-                    $palabras_moda = ['zapatos', 'zapato', 'ropa', 'camiseta', 'pantalón', 'pantalones', 'vestido', 'chaqueta', 'bolso', 'mochila', 'reloj', 'gafas', 'gafas de sol', 'perfume', 'colonia', 'moda', 'fashion'];
-                    $texto_conditions = [];
-                    foreach ($palabras_moda as $palabra) {
-                        $texto_conditions[] = ['titulo' => ['$regex' => $palabra, '$options' => 'i']];
-                        $texto_conditions[] = ['descripcion' => ['$regex' => $palabra, '$options' => 'i']];
-                    }
-                    if (!empty($texto_conditions)) {
-                        $categoria_conditions[] = ['$or' => $texto_conditions];
-                    }
-                }
-                
-                // Si es hogar, también buscar en títulos/descripciones para chollos mal categorizados
-                if ($categoria_filtro === 'hogar') {
-                    $palabras_hogar = ['mueble', 'muebles', 'sofá', 'sofa', 'mesa', 'silla', 'sillas', 'cama', 'colchón', 'almohada', 'toalla', 'toallas', 'cocina', 'nevera', 'frigorífico', 'lavadora', 'secadora', 'aspiradora', 'plancha', 'cafetera', 'batidora', 'microondas', 'horno', 'hogar', 'casa', 'decoración', 'decoracion'];
-                    $texto_conditions = [];
-                    foreach ($palabras_hogar as $palabra) {
-                        $texto_conditions[] = ['titulo' => ['$regex' => $palabra, '$options' => 'i']];
-                        $texto_conditions[] = ['descripcion' => ['$regex' => $palabra, '$options' => 'i']];
-                    }
-                    if (!empty($texto_conditions)) {
-                        $categoria_conditions[] = ['$or' => $texto_conditions];
-                    }
-                }
-            } elseif (is_array($categoria_filtro)) {
-                foreach ($categoria_filtro as $cat) {
-                    $categoria_conditions[] = ['categoria' => $cat];
-                    $categoria_conditions[] = ['categoria' => ['$in' => [$cat]]];
-                }
-            }
-            
-            if (!empty($categoria_conditions)) {
-                if (isset($query['$or'])) {
-                    $query['$and'] = [
-                        ['$or' => $query['$or']],
-                        ['$or' => $categoria_conditions]
-                    ];
-                    unset($query['$or']);
-                } else {
-                    $query['$or'] = $categoria_conditions;
-                }
-            }
-        }
-
-        // Filtro por estado
-        if (isset($filtros['estado'])) {
-            $query['estado'] = intval($filtros['estado']);
-        } else {
-            $query['estado'] = 1;
-        }
-
-        // Filtro por fuente
-        if (!empty($filtros['fuente'])) {
-            $query['fuente'] = $filtros['fuente'];
-        }
-
-        // Filtro por búsqueda
-        if (!empty($filtros['busqueda'])) {
-            if (isset($query['$or'])) {
-                $query['$and'] = [
-                    ['$or' => $query['$or']],
-                    ['$or' => [
-                        ['titulo' => ['$regex' => $filtros['busqueda'], '$options' => 'i']],
-                        ['descripcion' => ['$regex' => $filtros['busqueda'], '$options' => 'i']]
-                    ]]
-                ];
-                unset($query['$or']);
-            } else {
-                $query['$or'] = [
-                    ['titulo' => ['$regex' => $filtros['busqueda'], '$options' => 'i']],
-                    ['descripcion' => ['$regex' => $filtros['busqueda'], '$options' => 'i']]
-                ];
-            }
-        }
-
-        // Filtro por precio (rango)
-        if (isset($filtros['min_price']) || isset($filtros['max_price'])) {
-            $price_query = [];
-            if (isset($filtros['min_price']) && is_numeric($filtros['min_price'])) {
-                $price_query['$gte'] = floatval($filtros['min_price']);
-            }
-            if (isset($filtros['max_price']) && is_numeric($filtros['max_price'])) {
-                $price_query['$lte'] = floatval($filtros['max_price']);
-            }
-            if (!empty($price_query)) {
-                $query['precio_descuento'] = $price_query;
-            }
-        }
-
-        // Filtro por marca
-        if (!empty($filtros['marca'])) {
-            $marca_filter = $filtros['marca'];
-            if (is_array($marca_filter)) {
-                 $query['marca'] = ['$in' => $marca_filter];
-             } else {
-                 $query['marca'] = ['$regex' => $marca_filter, '$options' => 'i'];
-            }
-        }
-
-        // Filtro por descuento mínimo
-        if (isset($filtros['min_discount']) && is_numeric($filtros['min_discount'])) {
-            $query['porcentaje_descuento'] = ['$gte' => intval($filtros['min_discount'])];
-        }
-
-        // Filtro por fecha (solo si no hay búsqueda)
-        if (empty($filtros['busqueda']) && (!isset($filtros['estado']) || $filtros['estado'] == 1)) {
-            $fecha_actual = date('Y-m-d H:i:s');
-            $fecha_or = [
-                ['fecha_fin' => null],
-                ['fecha_fin' => ['$gte' => $fecha_actual]]
-            ];
-            
-            if (isset($query['$or'])) {
-                if (isset($query['$and'])) {
-                    $query['$and'][] = ['$or' => $fecha_or];
-                } else {
-                    $query['$and'] = [
-                        ['$or' => $query['$or']],
-                        ['$or' => $fecha_or]
-                    ];
-                    unset($query['$or']);
-                }
-            } else {
-                $query['$or'] = $fecha_or;
-            }
-        }
-
-        return $collection->countDocuments($query);
-    } catch (Throwable $e) {
-        error_log("Error al contar chollos: " . $e->getMessage());
-        return 0;
-    }
-}
-
-/**
- * Obtiene un chollo por ID
- * @param string $id ID del chollo
- * @param bool $incrementar_clicks Si debe incrementar los clicks (por defecto true)
- */
-function obtenerCholloPorId($id, $incrementar_clicks = true) {
+function obtenerCholloPorId($id, $incrementar_clicks = false) {
     $collection = getCollectionChollos();
     if (!$collection) {
         return null;
@@ -684,59 +247,26 @@ function obtenerCholloPorId($id, $incrementar_clicks = true) {
             return null;
         }
 
-        $doc = $collection->findOne(['_id' => $objectId]);
+        if ($incrementar_clicks) {
+            $doc = $collection->findOneAndUpdate(
+                ['_id' => $objectId],
+                ['$inc' => ['clicks' => 1]],
+                ['returnDocument' => MongoDB\Operation\FindOneAndUpdate::RETURN_DOCUMENT_AFTER]
+            );
+        } else {
+            $doc = $collection->findOne(['_id' => $objectId]);
+        }
 
         if (!$doc) {
             return null;
         }
 
-        // Incrementar clicks solo si se solicita
-        if ($incrementar_clicks) {
-            try {
-                $objectId = new MongoDB\BSON\ObjectId($id);
-                $collection->updateOne(
-                    ['_id' => $objectId],
-                    ['$inc' => ['clicks' => 1]]
-                );
-            } catch (Exception $e) {
-                // ID inválido, ignorar
-            }
-        }
-
-        // Convertir categoría de BSONArray a array PHP
-        $categoria = $doc['categoria'] ?? 'general';
-        
-        // Si es BSONArray, convertir a array
-        if (is_object($categoria)) {
-            if (method_exists($categoria, 'toArray')) {
-                $categoria = $categoria->toArray();
-            } else {
-                // Si no tiene toArray, intentar convertir directamente
-                $categoria = (array)$categoria;
-            }
-        }
-        
-        // Asegurar que sea array
+        // Convertir categoría a array si es string (compatibilidad legacy)
+        $categoria = $doc['categoria'] ?? ['General'];
         if (!is_array($categoria)) {
             $categoria = [$categoria];
         }
-        
-        // Convertir cada elemento a string (puede haber objetos BSON dentro)
-        $categoria = array_map(function($cat) {
-            if (is_object($cat)) {
-                // Si es objeto, intentar convertir a string
-                if (method_exists($cat, '__toString')) {
-                    return (string)$cat;
-                }
-                if (method_exists($cat, 'toArray')) {
-                    $arr = $cat->toArray();
-                    return is_array($arr) ? implode(',', $arr) : (string)$arr;
-                }
-                return (string)$cat;
-            }
-            return (string)$cat;
-        }, array_values($categoria));
-        
+
         return [
             'id' => (string)$doc['_id'],
             'titulo' => $doc['titulo'] ?? '',
@@ -876,6 +406,7 @@ function obtenerCategoriasChollos() {
         'deportes' => 'Deportes',
         'libros' => 'Libros',
         'videojuegos' => 'Videojuegos',
+        'viajes' => 'Viajes',
         'general' => 'General'
     ];
 }
@@ -931,6 +462,14 @@ function registrarClickChollo($chollo_id, $datos_adicionales = []) {
     try {
         $objectId = new MongoDB\BSON\ObjectId($chollo_id);
         
+        // Bot Detection
+        if (!function_exists('isBot')) {
+            require_once __DIR__ . '/bot_detection.php';
+        }
+        if (isBot()) {
+            return true; // Don't log, but pretend success
+        }
+
         // Incrementar contador de clicks en el chollo
         $collection->updateOne(
             ['_id' => $objectId],
@@ -951,7 +490,11 @@ function registrarClickChollo($chollo_id, $datos_adicionales = []) {
             
             // Añadir datos adicionales si se proporcionan
             if (!empty($datos_adicionales)) {
+                error_log("DEBUG registrarClickChollo: Datos adicionales antes de merge: " . json_encode($datos_adicionales));
                 $click_data = array_merge($click_data, $datos_adicionales);
+                error_log("DEBUG registrarClickChollo: Referer después de merge: " . ($click_data['referer'] ?? 'NULL'));
+            } else {
+                error_log("DEBUG registrarClickChollo: No datos adicionales");
             }
             
             // Añadir user_id si hay sesión
@@ -1163,7 +706,7 @@ function renderHotDealsWidget($categoria = null) {
         }
         $categoria_slug = categoriaToSlug($categoria);
         
-        $url = '/chollos/' . $categoria_slug . '/' . $chollo['id'];
+        $url = 'https://www.malprecio.com/chollos/' . $categoria_slug . '/' . $chollo['id'];
         $imagen = $chollo['imagen'] ?: 'https://via.placeholder.com/80x80?text=Chollo';
         $precio = $chollo['precio_descuento'] ? number_format((float)$chollo['precio_descuento'], 2, ',', '.') . '€' : '';
         $titulo = htmlspecialchars($chollo['titulo']);
@@ -1538,8 +1081,8 @@ HTML;
                 <span class="comments-sort-label">Ordenados por</span>
                 <div class="comments-sort">
                     <select id="comments-sort">
+                        <option value="nuevos" selected>Nuevos primero</option>
                         <option value="antiguos">Antiguos primero</option>
-                        <option value="nuevos">Nuevos primero</option>
                         <option value="populares">Más populares</option>
                     </select>
                 </div>
@@ -1594,19 +1137,24 @@ function renderCompactHotDealsWidget($categoria = null) {
         }
         $categoria_slug = categoriaToSlug($categoria);
         
-        $url = '/chollos/' . $categoria_slug . '/' . $chollo['id'];
+        $url = 'https://www.malprecio.com/chollos/' . $categoria_slug . '/' . $chollo['id'];
         $imagen = $chollo['imagen'] ?: 'https://via.placeholder.com/60x60?text=Chollo';
         $precio = $chollo['precio_descuento'] ? number_format((float)$chollo['precio_descuento'], 2, ',', '.') . '€' : '';
         $titulo = htmlspecialchars($chollo['titulo']);
         $temperatura = $chollo['temperatura'] ?? 0;
+        $descuento = $chollo['porcentaje_descuento'] ?? 0;
         
         // Clase de temperatura
         $temp_class = $temperatura >= 100 ? 'super-hot' : ($temperatura >= 50 ? 'hot' : 'warm');
+        
+        // Badge de descuento
+        $discount_badge = ($descuento > 0) ? '<div class="hot-deal-discount">-' . $descuento . '%</div>' : '';
         
         return <<<HTML
         <a href="{$url}" class="hot-deal-item" data-chollo-id="{$chollo['id']}">
             <div class="hot-deal-image">
                 <img src="{$imagen}" alt="{$titulo}" loading="lazy">
+                {$discount_badge}
             </div>
             <div class="hot-deal-content">
                 <div class="hot-deal-title">{$titulo}</div>
@@ -1614,7 +1162,7 @@ function renderCompactHotDealsWidget($categoria = null) {
                     <span class="hot-deal-temp {$temp_class}">
                         <i class="fas fa-fire"></i> {$temperatura}°
                     </span>
-                    {$precio}
+                    <span class="hot-deal-price">{$precio}</span>
                 </div>
             </div>
         </a>
@@ -1630,15 +1178,17 @@ HTML;
     return <<<HTML
     <style>
         .hot-deals-widget-global {
-            position: sticky;
-            z-index: 999;
+            position: relative;
+            z-index: 10;
             background: linear-gradient(135deg, rgba(227, 6, 19, 0.95) 0%, rgba(255, 140, 66, 0.95) 100%);
             backdrop-filter: blur(10px);
             border-bottom: 3px solid rgba(227, 6, 19, 0.3);
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
             transition: all 0.3s ease;
-            margin-bottom: 20px;
-            margin-top: -1px;
+            margin-bottom: 30px;
+            margin-top: 20px;
+            border-radius: 12px;
+            overflow: hidden;
         }
         
         .hot-deals-widget-global.minimized {
@@ -1734,6 +1284,20 @@ HTML;
             overflow: hidden;
             flex-shrink: 0;
             background: #f8f9fa;
+            position: relative;
+        }
+ 
+        .hot-deal-discount {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: #E30613;
+            color: white;
+            font-size: 0.7em;
+            font-weight: 800;
+            padding: 1px 4px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
         
         .hot-deal-image img {
@@ -1769,12 +1333,16 @@ HTML;
             font-size: 0.85em;
             font-weight: 700;
         }
+ 
+        .hot-deal-price {
+            color: #E30613;
+        }
         
         .hot-deal-temp {
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            padding: 3px 8px;
+            padding: 2px 8px;
             border-radius: 12px;
             font-weight: 800;
         }
@@ -1786,13 +1354,13 @@ HTML;
         }
         
         .hot-deal-temp.hot {
-            background: linear-gradient(135deg, #E30613, #ffa500);
+            background: linear-gradient(135deg, #E30613, #E30613);
             color: white;
             box-shadow: 0 2px 8px rgba(227, 6, 19, 0.3);
         }
         
         .hot-deal-temp.warm {
-            background: linear-gradient(135deg, #ffa500, #ffcc00);
+            background: linear-gradient(135deg, #E30613, #ffcc00);
             color: #333;
         }
         
@@ -1801,18 +1369,7 @@ HTML;
         }
         
         .hot-deals-toggle {
-            background: rgba(255, 255, 255, 0.2);
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            color: white;
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            flex-shrink: 0;
+            display: none;
         }
         
         .hot-deals-toggle:hover {
@@ -1827,16 +1384,16 @@ HTML;
         /* Mobile responsive */
         @media (max-width: 768px) {
             .hot-deals-widget-global {
-                top: 59px;
+                margin: 15px 10px;
             }
             
             .hot-deals-widget-container {
-                padding: 10px 15px;
-                gap: 10px;
+                padding: 8px 12px;
+                gap: 8px;
             }
             
             .hot-deals-header {
-                font-size: 0.95em;
+                font-size: 0.85em;
             }
             
             .hot-deals-header span {
@@ -1844,42 +1401,53 @@ HTML;
             }
             
             .hot-deal-item {
-                min-width: 260px;
-                flex-direction: column;
+                min-width: 220px;
+                flex-direction: row;
                 gap: 8px;
+                padding: 6px;
+                background: white;
             }
             
             .hot-deal-image {
-                width: 100%;
-                height: 120px;
+                width: 50px;
+                height: 50px;
+                border-radius: 6px;
             }
             
             .hot-deal-title {
-                font-size: 0.9em;
-                -webkit-line-clamp: 3;
-                line-height: 1.4;
+                font-size: 0.82em;
+                -webkit-line-clamp: 2;
+                line-height: 1.2;
             }
             
             .hot-deal-meta {
-                flex-wrap: wrap;
-                gap: 5px;
+                gap: 4px;
+                font-size: 0.8em;
+            }
+ 
+            .hot-deal-temp {
+                padding: 1px 6px;
+                font-size: 0.9em;
             }
         }
         
         @media (max-width: 480px) {
             .hot-deals-list {
-                gap: 10px;
+                gap: 8px;
             }
             
             .hot-deal-item {
-                min-width: 240px;
-                padding: 10px;
+                min-width: 200px;
             }
             
-            .hot-deal-image {
-                height: 100px;
+            .hot-deals-header i {
+                font-size: 1.1em;
             }
-
+ 
+            .hot-deals-toggle {
+                width: 30px;
+                height: 30px;
+            }
         }
     </style>
     
@@ -1900,41 +1468,6 @@ HTML;
     
     <script>
     (function() {
-        // Control de minimizar/expandir
-        const widget = document.getElementById('hotDealsWidget');
-        const toggle = document.getElementById('hotDealsToggle');
-        const toggleIcon = toggle ? toggle.querySelector('i') : null;
-        
-        if (toggle && widget && toggleIcon) {
-            // Verificar si estaba minimizado anteriormente
-            const wasMinimized = localStorage.getItem('hotDealsMinimized_v2') === 'true';
-            if (wasMinimized) {
-                widget.classList.add('minimized');
-                toggleIcon.classList.remove('fa-chevron-up');
-                toggleIcon.classList.add('fa-chevron-down');
-                toggle.setAttribute('title', 'Expandir');
-            }
-            
-            toggle.addEventListener('click', function() {
-                widget.classList.toggle('minimized');
-                const isMinimized = widget.classList.contains('minimized');
-                
-                // Guardar estado
-                localStorage.setItem('hotDealsMinimized_v2', isMinimized);
-                
-                // Cambiar icono
-                if (isMinimized) {
-                    toggleIcon.classList.remove('fa-chevron-up');
-                    toggleIcon.classList.add('fa-chevron-down');
-                    toggle.setAttribute('title', 'Expandir');
-                } else {
-                    toggleIcon.classList.remove('fa-chevron-down');
-                    toggleIcon.classList.add('fa-chevron-up');
-                    toggle.setAttribute('title', 'Minimizar');
-                }
-            });
-        }
-        
         // Track clicks en chollos
         const dealItems = document.querySelectorAll('.hot-deal-item');
         dealItems.forEach(function(item) {
@@ -2001,7 +1534,7 @@ function renderSocialProofSlider($limite = 12) {
         $chollo = htmlspecialchars(mb_substr($c['chollo_titulo'], 0, 40) . (mb_strlen($c['chollo_titulo']) > 40 ? '...' : ''));
         $tiempo = $tiempoRelativo($c['fecha']);
         $categoria_slug = categoriaToSlug($c['chollo_categoria']);
-        $url = '/chollos/' . $categoria_slug . '/' . $c['chollo_id'];
+        $url = 'https://www.malprecio.com/chollos/' . $categoria_slug . '/' . $c['chollo_id'];
         
         $cardsHtml .= <<<HTML
         <a href="{$url}" class="sp-card">
@@ -2255,4 +1788,262 @@ HTML;
         </div>
     </div>
 HTML;
+}
+
+/**
+ * Imprime un grid de chollos con el diseño de tarjetas moderno
+ * @param array $chollos Array de chollos a mostrar
+ * @param int $columnas Número de columnas (para clase CSS)
+ */
+function imprimir_grid_chollos($chollos, $columnas = 3) {
+    if (empty($chollos)) {
+        echo '<p style="text-align: center; color: #888; padding: 40px;">No hay chollos disponibles.</p>';
+        return;
+    }
+    
+    // Asegurar funciones helper disponibles
+    if (!function_exists('categoriaToSlug')) {
+        include_once __DIR__ . '/funciones_chollos_helpers.php';
+    }
+    
+    $grid_class = 'chollos-grid';
+    if ($columnas >= 3) {
+        $grid_class .= ' chollos-grid-3';
+    }
+    
+    echo '<div class="' . $grid_class . '">';
+    
+    foreach ($chollos as $chollo) {
+        // Obtener datos del chollo
+        $id = $chollo['id'] ?? '';
+        $titulo = $chollo['titulo'] ?? 'Sin título';
+        $descripcion = $chollo['descripcion'] ?? '';
+        $imagen = $chollo['imagen'] ?? '';
+        $precio_original = $chollo['precio_original'] ?? null;
+        $precio_descuento = $chollo['precio_descuento'] ?? null;
+        $porcentaje_descuento = $chollo['porcentaje_descuento'] ?? null;
+        $enlace = $chollo['enlace'] ?? '#';
+        $clicks = $chollo['clicks'] ?? 0;
+        $temperatura = $chollo['temperatura'] ?? 0;
+        $fecha_creacion = $chollo['fecha_creacion'] ?? '';
+        
+        // Manejar categoría (puede ser string o array)
+        $categoria = $chollo['categoria'] ?? 'general';
+        if (is_array($categoria)) {
+            $categoria_slug = categoriaToSlug($categoria[0] ?? 'general');
+        } else {
+            $categoria_slug = categoriaToSlug($categoria);
+        }
+        
+        // URL del detalle del chollo
+        $url_detalle = 'https://www.malprecio.com/chollos/' . $categoria_slug . '/' . $id;
+        
+        // Formatear fecha
+        $fecha_formateada = '';
+        if ($fecha_creacion) {
+            $timestamp = strtotime($fecha_creacion);
+            if ($timestamp) {
+                $ahora = time();
+                $diff = $ahora - $timestamp;
+                
+                if ($diff < 3600) {
+                    $mins = floor($diff / 60);
+                    $fecha_formateada = 'Hace ' . ($mins > 0 ? $mins . ' min' : 'ahora');
+                } elseif ($diff < 86400) {
+                    $horas = floor($diff / 3600);
+                    $fecha_formateada = 'Hace ' . $horas . ' h';
+                } else {
+                    $dias = floor($diff / 86400);
+                    $fecha_formateada = $dias === 1 ? 'Ayer' : 'Hace ' . $dias . ' días';
+                }
+            }
+        }
+        
+        // Color de temperatura
+        $temp_color = '#888';
+        if ($temperatura >= 100) {
+            $temp_color = '#ff5252';
+        } elseif ($temperatura >= 50) {
+            $temp_color = '#ff9800';
+        } elseif ($temperatura > 0) {
+            $temp_color = '#4caf50';
+        } elseif ($temperatura < 0) {
+            $temp_color = '#81d4fa';
+        }
+        
+        ?>
+        <div class="chollo-card" data-chollo-id="<?php echo htmlspecialchars($id); ?>">
+            <a href="<?php echo htmlspecialchars($url_detalle); ?>" class="chollo-image-link">
+                <div class="chollo-image">
+                    <?php if (!empty($imagen)): ?>
+                        <img src="<?php echo htmlspecialchars($imagen); ?>" 
+                             alt="<?php echo htmlspecialchars($titulo); ?>"
+                             loading="lazy"
+                             onerror="this.src='/img/no-image-placeholder.png'">
+                    <?php else: ?>
+                        <img src="/img/no-image-placeholder.png" alt="Sin imagen">
+                    <?php endif; ?>
+                </div>
+                
+                <?php if (!empty($porcentaje_descuento) && $porcentaje_descuento > 0): ?>
+                    <span class="chollo-badge">-<?php echo intval($porcentaje_descuento); ?>%</span>
+                <?php elseif ($temperatura >= 100): ?>
+                    <span class="chollo-badge chollo-badge-hot"><i class="fas fa-fire"></i> HOT</span>
+                <?php endif; ?>
+            </a>
+            
+            <div class="chollo-content">
+                <!-- Voting Widget -->
+                <?php 
+                if (function_exists('renderCholloVoting')) {
+                    echo '<div class="chollo-voting-wrapper">' . renderCholloVoting($chollo, 'small') . '</div>';
+                }
+                ?>
+                
+                <!-- Title -->
+                <a href="<?php echo htmlspecialchars($url_detalle); ?>" class="chollo-title-link">
+                    <h3 class="chollo-title"><?php echo htmlspecialchars($titulo); ?></h3>
+                </a>
+                
+                <!-- Description (truncated) -->
+                <?php if (!empty($descripcion)): ?>
+                    <p class="chollo-description"><?php echo htmlspecialchars(mb_substr($descripcion, 0, 120)) . (mb_strlen($descripcion) > 120 ? '...' : ''); ?></p>
+                <?php endif; ?>
+                
+                <!-- Prices -->
+                <div class="chollo-prices">
+                    <?php if ($precio_descuento !== null): ?>
+                        <span class="chollo-price-discount"><?php echo number_format($precio_descuento, 2, ',', '.'); ?>€</span>
+                    <?php endif; ?>
+                    
+                    <?php if ($precio_original !== null && $precio_original > $precio_descuento): ?>
+                        <span class="chollo-price-original"><?php echo number_format($precio_original, 2, ',', '.'); ?>€</span>
+                    <?php endif; ?>
+                </div>
+                
+                <!-- Meta -->
+                <div class="chollo-meta">
+                    <?php if ($clicks > 0): ?>
+                        <span class="chollo-meta-item">
+                            <i class="fas fa-eye"></i>
+                            <span class="chollo-clicks"><?php echo number_format($clicks); ?></span>
+                        </span>
+                    <?php endif; ?>
+                    
+                    <?php if ($fecha_formateada): ?>
+                        <span class="chollo-meta-item">
+                            <i class="fas fa-clock"></i>
+                            <span class="chollo-date"><?php echo $fecha_formateada; ?></span>
+                        </span>
+                    <?php endif; ?>
+                </div>
+                
+                <!-- Buttons -->
+                <div class="chollo-buttons">
+                    <a href="<?php echo htmlspecialchars($enlace); ?>" 
+                       class="chollo-button chollo-button-primary" 
+                       target="_blank" 
+                       rel="nofollow noopener"
+                       onclick="if(typeof registrarClickChollo === 'function') registrarClickChollo('<?php echo $id; ?>')">
+                        <i class="fas fa-external-link-alt"></i> Ir a Oferta
+                    </a>
+                    <a href="<?php echo htmlspecialchars($url_detalle); ?>" class="chollo-button chollo-button-secondary">
+                        <i class="fas fa-info-circle"></i> Ver Más
+                    </a>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+    
+    echo '</div>';
+}
+
+/**
+ * Genera paginación moderna estilo Google
+ */
+if (!function_exists('generate_modern_pagination')) {
+function generate_modern_pagination($total_items, $current_page, $items_per_page, $base = 'chollos') {
+    $total_pages = ceil($total_items / $items_per_page);
+    
+    if ($total_pages <= 1) {
+        return '';
+    }
+    
+    $html = '<nav class="pagination-modern" style="display: flex; justify-content: center; gap: 8px; margin: 40px 0; flex-wrap: wrap;">';
+    
+    // Construir URL base preservando parámetros GET
+    $url_params = $_GET;
+    unset($url_params['page']);
+    $query_string = http_build_query($url_params);
+    $base_url = '/' . $base . ($query_string ? '?' . $query_string . '&' : '?');
+    
+    // Botón anterior
+    if ($current_page > 1) {
+        $html .= '<a href="' . $base_url . 'page=' . ($current_page - 1) . '" class="page-link" style="padding: 10px 16px; background: #2a2a2a; color: #fff; border-radius: 8px; text-decoration: none; border: 1px solid #444;">
+            <i class="fas fa-chevron-left"></i> Anterior
+        </a>';
+    }
+    
+    // Números de página
+    $start = max(1, $current_page - 2);
+    $end = min($total_pages, $current_page + 2);
+    
+    if ($start > 1) {
+        $html .= '<a href="' . $base_url . 'page=1" class="page-link" style="padding: 10px 14px; background: #2a2a2a; color: #fff; border-radius: 8px; text-decoration: none; border: 1px solid #444;">1</a>';
+        if ($start > 2) {
+            $html .= '<span style="padding: 10px; color: #888;">...</span>';
+        }
+    }
+    
+    for ($i = $start; $i <= $end; $i++) {
+        $is_active = ($i == $current_page);
+        $style = $is_active 
+            ? 'padding: 10px 14px; background: #E30613; color: #fff; border-radius: 8px; text-decoration: none; font-weight: 700;'
+            : 'padding: 10px 14px; background: #2a2a2a; color: #fff; border-radius: 8px; text-decoration: none; border: 1px solid #444;';
+        
+        $html .= '<a href="' . $base_url . 'page=' . $i . '" class="page-link" style="' . $style . '">' . $i . '</a>';
+    }
+    
+    if ($end < $total_pages) {
+        if ($end < $total_pages - 1) {
+            $html .= '<span style="padding: 10px; color: #888;">...</span>';
+        }
+        $html .= '<a href="' . $base_url . 'page=' . $total_pages . '" class="page-link" style="padding: 10px 14px; background: #2a2a2a; color: #fff; border-radius: 8px; text-decoration: none; border: 1px solid #444;">' . $total_pages . '</a>';
+    }
+    
+    // Botón siguiente
+    if ($current_page < $total_pages) {
+        $html .= '<a href="' . $base_url . 'page=' . ($current_page + 1) . '" class="page-link" style="padding: 10px 16px; background: #2a2a2a; color: #fff; border-radius: 8px; text-decoration: none; border: 1px solid #444;">
+            Siguiente <i class="fas fa-chevron-right"></i>
+        </a>';
+    }
+    
+    $html .= '</nav>';
+    
+    return $html;
+}
+} // end function_exists('generate_modern_pagination') guard
+
+/**
+ * Footer simple para Malprecio
+ */
+function get_footer_malprecio() {
+    ?>
+    <footer style="background: #1a1a1a; color: #888; padding: 40px 20px; text-align: center; border-top: 1px solid #333; margin-top: 50px;">
+        <div style="max-width: 1200px; margin: 0 auto;">
+            <div style="margin-bottom: 20px;">
+                <a href="/" style="font-size: 1.5rem; font-weight: 800; color: #E30613; text-decoration: none;">MalPrecio</a>
+            </div>
+            <p>&copy; <?php echo date('Y'); ?> MalPrecio.com - Todos los derechos reservados.</p>
+            <div style="margin-top: 20px; display: flex; justify-content: center; gap: 20px;">
+                <a href="/privacidad" style="color: inherit; text-decoration: none;">Privacidad</a>
+                <a href="/legal" style="color: inherit; text-decoration: none;">Aviso Legal</a>
+                <a href="/contacto" style="color: inherit; text-decoration: none;">Contacto</a>
+            </div>
+        </div>
+    </footer>
+    </body>
+    </html>
+    <?php
 }

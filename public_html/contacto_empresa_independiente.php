@@ -17,7 +17,6 @@ get_header_new($title, $description);
 <!-- Script de reCAPTCHA v3 -->
 <script src="https://www.google.com/recaptcha/api.js?render=6LfyTegrAAAAAEGfm7q5Huhcej7EQFEIM9yCU8JS" async defer></script>
 
-<!-- Estilos removidos - reCAPTCHA v3 no necesita estilos especiales -->
 <div class="container container-top container-bottom">
     <div class="row">
     	<div class="col-md-12 col-xs-12 text-center"><h1 class="title_page">Formulario de contacto para empresas</h1></div>
@@ -47,7 +46,7 @@ get_header_new($title, $description);
         				<textarea class="form-control" name="mensaje" id="mensaje" rows="4" required placeholder="Hablanos sobre tu marca y que propuesta quieres hacernos llegar. Te responderemos lo más pronto posible."></textarea>
         			</div>
         		</div><br>
-        		<!-- reCAPTCHA v3 funciona en segundo plano -->
+        		<!-- reCAPTCHA v3 handled by js/funciones.js -->
 
 				<div class="text-center">
 					<input class="btn btn_codigo_amigo" value="Enviar Mensaje" type="submit">
@@ -62,63 +61,6 @@ get_header_new($title, $description);
         </div>
     </div>
 </div>
-
-<script>
-// Manejo de formulario empresarial con reCAPTCHA v3
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Página cargada, inicializando formulario empresarial con reCAPTCHA v3...');
-
-    var form = document.getElementById('contacto_empresas');
-    var submitBtn = form.querySelector('input[type="submit"]');
-
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
-
-        // Cambiar estado del botón
-        submitBtn.disabled = true;
-        submitBtn.value = 'Enviando...';
-
-        // Ejecutar reCAPTCHA v3
-        grecaptcha.execute('6LfyTegrAAAAAEGfm7q5Huhcej7EQFEIM9yCU8JS', {action: 'contact_business'})
-        .then(function(token) {
-            // Crear FormData con el token
-            var formData = new FormData(form);
-            formData.append('g-recaptcha-response', token);
-            formData.append('form_type', 'empresarial');
-
-            // Enviar formulario
-            return fetch('procesar_contacto.php', {
-                method: 'POST',
-                body: formData
-            });
-        })
-        .then(response => response.text())
-        .then(result => {
-            console.log('Respuesta del servidor:', result);
-
-            // Restaurar botón
-            submitBtn.disabled = false;
-            submitBtn.value = 'Enviar Mensaje';
-
-            if (result.includes('SUCCESS')) {
-                alert('✅ Mensaje enviado correctamente. Te responderemos pronto.');
-                form.reset();
-            } else {
-                alert('❌ Error al enviar el mensaje: ' + result);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-
-            // Restaurar botón
-            submitBtn.disabled = false;
-            submitBtn.value = 'Enviar Mensaje';
-
-            alert('❌ Error de conexión. Por favor, inténtalo de nuevo.');
-        });
-    });
-});
-</script>
 
 <?php get_footer(); ?>
 

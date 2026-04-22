@@ -21,7 +21,6 @@ function get_admin_sidebar_menu($active_page = '') {
                 ['url' => 'admin_marcas.php', 'icon' => 'fa-tags', 'text' => 'Marcas'],
                 ['url' => 'admin_faqs.php', 'icon' => 'fa-question-circle', 'text' => 'FAQs de Marcas'],
                 ['url' => 'admin_codigos.php', 'icon' => 'fa-code', 'text' => 'Códigos'],
-                ['url' => 'admin_chollos.php', 'icon' => 'fa-tag', 'text' => 'Chollos'],
                 ['url' => 'clean_orphan_codes.php', 'icon' => 'fa-broom', 'text' => 'Limpiar Códigos'],
             ]
         ],
@@ -58,6 +57,7 @@ function get_admin_sidebar_menu($active_page = '') {
             'items' => [
                 ['url' => 'admin_reportes.php', 'icon' => 'fa-chart-bar', 'text' => 'Reportes'],
                 ['url' => 'admin_seo.php', 'icon' => 'fa-search', 'text' => 'SEO (GSC)'],
+                ['url' => 'admin_seo_keywords.php', 'icon' => 'fa-key', 'text' => 'Keywords SEO'],
                 ['url' => 'admin_analytics.php', 'icon' => 'fa-chart-area', 'text' => 'Analytics (GA4)'],
             ]
         ],

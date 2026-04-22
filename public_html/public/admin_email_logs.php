@@ -187,6 +187,19 @@ $title = "Logs de Emails - Admin";
             border-radius: 5px;
             margin-bottom: 10px;
         }
+        /* Email logs table column sizing */
+        .table-email-logs th:nth-child(1),
+        .table-email-logs td:nth-child(1) { width: 90px; white-space: nowrap; } /* Fecha */
+        .table-email-logs th:nth-child(2),
+        .table-email-logs td:nth-child(2) { width: 100px; } /* Tipo */
+        .table-email-logs th:nth-child(3),
+        .table-email-logs td:nth-child(3) { width: auto; } /* Asunto - takes remaining space */
+        .table-email-logs td:nth-child(3) { font-weight: 600; font-size: 14px; }
+        .table-email-logs th:nth-child(4),
+        .table-email-logs td:nth-child(4) { width: 80px; white-space: nowrap; } /* Estado */
+        .table-email-logs th:nth-child(5),
+        .table-email-logs td:nth-child(5) { width: 80px; text-align: center; } /* Detalles */
+        .email-dest { font-size: 11px; color: #999; display: block; margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -311,22 +324,20 @@ $title = "Logs de Emails - Admin";
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
-                                <table class="table table-hover">
+                                <table class="table table-hover table-email-logs">
                                     <thead class="table-dark">
                                         <tr>
                                             <th>Fecha</th>
                                             <th>Tipo</th>
                                             <th>Asunto</th>
-                                            <th>Destinatario</th>
                                             <th>Estado</th>
-                                            <th>Método</th>
                                             <th>Detalles</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <?php if (empty($email_logs)): ?>
                                         <tr>
-                                            <td colspan="7" class="text-center text-muted py-4">
+                                            <td colspan="5" class="text-center text-muted py-4">
                                                 <i class="fas fa-inbox fa-3x mb-3 d-block"></i>
                                                 No hay registros de emails
                                             </td>
@@ -340,44 +351,38 @@ $title = "Logs de Emails - Admin";
                                                 </small>
                                             </td>
                                             <td>
-                                                <span class="badge bg-primary">
+                                                <span class="badge bg-primary" style="font-size: 10px;">
                                                     <?php echo formatearTipoEmail($log['tipo'] ?? ''); ?>
                                                 </span>
                                             </td>
                                             <td>
-                                                <div title="<?php echo htmlspecialchars($log['subject'] ?? ''); ?>">
-                                                    <?php echo htmlspecialchars(substr($log['subject'] ?? '', 0, 40)); ?>
-                                                    <?php if (strlen($log['subject'] ?? '') > 40): ?>...<?php endif; ?>
-                                                </div>
-                                            </td>
-                                            <td>
-                                                <small class="text-muted">
+                                                <div><?php echo htmlspecialchars($log['subject'] ?? ''); ?></div>
+                                                <span class="email-dest">
+                                                    <i class="fas fa-arrow-right" style="font-size:9px;"></i>
                                                     <?php echo htmlspecialchars($log['to_email'] ?? ''); ?>
-                                                </small>
+                                                    <?php if (!empty($log['metodo'])): ?>
+                                                        · <?php echo htmlspecialchars($log['metodo']); ?>
+                                                    <?php endif; ?>
+                                                </span>
                                             </td>
                                             <td>
                                                 <?php if ($log['enviado'] ?? false): ?>
-                                                    <span class="badge bg-success">
-                                                        <i class="fas fa-check me-1"></i>Enviado
+                                                    <span class="badge bg-success" style="font-size: 10px;">
+                                                        <i class="fas fa-check"></i>
                                                     </span>
                                                 <?php else: ?>
-                                                    <span class="badge bg-danger">
-                                                        <i class="fas fa-times me-1"></i>Error
+                                                    <span class="badge bg-danger" style="font-size: 10px;" title="<?php echo htmlspecialchars($log['error'] ?? ''); ?>">
+                                                        <i class="fas fa-times"></i>
                                                     </span>
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <small class="text-muted">
-                                                    <?php echo htmlspecialchars($log['metodo'] ?? 'Desconocido'); ?>
-                                                </small>
-                                            </td>
-                                            <td>
                                                 <?php if (isset($log['html_body']) && !empty($log['html_body'])): ?>
-                                                    <button type="button" class="btn btn-sm btn-primary" 
+                                                    <button type="button" class="btn btn-sm btn-primary btn-sm" 
                                                             data-bs-toggle="modal" 
                                                             data-bs-target="#emailViewerModal"
                                                             onclick="loadEmailContent(<?php echo htmlspecialchars(json_encode($log), ENT_QUOTES, 'UTF-8'); ?>)">
-                                                        <i class="fas fa-envelope-open me-1"></i>Ver mensaje
+                                                        <i class="fas fa-eye"></i>
                                                     </button>
                                                 <?php endif; ?>
                                                 <?php if (isset($log['error']) && !empty($log['error'])): ?>

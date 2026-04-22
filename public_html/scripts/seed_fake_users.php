@@ -8,13 +8,16 @@
 require_once __DIR__ . '/../myphp/funciones.php';
 require_once __DIR__ . '/../myphp/funciones_usuario.php';
 
-// Nombres españoles comunes (60 nombres)
-$nombres = [
+// Nombres españoles comunes categorizados
+$nombres_mujeres = [
     'María', 'Carmen', 'Ana', 'Laura', 'Lucía', 'Elena', 'Paula', 'Sara', 'Marta', 'Isabel',
     'Cristina', 'Patricia', 'Silvia', 'Andrea', 'Sofía', 'Clara', 'Raquel', 'Eva', 'Beatriz', 'Rosa',
+    'Alicia', 'Nuria', 'Mónica', 'Alba', 'Irene', 'Natalia', 'Sandra', 'Rocío', 'Adriana', 'Lorena'
+];
+
+$nombres_hombres = [
     'Carlos', 'Manuel', 'José', 'David', 'Pablo', 'Javier', 'Daniel', 'Alejandro', 'Miguel', 'Antonio',
     'Francisco', 'Fernando', 'Roberto', 'Alberto', 'Jorge', 'Sergio', 'Luis', 'Rafael', 'Pedro', 'Diego',
-    'Alicia', 'Nuria', 'Mónica', 'Alba', 'Irene', 'Natalia', 'Sandra', 'Rocío', 'Adriana', 'Lorena',
     'Marcos', 'Iván', 'Rubén', 'Óscar', 'Víctor', 'Hugo', 'Adrián', 'Álvaro', 'Mario', 'Gonzalo'
 ];
 
@@ -46,19 +49,24 @@ function normalizarParaUrl($texto) {
     return str_replace($originales, $reemplazos, $texto);
 }
 
-// Función para generar URL de avatar
-function generarAvatarUrl($username, $index) {
+// Función para generar URL de avatar basada en género
+function generarAvatarUrl($username, $gender, $index) {
     $username_normalizado = normalizarParaUrl($username);
-    $estilos = ['avataaars', 'bottts', 'micah', 'adventurer', 'lorelei', 'notionists'];
-    $estilo = $estilos[$index % count($estilos)];
     
-    // Alternar entre diferentes servicios de avatares
-    if ($index % 3 === 0) {
-        return "https://api.dicebear.com/7.x/{$estilo}/svg?seed=" . urlencode($username_normalizado);
-    } elseif ($index % 3 === 1) {
-        return "https://i.pravatar.cc/150?u=" . urlencode($username_normalizado);
+    // Usamos randomuser.me para realismo y control de género
+    // gender puede ser 'male' o 'female'
+    $rand_id = rand(1, 99);
+    
+    if ($index % 2 === 0) {
+        // Pravatar con género (si lo soporta el endpoint /u/...) - Pravatar no es muy fiable para género.
+        // Mejor usamos randomuser.me portraits
+        $gender_letter = ($gender === 'female') ? 'women' : 'men';
+        return "https://randomuser.me/api/portraits/{$gender_letter}/" . ($index % 95) . ".jpg";
     } else {
-        return "https://ui-avatars.com/api/?name=" . urlencode($username_normalizado) . "&background=random&color=fff&size=150";
+        // Dicebear con seed y género
+        $estilos = ['avataaars', 'lorelei', 'notionists', 'adventurer'];
+        $estilo = $estilos[$index % count($estilos)];
+        return "https://api.dicebear.com/7.x/{$estilo}/svg?seed=" . urlencode($username_normalizado);
     }
 }
 
@@ -89,8 +97,11 @@ $total_usuarios = 50;
 
 for ($i = 0; $i < $total_usuarios; $i++) {
     try {
-        // Seleccionar nombre y apellido aleatorios
-        $nombre = $nombres[array_rand($nombres)];
+        // Seleccionar género aleatorio y nombre
+        $es_mujer = (rand(1, 100) <= 50);
+        $gender = $es_mujer ? 'female' : 'male';
+        $nombre = $es_mujer ? $nombres_mujeres[array_rand($nombres_mujeres)] : $nombres_hombres[array_rand($nombres_hombres)];
+        
         $apellido = $apellidos[array_rand($apellidos)];
         $username = generarUsername($nombre, $apellido, $i);
         
@@ -106,10 +117,11 @@ for ($i = 0; $i < $total_usuarios; $i++) {
             'mail' => 'fake_' . str_pad($i + 1, 3, '0', STR_PAD_LEFT) . '@codigoamigo.local',
             'pass' => password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT),
             'confirm_password' => '',
-            'img' => generarAvatarUrl($username, $i),
+            'img' => generarAvatarUrl($username, $gender, $i),
             'estado' => 1,
             'tipo' => 'fake',
             'es_bot' => true,
+            'gender' => $gender, // Guardamos género para futuras referencias
             'type' => 'fake',
             'fecha_registro' => date("d-m-Y H:i"),
             'saldo' => 0,

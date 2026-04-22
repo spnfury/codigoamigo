@@ -65,6 +65,9 @@ $email_usuario = $usuario['email'] ?? '';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/stripe.php';
 $stripe_secret_key = get_stripe_secret_key($email_usuario, $_SESSION['user_id'] ?? null);
 
+// Get auto_renovar flag from POST
+$auto_renovar = $_POST['auto_renovar'] ?? '0';
+
 try {
     // Crear sesión de Stripe
     $stripe = new \Stripe\StripeClient($stripe_secret_key);
@@ -88,6 +91,7 @@ try {
             'usuario_id' => $_SESSION["user_id"],
             'username' => $_SESSION["username"] ?? 'Usuario',
             'tipo_destacado' => $tipo,
+            'auto_renovar' => $auto_renovar,
             'descripcion' => substr($codigo['descripcion'] ?? '', 0, 200)
         ]
     ]);

@@ -179,7 +179,9 @@ function procesarCholloConGroq($titulo, $descripcion = '', $texto_original = '')
    - La estructura debe ser: [\"Categoría Principal\", \"Subcategoría\", \"Sub-subcategoría\" (si aplica)].
    - Ejemplo: Si es un juego de mesa Monopoly: [\"Juguetes\", \"Juegos de Mesa\", \"Juegos de Estrategia\"]
    - Ejemplo: Si es un iPhone: [\"Electrónica\", \"Telefonía\", \"Smartphones\", \"Apple\"]
+   - IMPORTANTE: Si un producto encaja en varias áreas, elige la jerarquía MÁS relevante. EVITA poner varias categorías de nivel superior no relacionadas (ej: NO pongas [\"Electrónica\", \"Deportes\"] a la vez si puedes evitarlo).
    - Sé lo más específico posible.
+
 
 Responde SOLO en formato JSON válido con esta estructura exacta:
 {
@@ -374,7 +376,8 @@ function procesarPaqueteChollosConGroq($paquete) {
 
     $prompt = "Analiza estos " . count($paquete) . " chollos y para CADA UNO realiza estas tareas:
 1. Reescribe la descripción de forma atractiva, destacando ventajas. Máximo 200 palabras.
-2. Genera una estructura de categorías HIERÁRQUICA y ESPECÍFICA (ej: [\"Electrónica\", \"Telefonía\", \"Smartphones\"]).
+2. Genera una estructura de categorías HIERÁRQUICA y ESPECÍFICA (ej: [\"Electrónica\", \"Telefonía\", \"Smartphones\"]). Si encaja en varias áreas, elige la jerarquía MÁS relevante y evita poner varias categorías raíz no relacionadas.
+
 3. Mejora el título si se puede hacer más atractivo.
 
 Responde ÚNICAMENTE un objeto JSON donde las llaves sean los CHOLLO_ID y los valores sean objetos con {descripcion, categoria, titulo}.
@@ -738,4 +741,3 @@ function extraerInfoChollo($texto) {
 
     return $info;
 }
-

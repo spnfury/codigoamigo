@@ -2,6 +2,7 @@
 
 // Funciones para la sección de Servicios Amazon
 // Requiere inc/conexion.php estar incluido previamente
+require_once __DIR__ . '/../inc/includes.php';
 require_once __DIR__ . '/librerias/Mobile_Detect.php';
 
 function getCollectionAffiliateLinks() {
@@ -33,6 +34,14 @@ function getAllAmazonServices() {
  */
 function logAmazonServiceClick($slug, $referrer = '', $page_origin = '') {
     $collection = getCollectionAffiliateClicks();
+    
+    // Bot Detection
+    if (!function_exists('isBot')) {
+        require_once __DIR__ . '/bot_detection.php';
+    }
+    if (isBot()) {
+        return true; 
+    }
     
     // Intentar obtener IP y User Agent de forma segura
     $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';

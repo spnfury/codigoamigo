@@ -27,7 +27,7 @@ if (!function_exists('getFechaActualCorregida')) {
                 $fecha_corregida = $fecha_original - (365 * 24 * 60 * 60);
 
                 // Log de la corrección para debugging
-                error_log("Fecha del servidor corregida: " . date('Y-m-d H:i:s', $fecha_original) . " -> " . date('Y-m-d H:i:s', $fecha_corregida));
+                log_debug("Fecha del servidor corregida: " . date('Y-m-d H:i:s', $fecha_original) . " -> " . date('Y-m-d H:i:s', $fecha_corregida));
             } else {
                 $fecha_corregida = $fecha_original;
             }
@@ -90,11 +90,11 @@ if (!function_exists('createConnection')) {
                 return $db;
             }
             catch (MongoDB\Driver\Exception\Exception $e) {
-                error_log("Error de MongoDB en createConnection: " . $e->getMessage());
+                log_debug("Error de MongoDB en createConnection: " . $e->getMessage());
                 return null;
             }
-            catch (Throwable $e) {
-                error_log("Error general en createConnection: " . $e->getMessage());
+            catch (Exception $e) {
+                log_debug("Error general en createConnection: " . $e->getMessage());
                 return null;
             }
 
@@ -103,7 +103,36 @@ if (!function_exists('createConnection')) {
 
 
 
+/**
+ * Shim para compatibilidad con llamadas a debuglog() (sin guion bajo)
+ */
+if (!function_exists('debuglog')) {
+    function debuglog($message, $data = null) {
+        if (function_exists('debug_log')) {
+            debug_log($message, $data);
+        } else if (function_exists('log_debug')) {
+            log_debug($message, $data);
+        } else {
+            error_log($message . ($data ? " :: " . print_r($data, true) : ""));
+        }
+    }
+}
+
+/**
+ * Fallback para debug_log() cuando no está definido en el entry point
+ */
+if (!function_exists('debug_log')) {
+    function debug_log($message, $data = null) {
+        if (function_exists('log_debug')) {
+            log_debug($message, $data);
+        } else {
+            error_log($message . ($data ? " :: " . print_r($data, true) : ""));
+        }
+    }
+}
+
     if (!function_exists('mandaBot')) {
+
     function mandaBot($manda){
 
         // Inicializar variables para evitar warnings
@@ -190,7 +219,7 @@ if (!function_exists('createConnection')) {
         // Log para verificar qué imagen se obtiene de la base de datos
         // Comentado para evitar spam en logs
         // if ($usuario && isset($usuario["img"])) {
-        //     error_log("getObjectUser - Imagen obtenida de BD: " . $usuario["img"]);
+        //     log_debug("getObjectUser - Imagen obtenida de BD: " . $usuario["img"]);
         // }
         
         // Respeta la URL original de la imagen sin modificaciones
@@ -242,10 +271,28 @@ if (!function_exists('createConnection')) {
 
         session_start();
 
+        // ── Comprobación de propiedad ────────────────────────────────────────
+        // Solo el propietario REAL del código puede ver las estadísticas de visitas.
+        // No hay bypass de admin para esta sección.
+        if (!empty($datos['data_codigo_id'])) {
+            $obj_id_codigo = new \MongoDB\BSON\ObjectId($datos['data_codigo_id']);
+            $codigo_check  = getCodeByID($obj_id_codigo);
+            if ($codigo_check) {
+                $codigo_user_id = is_object($codigo_check['id_usuario'])
+                    ? (string)$codigo_check['id_usuario']
+                    : (string)($codigo_check['id_usuario'] ?? '');
+                $es_propietario = isset($_SESSION['user_id']) &&
+                                  !empty($_SESSION['user_id']) &&
+                                  $codigo_user_id === (string)$_SESSION['user_id'];
+                if (!$es_propietario) {
+                    return; // No mostrar nada a usuarios no propietarios
+                }
+            }
+        }
+        // ────────────────────────────────────────────────────────────────────
 
         $share_url = $datos["data_codigo_url"];
         $codigo_to_show["codigo"] = $datos["data_codigo_url"];
-
 
         ?>
                 <div class="modal-dialog modal-md">
@@ -414,13 +461,14 @@ if (!function_exists('createConnection')) {
                 $marca["imagen"] = str_replace("http://", "https://", $marca["imagen"]);
             }
 
-            if(strpos($marca["imagen"],'https://www.codigoamigo.com/img/') !==false ){
-                // Solo convertir a CloudFront si está en la carpeta /img/ (no /img/panel_marcas/)
-                if(strpos($marca["imagen"],'https://www.codigoamigo.com/img/panel_marcas/') === false) {
-                    $marca["imagen"] = str_replace("https://www.codigoamigo.com/img/","https://d3hcf0nbuqjt3g.cloudfront.net/",$marca["imagen"]);
-                }
-            }else if(strpos($marca["imagen"],'https://cdn-codigoamigo.s3-eu-west-1.amazonaws.com/') !==false ){
-                $marca["imagen"] = str_replace("https://cdn-codigoamigo.s3-eu-west-1.amazonaws.com/","https://d3hcf0nbuqjt3g.cloudfront.net/",$marca["imagen"]);
+            // CloudFront CDN (d3hcf0nbuqjt3g.cloudfront.net) is down - serve images directly
+            // Convert S3 URLs to direct server URLs
+            if(strpos($marca["imagen"],'https://cdn-codigoamigo.s3-eu-west-1.amazonaws.com/') !==false ){
+                $marca["imagen"] = str_replace("https://cdn-codigoamigo.s3-eu-west-1.amazonaws.com/","https://www.codigoamigo.com/img/",$marca["imagen"]);
+            }
+            // Convert dead CloudFront URLs to direct server URLs
+            if(strpos($marca["imagen"],'https://d3hcf0nbuqjt3g.cloudfront.net/') !==false ){
+                $marca["imagen"] = str_replace("https://d3hcf0nbuqjt3g.cloudfront.net/","https://www.codigoamigo.com/img/",$marca["imagen"]);
             }
 
             if($marca["imagen"] == 'Sin imagen'){
@@ -440,7 +488,13 @@ if (!function_exists('createConnection')) {
      *********************************************************/
 
     // Función para añadir impresión cuando un código se muestra en una lista
+    // OPTIMIZACIÓN: Solo se registra 1 de cada 5 impresiones para reducir carga
     function añadir_impresion_codigo ($codigo_id) {
+        // Solo registrar 1 de cada 5 impresiones para reducir carga en el servidor
+        if (rand(1, 5) !== 1) {
+            return true;
+        }
+
         try {
             $collection_codigos = getCollectionCodigos();
             
@@ -453,19 +507,19 @@ if (!function_exists('createConnection')) {
             $fecha_hoy = date('Y-m-d');
             $campo_stats = 'stats_diarias.' . $fecha_hoy . '.impresiones';
             
-            // Incrementar el contador total y el contador diario
-            $updateResult = $collection_codigos->updateOne(
+            // Incrementar el contador total y el contador diario (multiplicado por 5 para compensar el muestreo)
+            $collection_codigos->updateOne(
                 ['_id' => $codigo_id],
                 [
                     '$inc' => [
-                        'total_impressions' => 1,
-                        $campo_stats => 1
+                        'total_impressions' => 5,
+                        $campo_stats => 5
                     ]
                 ]
             );
             
             return true;
-        } catch(MongoDB\Driver\Exception\WriteException $e) {
+        } catch(Exception $e) {
             // Silenciosamente fallar para no interrumpir la renderización
             return false;
         }
@@ -675,16 +729,20 @@ if (!function_exists('createConnection')) {
      }
 
 
-    // Nueva función para el sistema de destacar moderno
     function destacar_codigo_moderno($codigo_id, $tipo_destacado = 'normal') {
         try {
             $collection_codigos = getCollectionCodigos();
             $obj_id_codigo = new \MongoDB\BSON\ObjectId($codigo_id);
             
+            $duracion_dias = ($tipo_destacado === 'super') ? (defined('DESTACADO_DURACION_SUPER') ? DESTACADO_DURACION_SUPER : 14) : (defined('DESTACADO_DURACION_NORMAL') ? DESTACADO_DURACION_NORMAL : 7);
+            
             $update_data = [
+                'estado' => 0, // Reactivar código si estaba desactivado/caducado (-2/-3)
                 'destacado' => strtotime('now'),
                 'fecha_destacado' => date('Y-m-d H:i:s'),
-                'tipo_destacado' => $tipo_destacado
+                'tipo_destacado' => $tipo_destacado,
+                'prioridad_pago' => strtotime('now'),
+                'fecha_fin_destacado' => new \MongoDB\BSON\UTCDateTime((time() + ($duracion_dias * 86400)) * 1000)
             ];
             
             // Para destacado super, marcar también destacado_social (aparece en home)
@@ -703,16 +761,22 @@ if (!function_exists('createConnection')) {
                 
                 // Si es destacado super, notificar a todos los usuarios con códigos en el home
                 if($tipo_destacado == 'super') {
-                    if (function_exists('notificar_competencia_home_destacado_super')) {
-                        $codigo_actualizado = $collection_codigos->findOne(['_id' => $obj_id_codigo]);
-                        $usuario_id = isset($codigo_actualizado['id_usuario']) ? (string)$codigo_actualizado['id_usuario'] : '';
-                        if ($usuario_id) {
-                            $emails_enviados = notificar_competencia_home_destacado_super(
-                                $codigo_id,
-                                $usuario_id,
-                                $codigo_actualizado
-                            );
-                            error_log("Notificaciones de competencia home enviadas desde destacar_codigo_moderno: $emails_enviados");
+                    try {
+                        if (function_exists('notificar_competencia_home_destacado_super')) {
+                            $codigo_actualizado = $collection_codigos->findOne(['_id' => $obj_id_codigo]);
+                            $usuario_id = isset($codigo_actualizado['id_usuario']) ? (string)$codigo_actualizado['id_usuario'] : '';
+                            if ($usuario_id) {
+                                $emails_enviados = notificar_competencia_home_destacado_super(
+                                    $codigo_id,
+                                    $usuario_id,
+                                    $codigo_actualizado
+                                );
+                                log_debug("Notificaciones de competencia home enviadas desde destacar_codigo_moderno: $emails_enviados");
+                            }
+                        }
+                    } catch (Exception $e) {
+                        if (function_exists('log_error')) {
+                            log_error("Error enviando notificaciones desde destacar_codigo_moderno: " . $e->getMessage());
                         }
                     }
                 }
@@ -722,8 +786,9 @@ if (!function_exists('createConnection')) {
             
             return false;
             
-        } catch(MongoDB\Driver\Exception\WriteException $e) {
-            error_log("Error al destacar código: " . $e->getMessage());
+        } catch (Exception $e) {
+            // Registrar error sin detener la ejecución
+            log_debug("Error al destacar código: " . $e->getMessage());
             return false;
         }
     }
@@ -806,7 +871,7 @@ if (!function_exists('createConnection')) {
 
             return true;
         } catch(Exception $e) {
-            error_log('Error enviando notificaciones de destacado: ' . $e->getMessage());
+            log_debug('Error enviando notificaciones de destacado: ' . $e->getMessage());
             return false;
         }
     }
@@ -829,7 +894,8 @@ if (!function_exists('createConnection')) {
                     ['_id' => new \MongoDB\BSON\ObjectId($codigo["_id"]) ],
                     ['$set' => [
                         'destacado' => strtotime('now'),
-                        'tipo_destacado' => 'normal' // Mantener consistencia con nuevo sistema
+                        'tipo_destacado' => 'normal', // Mantener consistencia con nuevo sistema
+                        'prioridad_pago' => strtotime('now')
                     ]]
                     );
             } catch(MongoDB\Driver\Exception\WriteException $e) {
@@ -900,7 +966,8 @@ if (!function_exists('createConnection')) {
                     ['$set' => [
                         'destacado' => strtotime('now'), 
                         'destacado_social' => strtotime('now'),
-                        'tipo_destacado' => 'super' // Mantener consistencia con nuevo sistema
+                        'tipo_destacado' => 'super', // Mantener consistencia con nuevo sistema
+                        'prioridad_pago' => strtotime('now')
                     ]]
                     );
 
@@ -1086,8 +1153,14 @@ function sendToTelegram($anuncio){
 
 function formatDateAgo($value)
 {
-    $time = strtotime($value);
-    $d = new \DateTime($value);
+    // Soportar MongoDB\BSON\UTCDateTime además de strings
+    if ($value instanceof \MongoDB\BSON\UTCDateTime) {
+        $d = $value->toDateTime();
+        $time = $d->getTimestamp();
+    } else {
+        $time = strtotime($value);
+        $d = new \DateTime($value);
+    }
 
     $weekDays = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
     $months = ['Janvier', 'Février', 'Mars', 'Avril',' Mai', 'Juin', 'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
@@ -1121,8 +1194,14 @@ function formatDateAgo($value)
 
 function formatDateAgoLarge($value)
 {
-    $time = strtotime($value);
-    $d = new \DateTime($value);
+    // Soportar MongoDB\BSON\UTCDateTime además de strings
+    if ($value instanceof \MongoDB\BSON\UTCDateTime) {
+        $d = $value->toDateTime();
+        $time = $d->getTimestamp();
+    } else {
+        $time = strtotime($value);
+        $d = new \DateTime($value);
+    }
 
     $weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
     $months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -1283,6 +1362,32 @@ function formatDateAgoLarge($value)
 
     }
 
+
+    /**
+     * Genera un filtro MongoDB para excluir códigos cuya fecha_validez haya pasado.
+     * Los códigos sin fecha_validez (vacío, null, no existe) se muestran siempre.
+     * fecha_validez es un string en formato YYYY-MM-DD, por lo que la comparación de strings funciona.
+     *
+     * Usa $nor para evitar colisiones con otros filtros que ya usen $or.
+     * Lógica: excluir documentos que tengan fecha_validez como string no vacía Y menor que hoy.
+     *
+     * @return array Filtro listo para array_merge con otros filtros MongoDB
+     */
+    function get_filtro_no_expirados() {
+        $hoy = date('Y-m-d'); // Formato compatible con fecha_validez
+        return array(
+            '$nor' => array(
+                // Excluir códigos cuya fecha_validez sea un string no vacío Y anterior a hoy
+                array(
+                    'fecha_validez' => array(
+                        '$type' => 'string',  // Solo si es string (no null/no existe)
+                        '$ne' => '',          // No vacío
+                        '$lt' => $hoy         // Anterior a hoy = expirado
+                    )
+                )
+            )
+        );
+    }
 
     function get_all_listado_codigos_array($array_filtro, $array_skip='',$array_group='',$results=1) {
 
@@ -1681,8 +1786,8 @@ function get_posicion_codigo_en_marca($codigo_id, $marca_clave) {
     $lista_codigos_destacados = get_all_listado_codigos_array($array_filtro_destacados, $array_opciones_destacados);
     $codigos_destacados = isset($lista_codigos_destacados["results"]) ? $lista_codigos_destacados["results"] : [];
     
-    // Obtener códigos normales (excluyendo los destacados)
-    $array_filtro_normales = array("marca" => $marca_clave, "estado" => 0, "destacado" => 0);
+    // Obtener códigos normales (excluyendo los destacados y los destacados sociales)
+    $array_filtro_normales = array("marca" => $marca_clave, "estado" => 0, "destacado" => 0, "destacado_social" => 0);
     $array_opciones_normales = array(
         'limit' => 20,
         'sort' => array('_id' => -1)
@@ -1818,7 +1923,7 @@ function getObjectCodigo($codigo_id) {
             return iterator_to_array($codigo);
         }
     } catch (Exception $e) {
-        error_log("Error al obtener código: " . $e->getMessage());
+        log_debug("Error al obtener código: " . $e->getMessage());
     }
     
     return false;
@@ -1875,7 +1980,7 @@ function updateCodigo($codigo_id, $update_data) {
         
         return $result->getModifiedCount() > 0;
     } catch (Exception $e) {
-        error_log("Error al actualizar código: " . $e->getMessage());
+        log_debug("Error al actualizar código: " . $e->getMessage());
         return false;
     }
 }
@@ -1923,7 +2028,7 @@ function normalizeMarcaName($marca_name) {
 
 // Función auxiliar para buscar o crear marca
 function findOrCreateMarca($marca_name, $marca_normalizada, $imagen_url = null, $categoria = null, $categoria_clave = null) {
-    error_log("findOrCreateMarca - Marca: $marca_name, Imagen: $imagen_url, Categoria: $categoria, Categoria clave: $categoria_clave");
+    log_debug("findOrCreateMarca - Marca: $marca_name, Imagen: $imagen_url, Categoria: $categoria, Categoria clave: $categoria_clave");
 
     $db = createConnection();
     $collection_marcas = $db->selectCollection('marcas');
@@ -1959,7 +2064,7 @@ function findOrCreateMarca($marca_name, $marca_normalizada, $imagen_url = null, 
         'aviso' => 'Marca creada por usuario'
     ];
 
-    error_log("Creando nueva marca con imagen: " . ($imagen_url ?: '/img/no_image.png') . ", categoria: " . ($categoria ?: 'General'));
+    log_debug("Creando nueva marca con imagen: " . ($imagen_url ?: '/img/no_image.png') . ", categoria: " . ($categoria ?: 'General'));
 
     $result = $collection_marcas->insertOne($nueva_marca);
 

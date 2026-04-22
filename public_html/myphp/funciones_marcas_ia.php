@@ -114,7 +114,7 @@ function generarDescripcionMarcaIA($nombre_marca, $categoria = '') {
                 'seo_que_es' => $json['seo_que_es'] ?? '',
                 'seo_como_usar' => $json['seo_como_usar'] ?? '',
                 'seo_tips' => $json['seo_tips'] ?? '',
-                'seo_faq' => implode(\"\\n\", $faq_lines),
+                'seo_faq' => implode("\n", $faq_lines),
                 'video' => $json['video'] ?? '',
                 'imagen' => $json['imagen'] ?? ''
             ];

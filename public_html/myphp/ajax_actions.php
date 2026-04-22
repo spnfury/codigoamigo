@@ -84,32 +84,49 @@ if ($_REQUEST) {
 
         case "añadir_favorito":
             header('Content-Type: application/json');
-            session_start();
+            if (session_status() === PHP_SESSION_NONE) session_start();
             if (!isset($_SESSION['user_id'])) {
                 echo json_encode(['success' => false, 'message' => 'No autorizado']);
                 exit;
             }
-            // Asegurar que funciones_usuario.php esté incluido
+            // Asegurar que funciones_favoritos.php esté incluido
             if (!function_exists('añadir_favorito')) {
-                include_once __DIR__ . '/funciones_usuario.php';
+                include_once __DIR__ . '/funciones_favoritos.php';
             }
-            $result = añadir_favorito($_SESSION['user_id'], $datos['codigo_id']);
+            $tipo = $datos['tipo'] ?? 'codigo';
+            $result = añadir_favorito($_SESSION['user_id'], $datos['codigo_id'], $tipo);
             echo json_encode($result);
             break;
 
         case "eliminar_favorito":
             header('Content-Type: application/json');
-            session_start();
+            if (session_status() === PHP_SESSION_NONE) session_start();
             if (!isset($_SESSION['user_id'])) {
                 echo json_encode(['success' => false, 'message' => 'No autorizado']);
                 exit;
             }
-            // Asegurar que funciones_usuario.php esté incluido
+            // Asegurar que funciones_favoritos.php esté incluido
             if (!function_exists('eliminar_favorito')) {
-                include_once __DIR__ . '/funciones_usuario.php';
+                include_once __DIR__ . '/funciones_favoritos.php';
             }
-            $result = eliminar_favorito($_SESSION['user_id'], $datos['codigo_id']);
+            $tipo = $datos['tipo'] ?? 'codigo';
+            $result = eliminar_favorito($_SESSION['user_id'], $datos['codigo_id'], $tipo);
             echo json_encode($result);
+            break;
+
+        case "check_favorito":
+            header('Content-Type: application/json');
+            if (session_status() === PHP_SESSION_NONE) session_start();
+            if (!isset($_SESSION['user_id'])) {
+                echo json_encode(['success' => false, 'is_favorito' => false]);
+                exit;
+            }
+            if (!function_exists('es_favorito')) {
+                include_once __DIR__ . '/funciones_favoritos.php';
+            }
+            $tipo = $datos['tipo'] ?? 'codigo';
+            $result = es_favorito($_SESSION['user_id'], $datos['codigo_id'], $tipo);
+            echo json_encode(['success' => true, 'is_favorito' => $result]);
             break;
 
         case "track_amazon":
@@ -236,31 +253,40 @@ if ($_REQUEST) {
             // Validar reCAPTCHA v3 con verificación de score
             $recaptchaValidado = false;
             $recaptchaScore = 0;
+            $motivoRechazo = 'Sin token';
             
             if (isset($datos['recaptcha_response']) && !empty($datos['recaptcha_response'])) {
                 $resultado = validarRecaptcha($datos['recaptcha_response'], $_SERVER['REMOTE_ADDR'] ?? null);
                 
                 if ($resultado['success']) {
                     $recaptchaScore = $resultado['score'] ?? 0;
-                    // Score mínimo de 0.6 para reCAPTCHA v3 (más estricto que 0.5)
-                    // Score de 1.0 = humano, 0.0 = bot
-                    if ($recaptchaScore >= 0.6) {
+                    // Score mínimo de 0.5 (recomendación oficial de Google para v3)
+                    if ($recaptchaScore >= 0.5) {
                         $recaptchaValidado = true;
+                        error_log("reCAPTCHA OK: score $recaptchaScore (IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida') . ")");
                     } else {
-                        // Score bajo = posible spam, rechazar
-                        error_log("reCAPTCHA score bajo rechazado: " . $recaptchaScore . " (IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida') . ")");
-                        echo "recaptcha_error";
-                        break;
+                        // Score bajo = posible spam
+                        $motivoRechazo = "Score bajo: $recaptchaScore";
+                        error_log("reCAPTCHA score bajo: " . $recaptchaScore . " (IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida') . "). Usuario: " . ($datos['nombre'] ?? 'anon'));
                     }
                 } else {
-                    error_log("reCAPTCHA validación fallida: " . ($resultado['error'] ?? 'error desconocido') . " (IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida') . ")");
+                    $motivoRechazo = "Error validación: " . ($resultado['error'] ?? 'desconocido');
+                    error_log("reCAPTCHA validación fallida técnica: " . $motivoRechazo . " (IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida') . ")");
                 }
             }
             
-            // Rechazar si no hay token o si la validación falló
+            // Fallback: si el score es bajo pero no es un error técnico y el usuario no parece un bot de fuerza bruta (rate limit)
+            // permitimos el envío pero con un log especial. 
+            // Si es un error técnico (invalid keys, timeout), también intentamos permitirlo si la IP es limpia.
             if (!$recaptchaValidado) {
-                echo "recaptcha_error";
-                break;
+                if (permiteContactoSinRecaptcha()) {
+                    error_log("reCAPTCHA FALLBACK ACTIVADO (Motivo: $motivoRechazo). Permitiendo envío para IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'unk'));
+                    $recaptchaValidado = true; 
+                    $datos['_sistema_nota'] = "Verificado mediante fallback de seguridad. Motivo: $motivoRechazo. IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida');
+                } else {
+                    echo "recaptcha_error";
+                    break;
+                }
             }
 
             // Antidoble envío: si mismo payload se envía en < 8s, no volver a disparar
@@ -278,6 +304,39 @@ if ($_REQUEST) {
 
             $result = formulario_contacto($datos);
             echo $result;
+            break;
+
+        /**********************************
+         *  DESTACADOS
+         *********************************/
+
+        case "toggle_auto_renovar":
+            header('Content-Type: application/json');
+            if (!isset($_SESSION['user_id'])) {
+                echo json_encode(['success' => false, 'message' => 'No autorizado']);
+                exit;
+            }
+            $codigo_id = $datos['codigo_id'] ?? '';
+            if (empty($codigo_id)) {
+                echo json_encode(['success' => false, 'message' => 'Código no especificado']);
+                exit;
+            }
+            try {
+                $collection_codigos = getCollectionCodigos();
+                $codigo = $collection_codigos->findOne(['_id' => new MongoDB\BSON\ObjectId($codigo_id)]);
+                if (!$codigo || (string)$codigo['id_usuario'] !== $_SESSION['user_id']) {
+                    echo json_encode(['success' => false, 'message' => 'No autorizado']);
+                    exit;
+                }
+                $nuevo_valor = !(isset($codigo['auto_renovar_destacado']) && $codigo['auto_renovar_destacado'] === true);
+                $collection_codigos->updateOne(
+                    ['_id' => new MongoDB\BSON\ObjectId($codigo_id)],
+                    ['$set' => ['auto_renovar_destacado' => $nuevo_valor]]
+                );
+                echo json_encode(['success' => true, 'auto_renovar' => $nuevo_valor]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            }
             break;
 
     }
@@ -315,13 +374,16 @@ function update_marca($datos)
 function editar_perfil($datos)
 {
     try {
+        error_log("editar_perfil START with datos: " . json_encode($datos));
         $collection_usuarios = getCollectionUsuarios();
         
         // Preparar datos para actualizar
         $updateData = [
             'username' => $datos['nombre'],
             'notis' => isset($datos['notis']) ? (int)$datos['notis'] : 0,
-            'email_comm' => isset($datos['email_comm']) ? (int)$datos['email_comm'] : 0,
+            'email_competencia' => isset($datos['email_competencia']) ? (int)$datos['email_competencia'] : 1,
+            'email_aperturas' => isset($datos['email_aperturas']) ? (int)$datos['email_aperturas'] : 1,
+            'email_destacados' => isset($datos['email_destacados']) ? (int)$datos['email_destacados'] : 1,
         ];
         
         // Solo actualizar contraseña si se proporciona y no está vacía
@@ -338,10 +400,13 @@ function editar_perfil($datos)
             $updateData['whatsapp'] = $datos['whatsapp'];
         }
         
+        error_log("editar_perfil updateData: " . json_encode($updateData));
         $updateResult = $collection_usuarios->updateOne(
             ['mail' => $datos["correo"]],
             ['$set' => $updateData]
         );
+        
+        error_log("editar_perfil Result - Matched: " . $updateResult->getMatchedCount() . ", Modified: " . $updateResult->getModifiedCount());
         
         if ($updateResult->getModifiedCount() > 0 || $updateResult->getMatchedCount() > 0) {
             echo json_encode(['success' => true, 'message' => 'Usuario modificado correctamente']);
@@ -349,6 +414,7 @@ function editar_perfil($datos)
             echo json_encode(['success' => false, 'message' => 'No se realizaron cambios']);
         }
     } catch (Exception $e) {
+        error_log("editar_perfil Error: " . $e->getMessage());
         echo json_encode(['success' => false, 'message' => 'Error al modificar datos: ' . $e->getMessage()]);
     }
 }

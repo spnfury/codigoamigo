@@ -170,33 +170,11 @@ if ($_GET["nuevo_codigo"] == 1) { ?>
                             <?php echo $marca["video"]; ?>
                         </div>
                         <div class="col-md-6">
-                            <div class="ad-container">
-                                <!-- AdSense -->
-                                <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-                                <ins class="adsbygoogle"
-                                     style="display:block"
-                                     data-ad-slot="2215822301"
-                                     data-ad-format="auto"
-                                     data-full-width-responsive="true"></ins>
-                                <script>
-                                     (adsbygoogle = window.adsbygoogle || []).push({});
-                                </script>
-                            </div>
+                            <?php echo generate_adsense_container(get_adsense_top_marcas(), 'ad-container', 'min-height: 250px;'); ?>
                         </div>
                     </div>
                 <?php } else { ?>
-                    <div class="ad-container">
-                        <!-- AdSense -->
-                        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-                        <ins class="adsbygoogle"
-                             style="display:block"
-                             data-ad-slot="2215822301"
-                             data-ad-format="auto"
-                             data-full-width-responsive="true"></ins>
-                        <script>
-                             (adsbygoogle = window.adsbygoogle || []).push({});
-                        </script>
-                    </div>
+                    <?php echo generate_adsense_container(get_adsense_top_marcas(), 'ad-container', 'min-height: 250px;'); ?>
                 <?php } ?>
             </div>
             
@@ -308,18 +286,7 @@ if ($_GET["nuevo_codigo"] == 1) { ?>
                         </div>
                         
                         <?php if ($_GET["codigo"] && !$detect_device->isMobile()) { ?>
-                            <div class="sidebar-ad">
-                                <!-- AdSense Lateral -->
-                                <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-                                <ins class="adsbygoogle"
-                                     style="display:block"
-                                     data-ad-slot="2861865272"
-                                     data-ad-format="auto"
-                                     data-full-width-responsive="true"></ins>
-                                <script>
-                                     (adsbygoogle = window.adsbygoogle || []).push({});
-                                </script>
-                            </div>
+                            <?php echo generate_adsense_container(get_adsense_detalle_lateral(), 'sidebar-ad', 'position: sticky; top: 2rem; margin-left: 2rem;'); ?>
                         <?php } ?>
                         
                     <?php } else { // BOOKING.COM ?>
@@ -342,18 +309,7 @@ if ($_GET["nuevo_codigo"] == 1) { ?>
                             <?php } ?>
                             
                             <?php if ($_GET["codigo"] && !$detect_device->isMobile()) { ?>
-                                <div class="sidebar-ad">
-                                    <!-- AdSense Lateral -->
-                                    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"></script>
-                                    <ins class="adsbygoogle"
-                                         style="display:block"
-                                         data-ad-slot="2861865272"
-                                         data-ad-format="auto"
-                                         data-full-width-responsive="true"></ins>
-                                    <script>
-                                         (adsbygoogle = window.adsbygoogle || []).push({});
-                                    </script>
-                                </div>
+                                <?php echo generate_adsense_container(get_adsense_detalle_lateral(), 'sidebar-ad', 'position: sticky; top: 2rem; margin-left: 2rem;'); ?>
                             <?php } ?>
                         </div>
                     <?php } ?>
@@ -782,8 +738,10 @@ function compartirCodigo(codigo) {
             text: texto,
             url: url
         }).catch(err => {
-            console.log('Error al compartir:', err);
-            compartirFallback(codigo, texto, url);
+            if (err.name !== 'AbortError') {
+                console.log('Error al compartir:', err);
+                compartirFallback(codigo, texto, url);
+            }
         });
     } else {
         // Fallback para navegadores sin soporte

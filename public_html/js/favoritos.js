@@ -47,6 +47,7 @@
 
         const isActive = button.classList.contains('active');
         const action = isActive ? 'eliminar_favorito' : 'añadir_favorito';
+        const tipo = button.getAttribute('data-tipo') || 'codigo';
 
         // Feedback visual inmediato
         button.style.opacity = '0.6';
@@ -56,6 +57,7 @@
             const formData = new FormData();
             formData.append('metodo', action);
             formData.append('codigo_id', codigoId);
+            formData.append('tipo', tipo);
 
             const response = await fetch('/ajax_actions', {
                 method: 'POST',

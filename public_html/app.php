@@ -1,8 +1,8 @@
 <?php
 // HABILITAR VISUALIZACIÓN DE ERRORES PHP (solo en desarrollo)
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 
 // Iniciar sesión si no está iniciada
 if (session_status() === PHP_SESSION_NONE) {
@@ -186,6 +186,14 @@ ini_set('display_startup_errors', 0);
 ini_set('log_errors', 1);
 ini_set('error_log', '/home/admin/web/codigoamigo.com/public_html/php_errors.log');
 
+// Inicializar Sentry lo antes posible
+if (file_exists(__DIR__ . '/inc/sentry_bootstrap.php')) {
+    require_once __DIR__ . '/inc/sentry_bootstrap.php';
+    if (function_exists('codigoamigo_init_sentry')) {
+        codigoamigo_init_sentry();
+    }
+}
+
 // Modo debug activable por URL: ?debug=1
 $DEBUG_MODE = false; // Deshabilitado para logear errores en archivos
 if ($DEBUG_MODE) {
@@ -197,14 +205,29 @@ if ($DEBUG_MODE) {
 // Mejorar la función de debug
 function debug_log($message, $data = null)
 {
-    $log = date('Y-m-d H:i:s') . " - " . $message;
-    if ($data !== null) {
-        $log .= "\nData: " . print_r($data, true);
+    $isSentryActive = function_exists('codigoamigo_is_sentry_initialized') && codigoamigo_is_sentry_initialized();
+
+    // Si el data es una excepción, enviarla a Sentry siempre que sea posible
+    if ($data instanceof Throwable) {
+        if (function_exists('codigoamigo_sentry_capture_exception')) {
+            codigoamigo_sentry_capture_exception($data);
+            // Si se envió a Sentry, podemos omitir el log a disco si queremos ahorrar I/O
+            if ($isSentryActive) return;
+        }
     }
-    if ($data instanceof Exception) {
-        $log .= "\nStack trace: " . $data->getTraceAsString();
+
+    // Si no hay Sentry o es un mensaje informativo, logear a disco solo si es necesario
+    // Para ahorrar disco, solo logeamos si Sentry NO está activo o si el mensaje es crítico
+    if (!$isSentryActive) {
+        $log = date('Y-m-d H:i:s') . " - " . $message;
+        if ($data !== null) {
+            $log .= "\nData: " . print_r($data, true);
+        }
+        if ($data instanceof Exception) {
+            $log .= "\nStack trace: " . $data->getTraceAsString();
+        }
+        error_log($log . "\n", 3, __DIR__ . '/debug.log');
     }
-    error_log($log . "\n", 3, __DIR__ . '/debug.log');
 }
 
 // Agregar manejador de errores fatal mejorado
@@ -282,7 +305,13 @@ include_once __DIR__ . '/myphp/_header.php';
 $container = $app->getContainer();
 $container['errorHandler'] = function($c) {
     return function($request, $response, $exception) use ($c) {
-        error_log('[EXCEPTION] '.get_class($exception).': '.$exception->getMessage().' in '.$exception->getFile().':'.$exception->getLine()."\n".$exception->getTraceAsString());
+        if (function_exists('codigoamigo_sentry_capture_exception')) {
+            codigoamigo_sentry_capture_exception($exception);
+        }
+        
+        if (!function_exists('codigoamigo_is_sentry_initialized') || !codigoamigo_is_sentry_initialized()) {
+            error_log('[EXCEPTION] '.get_class($exception).': '.$exception->getMessage().' in '.$exception->getFile().':'.$exception->getLine()."\n".$exception->getTraceAsString());
+        }
         return $c['response']->withStatus(500)->write('Internal Server Error');
     };
 };
@@ -291,7 +320,11 @@ $container['phpErrorHandler'] = function($c) use ($container) {
 };
 $container['notFoundHandler'] = function($c) {
     return function($request, $response) use ($c) {
-        error_log('[404] '.$request->getUri());
+        // Los 404 los seguimos logeando a error_log o podemos enviarlos como mensajes a Sentry
+        // Por ahora, minimizamos escritura a disco
+        if (!function_exists('codigoamigo_is_sentry_initialized') || !codigoamigo_is_sentry_initialized()) {
+             error_log('[404] '.$request->getUri());
+        }
         return $c['response']->withStatus(404)->write('Not Found');
     };
 };
@@ -511,172 +544,159 @@ $app->get('/admin_chat', function ($request, $respon) {
     exit;
 });
 
-$app->get('/admin_chollos', function ($request, $respon) {
-    header('Location: /public/admin_chollos.php');
-    exit;
-});
-
 $app->get('/admin_newsletters', function ($request, $respon) {
     header('Location: /public/admin_newsletters.php');
     exit;
 });
 
 /********************************************************************
- * CHOLLOS
+ * CHOLLOS - Redirects a malprecio.com
  *******************************************************************/
 
-// Incluir funciones de chollos
-include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_chollos.php';
-include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_chollos_amazon.php';
-include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_chollos_groq.php';
-
-// Ruta principal de chollos
+// Ruta principal de chollos - Redirect 301 a malprecio.com
 $app->get('/chollos', function ($request, $respon) {
-    global $panel, $detect;
-    
-    // Inicializar variables globales
-    $GLOBALS['website'] = 'https://www.codigoamigo.com/';
-    $GLOBALS['actual_url'] = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
-    
-    // Incluir archivos necesarios
-    include_once __DIR__ . '/inc/includes.php';
-    include_once __DIR__ . '/myphp/funciones.php';
-    
-    // Inicializar detector de móviles
+    return $respon->withRedirect('https://www.malprecio.com/chollos', 301);
+});
+
+// Chollos Shorts - Redirect 301 a malprecio.com
+$app->get('/chollos-shorts', function ($request, $respon) {
+    return $respon->withRedirect('https://www.malprecio.com/chollos-shorts', 301);
+});
+
+// Ruta de detalle por categoría - Redirect 301 a malprecio.com
+$app->get('/chollos/{categoria}', function ($request, $respon, $args) {
+    $categoria = $args['categoria'] ?? '';
+    return $respon->withRedirect('https://www.malprecio.com/chollos/' . $categoria, 301);
+});
+
+// Ruta de detalle individual - Redirect 301 a malprecio.com
+$app->get('/chollos/{categoria}/{id}', function ($request, $respon, $args) {
+    $categoria = $args['categoria'] ?? '';
+    $id = $args['id'] ?? '';
+    return $respon->withRedirect('https://www.malprecio.com/chollos/' . $categoria . '/' . $id, 301);
+});
+
+// Ruta del acortador de chollos - Redirect 301 a malprecio.com
+$app->get('/chollo/{id}', function ($request, $respon, $args) {
+    $id = $args['id'] ?? '';
+    return $respon->withRedirect('https://www.malprecio.com/chollo/' . $id, 301);
+});
+
+// Admin chollos - Redirect 301 a malprecio.com
+$app->get('/admin_chollos', function ($request, $respon) {
+    return $respon->withRedirect('https://www.malprecio.com/public/admin_chollos.php', 301);
+});
+
+// Webhook para Telegram chollos - Redirect a malprecio.com
+$app->post('/webhook/telegram-chollos', function ($request, $respon) {
+    // Webhook deshabilitado - chollos se gestionan desde malprecio.com
+    return $respon->withJson(['success' => false, 'message' => 'Webhook moved to malprecio.com']);
+});
+
+
+/********************************************************************
+ * FICHA DE CÓDIGO INDIVIDUAL - /codigo/{marca}-{shortId}
+ *******************************************************************/
+
+$app->get('/codigo/{slug}', function ($request, $respon, $args) {
+    global $author_web, $detect, $data_usuario;
+
+    // Asegurar que $detect esté inicializado
     if (!isset($detect)) {
         $detect = new Mobile_Detect();
     }
-    $GLOBALS['detect'] = $detect;
+
+    $slug = $args['slug'] ?? '';
     
-    // Incluir funciones modernas
-    include_once __DIR__ . '/myphp/funciones_modern.php';
-    include_once __DIR__ . '/myphp/_header_modern.php';
-    $GLOBALS['header_modern_used'] = true;
+    // Parsear el slug para obtener marca y short_id
+    $parsed = parse_ficha_codigo_slug($slug);
     
-    // Obtener chollos
-    $filtros = [
-        'estado' => 1,
-        'limite' => 24
-    ];
-    
-    if (isset($_GET['categoria']) && !empty($_GET['categoria'])) {
-        $filtros['categoria'] = $_GET['categoria'];
+    if (!$parsed) {
+        // Slug inválido → 404
+        return $respon->withStatus(404)->write('Código no encontrado');
     }
     
-    if (isset($_GET['busqueda']) && !empty($_GET['busqueda'])) {
-        $filtros['busqueda'] = $_GET['busqueda'];
+    $marca_clave = $parsed['marca'];
+    $short_id = $parsed['short_id'];
+    
+    // Buscar el código en MongoDB: iterar sobre los códigos de la marca
+    // (ObjectId no soporta regex, así que buscamos por marca y comparamos el sufijo del _id)
+    $collection_codigos = getCollectionCodigos();
+    $codigo = null;
+    
+    $codigos_marca = $collection_codigos->find([
+        'marca' => new \MongoDB\BSON\Regex('^' . preg_quote($marca_clave) . '$', 'i'),
+        'estado' => ['$in' => [0, -1, 1]]
+    ], ['limit' => 500]);
+    
+    foreach ($codigos_marca as $c) {
+        $id_str = (string)$c['_id'];
+        if (substr($id_str, -8) === $short_id) {
+            $codigo = $c;
+            break;
+        }
     }
     
-    $chollos = obtenerChollos($filtros);
-    $categorias = obtenerCategoriasChollos();
+    if (!$codigo) {
+        return $respon->withStatus(404)->write('Código no encontrado');
+    }
     
-    // Llamar a la función del header moderno
-    get_header_modern(
-        "Chollos y Ofertas - CodigoAmigo.com",
-        "Descubre los mejores chollos y ofertas de Amazon, Black Friday, electrónica, moda y más. Ahorra dinero con nuestras ofertas exclusivas.",
-        "chollos, ofertas, descuentos, amazon, black friday, electrónica, moda"
-    );
+    // Convertir a array si es objeto
+    if (is_object($codigo)) {
+        $codigo = iterator_to_array($codigo);
+    }
     
-    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/chollos_listado.php';
+    // Obtener datos de la marca
+    $marca = getObjectMarca('nombre_clave', $codigo['marca']);
+    if (!$marca) {
+        return $respon->withStatus(404)->write('Marca no encontrada');
+    }
     
-    return $respon;
+    // Obtener datos del usuario publicador
+    $usuario_publicador = null;
+    $datos_publicador = [];
+    if (!empty($codigo['id_usuario'])) {
+        $usuario_publicador = getObjectUser('_id', new \MongoDB\BSON\ObjectId($codigo['id_usuario']));
+        if ($usuario_publicador) {
+            $datos_publicador = get_array_de_usuario($usuario_publicador);
+        }
+    }
+    
+    // Incrementar vistas
+    if (function_exists('añadir_vista_codigo')) {
+        añadir_vista_codigo($codigo);
+    }
+    
+    // SEO
+    $nombre_marca = $marca['nombre'] ?? ucfirst($marca_clave);
+    $beneficio_text = '';
+    if (!empty($codigo['num_beneficio'])) {
+        $tipo = $codigo['tipo_descuento'] ?? 'euros';
+        if ($tipo === '% de descuento') {
+            $beneficio_text = $codigo['num_beneficio'] . '% descuento';
+        } elseif ($tipo === 'minutos gratis') {
+            $beneficio_text = $codigo['num_beneficio'] . ' minutos gratis';
+        } else {
+            $beneficio_text = $codigo['num_beneficio'] . '€';
+        }
+    }
+    
+    $title = "Código amigo $nombre_marca" . ($beneficio_text ? " – $beneficio_text" : "") . " | CodigoAmigo";
+    $description = "Código de descuento para $nombre_marca compartido por " . ($datos_publicador['username'] ?? 'un usuario') . ". " . ($beneficio_text ? "Ahorra $beneficio_text. " : "") . "Código verificado en CodigoAmigo.com";
+    $title_social = $title;
+    $description_social = $description;
+    $imagen_social = $marca['imagen'] ?? 'https://www.codigoamigo.com/img/logo_social_codigoamigo_final.jpg';
+    $links_meta = '';
+    
+    // Variables para la vista
+    $ficha_codigo = $codigo;
+    $ficha_marca = $marca;
+    $ficha_publicador = $datos_publicador;
+    $ficha_beneficio_text = $beneficio_text;
+    
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/ficha_codigo.php';
 });
 
-// Ruta del acortador de chollos /chollo/{id} - DEBE IR ANTES DE RUTAS GENÉRICAS
-$app->get('/chollo/{id}', function ($request, $respon, $args) {
-    // Incluir archivos necesarios
-    include_once __DIR__ . '/inc/includes.php';
-    include_once __DIR__ . '/myphp/funciones.php';
-    include_once __DIR__ . '/myphp/funciones_chollos.php';
-    
-    $chollo_id = $args['id'] ?? '';
-    
-    // Log para debugging
-    error_log("Acortador chollo - ID recibido: " . $chollo_id);
-    
-    if (empty($chollo_id)) {
-        error_log("Acortador chollo - ID vacío, redirigiendo a /chollos");
-        return $respon->withRedirect('/chollos', 301);
-    }
-    
-    // Obtener el chollo sin incrementar clicks (usaremos registrarClickChollo después)
-    $collection = getCollectionChollos();
-    if (!$collection) {
-        error_log("Acortador chollo - Error: No se pudo obtener colección");
-        return $respon->withRedirect('/chollos', 301);
-    }
-    
-    try {
-        $objectId = new MongoDB\BSON\ObjectId($chollo_id);
-        $doc = $collection->findOne(['_id' => $objectId]);
-        
-        if (!$doc) {
-            error_log("Acortador chollo - Chollo no encontrado con ID: " . $chollo_id);
-            return $respon->withRedirect('/chollos', 301);
-        }
-        
-        if (empty($doc['enlace'])) {
-            error_log("Acortador chollo - Chollo sin enlace, ID: " . $chollo_id);
-            return $respon->withRedirect('/chollos', 301);
-        }
-        
-        $enlace = $doc['enlace'];
-        error_log("Acortador chollo - Enlace encontrado: " . $enlace);
-        
-        // Redirigir a la URL original del chollo (absoluta)
-        if (!preg_match('/^https?:\/\//', $enlace)) {
-            // Si no tiene protocolo, añadir https://
-            $enlace = 'https://' . $enlace;
-        }
-
-        // Preparar datos para tracking
-        $enlace_original = $enlace;
-        $es_amazon = esEnlaceAmazon($enlace);
-        
-        // Cargar funciones de Amazon si no están cargadas
-        include_once __DIR__ . '/myphp/funciones_chollos_amazon.php';
-        
-        $asin = null;
-        if ($es_amazon) {
-            error_log("Acortador chollo - Es enlace de Amazon, aplicando tagging...");
-            $enlace = convertirEnlaceAmazonGarantizado($enlace, $chollo_id);
-            $asin = extraerASIN($enlace);
-        }
-
-        // Registrar el click con información detallada
-        $datos_click = [
-            'enlace_original' => $enlace_original,
-            'enlace_final' => $enlace,
-            'es_amazon' => $es_amazon,
-            'tiene_tag_afiliado' => ($es_amazon && strpos($enlace, 'tag=spnfuryy-21') !== false)
-        ];
-        if ($asin) { $datos_click['asin'] = $asin; }
-
-        registrarClickChollo($chollo_id, $datos_click);
-        
-        error_log("Acortador chollo - Redirigiendo a: " . $enlace);
-        return $respon->withRedirect($enlace, 302);
-    } catch (Exception $e) {
-        error_log("Error en acortador de chollo: " . $e->getMessage() . " - ID: " . $chollo_id);
-        error_log("Stack trace: " . $e->getTraceAsString());
-        return $respon->withRedirect('/chollos', 301);
-    }
-});
-
-// Ruta de detalle individual - Redirige directamente al short link
-$app->get('/chollos/{categoria}/{id}', function ($request, $respon, $args) {
-    $id = $args['id'];
-    
-    // Redirigir directamente al short link que lleva a Amazon
-    return $respon->withRedirect('/chollo/' . $id, 301);
-});
-
-// Webhook para Telegram
-$app->post('/webhook/telegram-chollos', function ($request, $respon) {
-    include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/telegram_chollos_bot.php';
-    procesarMensajeTelegram($request->getBody());
-    return $respon->withJson(['success' => true]);
-});
 
 $app->get('/panel-de-control-usuarios', function ($request, $respon) {
 
@@ -1169,6 +1189,76 @@ $app->get('/felicidades_splash', function ($request, $respon, $args) {
     include_once $_SERVER['DOCUMENT_ROOT'] . '/public/felicidades_splash.php';
 
 });
+
+$app->get('/destacados', function ($request, $respon) {
+
+    global $author_web, $detect, $name_page;
+
+    // Asegurar que $detect esté inicializado
+    if (!isset($detect)) {
+        $detect = new Mobile_Detect();
+    }
+
+    $name_page = "destacados";
+
+    /************************************************
+     * Super Destacados (destacado_social != 0) - Plan Premium 3,99€
+     ************************************************/
+    $array_filtro_super = array(
+        "estado" => array('$in' => [0, -1, 1]),
+        "destacado_social" => array('$ne' => 0)
+    );
+    $array_opciones_super = array(
+        'limit' => 50,
+        'sort' => array('destacado_social' => -1, '_id' => -1)
+    );
+    $lista_super_pre = get_all_listado_codigos_array($array_filtro_super, $array_opciones_super);
+    $lista_super_destacados = isset($lista_super_pre["results"]) ? $lista_super_pre["results"] : [];
+
+    // Obtener IDs de super destacados para excluirlos de los normales
+    $ids_super = array();
+    foreach ($lista_super_destacados as $cod) {
+        if (is_object($cod)) { $cod = (array)$cod; }
+        $ids_super[] = $cod["_id"];
+    }
+
+    /************************************************
+     * Destacados Normales (destacado != 0, no super)
+     ************************************************/
+    $array_filtro_normal = array(
+        "estado" => array('$in' => [0, -1, 1]),
+        "destacado" => array('$ne' => 0),
+        '$or' => array(
+            array('destacado_social' => 0),
+            array('destacado_social' => array('$exists' => false))
+        )
+    );
+    // Excluir los que ya están en super
+    if (!empty($ids_super)) {
+        $array_filtro_normal['_id'] = array('$nin' => $ids_super);
+    }
+    $array_opciones_normal = array(
+        'limit' => 50,
+        'sort' => array('destacado' => -1, '_id' => -1)
+    );
+    $lista_normal_pre = get_all_listado_codigos_array($array_filtro_normal, $array_opciones_normal);
+    $lista_destacados_normales = isset($lista_normal_pre["results"]) ? $lista_normal_pre["results"] : [];
+
+    /************************************************
+     * SEO
+     ************************************************/
+    $total_destacados = count($lista_super_destacados) + count($lista_destacados_normales);
+    $title = "Códigos Destacados - Los Mejores Descuentos Verificados | " . $author_web;
+    $description = "Descubre los " . $total_destacados . " códigos destacados activos. Códigos verificados y promocionados por la comunidad de " . $author_web;
+    $title_social = $title;
+    $description_social = $description;
+    $imagen_social = "https://www.codigoamigo.com/img/logo_social_codigoamigo_final.jpg";
+    $links_meta = "";
+
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/destacados.php';
+
+});
+
 
 $app->get('/destaca', function ($request, $respon, $args) {
 
@@ -2228,7 +2318,9 @@ $app->post('/modificar_codigo/{codigo_id}', function ($request, $response, $args
         $update_result = updateExistingCode($_POST, $_SESSION["user_id"]);
         
         if (!$update_result) {
-            $_SESSION['msg_error'] = "Error al modificar el código. Verifica que tengas permisos o que el código exista.";
+            if (empty($_SESSION['msg_error'])) {
+                $_SESSION['msg_error'] = "Error al modificar el código. Verifica que tengas permisos o que el código exista.";
+            }
             return $response->withRedirect($GLOBALS["website"]);
         }
 
@@ -2313,10 +2405,16 @@ $app->post('/codigo_insertado', function ($request, $respon) {
         $data = addNewCode($_POST, $_SESSION["user_id"]);
     }
 
+    // Si falla la creación (validación de beneficio u otro error), redirigir atrás
+    if (!$data) {
+        if (empty($_SESSION['msg_error'])) {
+            $_SESSION['msg_error'] = "No se pudo publicar el código. Puede que ya esté duplicado.";
+        }
+        return $respon->withRedirect($GLOBALS["website"] . 'publicar_codigo');
+    }
+
     $codigo = getObjectCode('codigo', filter_input(INPUT_POST, "codigo_id", FILTER_SANITIZE_STRING));
     $url = $GLOBALS["website"] . "de-" . $codigo["marca"] . "?codigo=" . $codigo["_id"];
-
-
 
     $_SESSION["msg"] = "Codigo insertado";
 

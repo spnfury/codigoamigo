@@ -66,13 +66,36 @@ if ($_POST) {
         case 'toggle_estado':
             $user_id = $_POST['user_id'];
             $nuevo_estado = $_POST['nuevo_estado'];
-            
+
             $collection_usuarios->updateOne(
                 ['_id' => new MongoDB\BSON\ObjectId($user_id)],
                 ['$set' => ['estado' => (int)$nuevo_estado]]
             );
-            
+
             $_SESSION['success_message'] = "Estado del usuario actualizado";
+            break;
+
+        case 'toggle_vip':
+            $user_id = $_POST['user_id'];
+            $accion_vip = $_POST['accion_vip'] ?? '';
+            try {
+                if ($accion_vip === 'activar') {
+                    $expires = new DateTime();
+                    $expires->modify('+1 month');
+                    $sub_id = 'direct_activation_' . time();
+                    $ok = activar_vip($user_id, $sub_id, $expires);
+                    $_SESSION[$ok ? 'success_message' : 'error_message'] = $ok
+                        ? "VIP activado manualmente (1 mes)"
+                        : "No se pudo activar VIP";
+                } else {
+                    $ok = desactivar_vip($user_id);
+                    $_SESSION[$ok ? 'success_message' : 'error_message'] = $ok
+                        ? "VIP desactivado"
+                        : "No se pudo desactivar VIP";
+                }
+            } catch (Throwable $e) {
+                $_SESSION['error_message'] = "Error toggle VIP: " . $e->getMessage();
+            }
             break;
             
         case 'add_saldo':
@@ -139,6 +162,7 @@ $filtro_busqueda = $_GET['busqueda'] ?? '';
 $filtro_saldo_min = $_GET['saldo_min'] ?? '';
 $filtro_saldo_max = $_GET['saldo_max'] ?? '';
 $filtro_usuario_id = $_GET['usuario_id'] ?? '';
+$filtro_vip = $_GET['vip'] ?? '';
 
 // Obtener parámetros de ordenamiento
 $sort_by = $_GET['sort'] ?? 'fecha_registro';
@@ -177,6 +201,11 @@ if (!$filtro_usuario_id) {
         if ($filtro_saldo_max !== '') {
             $filtros['saldo']['$lte'] = (float)$filtro_saldo_max;
         }
+    }
+    if ($filtro_vip === '1') {
+        $filtros['is_vip'] = true;
+    } elseif ($filtro_vip === '0') {
+        $filtros['$or'] = [['is_vip' => ['$exists' => false]], ['is_vip' => false]];
     }
 }
 
@@ -231,7 +260,8 @@ function generarEnlaceOrdenamiento($columna, $texto, $sort_by, $sort_order) {
     if (!empty($_GET['saldo_min'])) $url .= '&saldo_min=' . $_GET['saldo_min'];
     if (!empty($_GET['saldo_max'])) $url .= '&saldo_max=' . $_GET['saldo_max'];
     if (!empty($_GET['usuario_id'])) $url .= '&usuario_id=' . urlencode($_GET['usuario_id']);
-    
+    if (isset($_GET['vip']) && $_GET['vip'] !== '') $url .= '&vip=' . urlencode($_GET['vip']);
+
     $icono = '';
     if ($sort_by === $columna) {
         $icono = $sort_order === 'asc' ? ' <i class="fas fa-sort-up"></i>' : ' <i class="fas fa-sort-down"></i>';
@@ -247,7 +277,8 @@ $estadisticas = [
     'total' => $collection_usuarios->countDocuments([]),
     'activos' => $collection_usuarios->countDocuments(['estado' => 1]),
     'inactivos' => $collection_usuarios->countDocuments(['estado' => 0]),
-    'con_saldo' => $collection_usuarios->countDocuments(['saldo' => ['$gt' => 0]])
+    'con_saldo' => $collection_usuarios->countDocuments(['saldo' => ['$gt' => 0]]),
+    'vip' => $collection_usuarios->countDocuments(['is_vip' => true])
 ];
 
 $title = "Gestión de Usuarios - Panel de Administración";
@@ -358,7 +389,7 @@ $title = "Gestión de Usuarios - Panel de Administración";
 
                     <!-- Estadísticas -->
                     <div class="row mb-4">
-                        <div class="col-md-3 mb-3">
+                        <div class="col-md-3 col-6 mb-3">
                             <div class="card card-stat">
                                 <div class="card-body text-center">
                                     <h3 class="text-primary"><?php echo number_format($estadisticas['total']); ?></h3>
@@ -366,7 +397,7 @@ $title = "Gestión de Usuarios - Panel de Administración";
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3 mb-3">
+                        <div class="col-md-3 col-6 mb-3">
                             <div class="card card-stat">
                                 <div class="card-body text-center">
                                     <h3 class="text-success"><?php echo number_format($estadisticas['activos']); ?></h3>
@@ -374,21 +405,23 @@ $title = "Gestión de Usuarios - Panel de Administración";
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card card-stat">
-                                <div class="card-body text-center">
-                                    <h3 class="text-danger"><?php echo number_format($estadisticas['inactivos']); ?></h3>
-                                    <p class="text-muted mb-0">Inactivos</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
+                        <div class="col-md-3 col-6 mb-3">
                             <div class="card card-stat">
                                 <div class="card-body text-center">
                                     <h3 class="text-warning"><?php echo number_format($estadisticas['con_saldo']); ?></h3>
                                     <p class="text-muted mb-0">Con Saldo</p>
                                 </div>
                             </div>
+                        </div>
+                        <div class="col-md-3 col-6 mb-3">
+                            <a href="?vip=1" class="text-decoration-none">
+                                <div class="card card-stat" style="border:1px solid #ffd700;">
+                                    <div class="card-body text-center">
+                                        <h3 style="color:#d4a017;"><i class="fas fa-crown"></i> <?php echo number_format($estadisticas['vip']); ?></h3>
+                                        <p class="text-muted mb-0">VIP Activos</p>
+                                    </div>
+                                </div>
+                            </a>
                         </div>
                     </div>
 
@@ -411,6 +444,14 @@ $title = "Gestión de Usuarios - Panel de Administración";
                                         <option value="">Todos</option>
                                         <option value="1" <?php echo $filtro_estado === '1' ? 'selected' : ''; ?>>Activo</option>
                                         <option value="0" <?php echo $filtro_estado === '0' ? 'selected' : ''; ?>>Inactivo</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">VIP</label>
+                                    <select name="vip" class="form-select">
+                                        <option value="">Todos</option>
+                                        <option value="1" <?php echo $filtro_vip === '1' ? 'selected' : ''; ?>>Solo VIP</option>
+                                        <option value="0" <?php echo $filtro_vip === '0' ? 'selected' : ''; ?>>No VIP</option>
                                     </select>
                                 </div>
                                 <div class="col-md-2">
@@ -493,6 +534,7 @@ $title = "Gestión de Usuarios - Panel de Administración";
                                             <th><?php echo generarEnlaceOrdenamiento('usuario', 'Usuario', $sort_by, $sort_order); ?></th>
                                             <th><?php echo generarEnlaceOrdenamiento('email', 'Email', $sort_by, $sort_order); ?></th>
                                             <th><?php echo generarEnlaceOrdenamiento('estado', 'Estado', $sort_by, $sort_order); ?></th>
+                                            <th>VIP</th>
                                             <th><?php echo generarEnlaceOrdenamiento('saldo', 'Saldo', $sort_by, $sort_order); ?></th>
                                             <th><?php echo generarEnlaceOrdenamiento('zumbidos', 'Zumbidos', $sort_by, $sort_order); ?></th>
                                             <th><?php echo generarEnlaceOrdenamiento('fecha_registro', 'Registro', $sort_by, $sort_order); ?></th>
@@ -534,7 +576,25 @@ $title = "Gestión de Usuarios - Panel de Administración";
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <span class="fw-bold <?php 
+                                                <?php
+                                                $u_is_vip = !empty($usuario['is_vip']);
+                                                $u_vip_exp = $usuario['vip_expires_at'] ?? null;
+                                                if ($u_vip_exp instanceof MongoDB\BSON\UTCDateTime) {
+                                                    $u_vip_exp = $u_vip_exp->toDateTime()->format('d/m/Y');
+                                                } else {
+                                                    $u_vip_exp = '';
+                                                }
+                                                ?>
+                                                <?php if ($u_is_vip): ?>
+                                                    <span class="badge" style="background:#d4a017;color:#fff;" title="Expira: <?php echo $u_vip_exp; ?>">
+                                                        <i class="fas fa-crown"></i> VIP
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-secondary">—</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <span class="fw-bold <?php
                                                     $saldo = $usuario['saldo'] ?? 0;
                                                     echo $saldo > 0 ? 'saldo-positivo' : ($saldo < 0 ? 'saldo-negativo' : 'saldo-cero');
                                                 ?>">
@@ -574,6 +634,13 @@ $title = "Gestión de Usuarios - Panel de Administración";
                                                             onclick="toggleEstado('<?php echo $usuario['_id']; ?>', <?php echo $usuario['estado'] ?? 0; ?>)">
                                                         <i class="fas fa-toggle-<?php echo ($usuario['estado'] ?? 0) == 1 ? 'on' : 'off'; ?>"></i>
                                                     </button>
+                                                    <button type="button"
+                                                            class="btn btn-sm <?php echo $u_is_vip ? 'btn-warning' : 'btn-outline-warning'; ?>"
+                                                            style="<?php echo $u_is_vip ? 'background:#d4a017;border-color:#d4a017;color:#fff;' : 'border-color:#d4a017;color:#d4a017;'; ?>"
+                                                            title="<?php echo $u_is_vip ? 'Desactivar VIP' : 'Activar VIP (1 mes)'; ?>"
+                                                            onclick="toggleVip('<?php echo $usuario['_id']; ?>', <?php echo $u_is_vip ? 'true' : 'false'; ?>, '<?php echo htmlspecialchars($usuario['username'] ?? 'Usuario', ENT_QUOTES); ?>')">
+                                                        <i class="fas fa-crown"></i>
+                                                    </button>
                                                     <a href="admin_usuario_detalle.php?id=<?php echo $usuario['_id']; ?>"
                                                        class="btn btn-sm btn-outline-info" title="Ver detalle completo del usuario">
                                                         <i class="fas fa-user"></i>
@@ -600,7 +667,7 @@ $title = "Gestión de Usuarios - Panel de Administración";
                                 <ul class="pagination justify-content-center">
                                     <?php for ($i = 1; $i <= $total_pages; $i++): ?>
                                     <li class="page-item <?php echo $i == $page ? 'active' : ''; ?>">
-                                        <a class="page-link" href="?page=<?php echo $i; ?>&estado=<?php echo $filtro_estado; ?>&busqueda=<?php echo urlencode($filtro_busqueda); ?>&saldo_min=<?php echo $filtro_saldo_min; ?>&saldo_max=<?php echo $filtro_saldo_max; ?>&usuario_id=<?php echo urlencode($filtro_usuario_id); ?>">
+                                        <a class="page-link" href="?page=<?php echo $i; ?>&estado=<?php echo $filtro_estado; ?>&busqueda=<?php echo urlencode($filtro_busqueda); ?>&saldo_min=<?php echo $filtro_saldo_min; ?>&saldo_max=<?php echo $filtro_saldo_max; ?>&usuario_id=<?php echo urlencode($filtro_usuario_id); ?>&vip=<?php echo urlencode($filtro_vip); ?>">
                                             <?php echo $i; ?>
                                         </a>
                                     </li>
@@ -807,6 +874,23 @@ $title = "Gestión de Usuarios - Panel de Administración";
                 document.body.appendChild(form);
                 form.submit();
             }
+        }
+
+        // Toggle VIP
+        function toggleVip(userId, esVip, username) {
+            const mensaje = esVip
+                ? `¿Desactivar VIP de "${username}"?\n\nNo se cancela la suscripción en Stripe automáticamente.`
+                : `¿Activar VIP de "${username}" durante 1 mes?\n\nEsto añade +10€ de saldo (bonus VIP).`;
+            if (!confirm(mensaje)) return;
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.innerHTML = `
+                <input type="hidden" name="action" value="toggle_vip">
+                <input type="hidden" name="user_id" value="${userId}">
+                <input type="hidden" name="accion_vip" value="${esVip ? 'desactivar' : 'activar'}">
+            `;
+            document.body.appendChild(form);
+            form.submit();
         }
 
         // Si hay un ID de usuario en la URL, hacer scroll al resultado

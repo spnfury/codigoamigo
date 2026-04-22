@@ -13,9 +13,7 @@ function get_header_modern($title = "", $description = "", $title_social = "", $
     ];
 
     $layout = 'base';
-    if (strpos($_SERVER['REQUEST_URI'], '/chollos') !== false) {
-        $layout = 'chollos';
-    } elseif (strpos($_SERVER['REQUEST_URI'], '/chat') !== false) {
+    if (strpos($_SERVER['REQUEST_URI'], '/chat') !== false && strpos($_SERVER['REQUEST_URI'], 'chat_usuario.php') === false) {
         $layout = 'chat';
     }
 

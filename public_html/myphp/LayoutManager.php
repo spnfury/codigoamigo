@@ -53,6 +53,16 @@ class LayoutManager {
             include_once __DIR__ . '/funciones_modern.php';
         }
         
+        // Ensure core functions (getListMarcaSpecial, etc.) are available
+        if (!function_exists('getListMarcaSpecial')) {
+            include_once dirname(__DIR__) . '/inc/funciones.php';
+        }
+        
+        // Ensure getCategorias is available (defined in inc/conexion.php)
+        if (!function_exists('getCategorias')) {
+            include_once dirname(__DIR__) . '/inc/conexion.php';
+        }
+        
          if (!isset($anula_adsense)) {
             $anula_adsense = isset($GLOBALS['anula_adsense']) ? $GLOBALS['anula_adsense'] : false;
         }

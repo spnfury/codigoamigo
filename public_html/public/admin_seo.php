@@ -53,10 +53,39 @@ try {
     $lowHangingFruit = $seoService->getLowHangingFruit($siteUrl, $startDate, $endDate, 30); // Bajamos a 30 impresiones
     $lowCTR = $seoService->getLowCTR($siteUrl, $startDate, $endDate, 100, 2.0); // Bajamos a 100 impresiones y CTR < 2%
     $zombies = $seoService->getZombiePages($siteUrl, $startDate, $endDate);
+    $zombies = $seoService->getZombiePages($siteUrl, $startDate, $endDate);
     $cannibalization = $seoService->getCannibalizationIssues($siteUrl, $startDate, $endDate);
+    
+    // --- NUEVO: Content Decay, Preguntas, Tendencias y Expansión ---
+    $prevStart = date('Y-m-d', strtotime('-60 days'));
+    $prevEnd = date('Y-m-d', strtotime('-30 days'));
+    $decayData = $seoService->getContentDecay($siteUrl, $startDate, $endDate, $prevStart, $prevEnd);
+    $questionsData = $seoService->getQuestionOpportunities($siteUrl, $startDate, $endDate);
+    $emergingTrends = $seoService->getEmergingKeywords($siteUrl, $startDate, $endDate, $prevStart, $prevEnd);
+    $brandOpps = $seoService->getBrandOpportunities($siteUrl, $startDate, $endDate);
 
-    if (isset($performanceRows['error'])) {
-        throw new Exception("Error API Google: " . $performanceRows['error']);
+    // --- NUEVO: Verificar FAQs ya creadas para el sistema de oportunidades ---
+    $existing_faqs_map = [];
+    if (!empty($questionsData) && !isset($questionsData['error'])) {
+        require_once __DIR__ . '/../myphp/funciones_faq.php';
+        $faq_collection = getCollectionFAQs();
+        $brands_involved = [];
+        foreach ($questionsData as $row) {
+            if (isset($row->keys[1]) && preg_match('/\/de-([^\/]+)/', $row->keys[1], $m)) {
+                $brands_involved[] = $m[1];
+            }
+        }
+        if (!empty($brands_involved)) {
+            $unique_brands = array_values(array_unique($brands_involved));
+            $cursor = $faq_collection->find(['marca_clave' => ['$in' => $unique_brands]], ['projection' => ['marca_clave' => 1, 'titulo' => 1]]);
+            foreach ($cursor as $doc) {
+                // Normalizamos título para comparar: minúsculas, sin espacios extra y sin interrogaciones al final
+                $normalized_title = trim(mb_strtolower($doc['titulo']));
+                $normalized_title = preg_replace('/[¿?!\.]/', '', $normalized_title);
+                $key = $doc['marca_clave'] . '|' . $normalized_title;
+                $existing_faqs_map[$key] = true;
+            }
+        }
     }
 
     // --- NUEVO: Augmentar datos con estado de optimización de marca ---
@@ -155,6 +184,8 @@ try {
         .scale-75 { transform: scale(0.75); }
         .accordion-item { position: relative; }
         .accordion-header { padding-right: 140px; }
+        .keyword-link { cursor: pointer; color: #0d6efd; text-decoration: none; border-bottom: 1px dashed #0d6efd; transition: all 0.2s; }
+        .keyword-link:hover { color: #0a58ca; border-bottom-style: solid; background-color: rgba(13, 110, 253, 0.05); }
     </style>
 </head>
 <body>
@@ -229,6 +260,15 @@ try {
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="health-tab" data-bs-toggle="tab" data-bs-target="#health" type="button" role="tab">🏥 Salud del Sitio</button>
                         </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="insights-tab" data-bs-toggle="tab" data-bs-target="#insights" type="button" role="tab">🧠 Insights Avanzados</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="trends-tab" data-bs-toggle="tab" data-bs-target="#trends" type="button" role="tab">🔥 Tendencias 🔥</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="expansion-tab" data-bs-toggle="tab" data-bs-target="#expansion" type="button" role="tab">✨ Expansión</button>
+                        </li>
                     </ul>
 
                     <div class="tab-content" id="myTabContent">
@@ -265,7 +305,11 @@ try {
                                                 <tbody>
                                                     <?php foreach ($top_queries as $row): ?>
                                                     <tr>
-                                                        <td><?php echo htmlspecialchars($row->keys[0]); ?></td>
+                                                        <td>
+                                                            <span class="keyword-link" onclick="showKeywordEvolution('<?php echo htmlspecialchars($row->keys[0]); ?>')">
+                                                                <?php echo htmlspecialchars($row->keys[0]); ?>
+                                                            </span>
+                                                        </td>
                                                         <td class="text-end"><?php echo number_format($row->clicks); ?></td>
                                                         <td class="text-end"><?php echo number_format($row->impressions); ?></td>
                                                         <td class="text-end"><?php echo number_format($row->position, 1); ?></td>
@@ -346,7 +390,11 @@ try {
                                                                 }
                                                         ?>
                                                         <tr>
-                                                            <td class="fw-bold"><?php echo htmlspecialchars($row->keys[0]); ?></td>
+                                                            <td class="fw-bold">
+                                                                <span class="keyword-link" onclick="showKeywordEvolution('<?php echo htmlspecialchars($row->keys[0]); ?>')">
+                                                                    <?php echo htmlspecialchars($row->keys[0]); ?>
+                                                                </span>
+                                                            </td>
                                                             <td class="small text-truncate" style="max-width: 300px;">
                                                                 <a href="<?php echo htmlspecialchars($row->keys[1]); ?>" target="_blank"><?php echo htmlspecialchars(str_replace('https://www.codigoamigo.com', '', $row->keys[1])); ?></a>
                                                             </td>
@@ -407,7 +455,11 @@ try {
                                                                 }
                                                         ?>
                                                         <tr>
-                                                            <td><?php echo htmlspecialchars($row->keys[0]); ?></td>
+                                                            <td>
+                                                                <span class="keyword-link" onclick="showKeywordEvolution('<?php echo htmlspecialchars($row->keys[0]); ?>')">
+                                                                    <?php echo htmlspecialchars($row->keys[0]); ?>
+                                                                </span>
+                                                            </td>
                                                             <td class="small text-truncate" style="max-width: 300px;">
                                                                 <a href="<?php echo htmlspecialchars($row->keys[1]); ?>" target="_blank"><?php echo htmlspecialchars(str_replace('https://www.codigoamigo.com', '', $row->keys[1])); ?></a>
                                                             </td>
@@ -527,6 +579,245 @@ try {
                                             </table>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- TAB INSIGHTS AVANZADOS -->
+                        <div class="tab-pane fade" id="insights" role="tabpanel">
+                             <div class="row">
+                                <!-- Content Decay -->
+                                <div class="col-12 mb-4">
+                                    <div class="card shadow-sm border-danger">
+                                        <div class="card-header bg-danger bg-opacity-10 py-3">
+                                            <h5 class="mb-0 text-danger"><i class="fas fa-chart-line fa-flip-vertical me-2"></i>Decadencia de Contenido</h5>
+                                            <small class="text-muted">Páginas que han perdido tráfico significativo respecto al mes anterior. ¡Actualízalas!</small>
+                                        </div>
+                                        <div class="table-responsive">
+                                            <table class="table table-hover mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Página</th>
+                                                        <th class="text-center">Antes</th>
+                                                        <th class="text-center">Ahora</th>
+                                                        <th class="text-center">Pérdida</th>
+                                                        <th class="text-center">Acción</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <?php if (empty($decayData) || isset($decayData['error'])): ?>
+                                                        <tr><td colspan="5" class="text-center py-3">¡Bien! No se detectó decadencia significativa recientemente.</td></tr>
+                                                    <?php else: ?>
+                                                        <?php foreach ($decayData as $row): 
+                                                            $brand_slug = '';
+                                                            $opt_keyword = 'actualizar contenido';
+                                                            if (preg_match('/\/de-([^\/]+)/', $row['page'], $m)) {
+                                                                $brand_slug = $m[1];
+                                                                $opt_keyword = 'código promocional ' . str_replace('-', ' ', $brand_slug);
+                                                            }
+                                                        ?>
+                                                        <tr>
+                                                            <td class="small text-truncate" style="max-width: 350px;">
+                                                                <a href="<?php echo htmlspecialchars($row['page']); ?>" target="_blank" class="text-danger text-decoration-none">
+                                                                    <?php echo htmlspecialchars(str_replace('https://www.codigoamigo.com', '', $row['page'])); ?>
+                                                                </a>
+                                                            </td>
+                                                            <td class="text-center text-muted"><?php echo number_format($row['prev_clicks']); ?></td>
+                                                            <td class="text-center fw-bold"><?php echo number_format($row['curr_clicks']); ?></td>
+                                                            <td class="text-center text-danger">
+                                                                <i class="fas fa-arrow-down small"></i> <?php echo number_format(abs($row['diff'])); ?> 
+                                                                <span class="badge bg-danger bg-opacity-10 text-danger rounded-pill ms-1"><?php echo number_format($row['percent'], 1); ?>%</span>
+                                                            </td>
+                                                            <td class="text-center">
+                                                                <button class="btn btn-sm btn-outline-danger btn-optimize" 
+                                                                        data-page="<?php echo htmlspecialchars($row['page']); ?>"
+                                                                        data-brand="<?php echo htmlspecialchars($brand_slug); ?>"
+                                                                        data-keyword="<?php echo htmlspecialchars($opt_keyword); ?>">
+                                                                    <i class="fas fa-sync-alt"></i> Actualizar
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                        <?php endforeach; ?>
+                                                    <?php endif; ?>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Question Opportunities -->
+                                <div class="col-12">
+                                    <div class="card shadow-sm border-primary">
+                                        <div class="card-header bg-primary bg-opacity-10 py-3 d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h5 class="mb-0 text-primary"><i class="fas fa-question-circle me-2"></i>Oportunidades de Preguntas (FAQ)</h5>
+                                                <small class="text-muted">Keywords tipo pregunta con buen tráfico (Muestra top 5000).</small>
+                                            </div>
+                                            <div class="d-flex align-items-center">
+                                                <div id="bulkStatus" class="me-3 small text-muted" style="display:none;"></div>
+                                                <button class="btn btn-outline-primary btn-sm ms-2" id="toggleCreatedFaqsBtn" onclick="toggleCreatedFaqs()" data-hidden="true">
+                                                    <i class="fas fa-eye me-1"></i> Ver Creadas
+                                                </button>
+                                                <button class="btn btn-primary btn-sm ms-2" onclick="bulkCreateAllFAQs()">
+                                                    <i class="fas fa-robot me-1"></i> Crear Todas (Masivo)
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div id="bulkProgressContainer" class="progress mb-0" style="height: 5px; display:none; border-radius: 0;">
+                                            <div id="bulkProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: 0%"></div>
+                                        </div>
+                                        <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                                            <table class="table table-hover mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Pregunta</th>
+                                                        <th>Página Ranking</th>
+                                                        <th class="text-center">Posición</th>
+                                                        <th class="text-center">Impresiones</th>
+                                                        <th class="text-center">Acción</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <?php if (empty($questionsData) || isset($questionsData['error'])): ?>
+                                                        <tr><td colspan="5" class="text-center py-3">No se encontraron preguntas relevantes.</td></tr>
+                                                    <?php else: ?>
+                                                            <?php foreach ($questionsData as $row): 
+                                                                $page_url = $row->keys[1];
+                                                                $brand_slug = '';
+                                                                if (preg_match('/\/de-([^\/]+)/', $page_url, $m)) {
+                                                                    $brand_slug = $m[1];
+                                                                }
+
+                                                                // Verificar si ya existe
+                                                                $q_normalized = trim(mb_strtolower($row->keys[0]));
+                                                                $q_normalized = preg_replace('/[¿?!\.]/', '', $q_normalized);
+                                                                $check_key = $brand_slug . '|' . $q_normalized;
+                                                                $already_exists = isset($existing_faqs_map[$check_key]);
+                                                        ?>
+                                                        <tr class="<?php echo $already_exists ? 'faq-row-created' : 'faq-row-pending'; ?>" <?php echo $already_exists ? 'style="display:none;"' : ''; ?>>
+                                                            <td class="fw-bold text-primary">
+                                                                <span class="keyword-link" onclick="showKeywordEvolution('<?php echo htmlspecialchars($row->keys[0]); ?>')">
+                                                                    <?php echo htmlspecialchars($row->keys[0]); ?>
+                                                                </span>
+                                                            </td>
+                                                            <td class="small text-truncate" style="max-width: 300px;">
+                                                                <a href="<?php echo htmlspecialchars($row->keys[1]); ?>" target="_blank"><?php echo htmlspecialchars(str_replace('https://www.codigoamigo.com', '', $row->keys[1])); ?></a>
+                                                            </td>
+                                                            <td class="text-center"><?php echo number_format($row->position, 1); ?></td>
+                                                            <td class="text-center"><?php echo number_format($row->impressions); ?></td>
+                                                            <td class="text-center">
+                                                                <?php if ($already_exists): ?>
+                                                                    <span class="badge bg-success rounded-pill px-3 py-2">
+                                                                        <i class="fas fa-check-circle me-1"></i> Creada
+                                                                    </span>
+                                                                <?php else: ?>
+                                                                    <button class="btn btn-sm btn-outline-primary btn-generate-faq" 
+                                                                            data-question="<?php echo htmlspecialchars($row->keys[0]); ?>"
+                                                                            data-brand="<?php echo htmlspecialchars($brand_slug); ?>">
+                                                                        <i class="fas fa-magic"></i> Crear FAQ
+                                                                    </button>
+                                                                <?php endif; ?>
+                                                            </td>
+                                                        </tr>
+                                                        <?php endforeach; ?>
+                                                    <?php endif; ?>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                             </div>
+                        </div>
+
+                        <!-- TAB TENDENCIAS -->
+                        <div class="tab-pane fade" id="trends" role="tabpanel">
+                            <div class="card shadow-sm border-danger mb-4">
+                                <div class="card-header bg-danger bg-opacity-10 py-3">
+                                    <h5 class="mb-0 text-danger"><i class="fas fa-fire me-2"></i>Tendencias Emergentes</h5>
+                                    <small class="text-muted">Keywords con alto crecimiento en los últimos 30 días comparado con el mes anterior.</small>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Keyword</th>
+                                                <th class="text-center">Antes (Impr.)</th>
+                                                <th class="text-center">Ahora (Impr.)</th>
+                                                <th class="text-center">Crecimiento</th>
+                                                <th class="text-center">Acción</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php if (empty($emergingTrends)): ?>
+                                                <tr><td colspan="5" class="text-center py-3">No se detectaron tendencias explosivas recientemente.</td></tr>
+                                            <?php else: ?>
+                                                <?php foreach ($emergingTrends as $row): ?>
+                                                <tr>
+                                                    <td class="fw-bold"><?php echo htmlspecialchars($row['query']); ?></td>
+                                                    <td class="text-center text-muted"><?php echo number_format($row['prev_impr']); ?></td>
+                                                    <td class="text-center fw-bold"><?php echo number_format($row['curr_impr']); ?></td>
+                                                    <td class="text-center text-success">
+                                                        <i class="fas fa-chart-line small"></i> +<?php echo number_format($row['diff']); ?>
+                                                        <span class="badge bg-success bg-opacity-25 text-success rounded-pill ms-1">+<?php echo number_format($row['percent'], 1); ?>%</span>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <button class="btn btn-sm btn-outline-danger btn-optimize-title" 
+                                                                data-keyword="<?php echo htmlspecialchars($row['query']); ?>">
+                                                            <i class="fas fa-rocket"></i> Capitalizar
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                            <?php endif; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- TAB EXPANSIÓN -->
+                        <div class="tab-pane fade" id="expansion" role="tabpanel">
+                            <div class="card shadow-sm border-purple mb-4" style="border-color: #6f42c1 !important;">
+                                <div class="card-header py-3" style="background-color: rgba(111, 66, 193, 0.1);">
+                                    <h5 class="mb-0" style="color: #6f42c1;"><i class="fas fa-expand-arrows-alt me-2"></i>Oportunidades de Nuevas Marcas / Paginas</h5>
+                                    <small class="text-muted">Keywords transaccionales donde el ranking actual es pobre o redirige a la home/búsqueda.</small>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Intento de Búsqueda</th>
+                                                <th>Página Actual</th>
+                                                <th class="text-center">Posición</th>
+                                                <th class="text-center">Impresiones</th>
+                                                <th class="text-center">Potencial</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php if (empty($brandOpps)): ?>
+                                                <tr><td colspan="5" class="text-center py-3">No hay oportunidades de expansión detectadas.</td></tr>
+                                            <?php else: ?>
+                                                <?php foreach ($brandOpps as $row): ?>
+                                                <tr>
+                                                    <td class="fw-bold"><?php echo htmlspecialchars($row->keys[0]); ?></td>
+                                                    <td class="small text-truncate" style="max-width: 300px;">
+                                                        <a href="<?php echo htmlspecialchars($row->keys[1]); ?>" target="_blank" class="text-muted">
+                                                            <?php echo htmlspecialchars(str_replace('https://www.codigoamigo.com', '', $row->keys[1])); ?>
+                                                        </a>
+                                                    </td>
+                                                    <td class="text-center"><?php echo number_format($row->position, 1); ?></td>
+                                                    <td class="text-center"><?php echo number_format($row->impressions); ?></td>
+                                                    <td class="text-center">
+                                                        <button class="btn btn-sm btn-purple text-white" style="background-color: #6f42c1;"
+                                                                onclick="window.open('https://www.google.com/search?q=<?php echo urlencode($row->keys[0]); ?>', '_blank')">
+                                                            <i class="fas fa-plus-circle"></i> Crear Landing
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                <?php endforeach; ?>
+                                            <?php endif; ?>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
@@ -738,19 +1029,389 @@ try {
                                             }
                                         }
 
-                                        // Listener Botón "Nuevo Título" (Low CTR) -> Ahora hace optimización completa
-                                        document.querySelectorAll('.btn-optimize-title').forEach(btn => {
-                                            btn.addEventListener('click', function() {
-                                                autoOptimizeWeb(this, this.dataset.keyword, this.dataset.brand);
+                                        // --- NUEVO: Función para mostrar evolución de Keyword ---
+                                        let evolutionChart = null;
+
+                                        async function showKeywordEvolution(keyword) {
+                                            // 1. Mostrar modal con loading
+                                            const modalHtml = `
+                                                <div class="modal fade" id="evolutionModal" tabindex="-1">
+                                                    <div class="modal-dialog modal-xl">
+                                                        <div class="modal-content">
+                                                            <div class="modal-header">
+                                                                <h5 class="modal-title"><i class="fas fa-chart-line me-2 text-primary"></i>Evolución: <strong>${keyword}</strong></h5>
+                                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                            </div>
+                                                            <div class="modal-body">
+                                                                <div id="evoLoading" class="text-center py-5">
+                                                                    <div class="spinner-border text-primary" role="status"></div>
+                                                                    <p class="mt-2 text-muted">Obteniendo datos de Search Console...</p>
+                                                                </div>
+                                                                <div id="evoContent" style="display:none;">
+                                                                    <canvas id="evoChart" height="100"></canvas>
+                                                                    <div class="alert alert-info mt-3 small">
+                                                                        <i class="fas fa-info-circle"></i> Mostrando datos de los últimos 90 días.
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            `;
+                                            
+                                            // Limpiar modales viejos
+                                            const oldModal = document.getElementById('evolutionModal');
+                                            if (oldModal) oldModal.remove();
+                                            
+                                            document.body.insertAdjacentHTML('beforeend', modalHtml);
+                                            const modal = new bootstrap.Modal(document.getElementById('evolutionModal'));
+                                            modal.show();
+
+                                            // 2. Fetch data
+                                            try {
+                                                const response = await fetch(`../ajax/get_keyword_evolution.php?keyword=${encodeURIComponent(keyword)}`);
+                                                const data = await response.json();
+
+                                                if (data.success) {
+                                                    document.getElementById('evoLoading').style.display = 'none';
+                                                    document.getElementById('evoContent').style.display = 'block';
+                                                    renderEvolutionChart(data.data);
+                                                } else {
+                                                    alert('Error: ' + (data.error || 'No se pudieron cargar los datos'));
+                                                    modal.hide();
+                                                }
+                                            } catch (error) {
+                                                console.error(error);
+                                                alert('Error de conexión al cargar datos');
+                                                modal.hide();
+                                            }
+                                        }
+
+                                        function renderEvolutionChart(data) {
+                                            const ctx = document.getElementById('evoChart').getContext('2d');
+                                            
+                                            if (evolutionChart) {
+                                                evolutionChart.destroy();
+                                            }
+
+                                            evolutionChart = new Chart(ctx, {
+                                                type: 'line',
+                                                data: {
+                                                    labels: data.labels,
+                                                    datasets: [
+                                                        {
+                                                            label: 'Clicks',
+                                                            data: data.clicks,
+                                                            borderColor: '#0d6efd',
+                                                            backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                                                            yAxisID: 'y',
+                                                            tension: 0.3,
+                                                            fill: true,
+                                                            order: 2
+                                                        },
+                                                        {
+                                                            label: 'Posición Media',
+                                                            data: data.position,
+                                                            borderColor: '#ffc107',
+                                                            backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                                                            yAxisID: 'y1',
+                                                            tension: 0.3,
+                                                            borderDash: [5, 5],
+                                                            fill: false,
+                                                            order: 1
+                                                        }
+                                                    ]
+                                                },
+                                                options: {
+                                                    responsive: true,
+                                                    interaction: {
+                                                        mode: 'index',
+                                                        intersect: false,
+                                                    },
+                                                    plugins: {
+                                                        legend: { position: 'top' }
+                                                    },
+                                                    scales: {
+                                                        y: {
+                                                            type: 'linear',
+                                                            display: true,
+                                                            position: 'left',
+                                                            title: { display: true, text: 'Clicks' },
+                                                            beginAtZero: true
+                                                        },
+                                                        y1: {
+                                                            type: 'linear',
+                                                            display: true,
+                                                            position: 'right',
+                                                            reverse: true, // Posición 1 es mejor (arriba)
+                                                            grid: { drawOnChartArea: false },
+                                                            title: { display: true, text: 'Posición' },
+                                                            min: 1
+                                                        }
+                                                    }
+                                                }
                                             });
+                                        }
+
+
+                                        // Listener Delegado para botones de optimización
+                                        document.addEventListener('click', function(e) {
+                                            const btnOptimize = e.target.closest('.btn-optimize');
+                                            const btnOptimizeTitle = e.target.closest('.btn-optimize-title');
+                                            const btnFAQ = e.target.closest('.btn-generate-faq');
+
+                                            if (btnOptimize) {
+                                                console.log('Optimizar clickado', btnOptimize.dataset);
+                                                autoOptimizeWeb(btnOptimize, btnOptimize.dataset.keyword, btnOptimize.dataset.brand);
+                                            } else if (btnOptimizeTitle) {
+                                                console.log('Optimizar Título clickado', btnOptimizeTitle.dataset);
+                                                autoOptimizeWeb(btnOptimizeTitle, btnOptimizeTitle.dataset.keyword, btnOptimizeTitle.dataset.brand);
+                                            } else if (btnFAQ) {
+                                                openFAQGenerator(btnFAQ.dataset.question, btnFAQ.dataset.brand);
+                                            }
                                         });
 
-                                        // Listener Botón "Optimizar IA" (Low Hanging Fruit) -> Ahora hace optimización completa
-                                        document.querySelectorAll('.btn-optimize').forEach(btn => {
-                                            btn.addEventListener('click', function() {
-                                                autoOptimizeWeb(this, this.dataset.keyword, this.dataset.brand);
+                                        // --- NUEVO: FAQ Generator Logic ---
+                                        async function openFAQGenerator(question, brand) {
+                                            if (!brand) {
+                                                alert('No se pudo identificar la marca para esta pregunta.');
+                                                return;
+                                            }
+
+                                            // 1. Mostrar modal inicial
+                                            const modalHtml = `
+                                                <div class="modal fade" id="faqModal" tabindex="-1">
+                                                    <div class="modal-dialog modal-lg">
+                                                        <div class="modal-content">
+                                                            <div class="modal-header bg-primary text-white">
+                                                                <h5 class="modal-title"><i class="fas fa-robot me-2"></i>Generador de FAQ con IA</h5>
+                                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                            </div>
+                                                            <div class="modal-body">
+                                                                <h6 class="fw-bold mb-3">Pregunta a responder:</h6>
+                                                                <div class="p-3 bg-light rounded mb-3 border">
+                                                                    <i class="fas fa-question-circle text-primary me-2"></i> <strong>${question}</strong>
+                                                                </div>
+
+                                                                <div id="faqLoading" class="text-center py-4">
+                                                                    <div class="spinner-border text-primary" role="status"></div>
+                                                                    <p class="mt-2 text-muted">Redactando la mejor respuesta...</p>
+                                                                </div>
+
+                                                                <div id="faqEditor" style="display:none;">
+                                                                    <label class="form-label">Respuesta Generada (editable):</label>
+                                                                    <textarea id="faqAnswer" class="form-control mb-3" rows="5"></textarea>
+                                                                    <div class="alert alert-info small">
+                                                                        <i class="fas fa-info-circle"></i> Revisa la respuesta antes de guardar. Se añadirá a la descripción de la marca.
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                                <button type="button" class="btn btn-success" id="btnSaveFAQ" style="display:none;" onclick="saveFAQ('${question.replace(/'/g, "\\'")}', '${brand}')">
+                                                                    <i class="fas fa-save me-2"></i> Guardar en Web
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            `;
+                                            
+                                            const oldModal = document.getElementById('faqModal');
+                                            if (oldModal) oldModal.remove();
+                                            document.body.insertAdjacentHTML('beforeend', modalHtml);
+                                            const modal = new bootstrap.Modal(document.getElementById('faqModal'));
+                                            modal.show();
+
+                                            // 2. Generar respuesta
+                                            try {
+                                                const formData = new FormData();
+                                                formData.append('brand', brand);
+                                                formData.append('question', question);
+
+                                                const response = await fetch('../ajax/generate_faq.php', {
+                                                    method: 'POST',
+                                                    body: formData
+                                                });
+                                                const data = await response.json();
+
+                                                if (data.success) {
+                                                    document.getElementById('faqLoading').style.display = 'none';
+                                                    document.getElementById('faqEditor').style.display = 'block';
+                                                    document.getElementById('faqAnswer').value = data.answer;
+                                                    document.getElementById('btnSaveFAQ').style.display = 'inline-block';
+                                                } else {
+                                                    alert('Error: ' + (data.error || 'No se pudo generar respuesta'));
+                                                    modal.hide();
+                                                }
+                                            } catch (error) {
+                                                console.error(error);
+                                                alert('Error de conexión');
+                                                modal.hide();
+                                            }
+                                        }
+
+                                        async function saveFAQ(question, brand) {
+                                            const answer = document.getElementById('faqAnswer').value;
+                                            const btn = document.getElementById('btnSaveFAQ');
+                                            
+                                            if (!answer.trim()) {
+                                                alert('La respuesta no puede estar vacía');
+                                                return;
+                                            }
+
+                                            btn.disabled = true;
+                                            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+
+                                            try {
+                                                const formData = new FormData();
+                                                formData.append('brand', brand);
+                                                formData.append('question', question);
+                                                formData.append('answer', answer);
+
+                                                const response = await fetch('../ajax/save_faq.php', {
+                                                    method: 'POST',
+                                                    body: formData
+                                                });
+                                                const data = await response.json();
+
+                                                if (data.success) {
+                                                    alert('✅ FAQ guardada correctamente en la web.');
+                                                    bootstrap.Modal.getInstance(document.getElementById('faqModal')).hide();
+                                                    
+                                                    // Marcar como creada visualmente sin recargar
+                                                    const btnOrig = document.querySelector(`.btn-generate-faq[data-brand="${brand}"][data-question="${question}"]`);
+                                                    if (btnOrig) {
+                                                        const row = btnOrig.closest('tr');
+                                                        row.classList.add('faq-row-created');
+                                                        row.classList.remove('faq-row-pending');
+                                                        btnOrig.parentElement.innerHTML = '<span class="badge bg-success rounded-pill px-3 py-2"><i class="fas fa-check-circle me-1"></i> Creada</span>';
+                                                        
+                                                        // Ocultar si el toggle está en "Ver Creadas" (osea, ocultas por defecto)
+                                                        const toggleBtn = document.getElementById('toggleCreatedFaqsBtn');
+                                                        if (toggleBtn && toggleBtn.dataset.hidden === "true") {
+                                                            row.style.display = 'none';
+                                                        }
+                                                    }
+                                                } else {
+                                                    alert('Error al guardar: ' + data.error);
+                                                }
+                                            } catch (error) {
+                                                alert('Error de conexión al guardar');
+                                            } finally {
+                                                btn.disabled = false;
+                                                btn.innerHTML = '<i class="fas fa-save me-2"></i> Guardar en Web';
+                                            }
+                                        }
+
+                                        // --- NUEVO: Batch processing for Bulk Creation ---
+                                        async function bulkCreateAllFAQs() {
+                                            const allRows = document.querySelectorAll('.btn-generate-faq');
+                                            const total = allRows.length;
+                                            
+                                            if (total === 0) {
+                                                alert('No hay FAQs pendientes para crear en el listado actual.');
+                                                return;
+                                            }
+
+                                            if (!confirm(`¿Estás seguro de crear ${total} FAQs masivamente usando IA?\n\nEsto puede tardar varios minutos y consumirá créditos de la API.`)) {
+                                                return;
+                                            }
+
+                                            // Setup UI
+                                            const container = document.getElementById('bulkProgressContainer');
+                                            const bar = document.getElementById('bulkProgressBar');
+                                            const status = document.getElementById('bulkStatus');
+                                            container.style.display = 'flex';
+                                            status.style.display = 'block';
+                                            
+                                            const batchSize = 10;
+                                            let processed = 0;
+                                            
+                                            // Extract items
+                                            const items = [];
+                                            allRows.forEach(btn => {
+                                                items.push({
+                                                    brand: btn.dataset.brand,
+                                                    question: btn.dataset.question
+                                                });
                                             });
-                                        });
+
+                                            for (let i = 0; i < items.length; i += batchSize) {
+                                                const batch = items.slice(i, i + batchSize);
+                                                
+                                                status.innerText = `Procesando ${i + 1} de ${items.length}...`;
+                                                
+                                                try {
+                                                    const formData = new FormData();
+                                                    batch.forEach((item, index) => {
+                                                        formData.append(`items[${index}][brand]`, item.brand);
+                                                        formData.append(`items[${index}][question]`, item.question);
+                                                    });
+
+                                                    const response = await fetch('../ajax/bulk_process_faqs.php', {
+                                                        method: 'POST',
+                                                        body: formData
+                                                    });
+                                                    const data = await response.json();
+
+                                                    if (data.success) {
+                                                       // Mark individual rows as created
+                                                       batch.forEach(item => {
+                                                           const btn = document.querySelector(`.btn-generate-faq[data-brand="${item.brand}"][data-question="${item.question}"]`);
+                                                           if (btn) {
+                                                               const row = btn.closest('tr');
+                                                               row.classList.add('faq-row-created');
+                                                               row.classList.remove('faq-row-pending');
+                                                               btn.parentElement.innerHTML = '<span class="badge bg-success rounded-pill px-3 py-2"><i class="fas fa-check-circle me-1"></i> Creada</span>';
+                                                               
+                                                               // Ocultar si el toggle está en modo ocultar
+                                                               const toggleBtn = document.getElementById('toggleCreatedFaqsBtn');
+                                                               if (toggleBtn && toggleBtn.dataset.hidden === "true") {
+                                                                   row.style.display = 'none';
+                                                               }
+                                                           }
+                                                       });
+                                                    }
+                                                } catch (e) {
+                                                    console.error('Error en lote:', e);
+                                                }
+
+                                                processed += batch.length;
+                                                const percent = (processed / total) * 100;
+                                                bar.style.width = percent + '%';
+                                            }
+
+                                            status.innerText = '✅ Proceso masivo completado';
+                                            setTimeout(() => {
+                                                container.style.display = 'none';
+                                                status.style.display = 'none';
+                                            }, 5000);
+                                        }
+
+                                        function toggleCreatedFaqs() {
+                                            const btn = document.getElementById('toggleCreatedFaqsBtn');
+                                            const isHidden = btn.dataset.hidden === "true";
+                                            const rows = document.querySelectorAll('.faq-row-created');
+                                            
+                                            rows.forEach(row => {
+                                                row.style.display = isHidden ? 'table-row' : 'none';
+                                            });
+                                            
+                                            if (isHidden) {
+                                                btn.dataset.hidden = "false";
+                                                btn.innerHTML = '<i class="fas fa-eye-slash me-1"></i> Ocultar Creadas';
+                                                btn.classList.remove('btn-outline-primary');
+                                                btn.classList.add('btn-primary');
+                                            } else {
+                                                btn.dataset.hidden = "true";
+                                                btn.innerHTML = '<i class="fas fa-eye me-1"></i> Ver Creadas';
+                                                btn.classList.remove('btn-primary');
+                                                btn.classList.add('btn-outline-primary');
+                                            }
+                                        }
+
+                                        /* Eliminado listeners individuales antiguos para evitar duplicados si se recarga dinámicamente */
 
                                         // Listener Botón "Auto-Fix 301" (Cannibalization)
                                         document.querySelectorAll('.auto-fix-btn').forEach(btn => {

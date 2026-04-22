@@ -54,26 +54,34 @@ $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno p
         <!-- Header de la página -->
         <div class="favoritos-header">
             <h1><i class="fas fa-heart"></i> Mis Favoritos</h1>
-            <p class="favoritos-subtitle">Gestiona tus códigos y chollos guardados</p>
+            <p class="favoritos-subtitle">Gestiona tus códigos y usuarios favoritos</p>
         </div>
         
         <?php
-        $view = $_GET['view'] ?? ($_GET['tipo'] === 'chollo' ? 'chollos' : 'codigos');
+        $view = $_GET['view'] ?? (isset($_GET['tipo']) ? strtolower($_GET['tipo']) : 'codigos');
+        
         $active_codigos = $view === 'codigos' ? 'active' : '';
-        $active_chollos = $view === 'chollos' ? 'active' : '';
+        $active_usuarios = $view === 'usuarios' ? 'active' : '';
         
         // Contadores
         $total_codigos = contar_favoritos_usuario($usuario_id, 'codigo');
-        $total_chollos = contar_favoritos_usuario($usuario_id, 'chollo');
+        $total_usuarios = contar_favoritos_usuario($usuario_id, 'usuario');
         
         // Obtener datos según vista
         $limit = 20;
         $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
         $skip = ($page - 1) * $limit;
         
-        $tipo_actual = $view === 'chollos' ? 'chollo' : 'codigo';
+        if ($view === 'usuarios') {
+            $tipo_actual = 'usuario';
+            $total_actual = $total_usuarios;
+        } else {
+            $tipo_actual = 'codigo';
+            $view = 'codigos'; // normalize
+            $total_actual = $total_codigos;
+        }
+        
         $favoritos = obtener_favoritos_usuario($usuario_id, $tipo_actual, $limit, $skip);
-        $total_actual = $view === 'chollos' ? $total_chollos : $total_codigos;
         
         $total_pages = ceil($total_actual / $limit);
         ?>
@@ -83,8 +91,8 @@ $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno p
             <a href="/mis-favoritos?view=codigos" class="tab-item <?php echo $active_codigos; ?>">
                 <i class="fas fa-tags"></i> Códigos (<?php echo $total_codigos; ?>)
             </a>
-            <a href="/mis-favoritos?view=chollos" class="tab-item <?php echo $active_chollos; ?>">
-                <i class="fas fa-fire"></i> Chollos (<?php echo $total_chollos; ?>)
+            <a href="/mis-favoritos?view=usuarios" class="tab-item <?php echo $active_usuarios; ?>">
+                <i class="fas fa-users"></i> Usuarios (<?php echo $total_usuarios; ?>)
             </a>
         </div>
 
@@ -93,9 +101,71 @@ $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno p
             
                 <?php 
                 if (!empty($favoritos)) {
-                    if ($view === 'chollos') {
-                        // Renderizar grid de chollos (ya incluye su propio contenedor grid)
-                        imprimir_grid_chollos($favoritos, 3); // 3 columnas
+                    if ($view === 'usuarios') {
+                        // Renderizar grid de usuarios
+                        echo '<div class="favoritos-usuarios-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; padding: 10px 0;">';
+                        $usuarios_array = iterator_to_array($favoritos);
+                        foreach ($usuarios_array as $usr) {
+                            $u_id = (string)$usr['_id'];
+                            $u_name = htmlspecialchars($usr['username'] ?? 'Usuario');
+                            $u_img = isset($usr['img']) && !empty($usr['img']) ? htmlspecialchars($usr['img']) : '';
+                            
+                            // Reutilizar clases existentes de usuario publico si es posible, o hardcodear el estilo
+                            echo '<div class="usuario-favorito-card" id="card-usuario-'.$u_id.'" style="background:#fff; border-radius:15px; padding:25px 20px; text-align:center; box-shadow:0 4px 15px rgba(0,0,0,0.05); transition:transform 0.3s ease;">';
+                            echo '<a href="/perfil/' . urlencode($u_name) . '" style="text-decoration:none; color:inherit; display:block;">';
+                            
+                            if ($u_img) {
+                                echo '<img src="' . $u_img . '" alt="' . $u_name . '" style="width:80px; height:80px; border-radius:50%; object-fit:cover; margin:0 auto 15px auto; border:3px solid #E30613; display:block;">';
+                            } else {
+                                echo '<div style="width:80px; height:80px; border-radius:50%; background:#E30613; color:#fff; display:flex; align-items:center; justify-content:center; font-size:2rem; font-weight:bold; margin:0 auto 15px auto; box-shadow:0 4px 10px rgba(227,6,19,0.3);">' . strtoupper(substr($u_name, 0, 2)) . '</div>';
+                            }
+                            
+                            echo '<h3 style="margin:0 0 15px 0; font-size:1.2rem; color:#333;">' . $u_name . '</h3>';
+                            echo '</a>';
+                            
+                            echo '<button type="button" class="btn-dejar-seguir" data-usuario-id="'.$u_id.'" style="background:#f1f1f1; border:none; color:#666; padding:10px 20px; border-radius:25px; cursor:pointer; font-size:0.9rem; font-weight:600; width:100%; transition:all 0.3s ease;" onmouseover="this.style.background=\'#FFE5E5\'; this.style.color=\'#E30613\'" onmouseout="this.style.background=\'#f1f1f1\'; this.style.color=\'#666\'">';
+                            echo '<i class="fas fa-user-minus"></i> Dejar de seguir';
+                            echo '</button>';
+                            
+                            echo '</div>';
+                        }
+                        echo '</div>';
+                        
+                        // Script para el botón dejar de seguir
+                        echo '<script>
+                        document.addEventListener("DOMContentLoaded", function() {
+                            const btns = document.querySelectorAll(".btn-dejar-seguir");
+                            btns.forEach(btn => {
+                                btn.addEventListener("click", function() {
+                                    const uuid = this.getAttribute("data-usuario-id");
+                                    const icon = this.querySelector("i");
+                                    icon.className = "fas fa-spinner fa-spin";
+                                    
+                                    $.ajax({
+                                        url: "/ajax_actions",
+                                        method: "POST",
+                                        data: { action: "eliminar_favorito", codigo_id: uuid, tipo: "usuario" },
+                                        success: function(resp) {
+                                            if (typeof resp === "string") { try { resp = JSON.parse(resp); } catch(e){} }
+                                            if(resp.success) {
+                                                const card = document.getElementById("card-usuario-"+uuid);
+                                                card.style.opacity = "0.5";
+                                                setTimeout(() => card.remove(), 400);
+                                            } else {
+                                                alert(resp.message || "Error al dejar de seguir");
+                                                icon.className = "fas fa-user-minus";
+                                            }
+                                        },
+                                        error: function() {
+                                            alert("Error de conexión");
+                                            icon.className = "fas fa-user-minus";
+                                        }
+                                    });
+                                });
+                            });
+                        });
+                        </script>';
+                        
                     } else {
                         // Renderizar grid de códigos (necesita contenedor)
                         echo '<div class="favoritos-grid">';
@@ -137,7 +207,7 @@ $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno p
                     <i class="fas fa-heart"></i>
                     <h2>Aún no tienes <?php echo $view; ?> favoritos</h2>
                     <p>Cuando añadas <?php echo $view; ?> a tus favoritos, aparecerán aquí</p>
-                    <a href="<?php echo $view === 'chollos' ? '/chollos' : '/'; ?>" class="btn-explorar">
+                    <a href="<?php echo $view === 'chollos' ? 'https://www.malprecio.com/chollos' : '/'; ?>" class="btn-explorar">
                         <i class="fas fa-search"></i> Explorar <?php echo ucfirst($view); ?>
                     </a>
                 </div>

@@ -28,6 +28,7 @@ try {
 
     require_once __DIR__ . '/../config/stripe.php';
     // NOTA: este fichero históricamente usaba la test key en todos los casos.
+    // Se preserva ese comportamiento exacto para no romper el flujo.
     $stripe_secret_key = get_stripe_test_secret_key();
     $stripe = new \Stripe\StripeClient($stripe_secret_key);
 
@@ -62,11 +63,16 @@ foreach ($codigos_usuario as $codigo) {
         $nueva_posicion = 1;
 
         // Preparar datos de actualización
+        $duracion_dias = ($tipo === 'super') ? DESTACADO_DURACION_SUPER : DESTACADO_DURACION_NORMAL;
         $update_data = [
             'posicion' => $nueva_posicion,
-            'destacado' => time(), // sin fecha de fin (modelo puja)
-            'fecha_destacado' => date('Y-m-d H:i:s'),
-            'tipo_destacado' => $tipo
+            'destacado' => time(),
+            'fecha_destacado' => new MongoDB\BSON\UTCDateTime(),
+            'fecha_fin_destacado' => new MongoDB\BSON\UTCDateTime((time() + ($duracion_dias * 86400)) * 1000),
+            'tipo_destacado' => $tipo,
+            'prioridad_pago' => time(),
+            'aviso_expiracion_enviado' => false,
+            'aviso_expirado_enviado' => false
         ];
         
         // Para destacado "super", establecer también destacado_social (aparece en home y tiene prioridad)
@@ -117,7 +123,7 @@ if (!empty($codigos_destacados)) {
             'user_id' => $_SESSION["user_id"],
             'tipo' => 'destacar_todos',
             'fecha' => date('Y-m-d H:i:s'),
-            'detalles' => 'Destacados ' . count($codigos_destacados) . ' códigos (prioridad sin fecha límite)',
+            'detalles' => 'Destacados ' . count($codigos_destacados) . ' códigos (duración fija)',
             'monto' => 9.99,
             'codigos_destacados' => count($codigos_destacados),
             'session_id' => $session_id
@@ -160,7 +166,7 @@ get_header_modern("Códigos Destacados - Código Amigo", "Todos tus códigos han
                     <div style="font-size: 80px; margin-bottom: 25px;">🎉</div>
                     <h2 style="margin: 0 0 20px 0; font-size: 2.5rem; font-weight: 600;">¡Operación Exitosa!</h2>
                     <p style="margin: 0 0 25px 0; font-size: 1.3rem; opacity: 0.95; line-height: 1.6;">
-                        Has destacado <strong><?php echo count($codigos_destacados); ?> códigos</strong> con prioridad sin fecha límite
+                        Has destacado <strong><?php echo count($codigos_destacados); ?> códigos</strong> con posición prioritaria
                         con un solo pago de <strong>9,99€</strong>
                     </p>
 
@@ -177,7 +183,7 @@ get_header_modern("Códigos Destacados - Código Amigo", "Todos tus códigos han
                             </div>
                             <div>
                                 <strong style="font-size: 1.2rem;">⏱️ Duración:</strong>
-                                <span style="font-size: 1.1rem; margin-left: 10px;">Sin fecha límite (hasta que otro usuario te supere)</span>
+                                <span style="font-size: 1.1rem; margin-left: 10px;">Normal: 7 días · Super: 14 días (auto-renovable)</span>
                             </div>
                         </div>
                     </div>
@@ -257,8 +263,8 @@ get_header_modern("Códigos Destacados - Código Amigo", "Todos tus códigos han
                 <div style="text-align: center; margin: 40px 0; padding: 30px; background: #2a2a2a; border-radius: 15px; border: 1px solid #333;">
                     <h3 style="color: #E30613; margin-bottom: 15px; font-size: 1.5rem;">🎯 ¿Qué significa esto?</h3>
                     <p style="margin: 0 0 20px 0; font-size: 1.1rem; color: #ccc;">
-                        Todos tus códigos ahora aparecen en las <strong>primeras posiciones</strong> de cada marca sin fecha límite. Mantendrán la prioridad hasta que otro usuario destaque por encima.
-                        Esto significa que tendrán mucha más visibilidad y recibirán más clicks de los usuarios.
+                        Todos tus códigos ahora aparecen en las <strong>primeras posiciones</strong> de cada marca durante el periodo contratado.
+                        Recibirán mucha más visibilidad y más clicks. Activa la auto-renovación para no perder nunca tu posición.
                     </p>
                     <div style="background: rgba(227, 6, 19, 0.1); padding: 15px; border-radius: 10px; border-left: 4px solid #E30613;">
                         <p style="margin: 0; font-size: 1rem; color: #E30613;">

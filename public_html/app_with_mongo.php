@@ -4,12 +4,20 @@
 require_once __DIR__ . '/inc/logger.php';
 
 // Logear errores en lugar de mostrarlos en pantalla
-// MODO DESARROLLADOR ACTIVADO
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+// PRODUCCIÓN: No mostrar errores al usuario, solo logearlos
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
 ini_set('log_errors', 1);
 ini_set('error_log', '/home/admin/web/codigoamigo.com/public_html/php_errors.log');
 error_reporting(E_ALL);
+
+// Para activar modo debug temporalmente, añadir ?debug_mode=1 con la IP del admin
+// o cambiar esta variable a true
+$APP_DEBUG_MODE = false;
+if ($APP_DEBUG_MODE || (isset($_GET['debug_mode']) && $_GET['debug_mode'] === '1' && isset($_SERVER['REMOTE_ADDR']) && in_array($_SERVER['REMOTE_ADDR'], ['127.0.0.1', '::1']))) {
+    ini_set('display_errors', 1);
+    ini_set('display_startup_errors', 1);
+}
 
 // Iniciar sesión ANTES de output buffering
 if (session_status() === PHP_SESSION_NONE) {
@@ -107,7 +115,7 @@ register_shutdown_function(function () {
 // Crear aplicación Slim
 $app = new \Slim\App([
     'settings' => [
-        'displayErrorDetails' => false, // Deshabilitado para producción
+        'displayErrorDetails' => true, // Habilitado temporalmente para debugear el error 500
         'addContentLengthHeader' => false,
         'determineRouteBeforeAppMiddleware' => true,
         'outputBuffering' => 'append',
@@ -205,7 +213,7 @@ $app->get('/', function ($request, $response) {
     $skip_patrocinados = get_skip_patrocinados_in_pagination();
 
     // Determinar el orden según el parámetro recibido
-    $sort_order = array('fecha_publicacion' => -1); // orden por defecto: más recientes primero por fecha
+    $sort_order = array('fecha_publicacion' => -1); // orden por defecto: más recientes primero por fecha de publicación
 
     $orden_param = filter_input(INPUT_GET, 'orden', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
     if ($orden_param !== null) {
@@ -227,33 +235,35 @@ $app->get('/', function ($request, $response) {
 
     
 
-        $sort_order_destacados = array('prioridad_pago' => -1, 'destacado_social' => -1, 'destacado' => -1, 'fecha_publicacion' => -1);
+        // Ordenar por fecha de destacado social descendente (quien acaba de destacar sale primero)
+        // _id como desempate para orden 100% determinístico
+        $sort_order_destacados = array('destacado_social' => -1, '_id' => -1);
 
         /* Listado PATROCINADOS/DESTACADOS */
-        // Filtrar solo códigos que tengan destacado_social > 0 o destacado > 0
+        // Filtrar solo códigos Super/Guía que tengan destacado_social > 0 (los que pagan 3,99€+)
+        // Los códigos Normal (0,99€) solo tienen 'destacado' y NO deben aparecer en el home
+        // Solo mostrar los que NO han expirado
         $array_filtro = array(
             "estado" => 0,
-            '$or' => array(
-                array("destacado_social" => array('$ne' => 0)),
-                array("destacado" => array('$ne' => 0))
-            )
+            "destacado_social" => array('$gt' => 0),
+            "fecha_fin_destacado" => array('$gt' => new MongoDB\BSON\UTCDateTime())
         );
 
 
         $array_skip = array("limit" => 100); // Obtener los últimos 100 códigos destacados
-        //$array_skip = array_merge($array_skip, array("skip" => $skip_patrocinados));
         $array_skip = array_merge($array_skip, array("sort" => $sort_order_destacados)); // Aplicar orden
 
         //TOMO LOS CODIGOS
         $lista_codigos_patrocinados_pre = get_all_listado_codigos_array($array_filtro, $array_skip);
         $lista_codigos_patrocinados = isset($lista_codigos_patrocinados_pre["results"]) ? $lista_codigos_patrocinados_pre["results"] : [];
 
-    /* Listado TODOS LOS CODIGOS RECIENTES */
-    // Usar expresión regular para obtener códigos recientes correctamente
+    // Listado TODOS LOS CODIGOS RECIENTES (Optimizado: Ordenar por modificación para más justicia y rotación)
     $array_filtro = array(
-        "estado" => 0,
-        "fecha_publicacion" => array('$regex' => '^202[4-9]-') // Códigos de 2024 en adelante
+        "estado" => 0
+        // Se elimina el filtro de 30 días ya que el orden por fecha_modificacion descendente se encarga de mostrar los recientes
     );
+    // Excluir códigos con fecha_validez expirada
+    $array_filtro = array_merge($array_filtro, get_filtro_no_expirados());
 
     $array_skip = array("limit" => $limit2 * 2); // Duplicar límite ya que ahora obtenemos todos los códigos recientes
     $array_skip = array_merge($array_skip, array("skip" => $skip));
@@ -304,11 +314,7 @@ $app->get('/', function ($request, $response) {
         "https://www.codigoamigo.com/img/logo_codigoamigo_real4.png"
     );
 
-    // Widget de Chollos (movido desde header global)
-    if (!function_exists('renderCompactHotDealsWidget')) {
-        include_once __DIR__ . '/myphp/funciones_chollos.php';
-    }
-    echo renderCompactHotDealsWidget();
+
 
     // Hero Section (movido desde header global)
     ?>
@@ -317,9 +323,49 @@ $app->get('/', function ($request, $response) {
         <p class="hero-description">Códigos de descuento verificados y actualizados diariamente para que ahorres en tus compras favoritas</p>
     </section>
     <?php
+    // VIP Awareness Banner en homepage (solo para usuarios logueados no-VIP)
+    $show_vip_banner = false;
+    if (isset($_SESSION['user_id']) && !empty($_SESSION['user_id'])) {
+        if (function_exists('es_usuario_vip') && !es_usuario_vip($_SESSION['user_id'])) {
+            $show_vip_banner = true;
+        }
+    }
+    if ($show_vip_banner): ?>
+    <div id="vip-home-banner" style="max-width: 1200px; margin: 0 auto 30px; padding: 0 20px; display: none;">
+        <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 16px; padding: 25px 30px; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; border: 1px solid rgba(255, 215, 0, 0.25); position: relative;">
+            <button onclick="this.parentElement.parentElement.style.display='none'; localStorage.setItem('vip_banner_dismissed', Date.now())" style="position: absolute; top: 10px; right: 15px; background: none; border: none; color: rgba(255,255,255,0.4); font-size: 18px; cursor: pointer; padding: 5px; line-height: 1;">✕</button>
+            <div style="display: flex; align-items: center; gap: 15px; flex: 1; min-width: 250px;">
+                <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #ffd700, #E30613); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i class="fas fa-crown" style="color: white; font-size: 22px;"></i>
+                </div>
+                <div>
+                    <h4 style="color: #ffd700; font-weight: 700; margin: 0 0 4px 0; font-size: 1.05rem;">Hazte VIP y gana más con tus códigos</h4>
+                    <p style="color: rgba(255,255,255,0.8); margin: 0; font-size: 0.85rem; line-height: 1.4;">Badge dorado • Chat con viewers • 10€ de saldo gratis cada mes</p>
+                </div>
+            </div>
+            <a href="/public/mis_viewers.php" style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #ffd700, #E30613); color: white; padding: 12px 24px; border-radius: 25px; font-weight: 700; text-decoration: none; font-size: 0.9rem; white-space: nowrap; transition: transform 0.2s ease, box-shadow 0.2s ease;" onmouseover="this.style.transform='scale(1.03)'; this.style.boxShadow='0 8px 25px rgba(255,215,0,0.3)'" onmouseout="this.style.transform=''; this.style.boxShadow=''">
+                <i class="fas fa-crown"></i> Solo 9,99€/mes →
+            </a>
+        </div>
+    </div>
+    <script>
+    (function() {
+        var dismissed = localStorage.getItem('vip_banner_dismissed');
+        // Show banner if not dismissed in last 7 days
+        if (!dismissed || (Date.now() - parseInt(dismissed)) > 7 * 24 * 60 * 60 * 1000) {
+            document.getElementById('vip-home-banner').style.display = 'block';
+        }
+    })();
+    </script>
+    <?php endif; ?>
 
+    <?php
     // Generar contenido principal con diseño moderno
     echo '<div class="main-content">';
+    
+    // AdSense Top
+    echo generate_adsense_container(get_adsense_top(), 'adsense-main-top', 'margin-bottom: 30px;');
+
     echo '<div class="codes-section">';
     
     // Mostrar códigos destacados primero (solo en la primera página)
@@ -333,6 +379,8 @@ $app->get('/', function ($request, $response) {
         
         // Mostrar categorías populares (solo en la primera página)
         echo generate_popular_categories_section();
+        
+
     }
     
     // Mostrar información de códigos
@@ -369,6 +417,9 @@ $app->get('/', function ($request, $response) {
     echo '</div>';
     echo '</div>';
     
+    // AdSense Entremedio
+    echo generate_adsense_container(get_adsense_entremedio(), 'adsense-home-middle', 'margin-top: 20px; margin-bottom: 20px;');
+
     // Bloque de tendencias de búsqueda (solo home principal)
     if (!isset($_GET['page']) || (int)$_GET['page'] === 1) {
         if (function_exists('get_search_statistics')) {
@@ -702,6 +753,211 @@ $app->get('/guias/{slug}', function ($request, $response, $args) {
     return $response;
 });
 
+// Ruta de renovación de destacado al 50%
+$app->any('/renovar-destacado', function ($request, $response, $args) {
+    global $author_web, $data_usuario, $anula_adsense;
+    
+    $anula_adsense = true;
+    $title = "Renueva tu destacado con descuento";
+    $description = "Renueva tu código destacado con un 50% de descuento exclusivo";
+
+    // Hacer vars globales para el include
+    $GLOBALS['title'] = $title;
+    $GLOBALS['description'] = $description;
+    
+    // Ejecutar el script (que mandará sus propios headers de HTML)
+    ob_start();
+    include $_SERVER['DOCUMENT_ROOT'] . '/public/renovar_destacado.php';
+    $output = ob_get_clean();
+    $response->getBody()->write($output);
+    return $response;
+});
+
+/********************************************************************
+ * FICHA DE CÓDIGO INDIVIDUAL - /codigo/{marca}-{shortId}
+ *******************************************************************/
+
+$app->get('/codigo/{slug}', function ($request, $respon, $args) {
+    global $author_web, $detect, $data_usuario;
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+
+    // Asegurar que $detect esté inicializado
+    if (!isset($detect) || !is_object($detect) || !($detect instanceof Mobile_Detect)) {
+        if (!class_exists('Mobile_Detect')) {
+            if (file_exists($_SERVER['DOCUMENT_ROOT'] . '/myphp/librerias/Mobile_Detect.php')) {
+                require_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/librerias/Mobile_Detect.php';
+            } elseif (file_exists(__DIR__ . '/myphp/librerias/Mobile_Detect.php')) {
+                require_once __DIR__ . '/myphp/librerias/Mobile_Detect.php';
+            }
+        }
+        if (class_exists('Mobile_Detect')) {
+            $detect = new Mobile_Detect();
+        } else {
+            $detect = null;
+        }
+    }
+
+    $slug = $args['slug'] ?? '';
+    
+    // Parsear el slug para obtener marca y short_id
+    if (!function_exists('parse_ficha_codigo_slug')) {
+        if (file_exists($_SERVER['DOCUMENT_ROOT'] . '/myphp/links.php')) {
+            require_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/links.php';
+        } elseif (file_exists(__DIR__ . '/myphp/links.php')) {
+            require_once __DIR__ . '/myphp/links.php';
+        }
+    }
+    
+    if (function_exists('parse_ficha_codigo_slug')) {
+        $parsed = parse_ficha_codigo_slug($slug);
+    } else {
+        // Fallback en caso de que links.php no cargue
+        $parts = explode('-', $slug);
+        if (count($parts) < 2) {
+            $parsed = false;
+        } else {
+            $short_id = array_pop($parts);
+            if (strlen($short_id) !== 8) {
+                $parsed = false;
+            } else {
+                $parsed = [
+                    'marca' => implode('-', $parts),
+                    'short_id' => $short_id
+                ];
+            }
+        }
+    }
+    
+    if (!$parsed) {
+        // Slug inválido → 404
+        include_once __DIR__ . '/404.php';
+        return $respon->withStatus(404);
+    }
+    
+    $marca_clave = $parsed['marca'];
+    $short_id = $parsed['short_id'];
+    
+    // Buscar el código en MongoDB
+    $collection_codigos = getCollectionCodigos();
+    $codigo = null;
+    
+    $codigos_marca = $collection_codigos->find([
+        'marca' => new \MongoDB\BSON\Regex('^' . preg_quote($marca_clave) . '$', 'i'),
+        'estado' => ['$in' => [0, -1, 1]]
+    ], ['limit' => 500]);
+    
+    foreach ($codigos_marca as $c) {
+        $id_str = (string)$c['_id'];
+        if (substr($id_str, -8) === $short_id) {
+            $codigo = $c;
+            break;
+        }
+    }
+    
+    if (!$codigo) {
+        include_once __DIR__ . '/404.php';
+        return $respon->withStatus(404);
+    }
+    
+    // Incrementar vistas
+    if (function_exists('añadir_vista_codigo')) {
+        añadir_vista_codigo($codigo);
+    }
+    
+    // Redirigir a la página de la marca abriendo el modal de este código particular
+    $url_destino = '/de-' . $marca_clave . '?codigo=' . (string)$codigo['_id'];
+    return $respon->withRedirect($url_destino, 301);
+});
+
+// Ruta para Comparativas automáticas (/comparar/marca1-vs-marca2)
+$app->get('/comparar/{slug}', function ($request, $response, $args) {
+    $slug = $args['slug'];
+    
+    // Parse marca1-vs-marca2
+    $parts = explode('-vs-', $slug, 2);
+    if (count($parts) !== 2 || empty($parts[0]) || empty($parts[1])) {
+        include_once __DIR__ . '/404.php';
+        return $response->withStatus(404);
+    }
+    
+    $slug_a = trim($parts[0]);
+    $slug_b = trim($parts[1]);
+    
+    // Include necessary files
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/funciones_modern.php';
+    include_once __DIR__ . '/myphp/_header_modern.php';
+    
+    // Get brand info
+    $marca_a = get_brand_info($slug_a);
+    $marca_b = get_brand_info($slug_b);
+    
+    if (empty($marca_a['nombre']) || empty($marca_b['nombre'])) {
+        include_once __DIR__ . '/404.php';
+        return $response->withStatus(404);
+    }
+    
+    // Only allow comparisons between brands in the same category
+    $cat_a_clave = $marca_a['categoria_clave'] ?? '';
+    $cat_b_clave = $marca_b['categoria_clave'] ?? '';
+    if (empty($cat_a_clave) || empty($cat_b_clave) || $cat_a_clave !== $cat_b_clave) {
+        include_once __DIR__ . '/404.php';
+        return $response->withStatus(404);
+    }
+    
+    $nombre_a = $marca_a['nombre'];
+    $nombre_b = $marca_b['nombre'];
+    
+    // Get active codes for each brand
+    $filtro_a = ['marca' => ['$regex' => '^' . preg_quote($slug_a) . '$', '$options' => 'i'], 'estado' => 0];
+    $filtro_b = ['marca' => ['$regex' => '^' . preg_quote($slug_b) . '$', '$options' => 'i'], 'estado' => 0];
+    $opciones = ['limit' => 50, 'sort' => ['destacado' => -1, '_id' => -1]];
+    
+    $result_a = get_all_listado_codigos_array($filtro_a, $opciones);
+    $result_b = get_all_listado_codigos_array($filtro_b, $opciones);
+    $codigos_a = $result_a['results'] ?? [];
+    $codigos_b = $result_b['results'] ?? [];
+    
+    // Related brands (from same category)
+    $related_brands = [];
+    $cat_a = $marca_a['categoria_clave'] ?? '';
+    if (!empty($cat_a) && function_exists('get_brands_by_category')) {
+        $brands_in_cat = get_brands_by_category($cat_a . '-comparte-y-gana');
+        $related_brands = array_filter($brands_in_cat, function($b) use ($slug_a, $slug_b) {
+            return ($b['nombre_clave'] ?? '') !== $slug_a && ($b['nombre_clave'] ?? '') !== $slug_b;
+        });
+        $related_brands = array_values(array_slice($related_brands, 0, 6));
+    }
+    
+    // SEO meta
+    $title = "Código amigo $nombre_a vs $nombre_b – Comparativa " . date('Y') . " | CodigoAmigo";
+    $description = "Compara los códigos de descuento de $nombre_a y $nombre_b. ¿Cuál ofrece más beneficio? Encuentra el mejor código amigo verificado para " . date('Y') . ".";
+    
+    $GLOBALS['website'] = 'https://www.codigoamigo.com/';
+    $GLOBALS['actual_url'] = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+    $GLOBALS['header_modern_used'] = true;
+    
+    get_header_modern(
+        $title,
+        $description,
+        "$nombre_a vs $nombre_b",
+        $description,
+        'https://www.codigoamigo.com/images/logo.png',
+        ['description' => $description]
+    );
+    
+    // Render the view
+    include __DIR__ . '/myphp/views/comparar.php';
+    
+    // Footer
+    include_once __DIR__ . '/myphp/_footer.php';
+    get_footer_modern();
+    
+    return $response;
+});
+
 // Ruta de búsqueda simplificada
 $app->get('/ofertas/{termino}', function ($request, $response, $args) {
     $termino = $args['termino'];
@@ -711,7 +967,7 @@ $app->get('/ofertas/{termino}', function ($request, $response, $args) {
     include_once __DIR__ . '/inc/includes.php';
     include_once __DIR__ . '/myphp/funciones.php';
     include_once __DIR__ . '/myphp/funciones_modern.php';
-    include_once __DIR__ . '/myphp/funciones_chollos.php';
+
     include_once __DIR__ . '/myphp/funciones_busqueda.php';
     include_once __DIR__ . '/myphp/funciones_usuario.php'; // Required for getCollectionLogs used in record_search_term
     include_once __DIR__ . '/myphp/_header_modern.php';
@@ -871,34 +1127,7 @@ $app->get('/ofertas/{termino}', function ($request, $response, $args) {
         ? $lista_codigos_generales["results"]
         : array();
 
-    // Buscar chollos que coincidan con el término de búsqueda (con paginación)
-    $lista_chollos = array();
-    $total_chollos = 0;
-    $chollos_page = isset($queryParams['chollos_page']) ? max(1, intval($queryParams['chollos_page'])) : 1;
-    $chollos_per_page = 20; // Chollos por página
-    $chollos_skip = ($chollos_page - 1) * $chollos_per_page;
-    
-    if (!empty($termino) && function_exists('obtenerChollos')) {
-        // Obtener total de chollos para paginación
-        if (function_exists('contarChollos')) {
-            $filtros_count = array(
-                'estado' => 1,
-                'busqueda' => $termino
-            );
-            $total_chollos = contarChollos($filtros_count);
-        }
-        
-        // Obtener chollos con paginación
-        $filtros_chollos = array(
-            'estado' => 1,
-            'busqueda' => $termino,
-            'limite' => $chollos_per_page,
-            'skip' => $chollos_skip
-        );
-        $lista_chollos = obtenerChollos($filtros_chollos);
-    }
-    
-    $total_chollos_pages = $total_chollos > 0 ? ceil($total_chollos / $chollos_per_page) : 0;
+
 
     // Incluir funciones de AdSense
     if (!function_exists('get_adsense_search')) {
@@ -909,17 +1138,17 @@ $app->get('/ofertas/{termino}', function ($request, $response, $args) {
     echo '<div class="main-content">';
     
     // Migas de pan visuales
-    echo '<div class="container" style="margin-top: 20px;">';
-    echo '<nav class="breadcrumb-nav" style="margin-bottom: 20px; font-size: 0.9rem; color: #888;">';
+    echo '<div class="container breadcrumb-container">';
+    echo '<nav class="breadcrumb-nav">';
     echo '<a href="/" style="color: #888; text-decoration: none;">Inicio</a> <i class="fas fa-chevron-right" style="font-size: 0.7rem; margin: 0 8px;"></i> ';
     echo '<span style="color: #E30613; font-weight: 500;">Búsqueda: ' . htmlspecialchars($termino) . '</span>';
     echo '</nav>';
     echo '</div>';
 
     echo '<div class="codes-section">';
-    echo '<div class="page-header glass-card animate-on-scroll" style="margin-bottom: 3rem;">';
-    echo '<h1 class="premium-h1" style="font-size: 2.5rem; font-weight: 800; color: #fff; margin-bottom: 10px;">Códigos descuento ' . htmlspecialchars($termino) . '</h1>';
-    echo '<p class="premium-subtitle" style="font-size: 1.1rem; color: rgba(255,255,255,0.7);">Cupones y ofertas verificadas en ' . date('Y') . '</p>';
+    echo '<div class="page-header glass-card animate-on-scroll">';
+    echo '<h1 class="premium-h1">Códigos descuento ' . htmlspecialchars($termino) . '</h1>';
+    echo '<p class="premium-subtitle">Cupones y ofertas verificadas en ' . date('Y') . '</p>';
     echo '</div>';
     
     // Agregar contexto de búsqueda para AdSense (oculto pero presente en el DOM)
@@ -929,7 +1158,13 @@ $app->get('/ofertas/{termino}', function ($request, $response, $args) {
     echo '</div>';
     
     // AdSense para búsqueda - Top
-    include __DIR__ . "/myphp/chollos_search_view.php";
+    if (!empty($termino) && function_exists('get_adsense_search')) {
+        echo '<div class="adsense-search-top mb-4 mt-4" style="text-align: center; margin: 30px 0; padding: 30px; background: #f8f9fa; border-radius: 12px; border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.05); width: 100%; max-width: 100%; overflow: hidden; display: block; position: relative;">';
+        echo '<div style="min-height: 250px; width: 100%; max-width: 100%; display: block; position: relative;">';
+        echo get_adsense_search($termino, null, 'top');
+        echo '</div>';
+        echo '</div>';
+    }
 
     
     if (!empty($codigos_destacados)) {
@@ -961,7 +1196,7 @@ $app->get('/ofertas/{termino}', function ($request, $response, $args) {
         }
     }
 
-    if (empty($codigos_destacados) && empty($codigos_generales) && empty($lista_chollos)) {
+    if (empty($codigos_destacados) && empty($codigos_generales)) {
         echo '<div style="text-align: center; color: #ccc; padding: 2rem;">';
         echo '<i class="fas fa-search" style="font-size: 3rem; margin-bottom: 1rem; color: #E30613;"></i>';
         echo '<h3>No se encontraron códigos</h3>';
@@ -1073,9 +1308,11 @@ $app->get('/ultimos-codigos', function ($request, $response) {
 
     // Filtros para códigos recientes
     $array_filtro = array(
-        "estado" => 0,
-        "fecha_publicacion" => array('$regex' => '^202[4-5]-')
+        "estado" => 0
+        // Se elimina el filtro regex ya que el orden por fecha_modificacion hace el trabajo
     );
+    // Excluir códigos con fecha_validez expirada
+    $array_filtro = array_merge($array_filtro, get_filtro_no_expirados());
     
     $sort_order = array('fecha_publicacion' => -1);
     
@@ -1117,6 +1354,12 @@ $app->get('/ultimos-codigos', function ($request, $response) {
 
     get_footer();
     return $response;
+});
+
+// Ruta para el sistema de shorts (tipo TikTok)
+// Chollos Shorts - Eliminado definitivamente (410 Gone) para ahorro de Crawl Budget
+$app->get('/chollos-shorts', function ($request, $respon) {
+    return $respon->withStatus(410)->write('Este contenido ha sido eliminado permanentemente.');
 });
 
 // Ruta de prueba
@@ -1210,6 +1453,7 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
     // Inicializar variables globales
     $GLOBALS['website'] = 'https://www.codigoamigo.com/';
     $GLOBALS['actual_url'] = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+    $GLOBALS['actual_url_limpia'] = 'https://www.codigoamigo.com/de-' . $marca;
 
     // Incluir archivos necesarios
     include_once __DIR__ . '/inc/includes.php';
@@ -1288,10 +1532,10 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
             
             // Llamar a la función del header moderno
             get_header_modern(
-                "Código de descuento " . ucfirst($marca) . " - CodigoAmigo.com",
-                "Código de descuento verificado para " . ucfirst($marca),
-                "Código de descuento " . ucfirst($marca),
-                "Código de descuento " . ucfirst($marca),
+                "Código amigo " . ucfirst($marca) . " (verificado) - CodigoAmigo.com",
+                "Usa este código amigo de " . ucfirst($marca) . " verificado por la comunidad. Ahorra hasta " . ($codigo_arr['num_beneficio'] ?? '') . "€ en tu Registro.",
+                "Código amigo " . ucfirst($marca) . " Verificado",
+                "Código amigo " . ucfirst($marca) . " (verificado) - ¡Ahorra ahora!",
                 "https://www.codigoamigo.com/img/logo_codigoamigo_real4.png"
             );
             
@@ -1341,6 +1585,8 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
         // Mostrar listado de códigos de la marca
         $array_filtro = array("estado" => 0);
         $array_filtro = array_merge($array_filtro, array("marca" => $marca));
+        // Excluir códigos con fecha_validez expirada
+        $array_filtro = array_merge($array_filtro, get_filtro_no_expirados());
 
         // Aplicar filtro de fecha si está presente
         $fecha_filtro = $request->getQueryParam('fecha');
@@ -1499,8 +1745,8 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
         get_header_modern(
             $titulo_mejorado . " - CodigoAmigo.com",
             $descripcion_mejorada,
-            "Códigos de descuento para " . ucfirst($marca),
-            "Códigos de descuento para " . ucfirst($marca),
+            $titulo_mejorado,
+            $descripcion_mejorada,
             "https://www.codigoamigo.com/img/logo_codigoamigo_real4.png"
         );
 
@@ -1530,6 +1776,7 @@ $app->get('/login', function ($request, $response, $args) {
     // Incluir archivos necesarios
     include_once __DIR__ . '/inc/includes.php';
     include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/funciones_usuario.php';
     include_once __DIR__ . '/myphp/_header_modern.php';
     $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
     
@@ -1539,10 +1786,45 @@ $app->get('/login', function ($request, $response, $args) {
     }
     $GLOBALS['detect'] = $detect;
     
+    // Capturar parámetro de redirección
+    $redirect_path = $_GET['redirect'] ?? '';
+    $autologin_token = $_GET['autologin'] ?? '';
+
+    // Manejar autologin si está presente y el usuario no está logueado
+    if (!empty($autologin_token) && (!isset($_SESSION["user_id"]) || $_SESSION["user_id"] == "")) {
+        try {
+            $collection_usuarios = getCollectionUsuarios();
+            $usuario = $collection_usuarios->findOne(['autologin_token' => $autologin_token]);
+            
+            if ($usuario) {
+                // Iniciar sesión
+                $id_object = $usuario["_id"];
+                $_SESSION["user_id"] = ((string) new MongoDB\BSON\ObjectId($id_object));
+                $_SESSION["mail"] = $usuario["mail"];
+                $_SESSION["username"] = $usuario["username"];
+                $_SESSION["zumbido_saldo"] = $usuario["zumbido_saldo"] ?? 0;
+                
+                // Eliminar token para que sea de un solo uso
+                $collection_usuarios->updateOne(
+                    ['_id' => $id_object],
+                    ['$unset' => ['autologin_token' => '']]
+                );
+            }
+        } catch (Throwable $e) {
+            error_log("Error in autologin: " . $e->getMessage());
+        }
+    }
+    
     // Verificar si el usuario ya está logueado
     if (isset($_SESSION["user_id"]) && $_SESSION["user_id"] != "") {
-        echo "<script> window.location.href = 'https://www.codigoamigo.com' </script>";
+        $final_redirect = !empty($redirect_path) ? $redirect_path : 'https://www.codigoamigo.com';
+        echo "<script> window.location.href = '$final_redirect' </script>";
         exit;
+    }
+    
+    // Almacenar el redirect en localStorage si existe, para que los handlers de login (Google, etc) lo usen
+    if (!empty($redirect_path)) {
+        echo "<script> localStorage.setItem('redirectAfterLogin', " . json_encode($redirect_path) . "); </script>";
     }
     
     $author = isset($GLOBALS["author"]) ? $GLOBALS["author"] : "Código Amigo";
@@ -2058,22 +2340,17 @@ $app->get('/mis-anuncios', function ($request, $response, $args) {
     }
     
     // Obtener códigos del usuario (DESPUÉS de procesar el destacado)
+    // Cargar TODOS los códigos del usuario (cualquier estado) para que pueda ver caducados/inactivos
     $array_filtro = array("id_usuario" => new MongoDB\BSON\ObjectId($_SESSION["user_id"]));
-    $array_filtro = array_merge($array_filtro, array("estado" => 0)); // Solo códigos activos
 
-
-    // Primero contar cuántos códigos tiene el usuario
+    // Primero contar cuántos códigos tiene el usuario (todos los estados)
     $total_codigos_usuario = count_all_listado_codigos_array($array_filtro);
     
     // Usar un límite más alto o sin límite para usuarios con muchos códigos
     $limite_codigos = $total_codigos_usuario > 5000 ? 10000 : 5000;
 
- 
     $array_skip = array("limit" => $limite_codigos);
     $array_skip = array_merge($array_skip, array("sort" => array('fecha_publicacion' => -1)));
-
-
-
 
     $resultado_codigos = get_all_listado_codigos_array($array_filtro, $array_skip);
     $listado_codigos = isset($resultado_codigos["results"]) ? $resultado_codigos["results"] : array();
@@ -2083,14 +2360,35 @@ $app->get('/mis-anuncios', function ($request, $response, $args) {
     $mostrando_todos = $num_codigos >= $total_codigos_usuario;
     $codigos_ocultos = $total_codigos_usuario - $num_codigos;
 
-    // Contar códigos por visibilidad
+    // Contar códigos por estado
+    $num_activos = 0;
+    $num_caducados = 0;    // estado -3
+    $num_desactivados = 0; // estado -2
+    $num_inactivos = 0;    // estado -1
+    $num_sin_estado = 0;   // sin campo estado
+
+    // Contar códigos por visibilidad (solo para activos)
     $num_1_codes = 0; // Alta visibilidad (posición 1)
     $num_2_codes = 0; // Media visibilidad (posición 2)
     $num_3_codes = 0; // Baja visibilidad (posición 3+)
 
     foreach($listado_codigos as $codigo) {
-        // Verificar que $codigo['marca'] existe y no es null
-        if (isset($codigo['marca']) && $codigo['marca'] !== null) {
+        // Contar por estado
+        $estado_codigo = isset($codigo['estado']) ? (int)$codigo['estado'] : null;
+        if ($estado_codigo === 0 || $estado_codigo === null) {
+            $num_activos++;
+            if ($estado_codigo === null) $num_sin_estado++;
+        } elseif ($estado_codigo === -3) {
+            $num_caducados++;
+        } elseif ($estado_codigo === -2) {
+            $num_desactivados++;
+        } elseif ($estado_codigo === -1) {
+            $num_inactivos++;
+        }
+
+        // Contar visibilidad solo para códigos activos
+        $es_activo = ($estado_codigo === 0 || $estado_codigo === null);
+        if ($es_activo && isset($codigo['marca']) && $codigo['marca'] !== null) {
             $marca = getObjectMarca('nombre_clave', $codigo['marca']);
             if($marca) {
                 $posicion = get_posicion_codigo_en_marca($codigo['_id'], $codigo['marca']);
@@ -2213,6 +2511,27 @@ $app->get('/ficha/{id}', function ($request, $response, $args) {
     $description = "Detalles del código amigo";
     
     include_once $_SERVER['DOCUMENT_ROOT'] . '/public/ficha.php';
+    
+    return $response;
+});
+
+// Rutas de páginas informativas
+$app->get('/preguntas-frecuentes', function ($request, $response, $args) {
+    global $noindex;
+    
+    $noindex = 0; // Permitir indexación
+    
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/preguntas_frecuentes.php';
+    
+    return $response;
+});
+
+$app->get('/blog', function ($request, $response, $args) {
+    global $noindex;
+    
+    $noindex = 0; // Permitir indexación
+    
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/blog.php';
     
     return $response;
 });
@@ -2994,6 +3313,10 @@ $app->options('/ajax/', function ($request, $response, $args) {
 });
 
 $app->post('/ajax_actions', function ($request, $response, $args) {
+    // Incluir funciones necesarias para votos y otras acciones
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones_codigo.php';
+    
     // Obtener datos del body si vienen como JSON
     $parsedBody = $request->getParsedBody();
     $postData = !empty($parsedBody) ? $parsedBody : $_POST;
@@ -3061,6 +3384,10 @@ $app->get('/ajax_actions', function ($request, $response, $args) {
 
 // Manejar /ajax sin barra final (critico para llamadas desde JS)
 $app->post('/ajax', function ($request, $response, $args) {
+    // Incluir funciones necesarias para votos y otras acciones
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones_codigo.php';
+    
     $parsedBody = $request->getParsedBody();
     $postData = !empty($parsedBody) ? $parsedBody : $_POST;
     
@@ -3117,7 +3444,10 @@ $app->post('/ajax', function ($request, $response, $args) {
 
 // Manejar /ajax/ con barra final también
 $app->post('/ajax/', function ($request, $response, $args) {
-    // Redirigir a /ajax sin barra o procesar igual
+    // Incluir funciones necesarias para votos y otras acciones
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones_codigo.php';
+    
     $parsedBody = $request->getParsedBody();
     $postData = !empty($parsedBody) ? $parsedBody : $_POST;
     
@@ -3409,6 +3739,7 @@ $app->post('/procesar_destacado_saldo', function ($request, $response, $args) {
     
     try {
         // Incluir archivos necesarios
+        include_once __DIR__ . '/inc/includes.php';
         include_once __DIR__ . '/myphp/funciones.php';
         include_once __DIR__ . '/myphp/funciones_usuario.php';
         include_once __DIR__ . '/myphp/funciones_codigo.php';
@@ -3448,12 +3779,18 @@ $app->post('/procesar_destacado_saldo', function ($request, $response, $args) {
             }
         }
         
-        // Actualizar el código para destacarlo (prioridad sin fecha fin)
+        // Actualizar el código para destacarlo con duración fija
+        $duracion_dias = ($tipo === 'super' || $tipo === 'super_landing') ? DESTACADO_DURACION_SUPER : DESTACADO_DURACION_NORMAL;
+        $auto_renovar = isset($params['auto_renovar']) && $params['auto_renovar'] === '1';
         $update_data_codigo = [
             'destacado' => time(),
             'tipo_destacado' => $tipo,
             'fecha_destacado' => new MongoDB\BSON\UTCDateTime(),
-            'fecha_fin_destacado' => null
+            'fecha_fin_destacado' => new MongoDB\BSON\UTCDateTime((time() + ($duracion_dias * 86400)) * 1000),
+            'prioridad_pago' => time(),
+            'auto_renovar_destacado' => $auto_renovar,
+            'aviso_expiracion_enviado' => false,
+            'aviso_expirado_enviado' => false
         ];
         
         // Para destacado "super", establecer también destacado_social (aparece en home y tiene prioridad)
@@ -3471,19 +3808,6 @@ $app->post('/procesar_destacado_saldo', function ($request, $response, $args) {
             ['_id' => new MongoDB\BSON\ObjectId($codigo_id)],
             ['$set' => $update_data_codigo]
         );
-        
-        // Si es destacado super y se actualizó correctamente, notificar a usuarios del home
-        if ($resultado_codigo->getModifiedCount() > 0 && $tipo === 'super') {
-            if (function_exists('notificar_competencia_home_destacado_super')) {
-                $codigo_actualizado = $collection_codigos->findOne(['_id' => new MongoDB\BSON\ObjectId($codigo_id)]);
-                $emails_enviados = notificar_competencia_home_destacado_super(
-                    $codigo_id,
-                    $_SESSION["user_id"],
-                    $codigo_actualizado
-                );
-                error_log("Notificaciones de competencia home enviadas: $emails_enviados");
-            }
-        }
         
         if ($resultado_codigo->getModifiedCount() == 0) {
             if ($isAjax) {
@@ -3553,12 +3877,59 @@ $app->post('/procesar_destacado_saldo', function ($request, $response, $args) {
             'precio_euros' => $precio_euros
         ]);
         
+        // Guardar datos para notificaciones en background
+        $bg_notify_data = [
+            'codigo_id' => $codigo_id,
+            'user_id' => $_SESSION["user_id"],
+            'tipo' => $tipo,
+            'marca_clave' => $codigo['marca'] ?? '',
+            'modified' => $resultado_codigo->getModifiedCount() > 0
+        ];
+        
         if ($isAjax) {
-            return $response->withHeader('Content-Type', 'application/json')->write(json_encode([
+            // Enviar respuesta JSON al cliente ANTES de procesar emails
+            $response = $response->withHeader('Content-Type', 'application/json')->write(json_encode([
                 'success' => true,
                 'message' => 'Código destacado exitosamente',
                 'saldo_restante' => $saldo_actual - $precio_euros
             ]));
+            
+            // Registrar función para enviar emails DESPUÉS de cerrar la conexión HTTP
+            register_shutdown_function(function() use ($bg_notify_data) {
+                // Cerrar la conexión con el cliente para que no espere
+                if (function_exists('fastcgi_finish_request')) {
+                    fastcgi_finish_request();
+                }
+                
+                try {
+                    // Notificar competencia home (solo para destacado super)
+                    if ($bg_notify_data['modified'] && $bg_notify_data['tipo'] === 'super') {
+                        if (function_exists('notificar_competencia_home_destacado_super')) {
+                            $collection_codigos = getCollectionCodigos();
+                            $codigo_actualizado = $collection_codigos->findOne(['_id' => new \MongoDB\BSON\ObjectId($bg_notify_data['codigo_id'])]);
+                            $emails_enviados = notificar_competencia_home_destacado_super(
+                                $bg_notify_data['codigo_id'],
+                                $bg_notify_data['user_id'],
+                                $codigo_actualizado
+                            );
+                            error_log("Notificaciones de competencia home enviadas (background): $emails_enviados");
+                        }
+                    }
+                    
+                    // Notificar competencia en la misma marca
+                    if ($bg_notify_data['modified'] && !empty($bg_notify_data['marca_clave'])) {
+                        if (!function_exists('notificarCompetenciaDestacado')) {
+                            require_once __DIR__ . '/myphp/funciones_destacados_email.php';
+                        }
+                        $notifs = notificarCompetenciaDestacado($bg_notify_data['marca_clave'], $bg_notify_data['user_id'], $bg_notify_data['tipo']);
+                        error_log("Notificaciones competencia marca (background) ({$bg_notify_data['marca_clave']}): $notifs enviadas");
+                    }
+                } catch (\Exception $e) {
+                    error_log("Error enviando notificaciones en background: " . $e->getMessage());
+                }
+            });
+            
+            return $response;
         } else {
             // Redirigir a mis-anuncios con mensaje de éxito
             return $response->withRedirect('/mis-anuncios?success=destacado&codigo=' . $codigo_id . '&tipo=' . $tipo, 302);
@@ -4003,555 +4374,41 @@ $app->get('/amazon', function ($request, $response) {
  * CHOLLOS
  *******************************************************************/
 
-// Incluir funciones de chollos
-include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_chollos.php';
-include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_chollos_amazon.php';
-include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_chollos_groq.php';
+/********************************************************************
+ * CHOLLOS - Redirects a malprecio.com
+ *******************************************************************/
 
-// Ruta principal de chollos
+// Rutas de chollos - Eliminadas definitivamente (410 Gone) para ahorro de Crawl Budget
 $app->get('/chollos', function ($request, $respon) {
-    global $panel, $detect;
-    
-    // Inicializar variables globales
-    $GLOBALS['website'] = 'https://www.codigoamigo.com/';
-    $GLOBALS['actual_url'] = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
-    
-    // Incluir archivos necesarios
-    include_once __DIR__ . '/inc/includes.php';
-    include_once __DIR__ . '/myphp/funciones.php';
-    
-    // Inicializar detector de móviles
-    if (!isset($detect)) {
-        $detect = new Mobile_Detect();
-    }
-    $GLOBALS['detect'] = $detect;
-    
-    // Incluir funciones modernas
-    include_once __DIR__ . '/myphp/funciones_modern.php';
-    include_once __DIR__ . '/myphp/_header_modern.php';
-    $GLOBALS['header_modern_used'] = true;
-    
-    // Configurar paginación
-    $items_per_page = 24;
-    $current_page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
-    $skip = ($current_page - 1) * $items_per_page;
-    
-    // Obtener chollos con filtros
-    $filtros = [
-        'estado' => 1,
-        'limite' => $items_per_page,
-        'skip' => $skip
-    ];
-    
-    if (isset($_GET['categoria']) && !empty($_GET['categoria'])) {
-        $filtros['categoria'] = $_GET['categoria'];
-    }
-    
-    if (isset($_GET['busqueda']) && !empty($_GET['busqueda'])) {
-        $filtros['busqueda'] = $_GET['busqueda'];
-    }
-    
-    // Obtener chollos y total
-    $chollos = obtenerChollos($filtros);
-    $total_chollos = contarChollos($filtros);
-    $categorias = obtenerCategoriasChollos();
-    
-    // Llamar a la función del header moderno
-    get_header_modern(
-        "Chollos y Ofertas - CodigoAmigo.com",
-        "Descubre los mejores chollos y ofertas de Amazon, electrónica, moda y más. Ahorra dinero con nuestras ofertas exclusivas.",
-        "chollos, ofertas, descuentos, amazon, electrónica, moda"
-    );
-    
-    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/chollos_listado.php';
-    
-    return $respon;
+    return $respon->withStatus(410)->write('Este contenido ha sido eliminado permanentemente.');
 });
 
-// Ruta del acortador de chollos /chollo/{id} - DEBE IR ANTES DE RUTAS GENÉRICAS
-$app->get('/chollo/{id}', function ($request, $respon, $args) {
-    // Incluir archivos necesarios
-    include_once __DIR__ . '/inc/includes.php';
-    include_once __DIR__ . '/myphp/funciones.php';
-    include_once __DIR__ . '/myphp/funciones_chollos.php';
-    
-    $chollo_id = $args['id'] ?? '';
-    
-    // Log para debugging
-    error_log("Acortador chollo - ID recibido: " . $chollo_id);
-    
-    if (empty($chollo_id)) {
-        error_log("Acortador chollo - ID vacío, redirigiendo a /chollos");
-        return $respon->withRedirect('/chollos', 301);
-    }
-    
-    // Obtener el chollo sin incrementar clicks (usaremos registrarClickChollo después)
-    $collection = getCollectionChollos();
-    if (!$collection) {
-        error_log("Acortador chollo - Error: No se pudo obtener colección");
-        return $respon->withRedirect('/chollos', 301);
-    }
-    
-    try {
-        $objectId = new MongoDB\BSON\ObjectId($chollo_id);
-        $doc = $collection->findOne(['_id' => $objectId]);
-        
-        if (!$doc) {
-            error_log("Acortador chollo - Chollo no encontrado con ID: " . $chollo_id);
-            return $respon->withRedirect('/chollos', 301);
-        }
-        
-        if (empty($doc['enlace'])) {
-            error_log("Acortador chollo - Chollo sin enlace, ID: " . $chollo_id);
-            return $respon->withRedirect('/chollos', 301);
-        }
-        
-        $enlace = $doc['enlace'];
-        error_log("Acortador chollo - Enlace encontrado: " . $enlace);
-        
-        // Redirigir a la URL original del chollo (absoluta)
-        if (!preg_match('/^https?:\/\//', $enlace)) {
-            // Si no tiene protocolo, añadir https://
-            $enlace = 'https://' . $enlace;
-        }
-        
-        // Preparar datos para tracking
-        $enlace_original = $enlace;
-        $es_amazon = esEnlaceAmazon($enlace);
-        $asin = null;
-        
-        // IMPORTANTE: Si es un enlace de Amazon, añadir/actualizar el tag de afiliado
-        if ($es_amazon) {
-            error_log("Acortador chollo - Es enlace de Amazon, aplicando tagging garantizado...");
-            
-            // Usamos la nueva función que maneja expansión y fallback automáticamente
-            $enlace = convertirEnlaceAmazonGarantizado($enlace, $chollo_id);
-            
-            // Intentar obtener ASIN para el click log (opcional)
-            $asin = extraerASIN($enlace);
-            
-            error_log("Acortador chollo - Enlace final procesado: " . $enlace);
-        }
-        
-        // Registrar el click con información detallada sobre Amazon
-        $datos_click = [
-            'enlace_original' => $enlace_original,
-            'enlace_final' => $enlace,
-            'es_amazon' => $es_amazon,
-            'tiene_tag_afiliado' => ($es_amazon && strpos($enlace, 'tag=spnfuryy-21') !== false)
-        ];
-        
-        if ($asin) {
-            $datos_click['asin'] = $asin;
-        }
-        
-        registrarClickChollo($chollo_id, $datos_click);
-        
-        error_log("Acortador chollo - Redirigiendo a: " . $enlace);
-        return $respon->withRedirect($enlace, 302);
-    } catch (Exception $e) {
-        error_log("Error en acortador de chollo: " . $e->getMessage() . " - ID: " . $chollo_id);
-        error_log("Stack trace: " . $e->getTraceAsString());
-        return $respon->withRedirect('/chollos', 301);
-    }
+$app->get("/chollo/{id}", function ($request, $respon, $args) {
+    $id = $args["id"];
+    return $respon->withStatus(301)->withHeader("Location", "https://malprecio.com/chollo/" . $id);
 });
 
-// Ruta de detalle individual - DEBE IR ANTES DE /chollos/{categoria} para que Slim la procese primero
-// Restringimos ID a 24 caracteres hexadecimales (ObjectId) para evitar colisión con subcategorías
-// Permitimos que la categoría tenga múltiples segmentos (.*) para estructura SILO
-$app->get('/chollos/{categoria:.*}/{id:[0-9a-fA-F]{24}}', function ($request, $respon, $args) {
-    global $panel, $detect;
-    
-    // Inicializar variables globales
-    $GLOBALS['website'] = 'https://www.codigoamigo.com/';
-    $GLOBALS['actual_url'] = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
-    
-    // Incluir archivos necesarios
-    include_once __DIR__ . '/inc/includes.php';
-    include_once __DIR__ . '/myphp/funciones.php';
-    include_once __DIR__ . '/myphp/funciones_chollos.php';
-    
-    // Inicializar detector de móviles
-    if (!isset($detect)) {
-        $detect = new Mobile_Detect();
-    }
-    $GLOBALS['detect'] = $detect;
-    
-    // Incluir funciones modernas
-    include_once __DIR__ . '/myphp/funciones_modern.php';
-    include_once __DIR__ . '/myphp/_header_modern.php';
-    $GLOBALS['header_modern_used'] = true;
-    
-    $id = $args['id'] ?? '';
-    $categoria_url = $args['categoria'] ?? '';
-    
-    if (empty($id)) {
-        return $respon->withRedirect('/chollos', 301);
-    }
-    
-    // Obtener el chollo sin incrementar clicks (solo se incrementan cuando se hace click en el enlace directo)
-    $chollo = obtenerCholloPorId($id, false);
-    
-    if (!$chollo) {
-        return $respon->withRedirect('/chollos', 301);
-    }
-    
-    // Incluir helper para slugs
-    include_once __DIR__ . '/myphp/funciones_chollos_helpers.php';
 
-    // Verificar que la categoría coincida con la URL canónica (SEO)
-    // Extraer nombre de categoría de la BD de forma robusta
-    $categoria_db_raw = $chollo['categoria'];
-    if (is_object($categoria_db_raw) && method_exists($categoria_db_raw, 'getArrayCopy')) {
-        $categoria_db_raw = $categoria_db_raw->getArrayCopy();
-    }
-    
-    $categoria_db_nombre = 'general';
-    if (is_array($categoria_db_raw)) {
-        // Buscar la primera categoría válida (no general si es posible)
-        foreach ($categoria_db_raw as $cat) {
-            if ($cat !== 'general' && $cat !== 'black-friday') {
-                $categoria_db_nombre = $cat;
-                break;
-            }
-        }
-        if ($categoria_db_nombre === 'general' && !empty($categoria_db_raw)) {
-             $categoria_db_nombre = isset($categoria_db_raw[0]) ? $categoria_db_raw[0] : 'general';
-        }
-    } else {
-        $categoria_db_nombre = (string)$categoria_db_raw ?: 'general';
-    }
 
-    $categoria_slug_correcta = categoriaToSlug($categoria_db_nombre);
-    
-    // Comparar URL actual (decodificada) con slug correcto
-    $categoria_url_decoded = urldecode($categoria_url);
-    
-    // Si la URL no coincide con el slug (ej: mayúsculas vs minúsculas), redirigir
-    if (!empty($categoria_url) && $categoria_url_decoded !== $categoria_slug_correcta) {
-        return $respon->withRedirect('/chollos/' . $categoria_slug_correcta . '/' . $id, 301);
-    }
-    
-    // Preparar variables para la vista
-    // SEO TITLE OPTIMIZATION
-    $precio_chollo = isset($chollo['precio_descuento']) && $chollo['precio_descuento'] > 0 ? number_format($chollo['precio_descuento'], 2, ',', '.') . '€' : '';
-    
-    // Título más atractivo y rico en keywords
-    if ($precio_chollo) {
-        $title = htmlspecialchars($chollo['titulo']) . ' ' . $precio_chollo . ' - Chollo y Oferta';
-    } else {
-        $title = htmlspecialchars($chollo['titulo']) . ' - Chollo, Descuento y Oferta';
-    }
-    
-    // Si el título es muy largo, cortarlo de forma segura pero manteniendo lo importante
-    if (strlen($title) > 65) {
-        // Intentar mantener el titulo original + precio si cabe
-        $base_title = htmlspecialchars($chollo['titulo']);
-        if ($precio_chollo && (strlen($base_title) + strlen($precio_chollo) + 10) <= 65) {
-             $title = $base_title . ' ' . $precio_chollo . ' - Oferta';
-        } else {
-             // Si no, dejar solo el titulo del chollo y codigoamigo
-             $title = substr($base_title, 0, 50) . '... ' . ($precio_chollo ? $precio_chollo : '') . ' - Oferta';
-        }
-    }
-    
-    // SEO DESCRIPTION OPTIMIZATION
-    $description_text = !empty($chollo['descripcion']) ? strip_tags($chollo['descripcion']) : $chollo['titulo'];
-    // Limpiar saltos de línea múltiples
-    $description_text = preg_replace('/\s+/', ' ', $description_text);
-    
-    $cta = " ✅ ¡Aprovecha ahora!";
-    $desc_precio = $precio_chollo ? " por solo " . $precio_chollo : " al mejor precio";
-    
-    $description_start = "Aprovecha el chollo: " . htmlspecialchars($chollo['titulo']) . $desc_precio . ".";
-    // Calcular cuánto espacio nos queda para el extracto de la descripción
-    // Meta description ideal max 160 chars
-    $remaining_chars = 155 - strlen($description_start) - strlen($cta);
-    
-    if ($remaining_chars > 20) {
-        $extracto = substr($description_text, 0, $remaining_chars) . '...';
-        $description = $description_start . ' ' . $extracto . $cta;
-    } else {
-        $description = $description_start . $cta;
-    }
 
-    $keywords = 'chollo, oferta, descuento, ' . strtolower($chollo['titulo']) . ', comprar barato, mejor precio';
-    
-    // SCHEMA ORG - PRODUCT
-    $schema_data = [
-        "@context" => "https://schema.org/",
-        "@type" => "Product",
-        "name" => htmlspecialchars($chollo['titulo']),
-        "description" => htmlspecialchars(substr($description_text, 0, 300)), // Descripción más larga para schema
-    ];
-
-    if (!empty($chollo['imagen'])) {
-        $schema_data["image"] = $chollo['imagen'];
-    }
-    
-    // Marca logic
-    $marca_nombre = "Generico";
-    if (isset($chollo['marca']) && !empty($chollo['marca'])) {
-        $marca_nombre = $chollo['marca'];
-    } elseif (isset($chollo['categoria']) && !empty($chollo['categoria'])) {
-         $cat_for_brand = is_array($chollo['categoria']) ? ($chollo['categoria'][0] ?? '') : $chollo['categoria'];
-         if ($cat_for_brand) $marca_nombre = ucfirst($cat_for_brand);
-    }
-    $schema_data["brand"] = [
-        "@type" => "Brand",
-        "name" => htmlspecialchars($marca_nombre)
-    ];
-
-    // Offer logic
-    $offer = [
-        "@type" => "Offer",
-        "url" => $GLOBALS['actual_url'],
-        "priceCurrency" => "EUR",
-        "availability" => "https://schema.org/InStock"
-    ];
-
-    if (isset($chollo['precio_descuento']) && $chollo['precio_descuento'] > 0) {
-        $offer["price"] = $chollo['precio_descuento'];
-    } elseif (isset($chollo['precio_original']) && $chollo['precio_original'] > 0) {
-        $offer["price"] = $chollo['precio_original'];
-    } else {
-        $offer["price"] = "0.00"; // Fallback required
-    }
-    
-    // Valid until (default +30 days if not set)
-    if (isset($chollo['fecha_caducidad']) && !empty($chollo['fecha_caducidad'])) {
-         $caducidad = $chollo['fecha_caducidad'];
-         if ($caducidad instanceof MongoDB\BSON\UTCDateTime) {
-             $expire_date = $caducidad->toDateTime()->format('Y-m-d');
-         } else {
-             $expire_date = date('Y-m-d', strtotime($caducidad));
-         }
-    } else {
-         $expire_date = date('Y-m-d', strtotime('+30 days'));
-    }
-    $offer["priceValidUntil"] = $expire_date;
-
-    $schema_data["offers"] = $offer;
-    
-    // Rating logic (AggregateRating)
-    // Usamos temperatura y votos para simular un rating si no hay sistema de estrellas explícitas
-    $total_votos = isset($chollo['votos']) ? (int)$chollo['votos'] : 0;
-    $temperatura = isset($chollo['temperatura']) ? (int)$chollo['temperatura'] : 0;
-    
-    if ($total_votos > 0 || $temperatura > 0) {
-        // Normalizar temperatura a escala 5 estrellas
-        // Supongamos 0 grados = 2.5, 100+ grados = 5, -100 = 1
-        $rating_val = 2.5;
-        if ($temperatura > 0) {
-            $rating_val = min(5, 2.5 + ($temperatura / 40)); 
-        } else {
-            $rating_val = max(1, 2.5 + ($temperatura / 40));
-        }
-        $rating_val = round($rating_val, 1);
-        
-        $review_count = max(1, $total_votos); // Schema necesita al menos 1 review count si hay rating
-
-        $schema_data["aggregateRating"] = [
-            "@type" => "AggregateRating",
-            "ratingValue" => (string)$rating_val,
-            "reviewCount" => (string)$review_count,
-            "bestRating" => "5",
-            "worstRating" => "1"
-        ];
-    }
-
-    $schema_json = '<script type="application/ld+json">' . json_encode($schema_data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>';
-
-    $links_meta = [
-        'schema' => $schema_json
-    ];
-    
-    // Llamar a la función del header moderno con los nuevos parámetros
-    get_header_modern($title, $description, $keywords, "", "", $links_meta);
-    
-    // Incluir la página de detalle
-    include_once __DIR__ . '/public/chollos_detalle.php';
-    
-    return $respon;
+$app->get('/chollos/{categoria}', function ($request, $respon, $args) {
+    return $respon->withStatus(410)->write('Este contenido ha sido eliminado permanentemente.');
 });
 
-// Ruta por categoría - Captura rutas jerárquicas (SILO)
+$app->get('/chollos/{categoria}/{id}', function ($request, $respon, $args) {
+    return $respon->withStatus(410)->write('Este contenido ha sido eliminado permanentemente.');
+});
+
 $app->get('/chollos/{categoria:.*}', function ($request, $respon, $args) {
-    global $panel, $detect;
-    
-    $categoria_path = $args['categoria'];
-    
-    // Incluir funciones helper para slugs
-    include_once __DIR__ . '/myphp/funciones_chollos_helpers.php';
-    include_once __DIR__ . '/myphp/funciones_chollos.php';
-    
-    // Parsear la ruta de slugs a categorías legibles
-    $categorias_array = parseCategoriaPath($categoria_path);
-    $categoria_final = end($categorias_array);
-    
-    // Obtener el slug final para filtrar
-    $parts = explode('/', trim($categoria_path, '/'));
-    $categoria_slug = end($parts);
-    
-    // Normalizar para buscar en el mapa
-    $categorias_map = obtenerCategoriasChollos();
-    
-    // Nombre de la categoría para mostrar
-    $nombre_categoria = $categoria_final;
-    
-    // INTENTO DE RECUPERACIÓN DE CATEGORÍA REAL (Con tildes/mayúsculas)
-    // Esto es crucial para URLs profundas donde slugsPierdenTildes -> "inalambricos" vs "Inalámbricos"
-    $categoria_real_bd = obtenerCategoriaReal($categoria_slug);
-    if (!empty($categoria_real_bd) && is_string($categoria_real_bd) && strtolower($categoria_real_bd) !== strtolower($categoria_slug)) {
-        $categoria_final = $categoria_real_bd;
-        // Actualizar nombre para mostrar más bonito
-        $nombre_categoria = $categoria_real_bd;
-    }
-    
-    // Inicializar variables globales
-    $GLOBALS['website'] = 'https://www.codigoamigo.com/';
-    $GLOBALS['actual_url'] = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
-    $GLOBALS['categoria_path'] = $categoria_path;
-    $GLOBALS['categorias_array'] = $categorias_array;
-    $GLOBALS['nombre_categoria'] = $nombre_categoria;
-    
-    // Incluir archivos necesarios
-    include_once __DIR__ . '/inc/includes.php';
-    include_once __DIR__ . '/myphp/funciones.php';
-    
-    // Inicializar detector de móviles
-    if (!isset($detect)) {
-        $detect = new Mobile_Detect();
-    }
-    $GLOBALS['detect'] = $detect;
-    
-    // Incluir funciones modernas
-    include_once __DIR__ . '/myphp/funciones_modern.php';
-    include_once __DIR__ . '/myphp/_header_modern.php';
-    $GLOBALS['header_modern_used'] = true;
-    
-    // Configurar paginación
-    $items_per_page = 24;
-    $current_page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
-    $skip = ($current_page - 1) * $items_per_page;
-    
-    // Incluir helpers para manejo de categorías
-    include_once __DIR__ . '/myphp/funciones_chollos_helpers.php';
-    
-    // Generar regex flexible para tolerar acentos y mayúsculas (Fuzzy Match)
-    $regex_flexible = null;
-    if (!empty($categoria_slug)) {
-        $base = str_replace('-', ' ', $categoria_slug);
-        $patron = '';
-        for ($i = 0; $i < mb_strlen($base); $i++) {
-            $char = mb_substr($base, $i, 1);
-            switch ($char) {
-                case 'a': $patron .= '[aáAÁ]'; break;
-                case 'e': $patron .= '[eéEÉ]'; break;
-                case 'i': $patron .= '[iíIÍ]'; break;
-                case 'o': $patron .= '[oóOÓ]'; break;
-                case 'u': $patron .= '[uúüUÚÜ]'; break;
-                case 'n': $patron .= '[nñNÑ]'; break;
-                case ' ': $patron .= '[ -]'; break;
-                default: $patron .= preg_quote($char);
-            }
-        }
-        $regex_flexible = new \MongoDB\BSON\Regex('^' . $patron . '$', 'i');
-    }
-
-    // Obtener chollos de la categoría y sus hijos (SILO)
-    // Expandimos la búsqueda para incluir subcategorías y sinónimos
-    $categorias_strings = array_unique(array_filter(array_merge(
-        [$categoria_final], 
-        [$categoria_slug],  
-        [str_replace('-', ' ', $categoria_slug)],
-        // obtenerSubcategorias($categoria_final), // DESACTIVADO: Evitar contaminación cruzada
-        obtenerVariacionesCategoria($categoria_final)
-    )));
-    
-    // Limpiar valores vacíos y reindexar
-    $categorias_busqueda = array_values(array_filter($categorias_strings));
-    
-    // Añadir Regex al final (fuera de array_unique para evitar errores de conversión a string)
-    if ($regex_flexible) {
-        $categorias_busqueda[] = $regex_flexible;
-    }
-    
-    $filtros = [
-        'categoria' => $categorias_busqueda, // Pasamos el array expandido
-        'estado' => 1,
-        'limite' => $items_per_page,
-        'skip' => $skip
-    ];
-    
-    
-    
-    if (isset($_GET['min_price']) && is_numeric($_GET['min_price'])) {
-        $filtros['min_price'] = $_GET['min_price'];
-    }
-    if (isset($_GET['max_price']) && is_numeric($_GET['max_price'])) {
-        $filtros['max_price'] = $_GET['max_price'];
-    }
-    if (isset($_GET['sort'])) {
-        $filtros['sort'] = $_GET['sort'];
-    }
-    if (isset($_GET['marca'])) {
-        $filtros['marca'] = $_GET['marca'];
-    }
-    if (isset($_GET['min_discount']) && is_numeric($_GET['min_discount'])) {
-        $filtros['min_discount'] = $_GET['min_discount'];
-    }
-
-    if (isset($_GET['busqueda']) && !empty($_GET['busqueda'])) {
-        $filtros['busqueda'] = $_GET['busqueda'];
-    }
-    
-    // Exportar filtros a GLOBALS para usar en la vista
-    $GLOBALS['filtros_chollos'] = $filtros;
-
-    // Obtener chollos y total
-    $chollos = obtenerChollos($filtros);
-    $total_chollos = contarChollos($filtros);
-    
-    // INTENTAR OBTENER CONTENIDO SEO DINÁMICO (GROQ)
-    include_once __DIR__ . '/myphp/funciones_chollos_seo.php';
-    $contenido_seo = obtenerContenidoSeoCategoria($categoria_path, $categorias_array);
-    $GLOBALS['contenido_seo'] = $contenido_seo; // Pasar a la vista
-    
-    // Construir título SEO (usar el de Groq si existe, sino fallback)
-    $titulo_seo = ($contenido_seo && !empty($contenido_seo['h1'])) 
-        ? $contenido_seo['h1'] 
-        : "Chollos de " . $nombre_categoria;
-    
-    // Construir descripción SEO (usar la de Groq si existe, sino fallback)
-    if ($contenido_seo && !empty($contenido_seo['meta_description'])) {
-        $descripcion_seo = $contenido_seo['meta_description'];
-    } else {
-        $descripcion_seo = "Descubre los mejores chollos y ofertas de " . $nombre_categoria;
-        if (count($categorias_array) > 1) {
-            $ruta_completa = implode(' › ', $categorias_array);
-            $descripcion_seo .= " en " . $ruta_completa;
-        }
-        $descripcion_seo .= ". Ahorra dinero con nuestras ofertas exclusivas.";
-    }
-    
-    // Llamar a la función del header moderno
-    get_header_modern(
-        $titulo_seo . " - CodigoAmigo.com",
-        $descripcion_seo,
-        "chollos, ofertas, " . strtolower($nombre_categoria) . ", descuentos"
-    );
-    
-    include_once __DIR__ . '/public/chollos_categoria.php';
-    
-    return $respon;
+    return $respon->withStatus(410)->write('Este contenido ha sido eliminado permanentemente.');
 });
+    
 
-// Webhook para Telegram
+
+// Webhook para Telegram chollos - Redirect a malprecio.com
 $app->post('/webhook/telegram-chollos', function ($request, $respon) {
-    include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/telegram_chollos_bot.php';
-    procesarMensajeTelegram($request->getBody());
-    return $respon->withJson(['success' => true]);
+    // Webhook deshabilitado - chollos se gestionan desde malprecio.com
+    return $respon->withJson(['success' => false, 'message' => 'Webhook moved to malprecio.com']);
 });
 
 // Ruta para páginas de categoría (debe ir al final para evitar conflictos)

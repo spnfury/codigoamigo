@@ -36,7 +36,7 @@ $GLOBALS['weekdays_arr'][5]="Jueves";
 $GLOBALS['weekdays_arr'][6]="Viernes";
 $GLOBALS['weekdays_arr'][7]="Sabado";
 
-$actual_link = "https://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+$actual_link = "https://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . ($_SERVER['REQUEST_URI'] ?? '/');
 
 
 global $keywords;
@@ -423,6 +423,13 @@ function transformafechaV2($date){
                 $usuario = getObjectUser('_id', $item["id_usuario"]);
                 if($usuario && $usuario != "") { $usuario = getObjectUser('_id', new \MongoDB\BSON\ObjectId($item["id_usuario"])); }
                 if($usuario && $usuario != "") {$datos_usuario = get_array_de_usuario($usuario); }
+                
+                // Comprobar si el usuario es VIP
+                $es_usuario_vip_card = false;
+                if (!empty($datos_usuario['_id']) && function_exists('es_usuario_vip')) {
+                    $es_usuario_vip_card = es_usuario_vip((string)$datos_usuario['_id']);
+                }
+                
                 $marca = getObjectMarca('nombre_clave', $item["marca"]);
                 if($marca && isset($marca["nombre"])) {
                     $marca["nombre"] = ucfirst(strtolower($marca["nombre"]));
@@ -438,11 +445,49 @@ function transformafechaV2($date){
             <div class="card_real <? echo $destacado; ?> <? if($tipo == 'detalle'){ echo "detalle"; } ?><?php if($tipo == "mis_codigos" || $tipo == "normal"){ echo "mis_codigos"; }?>">
             
             <?php 
-            // Mostrar badge de destacado si el código está destacado
-            if($item["destacado"] && $item["destacado"] > 0): ?>
-                <div class="featured-badge">
-                    <i class="fas fa-star"></i> Destacado
+            // Mostrar badge de destacado si el código está destacado y activo
+            if($item["destacado"] && $item["destacado"] > 0): 
+                $es_super = (isset($item['tipo_destacado']) && $item['tipo_destacado'] === 'super');
+                $badge_class = $es_super ? 'featured-badge-gold' : '';
+                $badge_icon = $es_super ? 'crown' : 'star';
+                $badge_text = $es_super ? 'Super Destacado' : 'Destacado';
+                
+                // Calcular días restantes si hay fecha_fin_destacado
+                $dias_restantes = '';
+                if(isset($item['fecha_fin_destacado']) && $item['fecha_fin_destacado']) {
+                    if($item['fecha_fin_destacado'] instanceof MongoDB\BSON\UTCDateTime) {
+                        $ts_fin = $item['fecha_fin_destacado']->toDateTime()->getTimestamp();
+                    } else {
+                        $ts_fin = is_numeric($item['fecha_fin_destacado']) ? $item['fecha_fin_destacado'] : strtotime($item['fecha_fin_destacado']);
+                    }
+                    $diff = $ts_fin - time();
+                    if($diff > 0) {
+                        $dias = ceil($diff / 86400);
+                        $dias_restantes = $dias . 'd';
+                    } else {
+                        $badge_text .= ' (expirado)';
+                    }
+                }
+            ?>
+                <div class="featured-badge <?php echo $badge_class; ?>">
+                    <i class="fas fa-<?php echo $badge_icon; ?>"></i> <?php echo $badge_text; ?>
+                    <?php if($dias_restantes && isset($_SESSION["user_id"]) && $_SESSION["user_id"] == $item["id_usuario"]): ?>
+                        <span style="margin-left:4px;font-size:0.7rem;opacity:0.85;">⏱ <?php echo $dias_restantes; ?></span>
+                    <?php endif; ?>
                 </div>
+                <?php if(isset($_SESSION["user_id"]) && $_SESSION["user_id"] == $item["id_usuario"] && $dias_restantes): 
+                    $auto_renovar_activo = isset($item['auto_renovar_destacado']) && $item['auto_renovar_destacado'] === true;
+                ?>
+                <div class="auto-renovar-toggle" 
+                     data-codigo-id="<?php echo $item['_id']; ?>"
+                     onclick="toggleAutoRenovar(this)"
+                     style="position:absolute;top:42px;right:15px;z-index:10;cursor:pointer;padding:3px 10px;border-radius:12px;font-size:0.7rem;font-weight:600;
+                     background:<?php echo $auto_renovar_activo ? 'linear-gradient(135deg,#28a745,#20c997)' : '#e9ecef'; ?>;
+                     color:<?php echo $auto_renovar_activo ? 'white' : '#666'; ?>;"
+                     title="<?php echo $auto_renovar_activo ? 'Auto-renovación activada: se renovará desde tu saldo al expirar' : 'Activa la auto-renovación para renovar automáticamente desde tu saldo'; ?>">
+                    🔄 Auto <?php echo $auto_renovar_activo ? 'ON' : 'OFF'; ?>
+                </div>
+                <?php endif; ?>
             <?php endif; ?>
             
             <?php 
@@ -500,7 +545,17 @@ function transformafechaV2($date){
     			    ?>
                 	 <div class='<?php echo $class; ?>' style="text-align:center;padding:0px 0px 0px 0px;margin-top:0px;color:white;position:relative;">
                 	 <?php echo "Código en ".$posicion." posición <b></b><br>";
-                	 ?></div><?
+                	 ?></div><?php
+                	 // Upsell: si el código no está destacado y posición > 1
+                	 $posicion_raw = is_numeric($posicion) ? $posicion : intval(preg_replace('/[^0-9]/', '', $posicion));
+                	 if((!$item["destacado"] || $item["destacado"] == 0) && $posicion_raw > 1) { ?>
+                	     <a href="/destacar-codigo?codigo_id=<?php echo $item['_id']; ?>" 
+                	        style="display:block;text-align:center;padding:5px 8px;margin:3px 0;background:linear-gradient(135deg,#E30613,#f7931e);color:white;border-radius:6px;font-size:0.7rem;font-weight:600;text-decoration:none;transition:transform 0.2s;position:relative;"
+                	        onmouseover="this.style.transform='scale(1.03)'" 
+                	        onmouseout="this.style.transform='scale(1)'">
+                	        📈 ¡Sube al #1! Desde 0,99€
+                	     </a>
+                	 <?php }
                 	 }
     			?>
     
@@ -517,10 +572,24 @@ function transformafechaV2($date){
 			<div class="middle">
             <div class="avatar" item-start="">
 
-           <div class="pre_avatar lazyload" data-src="<?php echo isset($datos_usuario["img"]) ? $datos_usuario["img"] : ''; ?>">
+           <?php
+            $safe_card_username = htmlspecialchars(isset($datos_usuario["username"]) ? $datos_usuario["username"] : 'Usuario');
+            $safe_card_img = htmlspecialchars(isset($datos_usuario["img"]) ? $datos_usuario["img"] : '');
+            $safe_card_user_id = isset($datos_usuario["_id"]) ? (string)$datos_usuario["_id"] : '';
+           ?>
+           <div class="pre_avatar lazyload" data-src="<?php echo $safe_card_img; ?>">
             
             
-            <div rel="nofollow" class="link_usuario a_link_us" title="Publicado por <?php echo isset($datos_usuario["username"]) ? $datos_usuario["username"] : 'Usuario'; ?>" data-href="<?php echo link_usuario(isset($datos_usuario["username"]) ? $datos_usuario["username"] : '', isset($datos_usuario["_id"]) ? $datos_usuario["_id"] : ''); ?>">            </div>
+            <div rel="nofollow" class="link_usuario a_link_us user-modal-trigger" style="cursor:pointer" title="Publicado por <?php echo $safe_card_username; ?>"
+                data-username="<?php echo $safe_card_username; ?>"
+                data-image="<?php echo $safe_card_img; ?>"
+                data-user-id="<?php echo $safe_card_user_id; ?>"
+                data-vip="<?php echo $es_usuario_vip_card ? 'true' : 'false'; ?>"
+                data-joined="Miembro verificado"
+                data-stats-offers="<?php echo $item['totalclicks'] ?? '0'; ?>"
+                data-profile-url="<?php echo link_usuario(isset($datos_usuario['username']) ? $datos_usuario['username'] : '', $safe_card_user_id); ?>"
+                data-href="<?php echo link_usuario(isset($datos_usuario["username"]) ? $datos_usuario["username"] : '', $safe_card_user_id); ?>"
+            >            </div>
            
                     </div>
 
@@ -528,7 +597,16 @@ function transformafechaV2($date){
                 <div class="item-inner">
                     <div class="input-wrapper">
                         <div class="label">
-                            <div class="a_link_us" title="Publicado por <?php echo isset($datos_usuario["username"]) ? $datos_usuario["username"] : 'Usuario'; ?>" data-href="<?php echo link_usuario(isset($datos_usuario["username"]) ? $datos_usuario["username"] : '', isset($datos_usuario["_id"]) ? $datos_usuario["_id"] : ''); ?>"><?php if($tipo != "mis_codigos"){?><p><?php echo isset($datos_usuario["username"]) ? $datos_usuario["username"] : 'Usuario';  ?></p><?php } ?>
+                            <div class="a_link_us user-modal-trigger" style="cursor:pointer" title="Publicado por <?php echo $safe_card_username; ?>"
+                                data-username="<?php echo $safe_card_username; ?>"
+                                data-image="<?php echo $safe_card_img; ?>"
+                                data-user-id="<?php echo $safe_card_user_id; ?>"
+                                data-vip="<?php echo $es_usuario_vip_card ? 'true' : 'false'; ?>"
+                                data-joined="Miembro verificado"
+                                data-stats-offers="<?php echo $item['totalclicks'] ?? '0'; ?>"
+                                data-profile-url="<?php echo link_usuario(isset($datos_usuario['username']) ? $datos_usuario['username'] : '', $safe_card_user_id); ?>"
+                                data-href="<?php echo link_usuario(isset($datos_usuario["username"]) ? $datos_usuario["username"] : '', $safe_card_user_id); ?>"
+                            ><?php if($tipo != "mis_codigos"){?><p><?php echo $safe_card_username; ?><?php if($es_usuario_vip_card): ?> <span class="vip-badge-gold" style="display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1e3a5f;font-size:0.65rem;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:5px;vertical-align:middle"><i class="fas fa-crown"></i> VIP</span><?php endif; ?></p><?php } ?>
 
                             <small class="ico hidden-xs"><span showwhen="core"><i class="fas fa-eye"></i></span> <?php echo $item["totalclicks"]; ?></small>
                             <div class="fecha-publicacion-large" name="<?php echo $destacado_fecha; ?>">
@@ -812,6 +890,15 @@ function transformafechaV2($date){
                         
                         ?>
                         <a class="btn btn_codigo_amigo ir_codigo" title="Ir al código amigo" href="<?php echo link_codigo($item["_id"], $marca["nombre_clave"]); ?>">Ir al código <i class="fas fa-angle-right"></i></a>
+                        <?php if (function_exists('link_ficha_codigo')): ?>
+                        <a class="btn btn-sm" style="margin-left:6px;display:inline-flex;align-items:center;gap:4px;padding:6px 14px;border-radius:8px;font-size:0.78rem;font-weight:600;color:#60a5fa;background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.25);text-decoration:none;transition:all 0.2s;" 
+                           href="<?php echo link_ficha_codigo($marca["nombre_clave"], $item["_id"]); ?>" 
+                           title="Ver ficha detallada del código"
+                           onmouseover="this.style.background='rgba(96,165,250,0.2)';this.style.transform='translateY(-1px)'" 
+                           onmouseout="this.style.background='rgba(96,165,250,0.1)';this.style.transform='none'">
+                            <i class="fas fa-id-card"></i> Ver ficha
+                        </a>
+                        <?php endif; ?>
                     	
                         <?php
 
@@ -834,7 +921,7 @@ function transformafechaV2($date){
                     	          <i class="fas fa-cog"></i> Acciones
                     	      </button>
                     	      <ul class="dropdown-menu">
-                    	          <?php if($item["estado"] != '-2') { ?>
+                    	          <?php if(!in_array($item["estado"], ['-2', -2, '-3', -3])) { ?>
                     	          <li>
                     	              <a class="dropdown-item" href="<?php echo link_codigo($item["_id"], $marca["nombre_clave"],'1'); ?>" title="Destacar el código">
                     	                  <i class="fas fa-star"></i> Destacar
@@ -845,7 +932,7 @@ function transformafechaV2($date){
                     	                  <i class="fas fa-edit"></i> Editar
                     	              </a>
                     	          </li>
-                    	          <?php if($item["estado"] != '-2') { ?>
+                    	          <?php if(!in_array($item["estado"], ['-2', -2, '-3', -3])) { ?>
                     	          <li>
                     	              <a class="dropdown-item" href="/crear-promocion?codigo_id=<?php echo (string)($item["_id"]); ?>" title="Crear promoción temporal">
                     	                  <i class="fas fa-tag"></i> Crear Promoción
@@ -1664,9 +1751,23 @@ filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#262626', end
 
     function muestra_visitas($c) {
 
-
-
+        // ── Comprobación de propiedad ────────────────────────────────────────
+        // Solo el propietario REAL del código puede ver los usuarios detectados.
+        // No hay bypass de admin para esta sección.
         $obj_id_codigo = new \MongoDB\BSON\ObjectId($c);
+        $codigo_check = getCodeByID($obj_id_codigo);
+        if ($codigo_check) {
+            $codigo_user_id = is_object($codigo_check['id_usuario'])
+                ? (string)$codigo_check['id_usuario']
+                : (string)($codigo_check['id_usuario'] ?? '');
+            $es_propietario = isset($_SESSION['user_id']) &&
+                              !empty($_SESSION['user_id']) &&
+                              $codigo_user_id === (string)$_SESSION['user_id'];
+            if (!$es_propietario) {
+                return; // No mostrar nada a usuarios no propietarios
+            }
+        }
+        // ────────────────────────────────────────────────────────────────────
 
         $visitas = getVistasCodeById($obj_id_codigo);
 
@@ -1727,6 +1828,60 @@ filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#262626', end
 
         ?>
 
+        <?php
+        // === Sección de estado de destacado ===
+        $codigo_info = getCodeByID($obj_id_codigo);
+        if ($codigo_info && isset($_SESSION["user_id"]) && $_SESSION["user_id"] == ($codigo_info['id_usuario'] ?? '')) {
+            $es_destacado = isset($codigo_info['destacado']) && $codigo_info['destacado'] > 0;
+            $tipo_dest = $codigo_info['tipo_destacado'] ?? 'normal';
+            $auto_renew = isset($codigo_info['auto_renovar_destacado']) && $codigo_info['auto_renovar_destacado'] === true;
+            
+            if ($es_destacado && isset($codigo_info['fecha_fin_destacado']) && $codigo_info['fecha_fin_destacado'] instanceof MongoDB\BSON\UTCDateTime) {
+                $ts_fin = $codigo_info['fecha_fin_destacado']->toDateTime()->getTimestamp();
+                $diff = $ts_fin - time();
+                $dias_rest = max(0, ceil($diff / 86400));
+                $duracion_total = ($tipo_dest === 'super') ? DESTACADO_DURACION_SUPER : DESTACADO_DURACION_NORMAL;
+                $progreso = $diff > 0 ? min(100, round(($dias_rest / $duracion_total) * 100)) : 0;
+                $expirado = $diff <= 0;
+                
+                $color_tier = ($tipo_dest === 'super') ? '#FFD700' : '#E30613';
+                $nombre_tier = ($tipo_dest === 'super') ? '👑 Super Destacado' : '⭐ Destacado Normal';
+        ?>
+            <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:10px;padding:20px;margin-bottom:20px;border-left:4px solid <?php echo $color_tier; ?>;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <span style="color:<?php echo $color_tier; ?>;font-weight:700;font-size:1.1rem;"><?php echo $nombre_tier; ?></span>
+                    <span style="color:<?php echo $auto_renew ? '#28a745' : '#999'; ?>;font-size:0.85rem;">
+                        🔄 Auto-renovar: <?php echo $auto_renew ? '<strong>ON</strong>' : 'OFF'; ?>
+                    </span>
+                </div>
+                <?php if (!$expirado): ?>
+                <div style="margin-bottom:8px;">
+                    <div style="display:flex;justify-content:space-between;color:#ccc;font-size:0.85rem;margin-bottom:4px;">
+                        <span>⏱ <?php echo $dias_rest; ?> días restantes</span>
+                        <span>Expira: <?php echo date('d/m/Y', $ts_fin); ?></span>
+                    </div>
+                    <div style="background:#333;border-radius:6px;height:8px;overflow:hidden;">
+                        <div style="background:linear-gradient(90deg,<?php echo $color_tier; ?>,#f7931e);width:<?php echo $progreso; ?>%;height:100%;border-radius:6px;"></div>
+                    </div>
+                </div>
+                <?php else: ?>
+                <div style="background:#f8d7da;border-radius:6px;padding:10px;text-align:center;margin-bottom:8px;">
+                    <span style="color:#721c24;font-weight:600;">❌ Expirado</span>
+                </div>
+                <a href="/destacar-codigo?codigo_id=<?php echo $c; ?>" style="display:block;text-align:center;background:linear-gradient(135deg,#E30613,#f7931e);color:white;padding:10px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:8px;">🔄 Renovar ahora</a>
+                <?php endif; ?>
+            </div>
+        <?php
+            } elseif (!$es_destacado) {
+        ?>
+            <div style="background:#f0f0f0;border-radius:10px;padding:15px;margin-bottom:20px;text-align:center;border:1px dashed #ccc;">
+                <p style="color:#666;margin:0 0 10px;font-size:0.95rem;">Tu código no está destacado</p>
+                <a href="/destacar-codigo?codigo_id=<?php echo $c; ?>" style="display:inline-block;background:linear-gradient(135deg,#E30613,#f7931e);color:white;padding:10px 25px;border-radius:25px;text-decoration:none;font-weight:600;">⭐ Destacar desde 0,99€</a>
+            </div>
+        <?php
+            }
+        }
+        ?>
 
         <canvas id="myChart" height="50"></canvas>
         <script>
@@ -2108,7 +2263,7 @@ filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#262626', end
             // Menú de acciones para códigos propios
             $actions_menu = '';
             if(isset($_SESSION["user_id"]) && $item["id_usuario"] == $_SESSION["user_id"]) {
-                if($item["estado"] != '-2') {
+                if(!in_array($item["estado"], ['-2', -2, '-3', -3])) {
                     $actions_menu = '
                     <div class="code-actions-menu">
                         <button class="btn btn-primary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -2125,7 +2280,7 @@ filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#262626', end
                                     <i class="fas fa-edit"></i> Editar
                                 </a>
                             </li>';
-            if($item["estado"] != '-2') {
+            if(!in_array($item["estado"], ['-2', -2, '-3', -3])) {
                 $actions_menu .= '
                             <li>
                                 <a class="dropdown-item" href="/crear-promocion?codigo_id=' . (string)($item["_id"]) . '" title="Crear promoción temporal">

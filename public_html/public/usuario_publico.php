@@ -1,5 +1,28 @@
 <?php 
 get_header_modern($title, $description); 
+
+// Pre-filtrar $listado_codigos para contar solo los válidos
+$valid_codigos = [];
+$categorias_usuario_filtradas = [];
+if (isset($listado_codigos) && is_array($listado_codigos)) {
+    foreach ($listado_codigos as $codigo) {
+        if (!isset($codigo['marca']) || $codigo['marca'] === null) {
+            continue;
+        }
+        $marca = getObjectMarca('nombre_clave', $codigo['marca']);
+        if (!$marca) {
+            continue;
+        }
+        $valid_codigos[] = $codigo;
+        $categoria = isset($codigo['clave_categoria']) ? $codigo['clave_categoria'] : 'sin-categoria';
+        if (!in_array($categoria, $categorias_usuario_filtradas)) {
+            $categorias_usuario_filtradas[] = $categoria;
+        }
+    }
+}
+$listado_codigos = $valid_codigos;
+$num_codigos = count($listado_codigos);
+$categorias_usuario = $categorias_usuario_filtradas;
 ?>
 
 <style>
@@ -11,13 +34,25 @@ get_header_modern($title, $description);
 }
 
 .user-page-header {
-    background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 50%, #222222 100%);
-    border-radius: 20px;
-    margin: 20px auto;
+    background: linear-gradient(135deg, #161616 0%, #222222 100%);
+    border-radius: 24px;
+    margin: 30px auto;
     max-width: 1600px;
     padding: 40px 30px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-    border: 1px solid rgba(255,255,255,0.05);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.08);
+    position: relative;
+    overflow: hidden;
+}
+
+.user-page-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--primary-orange), #FF4D4D);
 }
 
 .user-profile-section {
@@ -111,6 +146,15 @@ get_header_modern($title, $description);
     box-shadow: 0 6px 20px rgba(227, 6, 19, 0.4);
 }
 
+.btn-siguiendo {
+    background: linear-gradient(135deg, #444, #333) !important;
+    box-shadow: none !important;
+}
+
+.btn-siguiendo:hover {
+    background: linear-gradient(135deg, #555, #444) !important;
+}
+
 .btn-chat-user-profile:active {
     transform: translateY(0);
     box-shadow: 0 2px 10px rgba(227, 6, 19, 0.3);
@@ -128,45 +172,71 @@ get_header_modern($title, $description);
 }
 
 .stat-item {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
-    padding: 18px 20px;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+    border-radius: 16px;
+    padding: 22px 20px;
     text-align: center;
     border: 1px solid rgba(255, 255, 255, 0.08);
     transition: all 0.3s ease;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(145deg, rgba(227, 6, 19, 0.1) 0%, transparent 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
 .stat-item:hover {
-    background: rgba(255, 255, 255, 0.08);
-    transform: translateY(-2px);
-    border-color: rgba(227, 6, 19, 0.3);
+    transform: translateY(-4px);
+    border-color: rgba(227, 6, 19, 0.4);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+}
+
+.stat-item:hover::before {
+    opacity: 1;
 }
 
 .stat-item i {
-    font-size: 1.5rem;
+    font-size: 1.8rem;
     color: var(--primary-orange);
     margin-bottom: 5px;
+    position: relative;
+    z-index: 2;
 }
 
 .stat-number {
-    font-size: 2.2rem;
+    font-size: 2.5rem;
     font-weight: 800;
     color: var(--text-white);
     margin: 0;
     line-height: 1;
+    position: relative;
+    z-index: 2;
 }
 
 .stat-label {
     color: var(--text-gray);
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     margin: 0;
     opacity: 0.8;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    font-weight: 600;
+    position: relative;
+    z-index: 2;
 }
 
 .filters-section {
@@ -1059,6 +1129,90 @@ get_header_modern($title, $description);
         font-size: 1.5rem;
     }
 }
+
+.trust-badge-public {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.trust-stars-public .fas {
+    font-size: 0.7rem;
+}
+
+/* Trust Breakdown Card */
+.trust-breakdown-card {
+    background: linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 16px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.trust-breakdown-header {
+    font-size: 0.8rem;
+    color: #aaa;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.trust-breakdown-score {
+    margin-left: auto;
+    font-size: 0.75rem;
+    color: #888;
+    font-weight: 400;
+}
+
+.trust-breakdown-stars {
+    text-align: center;
+    margin-bottom: 15px;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.trust-breakdown-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.trust-breakdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    font-size: 0.8rem;
+}
+
+.trust-breakdown-item i {
+    width: 16px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.trust-breakdown-item span:first-of-type {
+    color: #ccc;
+    flex: 1;
+}
+
+.trust-breakdown-pts {
+    font-size: 0.7rem;
+    color: #888 !important;
+    flex: none !important;
+}
 </style>
 
 <div class="user-page-container">
@@ -1067,8 +1221,76 @@ get_header_modern($title, $description);
             <?php
             // Check VIP
             if (!function_exists('es_usuario_vip')) { include_once __DIR__ . '/../myphp/funciones_usuario.php'; }
+            include_once __DIR__ . '/../myphp/funciones_trust_score.php';
             $profile_user_id = isset($data_usuario['_id']) ? (string)$data_usuario['_id'] : '';
             $is_profile_vip = !empty($profile_user_id) && es_usuario_vip($profile_user_id);
+            
+            // Calculate trust score for public profile
+            $pub_trust_score = 1;
+            $pub_checks = [
+                'foto' => false,
+                'email' => false,
+                'antiguedad_years' => 0,
+                'multimarca' => false,
+                'votos_positivos' => 0,
+                'descripcion' => false,
+            ];
+            $url_usuario_sin_foto_pub = $GLOBALS['url_usuario_sin_foto'] ?? '';
+            
+            // Foto
+            $pub_tiene_foto = false;
+            if (!empty($data_usuario['img'])) {
+                $img_pub = $data_usuario['img'];
+                if ($url_usuario_sin_foto_pub && $img_pub != $url_usuario_sin_foto_pub 
+                    && strpos($img_pub, 'sin_foto') === false
+                    && strpos($img_pub, 'default') === false) {
+                    $pub_tiene_foto = true;
+                }
+            }
+            $pub_checks['foto'] = $pub_tiene_foto;
+            if ($pub_tiene_foto) $pub_trust_score += 2; else $pub_trust_score -= 1;
+            
+            // Email verificado
+            $pub_checks['email'] = !empty($data_usuario['verificado']) || !empty($data_usuario['email_verificado']) || (!empty($data_usuario['estado']) && $data_usuario['estado'] == 1);
+            if ($pub_checks['email']) $pub_trust_score += 1;
+            
+            // Antigüedad
+            $pub_años = 0;
+            if (!empty($data_usuario['fecha_registro'])) {
+                $fr_pub = $data_usuario['fecha_registro'];
+                if (is_string($fr_pub)) $ts_pub = strtotime($fr_pub);
+                elseif ($fr_pub instanceof MongoDB\BSON\UTCDateTime) $ts_pub = $fr_pub->toDateTime()->getTimestamp();
+                else $ts_pub = time();
+                $pub_años = floor((time() - $ts_pub) / (365.25 * 24 * 3600));
+            } elseif (!empty($data_usuario['_id']) && $data_usuario['_id'] instanceof MongoDB\BSON\ObjectId) {
+                $ts_pub = $data_usuario['_id']->getTimestamp();
+                $pub_años = floor((time() - $ts_pub) / (365.25 * 24 * 3600));
+            }
+            $pub_checks['antiguedad_years'] = $pub_años;
+            $pub_trust_score += max(0, min($pub_años, 5));
+            
+            // Múltiples marcas, votos, descripción
+            $pub_marcas_count = 0;
+            try {
+                $col_pub = getCollectionCodigos();
+                $uid_pub_oid = new MongoDB\BSON\ObjectId($profile_user_id);
+                $pub_marcas_count = count($col_pub->distinct('marca', ['id_usuario' => $uid_pub_oid, 'estado' => ['$in' => [0, 1]]]));
+                $pub_checks['multimarca'] = ($pub_marcas_count > 1);
+                if ($pub_checks['multimarca']) $pub_trust_score += 1;
+                
+                $pipe_pub = [
+                    ['$match' => ['id_usuario' => $uid_pub_oid, 'estado' => ['$in' => [0, 1]]]],
+                    ['$group' => ['_id' => null, 'total_votos' => ['$sum' => '$votos_positivos'], 'has_desc' => ['$sum' => ['$cond' => [['$and' => [['$ne' => ['$descripcion', '']], ['$ne' => ['$descripcion', null]]]], 1, 0]]]]]
+                ];
+                $res_pub = $col_pub->aggregate($pipe_pub)->toArray();
+                $pub_checks['votos_positivos'] = intval($res_pub[0]['total_votos'] ?? 0);
+                $pub_checks['descripcion'] = ($res_pub[0]['has_desc'] ?? 0) > 0;
+                $pub_trust_score += $pub_checks['votos_positivos'];
+                if ($pub_checks['descripcion']) $pub_trust_score += 2;
+            } catch (Exception $e) {}
+            
+            $pub_trust_score = max(1, $pub_trust_score);
+            $pub_trust = getTrustLevel($pub_trust_score, false, $is_profile_vip);
             ?>
             <div class="user-avatar-large" style="<?php echo $is_profile_vip ? 'border-color: #ffd700; box-shadow: 0 0 25px rgba(255, 215, 0, 0.5);' : ''; ?>">
                 <?php if (!empty($data_usuario["img"])): ?>
@@ -1080,12 +1302,20 @@ get_header_modern($title, $description);
                 <?php endif; ?>
             </div>
             <div class="user-info">
-                <h1>
-                    <?php echo htmlspecialchars($data_usuario["username"] ?? "Usuario"); ?>
+                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap; margin-bottom: 8px;">
+                    <h1 style="margin: 0;">
+                        <?php echo htmlspecialchars($data_usuario["username"] ?? "Usuario"); ?>
+                    </h1>
                     <?php if ($is_profile_vip): ?>
-                        <span class="vip-badge-gold" style="font-size: 0.5em; vertical-align: middle; margin-left: 10px;"><i class="fas fa-crown"></i> VIP</span>
+                        <span class="vip-badge-gold" style="font-size: 1rem; padding: 6px 14px; display: inline-flex; align-items: center; gap: 6px; line-height: 1;"><i class="fas fa-crown"></i> VIP</span>
                     <?php endif; ?>
-                </h1>
+                    <span class="trust-badge-public <?php echo $pub_trust['class']; ?>" style="background: <?php echo $pub_trust['color']; ?>22; border: 1px solid <?php echo $pub_trust['color']; ?>44;">
+                        <span class="trust-stars-public" style="color: <?php echo $pub_trust['color']; ?>;">
+                            <?php for ($si = 0; $si < $pub_trust['stars']; $si++) echo '<i class="fas fa-star"></i>'; ?>
+                        </span>
+                        <span style="color: <?php echo $pub_trust['color']; ?>; font-weight: 600;"><?php echo $pub_trust['label']; ?></span>
+                    </span>
+                </div>
                 <p>
                     <?php 
                     $fecha_registro_formateada = '';
@@ -1130,7 +1360,7 @@ get_header_modern($title, $description);
                 <?php endif; ?>
                 
                 <?php 
-                // Botón de chat - solo mostrar si el usuario está logueado y no es su propio perfil
+                // Botón de chat o editar perfil
                 $usuario_actual_id = isset($_SESSION['user_id']) ? (string)$_SESSION['user_id'] : '';
                 
                 // Obtener ID del usuario del perfil de forma segura
@@ -1143,14 +1373,32 @@ get_header_modern($title, $description);
                     }
                 }
                 
-                $mostrar_boton_chat = !empty($usuario_actual_id) && !empty($usuario_perfil_id) && $usuario_actual_id !== $usuario_perfil_id;
+                $es_mi_perfil = !empty($usuario_actual_id) && !empty($usuario_perfil_id) && $usuario_actual_id === $usuario_perfil_id;
+                $mostrar_botones_accion = !empty($usuario_actual_id) && !empty($usuario_perfil_id) && $usuario_actual_id !== $usuario_perfil_id;
                 
-                if ($mostrar_boton_chat):
+                // Comprobar si ya sigue a este usuario
+                $sigue_usuario = false;
+                if ($mostrar_botones_accion) {
+                    if (!function_exists('es_favorito')) {
+                        include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/funciones_favoritos.php';
+                    }
+                    $sigue_usuario = es_favorito($usuario_actual_id, $usuario_perfil_id, 'usuario');
+                }
+                
+                if ($es_mi_perfil):
+                ?>
+                <div class="user-chat-button-container" style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                    <a href="/usuario" class="btn-chat-user-profile" style="text-decoration: none;">
+                        <i class="fas fa-pen-to-square"></i>
+                        <span>Editar perfil</span>
+                    </a>
+                </div>
+                <?php elseif ($mostrar_botones_accion):
                     $user_id_js = json_encode($usuario_perfil_id, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
                     $username_js = json_encode($data_usuario["username"] ?? "Usuario", JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
                     $user_img_js = json_encode($data_usuario["img"] ?? '', JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
                 ?>
-                <div class="user-chat-button-container" style="margin-top: 15px;">
+                <div class="user-chat-button-container" style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
                     <button type="button" class="btn-chat-user-profile" 
                             data-chat-user-id="<?php echo htmlspecialchars($usuario_perfil_id); ?>"
                             data-chat-username="<?php echo htmlspecialchars($data_usuario["username"] ?? "Usuario"); ?>"
@@ -1159,6 +1407,17 @@ get_header_modern($title, $description);
                         <i class="fas fa-comments"></i>
                         <span>Enviar mensaje</span>
                     </button>
+                    <button type="button" id="btn-seguir-usuario" class="btn-chat-user-profile <?php echo $sigue_usuario ? 'btn-siguiendo' : ''; ?>" data-usuario-id="<?php echo htmlspecialchars($usuario_perfil_id); ?>">
+                        <i class="fas <?php echo $sigue_usuario ? 'fa-user-minus' : 'fa-user-plus'; ?>"></i>
+                        <span class="seguir-text"><?php echo $sigue_usuario ? 'Dejar de seguir' : 'Seguir'; ?></span>
+                    </button>
+                </div>
+                <?php else: // Si no está logueado ?>
+                <div class="user-chat-button-container" style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                    <a href="/login" class="btn-chat-user-profile" style="text-decoration: none;">
+                        <i class="fas fa-user-plus"></i>
+                        <span>Inicia sesión para seguir</span>
+                    </a>
                 </div>
                 <?php endif; ?>
             </div>
@@ -1184,6 +1443,53 @@ get_header_modern($title, $description);
                 <i class="fas fa-eye"></i>
                 <div class="stat-number"><?php echo isset($total_impresiones_usuario) ? number_format($total_impresiones_usuario) : "0"; ?></div>
                 <div class="stat-label">Impresiones totales</div>
+            </div>
+        </div>
+        
+        <!-- Trust Level Breakdown Card -->
+        <div class="trust-breakdown-card">
+            <div class="trust-breakdown-header">
+                <i class="fas fa-shield-alt" style="color: <?php echo $pub_trust['color']; ?>;"></i>
+                Nivel de Confianza
+                <span class="trust-breakdown-score"><?php echo $pub_trust_score; ?> pts</span>
+            </div>
+            <div class="trust-breakdown-stars">
+                <?php for ($si = 0; $si < 5; $si++) echo $si < $pub_trust['stars'] ? '<i class="fas fa-star" style="color:' . $pub_trust['color'] . ';"></i>' : '<i class="far fa-star" style="color:#555;"></i>'; ?>
+                <span style="display:inline-block; padding: 3px 10px; border-radius: 15px; font-size: 0.75rem; font-weight: 700; background: <?php echo $pub_trust['color']; ?>22; color: <?php echo $pub_trust['color']; ?>;">
+                    <?php echo $pub_trust['label']; ?>
+                </span>
+            </div>
+            <div class="trust-breakdown-list">
+                <div class="trust-breakdown-item" style="color: <?php echo $pub_checks['foto'] ? '#10b981' : '#ef4444'; ?>;">
+                    <i class="fas <?php echo $pub_checks['foto'] ? 'fa-check-circle' : 'fa-times-circle'; ?>"></i>
+                    <span>Foto de perfil</span>
+                    <span class="trust-breakdown-pts"><?php echo $pub_checks['foto'] ? '+2' : '-1'; ?></span>
+                </div>
+                <div class="trust-breakdown-item" style="color: <?php echo $pub_checks['email'] ? '#10b981' : '#ef4444'; ?>;">
+                    <i class="fas <?php echo $pub_checks['email'] ? 'fa-check-circle' : 'fa-times-circle'; ?>"></i>
+                    <span>Email verificado</span>
+                    <span class="trust-breakdown-pts"><?php echo $pub_checks['email'] ? '+1' : '0'; ?></span>
+                </div>
+                <div class="trust-breakdown-item" style="color: <?php echo $pub_años >= 1 ? '#10b981' : '#6b7280'; ?>;">
+                    <i class="fas <?php echo $pub_años >= 1 ? 'fa-check-circle' : 'fa-clock'; ?>"></i>
+                    <span>Antigüedad (<?php echo $pub_años; ?> año<?php echo $pub_años != 1 ? 's' : ''; ?>)</span>
+                    <span class="trust-breakdown-pts">+<?php echo min($pub_años, 5); ?></span>
+                </div>
+                <div class="trust-breakdown-item" style="color: <?php echo $pub_checks['multimarca'] ? '#10b981' : '#ef4444'; ?>;">
+                    <i class="fas <?php echo $pub_checks['multimarca'] ? 'fa-check-circle' : 'fa-times-circle'; ?>"></i>
+                    <span>Varias marcas<?php echo $pub_marcas_count > 0 ? ' (' . $pub_marcas_count . ')' : ''; ?></span>
+                    <span class="trust-breakdown-pts"><?php echo $pub_checks['multimarca'] ? '+1' : '0'; ?></span>
+                </div>
+                <div class="trust-breakdown-item" style="color: <?php echo $pub_checks['votos_positivos'] > 0 ? '#10b981' : '#6b7280'; ?>;">
+                    <i class="fas <?php echo $pub_checks['votos_positivos'] > 0 ? 'fa-check-circle' : 'fa-thumbs-up'; ?>"></i>
+                    <span>Votos positivos</span>
+                    <span class="trust-breakdown-pts">+<?php echo $pub_checks['votos_positivos']; ?></span>
+                </div>
+                <div class="trust-breakdown-item" style="color: <?php echo $pub_checks['descripcion'] ? '#10b981' : '#ef4444'; ?>;">
+                    <i class="fas <?php echo $pub_checks['descripcion'] ? 'fa-check-circle' : 'fa-times-circle'; ?>"></i>
+                    <span>Descripción en códigos</span>
+                    <span class="trust-breakdown-pts"><?php echo $pub_checks['descripcion'] ? '+2' : '0'; ?></span>
+                </div>
             </div>
         </div>
         
@@ -1571,6 +1877,55 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }, 500);
             }
+        });
+    }
+    
+    // Funcionalidad para Seguir Usuario
+    const btnSeguir = document.getElementById('btn-seguir-usuario');
+    if (btnSeguir) {
+        btnSeguir.addEventListener('click', function() {
+            const usuarioId = this.getAttribute('data-usuario-id');
+            const $this = $(this);
+            const isSiguiendo = $this.hasClass('btn-siguiendo');
+            const action = isSiguiendo ? 'eliminar_favorito' : 'añadir_favorito';
+            
+            // Icon y texto de carga
+            const $icon = $this.find('i');
+            const originalIconClass = $icon.attr('class');
+            $icon.attr('class', 'fas fa-spinner fa-spin');
+            
+            $.ajax({
+                url: '/ajax_actions',
+                method: 'POST',
+                data: {
+                    action: action,
+                    codigo_id: usuarioId,
+                    tipo: 'usuario'
+                },
+                success: function(response) {
+                    if (typeof response === 'string') {
+                        try { response = JSON.parse(response); } catch(e) {}
+                    }
+                    if (response && response.success) {
+                        if (isSiguiendo) {
+                            $this.removeClass('btn-siguiendo');
+                            $this.find('.seguir-text').text('Seguir');
+                            $icon.attr('class', 'fas fa-user-plus');
+                        } else {
+                            $this.addClass('btn-siguiendo');
+                            $this.find('.seguir-text').text('Dejar de seguir');
+                            $icon.attr('class', 'fas fa-user-minus');
+                        }
+                    } else {
+                        alert(response.message || 'Error al procesar la solicitud');
+                        $icon.attr('class', originalIconClass);
+                    }
+                },
+                error: function() {
+                    alert('Error de conexión');
+                    $icon.attr('class', originalIconClass);
+                }
+            });
         });
     }
 });

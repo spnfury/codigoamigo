@@ -48,8 +48,7 @@ if ($_POST) {
         switch ($tipo) {
             case 'principal':
                 $resultado = generarSitemapPrincipal(
-                    isset($_POST['incluir_codigos']) && $_POST['incluir_codigos'] === '1',
-                    isset($_POST['incluir_chollos']) && $_POST['incluir_chollos'] === '1'
+                    isset($_POST['incluir_codigos']) && $_POST['incluir_codigos'] === '1'
                 );
                 break;
             case 'marcas':
@@ -62,9 +61,12 @@ if ($_POST) {
                 $limite = intval($_POST['limite_codigos'] ?? 10000);
                 $resultado = generarSitemapCodigos($limite);
                 break;
-            case 'chollos':
-                $limite = intval($_POST['limite_chollos'] ?? 5000);
-                $resultado = generarSitemapChollos($limite);
+            case 'comparativas':
+                $limite = intval($_POST['limite_comparativas'] ?? 3000);
+                $resultado = generarSitemapComparativas($limite);
+                break;
+            case 'guias':
+                $resultado = generarSitemapGuias();
                 break;
             case 'estaticas':
                 $resultado = generarSitemapEstaticas();
@@ -191,16 +193,11 @@ $page_title = "Gestión de Sitemaps";
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="incluir_chollos" value="1" id="incluir_chollos" checked>
-                                        <label class="form-check-label" for="incluir_chollos">
-                                            Incluir chollos en sitemap
-                                        </label>
+                                    <div class="form-group">
+                                        <label>Límite de comparativas (pares marca vs marca):</label>
+                                        <input type="number" name="limite_comparativas" value="3000" min="100" max="10000" class="form-control">
                                     </div>
-                                    <div class="form-group mt-2">
-                                        <label>Límite de chollos:</label>
-                                        <input type="number" name="limite_chollos" value="5000" min="1000" max="20000" class="form-control">
-                                    </div>
+                                    <small class="text-muted">Las comparativas se generan automáticamente para marcas de la misma categoría.</small>
                                 </div>
                             </div>
                             
@@ -231,12 +228,13 @@ $page_title = "Gestión de Sitemaps";
                                 <tbody>
                                     <?php
                                     $tipos_sitemaps = [
-                                        'principal' => ['nombre' => 'Principal (Index)', 'icon' => 'fa-home'],
-                                        'marcas' => ['nombre' => 'Marcas', 'icon' => 'fa-tags'],
-                                        'categorias' => ['nombre' => 'Categorías', 'icon' => 'fa-folder'],
-                                        'codigos' => ['nombre' => 'Códigos', 'icon' => 'fa-code'],
-                                        'chollos' => ['nombre' => 'Chollos', 'icon' => 'fa-tag'],
-                                        'estaticas' => ['nombre' => 'Páginas Estáticas', 'icon' => 'fa-file']
+                                        'principal'    => ['nombre' => 'Principal (Index)', 'icon' => 'fa-home'],
+                                        'marcas'       => ['nombre' => 'Marcas', 'icon' => 'fa-tags'],
+                                        'categorias'   => ['nombre' => 'Categorías', 'icon' => 'fa-folder'],
+                                        'comparativas' => ['nombre' => 'Comparativas', 'icon' => 'fa-chart-bar'],
+                                        'guias'        => ['nombre' => 'Guías', 'icon' => 'fa-book'],
+                                        'estaticas'    => ['nombre' => 'Páginas Estáticas', 'icon' => 'fa-file'],
+                                        'codigos'      => ['nombre' => 'Códigos', 'icon' => 'fa-code'],
                                     ];
                                     
                                     foreach ($tipos_sitemaps as $tipo => $info):

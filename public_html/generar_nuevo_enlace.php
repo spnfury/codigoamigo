@@ -9,7 +9,9 @@ echo "<h1>Generar Nuevo Enlace de Recuperación</h1>";
 
 // Habilitar logging de errores
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 ini_set('log_errors', 1);
 
 $email = isset($_GET['email']) ? $_GET['email'] : 'thevega82@gmail.com';

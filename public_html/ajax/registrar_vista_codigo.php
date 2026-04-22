@@ -9,6 +9,10 @@ require_once __DIR__ . '/../myphp/funciones_usuario.php';
 
 header('Content-Type: application/json');
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 // Obtener datos de la solicitud
 $data = json_decode(file_get_contents('php://input'), true);
 if (!$data) {
@@ -26,17 +30,10 @@ if (empty($codigo_id)) {
 }
 
 // Obtener el usuario actual (si está logueado)
-$viewer_user_id = null;
-if (isset($_SESSION['user_id']) && !empty($_SESSION['user_id'])) {
-    $viewer_user_id = $_SESSION['user_id'];
-}
+$viewer_user_id = $_SESSION['user_id'] ?? null;
 
-// Obtener o crear session_id para usuarios anónimos
+// Obtener session_id
 $session_id = session_id();
-if (empty($session_id)) {
-    session_start();
-    $session_id = session_id();
-}
 
 try {
     // Registrar la vista
