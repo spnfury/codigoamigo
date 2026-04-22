@@ -1,5 +1,6 @@
 <?php
 include_once __DIR__ . '/../myphp/_header_modern.php';
+include_once __DIR__ . '/../myphp/_footer.php';
 get_header_new($title, $description);
 ?>
 
