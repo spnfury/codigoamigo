@@ -271,9 +271,12 @@ register_shutdown_function( "fatal_handler" );
 	    }
 	    
 	    // 2. Construir el filtro para las marcas
+	    // Excluir marcas marcadas como inactiva_seo (sin código nuevo en >12m)
+	    // para no listarlas en navegación interna.
 	    $filtro = [
 	        'estado' => 1,
-	        'aviso' => 'revisada'
+	        'aviso' => 'revisada',
+	        'inactiva_seo' => ['$ne' => true]
 	    ];
 	    
 	    if ($categoria !== '') {
@@ -923,6 +926,13 @@ register_shutdown_function( "fatal_handler" );
 	            }
 	        }
 
+	        // Descripción mínima 50 caracteres
+	        if (mb_strlen(trim($datos['descripcion']), 'UTF-8') < 50) {
+	            $_SESSION['msg_error'] = 'La descripción debe tener al menos 50 caracteres para aportar valor a la comunidad.';
+	            log_info("Descripción demasiado corta en createNewCode", ['user_id' => $user_id, 'len' => mb_strlen(trim($datos['descripcion']), 'UTF-8')]);
+	            return false;
+	        }
+
 	        // Normalizar el código antes de verificar
 	        $codigo_normalizado = trim($datos['codigo']);
 	        
@@ -945,10 +955,12 @@ register_shutdown_function( "fatal_handler" );
             $datos['categoria_clave'] ?? null
         );
 	        
-	        // Verificar si ya existe un código de esta marca para este usuario
+	        // Verificar si ya existe un código activo de esta marca para este usuario.
+	        // Filtra por estado activo para permitir re-publicar tras eliminar (estado -2).
 	        $codigo_existente = $collection_codigos->findOne([
 	            'marca' => $marca_existente['nombre_clave'],
-	            'id_usuario' => new MongoDB\BSON\ObjectId($user_id)
+	            'id_usuario' => new MongoDB\BSON\ObjectId($user_id),
+	            'estado' => ['$in' => [0, -1, 1]]
 	        ]);
 	        
 	        if ($codigo_existente) {
@@ -1024,10 +1036,18 @@ register_shutdown_function( "fatal_handler" );
 	            // Actualizar la visibilidad basada en la posición real
 	            $codigo_id = (string)$result->getInsertedId();
 	            updateCodeVisibilityByPosition($codigo_id, $marca_existente['nombre_clave']);
-	            
+
 	            // Actualizar la visibilidad de todos los códigos de la marca para mantener consistencia
 	            updateAllCodesVisibilityInBrand($marca_existente['nombre_clave']);
-	            
+
+	            // Bonus +1€ al primer código publicado (onboarding incentive).
+	            // Solo se aplica una vez por usuario, controlado por flag bonus_primer_codigo.
+	            try {
+	                otorgar_bonus_primer_codigo($user_id, $codigo_id, $marca_existente['nombre_clave']);
+	            } catch (Throwable $bonus_e) {
+	                log_error("Error otorgando bonus primer código", ['user_id' => $user_id, 'error' => $bonus_e->getMessage()]);
+	            }
+
 	            // Obtener el código actualizado para devolverlo
 	            $codigo_actualizado = $collection_codigos->findOne(['_id' => $result->getInsertedId()]);
 	            return iterator_to_array($codigo_actualizado);

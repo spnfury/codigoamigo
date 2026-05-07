@@ -881,197 +881,254 @@ function generate_modern_featured_cards($lista_codigos_destacados, $show_all = f
     // Asegurar que el script del slider se cargue
     add_mobile_javascript();
     // Usar el nuevo slider en lugar del grid
-    return generate_featured_codes_slider($lista_codigos_destacados, $show_all, '🌟 Códigos Destacados', 'Los códigos más rentables, patrocinados por nuestra comunidad para asegurar que ahorres al máximo.', $marca_nombre_clave, $codigo_existente);
+    return generate_featured_codes_slider($lista_codigos_destacados, $show_all, 'Los mejores beneficios ahora mismo', 'Códigos verificados con la mayor recompensa al usarlos. Marcas reales, beneficios reales.', $marca_nombre_clave, $codigo_existente);
+}
+
+/**
+ * Extrae lista de requisitos heurísticamente desde texto descripción.
+ * Busca viñetas/saltos de línea o frases con verbos típicos de condición.
+ * Devuelve array de strings cortos (max 3, max 70 chars cada uno).
+ */
+function parse_requisitos_from_descripcion($descripcion) {
+    $descripcion = strip_tags($descripcion);
+    $descripcion = html_entity_decode($descripcion, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $descripcion = trim($descripcion);
+    if (empty($descripcion)) {
+        return [];
+    }
+
+    // Normalizar viñetas comunes a salto de línea
+    $normalizado = preg_replace('/\s*[•·●○◦▪▫–—\-\*✓✔→]\s+/u', "\n", $descripcion);
+    $normalizado = preg_replace('/\n{2,}/', "\n", $normalizado);
+    $normalizado = preg_replace('/(?<=[\.;])\s+(?=[A-ZÁÉÍÓÚÑ])/u', "\n", $normalizado);
+
+    $lineas = array_filter(array_map('trim', explode("\n", $normalizado)), function($l) {
+        return mb_strlen($l) >= 8 && mb_strlen($l) <= 120;
+    });
+
+    // Patrones que típicamente indican requisito/condición
+    $patrones_req = '/\b(debes?|tienes? que|necesitas?|requiere|mínimo|al menos|antes de|durante|primer[oa]s?|al abrir|al registrar|introduc[ie]|usar|aplica|verifica|ingres[ae]|deposita|gasta|compra mínim|nuevos? client|sólo|solo |únicamente|durante|válido|cumple|importe mínimo|edad|residente|verificación|kyc|primera compra)/iu';
+
+    $requisitos = [];
+    foreach ($lineas as $linea) {
+        if (preg_match($patrones_req, $linea)) {
+            $linea = preg_replace('/\s+/', ' ', $linea);
+            $linea = rtrim($linea, '.;,');
+            if (mb_strlen($linea) > 70) {
+                $linea = mb_substr($linea, 0, 67) . '...';
+            }
+            $requisitos[] = $linea;
+            if (count($requisitos) >= 3) break;
+        }
+    }
+
+    return $requisitos;
+}
+
+/**
+ * Etiqueta legible para el beneficio hero según tipo_descuento + descripcion.
+ */
+function format_benefit_label($num_beneficio, $tipo_descuento, $descripcion = '') {
+    $tipo = strtolower(trim($tipo_descuento ?? ''));
+    $desc_low = mb_strtolower($descripcion ?? '', 'UTF-8');
+
+    if ($num_beneficio <= 0) {
+        return ['hero' => 'Beneficio exclusivo', 'sub' => 'al usar el código'];
+    }
+
+    if ($tipo === 'porcentaje' || strpos($tipo, '%') !== false) {
+        $hero = $num_beneficio . '%';
+        $sub = 'de descuento';
+        if (strpos($desc_low, 'cashback') !== false) $sub = 'cashback';
+        return ['hero' => $hero, 'sub' => $sub];
+    }
+
+    // Default euros
+    $hero = $num_beneficio . '€';
+    if (strpos($desc_low, 'cashback') !== false)       $sub = 'de cashback';
+    elseif (strpos($desc_low, 'saldo') !== false)       $sub = 'de saldo gratis';
+    elseif (strpos($desc_low, 'regalo') !== false)      $sub = 'de regalo';
+    elseif (strpos($desc_low, 'bonific') !== false)     $sub = 'de bonificación';
+    elseif (strpos($desc_low, 'bono') !== false)        $sub = 'de bono';
+    elseif (strpos($desc_low, 'crédit') !== false || strpos($desc_low, 'credit') !== false) $sub = 'de crédito';
+    elseif (strpos($desc_low, 'reembols') !== false)    $sub = 'reembolso';
+    else                                                 $sub = 'al registrarte';
+
+    return ['hero' => $hero, 'sub' => $sub];
+}
+
+/**
+ * Hook corto "qué es la marca" para destacar valor antes que nombre.
+ * Prioriza h2 (suele ser tagline SEO), fallback seo_que_es truncado, fallback genérico.
+ */
+function get_brand_hook($marca_info, $brand_name) {
+    $h2 = trim(strip_tags($marca_info['h2'] ?? ''));
+    if (!empty($h2) && mb_strlen($h2) <= 120) {
+        return $h2;
+    }
+    $que_es = trim(strip_tags($marca_info['seo_que_es'] ?? $marca_info['descripcion'] ?? ''));
+    $que_es = html_entity_decode($que_es, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    if (!empty($que_es)) {
+        // Primera frase
+        $first = preg_split('/(?<=[\.\!\?])\s+/u', $que_es, 2)[0] ?? $que_es;
+        if (mb_strlen($first) > 110) {
+            $first = mb_substr($first, 0, 107) . '...';
+        }
+        return $first;
+    }
+    return '';
 }
 
 // Función para generar una tarjeta destacada individual
 function generate_single_featured_card($codigo, $index = 0) {
     $brand = isset($codigo['marca']) ? $codigo['marca'] : 'Marca desconocida';
-    $description = isset($codigo['descripcion']) ? $codigo['descripcion'] : 'Descripción no disponible';
+    $description = isset($codigo['descripcion']) ? $codigo['descripcion'] : '';
     $code_id = isset($codigo['_id']) ? (string)$codigo['_id'] : '';
-    $benefit = isset($codigo['num_beneficio']) ? $codigo['num_beneficio'] : 0;
-    $ratings = isset($codigo['num_valoraciones']) ? $codigo['num_valoraciones'] : 0;
+    $benefit = isset($codigo['num_beneficio']) ? (float)$codigo['num_beneficio'] : 0;
+    $tipo_descuento = isset($codigo['tipo_descuento']) ? $codigo['tipo_descuento'] : 'euros';
     $usuario_id = isset($codigo['id_usuario']) ? $codigo['id_usuario'] : '';
-    
+
     // REGISTRAR IMPRESIÓN: Cada vez que se renderiza esta tarjeta destacada
     if ($code_id) {
         añadir_impresion_codigo($code_id);
     }
-    
-    // Obtener información del usuario
+
+    // Info usuario (para badge VIP discreto + modal)
     $user_info = get_user_info($usuario_id);
     $username = $user_info['username'];
     $user_img = $user_info['img'];
-    
-    // Asegurar que la función link_usuario esté disponible
     if (!function_exists('link_usuario')) {
         include_once __DIR__ . '/links.php';
     }
-    
-    // Crear enlace al perfil del usuario
     $user_url = link_usuario($username, $usuario_id);
-    
-    // Check if user is VIP
     $es_vip = false;
     if (function_exists('es_usuario_vip') && !empty($usuario_id)) {
         $es_vip = es_usuario_vip($usuario_id);
     }
-    
-    // Obtener información de la marca para el logo
+
+    // Info marca
     $marca_info = get_brand_info($brand);
     $marca_imagen = $marca_info['imagen'] ?? '';
     $brand_slug = $marca_info['nombre_clave'] ?? generate_brand_slug($brand);
-    $brand_slug = $marca_info['nombre_clave'] ?? generate_brand_slug($brand);
-    
-    // Crear enlace a la página de la marca
     $marca_url = '/de-' . $brand_slug;
-    
-    // Limpiar descripción
-    $description = strip_tags($description);
-    $is_long_description = mb_strlen($description) > 120;
-    $short_description = mb_substr($description, 0, 120);
-    
-    $html = '<div class="featured-card glass-card animate-on-scroll' . ($es_vip ? ' vip-user' : '') . '" data-code-id="' . htmlspecialchars($code_id) . '" style="position: relative;">';
-    
-    // Stretch link para Faux Block Link (UX: hace todo el bloque navegable al código)
-    $html .= '<div class="faux-stretch-link" onclick="viewCode(\'' . htmlspecialchars($code_id) . '\', \'' . htmlspecialchars($brand_slug) . '\')" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 10; cursor: pointer;" title="Ver código"></div>';
-    
-    // Badge destacado
-    $html .= '<div class="featured-badge">';
-    $html .= '<i class="fas fa-star"></i> Destacado';
-    $html .= '</div>';
-    
-    // Flip card container for logo
-    $html .= '<div class="flip-card">';
-    $html .= '<div class="flip-card-inner">';
-    
-    // Front side
-    $html .= '<div class="flip-card-front">';
-    // Logo de la marca (ahora visual, clic gestionado por el stretch-link al código)
-    $html .= '<div class="featured-brand-logo">';
-    $html .= '<div class="brand-link" style="width: 100%; height: 100%; display: block; border-radius: 12px; overflow: hidden; pointer-events: none;">';
-    if($marca_imagen) {
-        $html .= '<img loading="lazy" src="' . htmlspecialchars($marca_imagen) . '" alt="Logo de ' . htmlspecialchars($brand) . '" class="brand-logo-img">';
+    $categoria = trim($marca_info['categoria'] ?? '');
+
+    // Hook qué-es marca (efecto descubrimiento)
+    $brand_hook = get_brand_hook($marca_info, $brand);
+
+    // Beneficio hero
+    $benefit_parts = format_benefit_label($benefit, $tipo_descuento, $description);
+
+    // Requisitos heurísticos
+    $requisitos = parse_requisitos_from_descripcion($description);
+
+    $description_clean = strip_tags($description);
+
+    // Reqs limitar a 2 (chips inline) para card narrow
+    $reqs_chips = array_slice($requisitos, 0, 2);
+    // Si no hay reqs parseables, intentar mini-frase desde descripción
+    if (empty($reqs_chips) && !empty($description_clean)) {
+        $first = trim(preg_split('/(?<=[\.\!\?])\s+/u', $description_clean, 2)[0] ?? '');
+        if (!empty($first) && mb_strlen($first) <= 90) {
+            $reqs_chips = [$first];
+        }
+    }
+
+    $html = '<div class="featured-card fc-card animate-on-scroll' . ($es_vip ? ' fc-vip' : '') . '" data-code-id="' . htmlspecialchars($code_id) . '">';
+
+    // Stretch link (toda la card cliclable al código)
+    $html .= '<div class="fc-stretch" onclick="viewCode(\'' . htmlspecialchars($code_id) . '\', \'' . htmlspecialchars($brand_slug) . '\')" title="Ver código"></div>';
+
+    // Badge top-right (verificado, no "destacado" — lenguaje del descubridor)
+    $html .= '<span class="fc-badge" title="Verificado"><i class="fas fa-check"></i></span>';
+
+    // ZONA 1: Marca (logo + nombre + categoría)
+    $html .= '<a href="' . htmlspecialchars($marca_url) . '" class="fc-brand" onclick="event.stopPropagation();" title="Ver ' . htmlspecialchars($brand) . '">';
+    $html .= '<span class="fc-brand-logo">';
+    if ($marca_imagen) {
+        $html .= '<img loading="lazy" src="' . htmlspecialchars($marca_imagen) . '" alt="' . htmlspecialchars($brand) . '">';
     } else {
-        $html .= '<div class="brand-logo-placeholder">';
         $html .= '<i class="fas fa-tag"></i>';
-        $html .= '</div>';
     }
-    $html .= '</div>';
-    // Badge flotante con nombre de marca (El enlace SEO original de la marca se mantiene aquí)
-    $html .= '<div class="brand-name-badge" style="position: relative; z-index: 20; pointer-events: auto; padding: 0 !important;">';
-    $html .= '<a href="' . htmlspecialchars($marca_url) . '" onclick="event.stopPropagation();" style="cursor: pointer; color: inherit; text-decoration: none; display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; padding: 0.5rem 0.75rem;" title="Ver códigos de ' . htmlspecialchars($brand) . '">';
-    $html .= htmlspecialchars($brand);
+    $html .= '</span>';
+    $html .= '<span class="fc-brand-text">';
+    $html .= '<span class="fc-brand-name">' . htmlspecialchars($brand) . '</span>';
+    if (!empty($categoria)) {
+        $html .= '<span class="fc-brand-cat">' . htmlspecialchars($categoria) . '</span>';
+    }
+    $html .= '</span>';
     $html .= '</a>';
+
+    // ZONA 2: Beneficio (centerpiece)
+    $html .= '<div class="fc-benefit">';
+    $html .= '<div class="fc-benefit-shine"></div>';
+    $html .= '<div class="fc-benefit-amount">' . htmlspecialchars($benefit_parts['hero']) . '</div>';
+    $html .= '<div class="fc-benefit-label">' . htmlspecialchars($benefit_parts['sub']) . '</div>';
     $html .= '</div>';
-    // Badge flotante con fecha (si existe)
-    if(isset($codigo['fecha_publicacion'])) {
-        $fecha_formateada = formatDateAgoLarge($codigo['fecha_publicacion']);
-        $html .= '<div class="brand-date-badge">';
-        $html .= '<i class="far fa-clock"></i>';
-        $html .= '<span>' . htmlspecialchars($fecha_formateada) . '</span>';
+
+    // ZONA 3: Hook (qué es la marca)
+    if (!empty($brand_hook)) {
+        $html .= '<p class="fc-hook">' . htmlspecialchars($brand_hook) . '</p>';
+    }
+
+    // ZONA 4: Requisitos como chips
+    if (!empty($reqs_chips)) {
+        $html .= '<div class="fc-reqs">';
+        foreach ($reqs_chips as $req) {
+            // Truncar chip a algo manejable
+            $chip = mb_strlen($req) > 50 ? mb_substr($req, 0, 47) . '...' : $req;
+            $html .= '<span class="fc-req"><i class="fas fa-check"></i>' . htmlspecialchars($chip) . '</span>';
+        }
         $html .= '</div>';
     }
-    $html .= '</div>'; // .featured-brand-logo
-    $html .= '</div>'; // .flip-card-front
-    
-    // Back side (Description)
-    $brand_desc = $marca_info['descripcion'] ?? $marca_info['seo_que_es'] ?? 'Información sobre ' . htmlspecialchars($brand) . ' no disponible';
-    // Limpiar HTML y decodificar entidades
-    $brand_desc = strip_tags($brand_desc);
-    $brand_desc = html_entity_decode($brand_desc, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    $brand_desc_short = strlen($brand_desc) > 180 ? substr($brand_desc, 0, 177) . '...' : $brand_desc;
-    
-    $html .= '<div class="flip-card-back">';
-    $html .= '<div class="brand-info-back">';
-    $html .= '<h4>¿Qué es ' . htmlspecialchars($brand) . '?</h4>';
-    $html .= '<p>' . $brand_desc_short . '</p>';
-    $html .= '<a href="' . htmlspecialchars($marca_url) . '" class="btn-more-info">Ver más códigos <i class="fas fa-arrow-right"></i></a>';
-    $html .= '</div>';
-    $html .= '</div>'; // .flip-card-back
-    
-    $html .= '</div>'; // .flip-card-inner
-    
-    // Mobile trigger
-    $html .= '<div class="flip-trigger-mobile" title="Saber más sobre esta marca" style="position: relative; z-index: 20;"><i class="fas fa-question-circle"></i></div>';
-    
-    $html .= '</div>'; // .flip-card
-    
-    // Header de la tarjeta con usuario
-    $html .= '<div class="featured-card-header">';
-    
-    // Preparar atributos para el modal
+
+    // ZONA 5: CTA
+    $cta_text = $benefit > 0 ? 'Conseguir ' . $benefit_parts['hero'] : 'Ver código';
+    $html .= '<button class="fc-cta featured-button" onclick="viewCode(\'' . htmlspecialchars($code_id) . '\', \'' . htmlspecialchars($brand_slug) . '\')">';
+    $html .= '<span>' . htmlspecialchars($cta_text) . '</span>';
+    $html .= '<i class="fas fa-arrow-right"></i>';
+    $html .= '</button>';
+
+    // ZONA 6: Meta usuario (tiny footer)
     $safe_username = htmlspecialchars($username);
     $safe_img = htmlspecialchars($user_img ?: '');
-    $stats_offers = rand(10, 500); // Placeholder simulado
-    $stats_comments = rand(5, 100); // Placeholder simulado
-    $stats_likes = rand(50, 1000); // Placeholder simulado
-    
-    $html .= '<div class="featured-user-info user-modal-trigger" style="cursor:pointer; position: relative; z-index: 20;" ';
+    $html .= '<div class="fc-meta user-modal-trigger" ';
     $html .= 'data-username="' . $safe_username . '" ';
     $html .= 'data-image="' . $safe_img . '" ';
     $html .= 'data-official="false" ';
     $html .= 'data-vip="' . ($es_vip ? 'true' : 'false') . '" ';
     $html .= 'data-profile-url="' . htmlspecialchars($user_url) . '" ';
-    $html .= 'data-joined="Miembro verificado" ';
-    $html .= 'data-stats-offers="' . $stats_offers . '" ';
-    $html .= 'data-stats-comments="' . $stats_comments . '" ';
-    $html .= 'data-stats-likes="' . $stats_likes . '" ';
-    $html .= 'data-user-id="' . (string)$usuario_id . '" ';
-    $html .= '>';
-    
-    $html .= '<div class="featured-user-avatar">';
-    if($user_img) {
-        $html .= '<img src="' . $safe_img . '" alt="Avatar de ' . $safe_username . '" class="featured-user-img">';
-    } else {
-        $html .= '<div class="featured-user-placeholder">';
-        $html .= '<i class="fas fa-user"></i>';
-        $html .= '</div>';
+    $html .= 'data-user-id="' . (string)$usuario_id . '">';
+    $html .= '<span class="fc-meta-by">por</span> ';
+    if ($user_img) {
+        $html .= '<img src="' . $safe_img . '" alt="' . $safe_username . '" class="fc-meta-avatar">';
     }
-    $html .= '</div>';
-    $html .= '<div class="featured-user-details">';
-    $vip_badge_html = '';
+    $html .= '<span class="fc-meta-name">' . $safe_username;
     if ($es_vip) {
-        $vip_badge_html = ' <span class="vip-badge-gold" data-vip-tt="1" style="font-size: 0.6rem; margin-left: 4px; vertical-align: middle; display: inline-flex; align-items: center; gap: 2px; padding: 2px 5px;" title="Usuario VIP"><i class="fas fa-crown"></i> VIP</span>';
+        $html .= ' <i class="fas fa-crown" title="VIP"></i>';
     }
-    $html .= '<span class="featured-user-name" title="Ver perfil de ' . $safe_username . '">' . $safe_username . $vip_badge_html . '</span>';
-    $html .= '</div>';
-    $html .= '</div>';
-    $html .= '</div>';
-    
-    // Descripción con funcionalidad "ver más"
-    if ($is_long_description) {
-        $html .= '<div class="featured-description read-more-content" style="position: relative; z-index: 20;" data-full-text="' . htmlspecialchars($description) . '" data-short-text="' . htmlspecialchars($short_description) . '...">' . htmlspecialchars($short_description) . '... <span class="read-more-btn">ver más</span></div>';
-    } else {
-        $html .= '<div class="featured-description" style="position: relative; z-index: 20;">' . htmlspecialchars($description) . '</div>';
+    $html .= '</span>';
+
+    // Antigüedad publicador
+    try {
+        $uid_fc = is_object($usuario_id) ? (string)$usuario_id : (string)($codigo['id_usuario'] ?? '');
+        if (strlen($uid_fc) === 24) {
+            $anio_fc = date('Y', hexdec(substr($uid_fc, 0, 8)));
+            $html .= ' <span style="font-size:11px;color:#aaa;" title="Miembro desde ' . $anio_fc . '">desde ' . $anio_fc . '</span>';
+        }
+    } catch (Exception $e) {}
+
+    // Clicks badge
+    $fc_clicks = isset($codigo['totalclicks']) ? (int)$codigo['totalclicks'] : 0;
+    if ($fc_clicks > 0) {
+        $fc_clicks_fmt = $fc_clicks >= 1000 ? round($fc_clicks/1000, 1) . 'K' : $fc_clicks;
+        $html .= '<span class="fc-clicks-badge" style="margin-left:8px;font-size:11px;color:#27ae60;font-weight:600;" title="Usos registrados"><i class="fas fa-users"></i> ' . $fc_clicks_fmt . '</span>';
     }
-    
-    // Información adicional
-    $html .= '<div class="featured-stats">';
-    
-    if($benefit > 0) {
-        $html .= '<span class="featured-stat"><i class="fas fa-euro-sign"></i> ' . $benefit . ' beneficio</span>';
-    }
-    
-    if($ratings > 0) {
-        $html .= '<span class="featured-stat"><i class="fas fa-star"></i> ' . $ratings . ' valoraciones</span>';
-    }
-    
-    // Mostrar impresiones si existen
-    $impressions = isset($codigo['total_impressions']) ? $codigo['total_impressions'] : 0;
-    if($impressions > 0) {
-		$html .= '<span class="featured-stat impressions-link" title="Ver estadísticas" style="cursor: pointer; position: relative; z-index: 20;" data-codigo-id="' . htmlspecialchars((string)$code_id, ENT_QUOTES, 'UTF-8') . '" onclick="if(window.viewStatsModal){viewStatsModal(\'' . htmlspecialchars((string)$code_id, ENT_QUOTES, 'UTF-8') . '\');} return false;"><i class="fas fa-eye"></i> ' . number_format($impressions) . ' impresiones</span>';
-    }
-    
+
     $html .= '</div>';
-    
-    // Botón de acción
-    $html .= '<button class="featured-button" onclick="viewCode(\'' . htmlspecialchars($code_id) . '\', \'' . htmlspecialchars($brand_slug) . '\')" style="position: relative; z-index: 20;">';
-    $html .= '<i class="fas fa-eye"></i> Ver Código';
-    $html .= '</button>';
-    
-    $html .= '</div>';
-    
+
+    $html .= '</div>'; // .featured-card / .fc-card
+
     return $html;
 }
 
@@ -1211,7 +1268,7 @@ function generate_empty_featured_card($marca_nombre_clave = null, $codigo_existe
 }
 
 // Función para generar el slider de códigos destacados en la home
-function generate_featured_codes_slider($lista_codigos_destacados, $show_all = false, $title = '🌟 Códigos Destacados', $subtitle = 'Los códigos más rentables, patrocinados por nuestra comunidad para asegurar que ahorres al máximo.', $marca_nombre_clave = null, $codigo_existente = null) {
+function generate_featured_codes_slider($lista_codigos_destacados, $show_all = false, $title = 'Los mejores beneficios ahora mismo', $subtitle = 'Códigos verificados con la mayor recompensa al usarlos.', $marca_nombre_clave = null, $codigo_existente = null) {
     if(empty($lista_codigos_destacados)) {
         return '';
     }
@@ -1235,12 +1292,7 @@ function generate_featured_codes_slider($lista_codigos_destacados, $show_all = f
         $html .= '<p class="section-subtitle" style="margin-bottom: 0;">' . htmlspecialchars($subtitle) . '</p>';
     }
     $html .= '</div>'; // title-container
-    
-    // CTA Button
-    $html .= '<a href="/mis-anuncios" class="btn-destaca-tu-codigo" style="display: inline-flex; align-items: center; gap: 8px; background: rgba(227, 6, 19, 0.1); color: #E30613; border: 1px solid rgba(227, 6, 19, 0.3); padding: 10px 20px; border-radius: 20px; font-weight: 600; text-decoration: none; transition: all 0.3s ease;">';
-    $html .= '🚀 ¿Quieres salir el primero? Destaca tu código';
-    $html .= '</a>';
-    
+
     $html .= '</div>'; // featured-header-flex
 
     // Contenedor del slider
@@ -1252,11 +1304,6 @@ function generate_featured_codes_slider($lista_codigos_destacados, $show_all = f
         $html .= generate_single_featured_card($codigo, $index);
         $html .= '</div>';
     }
-
-    // Agregar tarjeta vacía "Tu código podría estar aquí"
-    $html .= '<div class="featured-code-slide" data-slider-item>';
-    $html .= generate_empty_featured_card($marca_nombre_clave, $codigo_existente);
-    $html .= '</div>';
 
     $html .= '</div>'; // featured-codes-slider
 
@@ -1321,6 +1368,194 @@ function generate_featured_codes_slider($lista_codigos_destacados, $show_all = f
 </script>
 HTML;
 	
+    return $html;
+}
+
+/**
+ * Marcas para la sección "Descubre marcas que no conocías".
+ * Heurística: marcas con códigos activos, beneficio medio alto y poca tracción
+ * (long-tail), excluyendo mainstream para maximizar efecto descubrimiento.
+ */
+function get_discovery_brands_for_home($limit = 8) {
+    $excluir_mainstream = [
+        'amazon','netflix','spotify','apple','google','microsoft','disney','hbo',
+        'movistar','vodafone','orange','el corte ingles','el-corte-ingles','mediamarkt',
+        'zalando','aliexpress','ebay','pccomponentes','glovo','uber','ifood','justeat'
+    ];
+
+    $marcas_descubrir = [];
+
+    try {
+        $collection_codigos = getCollectionCodigos();
+
+        // Pipeline: beneficio realista 1-500€ (excluir sorteos/rifas outliers gigantes)
+        $pipeline = [
+            ['$match' => [
+                'estado' => 0,
+                'num_beneficio' => ['$gte' => 1, '$lte' => 500]
+            ]],
+            ['$group' => [
+                '_id' => '$marca',
+                'max_beneficio' => ['$max' => '$num_beneficio'],
+                'avg_beneficio' => ['$avg' => '$num_beneficio'],
+                'total_codigos' => ['$sum' => 1],
+                'sample_tipo' => ['$first' => '$tipo_descuento']
+            ]],
+            // Long-tail: 1 a 8 códigos (ni totalmente nichos sin tracción ni mainstream)
+            ['$match' => [
+                'total_codigos' => ['$gte' => 1, '$lte' => 8]
+            ]],
+            ['$sort' => ['max_beneficio' => -1, 'avg_beneficio' => -1]],
+            ['$limit' => $limit * 4]
+        ];
+
+        $candidatas = $collection_codigos->aggregate($pipeline)->toArray();
+
+        // Diversificar por categoría (1 por categoría hasta agotarlas, luego rellenar)
+        $por_categoria = [];
+        $resto = [];
+
+        foreach ($candidatas as $c) {
+            $clave = (string)$c['_id'];
+            if (empty($clave)) continue;
+            // Filtrar entradas malformadas (URLs, paths, espacios raros)
+            if (preg_match('#^https?://|/|^www\.#i', $clave)) continue;
+            if (mb_strlen($clave) > 40) continue;
+            $clave_lower = mb_strtolower($clave, 'UTF-8');
+            if (in_array($clave_lower, $excluir_mainstream, true)) continue;
+
+            $marca_info = getObjectMarca('nombre_clave', $clave);
+            if (!$marca_info) continue;
+
+            $imagen = $marca_info['imagen'] ?? '';
+            if (empty($imagen) || $imagen === 'Sin imagen') {
+                $imagen = '/img/no_image.png';
+            }
+            $imagen = process_marca_imagen($imagen);
+
+            $cat = $marca_info['categoria'] ?? 'General';
+            $hook = get_brand_hook($marca_info, $marca_info['nombre'] ?? $clave);
+
+            $registro = [
+                'nombre' => $marca_info['nombre'] ?? ucfirst($clave),
+                'nombre_clave' => $marca_info['nombre_clave'] ?? $clave,
+                'imagen' => $imagen,
+                'categoria' => $cat,
+                'hook' => $hook,
+                'max_beneficio' => $c['max_beneficio'] ?? 0,
+                'tipo_descuento' => $c['sample_tipo'] ?? 'euros',
+                'total_codigos' => $c['total_codigos'] ?? 0
+            ];
+
+            if (!isset($por_categoria[$cat])) {
+                $por_categoria[$cat] = $registro;
+            } else {
+                $resto[] = $registro;
+            }
+        }
+
+        // Primero una por categoría, luego completar con resto
+        $marcas_descubrir = array_values($por_categoria);
+        foreach ($resto as $r) {
+            if (count($marcas_descubrir) >= $limit) break;
+            $marcas_descubrir[] = $r;
+        }
+        $marcas_descubrir = array_slice($marcas_descubrir, 0, $limit);
+
+    } catch (Exception $e) {
+        log_warning('Error get_discovery_brands_for_home', ['error' => $e->getMessage()]);
+    }
+
+    return $marcas_descubrir;
+}
+
+/**
+ * Sección "Descubre marcas que no conocías" para la home.
+ * Card-grid (no slider) con hook + beneficio gordo + categoría.
+ */
+function generate_brand_discovery_section($limit = 8) {
+    $marcas = get_discovery_brands_for_home($limit);
+    if (empty($marcas)) {
+        return '';
+    }
+
+    $html  = '<div class="brand-discovery-section">';
+    $html .= '<div class="container">';
+    $html .= '<div class="discovery-header">';
+    $html .= '<div class="discovery-eyebrow"><i class="fas fa-compass"></i> Descubrimiento</div>';
+    $html .= '<h2 class="section-title h2-style discovery-title">Marcas que no sabías que existían</h2>';
+    $html .= '<p class="section-subtitle">Bonos, cashback y servicios reales de marcas fuera del radar. Cero ruido publicitario.</p>';
+    $html .= '</div>';
+
+    $html .= '<div class="discovery-grid">';
+    foreach ($marcas as $m) {
+        $url = '/de-' . htmlspecialchars($m['nombre_clave']);
+        $benefit_parts = format_benefit_label($m['max_beneficio'], $m['tipo_descuento'], $m['hook']);
+
+        $html .= '<a href="' . $url . '" class="discovery-card">';
+        $html .= '<div class="discovery-card-top">';
+        $html .= '<div class="discovery-logo">';
+        if (!empty($m['imagen'])) {
+            $html .= '<img src="' . htmlspecialchars($m['imagen']) . '" alt="' . htmlspecialchars($m['nombre']) . '" loading="lazy">';
+        } else {
+            $html .= '<i class="fas fa-tag"></i>';
+        }
+        $html .= '</div>';
+        $html .= '<div class="discovery-meta">';
+        $html .= '<span class="discovery-cat">' . htmlspecialchars($m['categoria']) . '</span>';
+        $html .= '<span class="discovery-name">' . htmlspecialchars($m['nombre']) . '</span>';
+        $html .= '</div>';
+        $html .= '</div>';
+
+        if (!empty($m['hook'])) {
+            $html .= '<p class="discovery-hook">' . htmlspecialchars($m['hook']) . '</p>';
+        }
+
+        $html .= '<div class="discovery-benefit">';
+        $html .= '<span class="discovery-benefit-amount">' . htmlspecialchars($benefit_parts['hero']) . '</span>';
+        $html .= '<span class="discovery-benefit-sub">' . htmlspecialchars($benefit_parts['sub']) . '</span>';
+        $html .= '</div>';
+
+        $html .= '<span class="discovery-cta">Descubrir <i class="fas fa-arrow-right"></i></span>';
+        $html .= '</a>';
+    }
+    $html .= '</div>'; // .discovery-grid
+
+    $html .= '<div class="discovery-foot">';
+    $html .= '<a href="/listado-marcas" class="btn-modern-outline" style="text-decoration:none;">Ver todas las marcas <i class="fas fa-arrow-right"></i></a>';
+    $html .= '</div>';
+
+    $html .= '</div>'; // .container
+    $html .= '</div>'; // .brand-discovery-section
+    return $html;
+}
+
+/**
+ * Banda CTA dirigida a publishers latentes (usuarios que aún no han compartido códigos).
+ * Mensaje: "tu marca aún no está aquí" → publica.
+ */
+function generate_publisher_latent_cta() {
+    $is_logged = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
+    $cta_url = $is_logged ? '/nuevo_codigo' : '/registro';
+    $title = $is_logged
+        ? '¿Usas Revolut, Trade Republic o Wise? Tu marca aún no está aquí.'
+        : 'Convierte tus códigos en dinero real';
+    $desc = $is_logged
+        ? 'Comparte tu código de referido y gana cada vez que alguien lo use. Sin intermediarios, sin esperas.'
+        : 'Únete y publica tus códigos de referido. Cuando alguien los usa, ganas tú. Cero coste.';
+    $btn = $is_logged ? 'Compartir mi código' : 'Empezar a ganar';
+
+    $html  = '<div class="publisher-cta-band">';
+    $html .= '<div class="publisher-cta-content">';
+    $html .= '<div class="publisher-cta-eyebrow"><i class="fas fa-coins"></i> Para publishers</div>';
+    $html .= '<h3 class="publisher-cta-title">' . htmlspecialchars($title) . '</h3>';
+    $html .= '<p class="publisher-cta-desc">' . htmlspecialchars($desc) . '</p>';
+    $html .= '</div>';
+    $html .= '<a href="' . htmlspecialchars($cta_url) . '" class="publisher-cta-btn">';
+    $html .= htmlspecialchars($btn) . ' <i class="fas fa-arrow-right"></i>';
+    $html .= '</a>';
+    $html .= '</div>';
+
     return $html;
 }
 
@@ -2053,6 +2288,36 @@ function generate_single_code_card($codigo) {
     }
     $html .= '</div>';
     $html .= '<div class="code-description-text">' . htmlspecialchars($description) . '</div>';
+
+    // Stats row: clicks, votos, antigüedad publicador
+    $totalclicks = isset($codigo['totalclicks']) ? (int)$codigo['totalclicks'] : 0;
+    $votos_pos = isset($codigo['votos_positivos']) ? (int)$codigo['votos_positivos'] : 0;
+
+    // Antigüedad publicador desde ObjectId (primeros 4 bytes = unix timestamp)
+    $anio_registro = null;
+    if (!empty($usuario_id)) {
+        try {
+            $uid_str = is_object($usuario_id) ? (string)$usuario_id : $usuario_id;
+            if (strlen($uid_str) === 24) {
+                $ts_usuario = hexdec(substr($uid_str, 0, 8));
+                $anio_registro = date('Y', $ts_usuario);
+            }
+        } catch (Exception $e) {}
+    }
+
+    $html .= '<div class="code-stats-row" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;font-size:12px;">';
+    if ($totalclicks > 0) {
+        $clicks_fmt = $totalclicks >= 1000 ? round($totalclicks/1000, 1) . 'K' : $totalclicks;
+        $html .= '<span style="color:#27ae60;font-weight:600;" title="Personas que usaron este código"><i class="fas fa-users"></i> ' . $clicks_fmt . ' personas lo usaron</span>';
+    }
+    if ($votos_pos > 0) {
+        $html .= '<span style="color:#2980b9;" title="Valoraciones positivas"><i class="fas fa-thumbs-up"></i> ' . number_format($votos_pos, 0, ',', '.') . '</span>';
+    }
+    if ($anio_registro) {
+        $html .= '<span style="color:#888;" title="Antigüedad del publicador"><i class="far fa-calendar-check"></i> desde ' . $anio_registro . '</span>';
+    }
+    $html .= '</div>';
+
     // Fecha de publicación visible
     if(isset($codigo['fecha_publicacion'])) {
         $fecha_pub = formatDateAgoLarge($codigo['fecha_publicacion']);

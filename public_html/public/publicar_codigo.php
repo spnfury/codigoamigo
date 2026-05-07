@@ -887,8 +887,9 @@
                         <span class="vip-badge-mini">VIP</span>
                     </button>
                  </label>
-                 <textarea class="form-control" id="descripcion" name="descripcion" rows="5" placeholder="Describe tu código amigo" required><?php echo htmlspecialchars($descripcion); ?></textarea>
-                 <div class="error-message" id="descripcion-error">La descripción es obligatoria</div>
+                 <textarea class="form-control" id="descripcion" name="descripcion" rows="5" minlength="50" placeholder="Ej: Te regalo 10€ al abrir tu cuenta. Llevo usando este servicio 2 años y nunca me han cobrado comisiones..." required><?php echo htmlspecialchars($descripcion); ?></textarea>
+                 <div class="desc-char-counter" id="desc-counter" style="font-size:12px;color:#888;margin-top:4px;"><span id="desc-char-count">0</span>/50 caracteres mínimos</div>
+                 <div class="error-message" id="descripcion-error">La descripción debe tener al menos 50 caracteres</div>
              </div>
 
             <div class="warning-text">
@@ -1064,7 +1065,7 @@
         var codigo = $("#codigo").val().trim();
         var descripcion = $("#descripcion").val().trim();
 
-        var allValid = marcaValue !== '' && beneficio !== '' && codigo !== '' && descripcion !== '';
+        var allValid = marcaValue !== '' && beneficio !== '' && codigo !== '' && descripcion.length >= 50;
 
         // Habilitar/deshabilitar botón flotante
         if (allValid) {
@@ -1184,8 +1185,17 @@
     });
 
     $('#descripcion').on('blur input', function() {
-        validateField('descripcion', 'descripcion-error', 'La descripción es obligatoria');
-        validateAllRequiredFields(); // Verificar si habilitar botón
+        var len = $(this).val().trim().length;
+        $('#desc-char-count').text(len);
+        var counter = $('#desc-counter');
+        if (len >= 50) {
+            counter.css('color', '#27ae60');
+        } else {
+            counter.css('color', len > 30 ? '#e67e22' : '#888');
+        }
+        var ok = len >= 50;
+        $('#descripcion-error').toggle(!ok && $(this).is(':not(:focus)'));
+        validateAllRequiredFields();
     });
 
         // Manejar selección de marca
