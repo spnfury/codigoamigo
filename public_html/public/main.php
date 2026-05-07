@@ -823,6 +823,32 @@ $numero_codigos_format = number_format($numero_codigos, 0, ',', '.');
 }
 </style>
 
+<?php if(!isset($_GET["page"]) || $_GET["page"] == ""): ?>
+<section class="container mt-5 mb-4" id="que-es-codigo-amigo">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <h2 class="h4 mb-3">¿Qué es un código amigo?</h2>
+            <p>Un <strong>código amigo</strong> (también llamado código de invitación, código referido o código promocional) es un código único que un usuario registrado comparte con otra persona para que esta obtenga un descuento, crédito o beneficio al registrarse en una app o servicio.</p>
+            <p>Cuando alguien se registra usando un <strong>código amigo</strong>, normalmente ambos reciben una recompensa: el nuevo usuario consigue un descuento o bono de bienvenida, y quien compartió el código gana créditos, cashback o minutos gratuitos.</p>
+            <div class="row mt-3">
+                <div class="col-md-4 mb-3">
+                    <h3 class="h6">¿Cómo funciona un código amigo?</h3>
+                    <p class="small">El nuevo usuario introduce el código durante el registro o en su primera compra. El sistema valida el código y aplica el beneficio automáticamente.</p>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <h3 class="h6">¿Dónde usar los códigos amigo?</h3>
+                    <p class="small">Bancos digitales, apps de movilidad, plataformas de inversión, supermercados online, seguros, telecomunicaciones y muchos más sectores ofrecen este tipo de descuentos.</p>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <h3 class="h6">¿Son seguros los códigos de descuento?</h3>
+                    <p class="small">En CodigoAmigo.com todos los códigos son verificados por la comunidad. Solo publicamos códigos activos y comprobados por usuarios reales.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+<?php endif; ?>
+
 <?php
 
 get_footer(); ?>

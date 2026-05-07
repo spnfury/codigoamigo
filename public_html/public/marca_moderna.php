@@ -42,6 +42,9 @@ if (!empty($url_logo_rs)) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo $title; ?></title>
     <meta name="description" content="<?php echo $description; ?>">
+    <?php if ($numero_codigos == 0 && empty($marca_faqs_count)): ?>
+    <meta name="robots" content="noindex,follow">
+    <?php endif; ?>
     
     <!-- CSS Moderno -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -95,18 +98,18 @@ if (!empty($url_logo_rs)) {
     <style>
         /* Estilos específicos de la página */
         body {
-            --brand-orange: #ff7a18;
-            --brand-orange-dark: #ff4f0f;
-            --brand-charcoal: #201a2b;
-            --brand-cream: #fff3e8;
+            --brand-orange: #E30613;
+            --brand-orange-dark: #b8040f;
+            --brand-charcoal: #1a1a2e;
+            --brand-cream: #fff0f0;
         }
 
         .brand-header {
             position: relative;
             overflow: hidden;
-            background: linear-gradient(135deg, var(--brand-orange) 0%, var(--brand-orange-dark) 100%);
+            background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 60%, var(--brand-orange-dark) 100%);
             color: #fff;
-            box-shadow: 0 12px 45px -20px rgba(255, 79, 15, 0.65);
+            box-shadow: 0 12px 45px -20px rgba(227, 6, 19, 0.5);
         }
 
         .brand-header::before,
@@ -199,7 +202,7 @@ if (!empty($url_logo_rs)) {
         .tabs .tab:hover {
             background: linear-gradient(135deg, var(--brand-orange) 0%, var(--brand-orange-dark) 100%);
             color: #fff;
-            box-shadow: 0 10px 25px -18px rgba(255, 79, 15, 0.85);
+            box-shadow: 0 10px 25px -18px rgba(227, 6, 19, 0.7);
         }
 
         .chollometro-tabs .tab-button.active,
@@ -214,13 +217,13 @@ if (!empty($url_logo_rs)) {
             background: linear-gradient(135deg, var(--brand-orange), var(--brand-orange-dark));
             border: none;
             color: #fff;
-            box-shadow: 0 12px 24px -16px rgba(255, 79, 15, 0.85);
+            box-shadow: 0 12px 24px -16px rgba(227, 6, 19, 0.7);
         }
 
         .btn-primary:hover,
         .btn-publish:hover,
         .header .btn-primary:hover {
-            background: linear-gradient(135deg, var(--brand-orange-dark), #e63f00);
+            background: linear-gradient(135deg, var(--brand-orange-dark), #8b0209);
         }
 
         .btn-outline:hover {
@@ -242,7 +245,7 @@ if (!empty($url_logo_rs)) {
         }
 
         .cta-button .btn {
-            background: linear-gradient(135deg, #ffd167 0%, var(--brand-orange) 100%);
+            background: linear-gradient(135deg, var(--brand-orange) 0%, var(--brand-orange-dark) 100%);
         }
         
         .code-item {
@@ -356,7 +359,7 @@ if (!empty($url_logo_rs)) {
         }
         
         .brand-description-short h3 {
-            color: #1e40af;
+            color: #E30613;
             font-size: 1.5rem;
             font-weight: 700;
             margin-bottom: 15px;
@@ -377,11 +380,11 @@ if (!empty($url_logo_rs)) {
             border-radius: 12px;
             margin: 30px 0;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            border-left: 4px solid #3b82f6;
+            border-left: 4px solid #E30613;
         }
-        
+
         .brand-description-long h3 {
-            color: #1e40af;
+            color: #E30613;
             font-size: 1.8rem;
             font-weight: 700;
             margin-bottom: 20px;
@@ -403,7 +406,7 @@ if (!empty($url_logo_rs)) {
         .brand-description-long .description-content h2,
         .brand-description-long .description-content h3,
         .brand-description-long .description-content h4 {
-            color: #1e40af;
+            color: #E30613;
             margin: 20px 0 10px 0;
         }
         
@@ -716,7 +719,24 @@ if (!empty($url_logo_rs)) {
                 </div>
 
                 <!-- Publish Code Section -->
-                <?php if (!filter_input(INPUT_GET, "codigo", FILTER_SANITIZE_STRING) && $marca["nombre_clave"] != 'bookingcom'): ?>
+                <?php if (!filter_input(INPUT_GET, "codigo", FILTER_SANITIZE_STRING) && $marca["nombre_clave"] != 'bookingcom'):
+                    // Detectar si el usuario tiene derecho al bonus de primer código
+                    $bonus_disponible = true;
+                    if (!empty($_SESSION["user_id"])) {
+                        try {
+                            $col_u = getCollectionUsuarios();
+                            $u_data = $col_u->findOne(
+                                ['_id' => new MongoDB\BSON\ObjectId($_SESSION["user_id"])],
+                                ['projection' => ['bonus_primer_codigo' => 1]]
+                            );
+                            if (!empty($u_data['bonus_primer_codigo'])) {
+                                $bonus_disponible = false;
+                            }
+                        } catch (Throwable $e) {
+                            $bonus_disponible = false;
+                        }
+                    }
+                ?>
                 <div class="publish-section">
                     <div class="publish-card">
                         <div class="publish-content">
@@ -729,6 +749,11 @@ if (!empty($url_logo_rs)) {
                             <?php else: ?>
                                 Comparte tu código con la comunidad y ayuda a otros usuarios a ahorrar dinero
                             <?php endif; ?></p>
+                            <?php if ($bonus_disponible): ?>
+                            <div style="background: linear-gradient(135deg,#fff8e1,#fffde7); border-left:4px solid #f39c12; border-radius:8px; padding:12px 16px; margin:12px 0; font-weight:600; color:#7b5400;">
+                                🎁 ¡<strong>+1€ de regalo</strong> al publicar tu primer código!
+                            </div>
+                            <?php endif; ?>
                             <div class="publish-benefits">
                                 <div class="benefit-item">
                                     <i class="fas fa-check-circle"></i>
@@ -746,12 +771,12 @@ if (!empty($url_logo_rs)) {
                             <?php if (!empty($_SESSION["user_id"])): ?>
                                 <a href="<?php echo link_nuevo_codigo(); ?>?marca=<?php echo $marca["nombre"]; ?>" class="btn-publish">
                                     <i class="fas fa-plus"></i>
-                                    Publicar mi código ahora
+                                    <?php echo $bonus_disponible ? 'Publicar mi código y ganar +1€' : 'Publicar mi código ahora'; ?>
                                 </a>
                             <?php else: ?>
                                 <button class="btn-publish open_modal_login">
                                     <i class="fas fa-plus"></i>
-                                    Publicar mi código ahora
+                                    <?php echo $bonus_disponible ? 'Publicar mi código y ganar +1€' : 'Publicar mi código ahora'; ?>
                                 </button>
                             <?php endif; ?>
                         </div>
@@ -800,7 +825,7 @@ if (!empty($url_logo_rs)) {
                     }
                     
                     .obtener-header {
-                        background: linear-gradient(135deg, #1e3a5f 0%, #2d5a8e 60%, #3b82f6 100%);
+                        background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 60%, #E30613 100%);
                         padding: 28px 24px;
                         text-align: center;
                         position: relative;
@@ -836,7 +861,7 @@ if (!empty($url_logo_rs)) {
                     .obtener-beneficio-badge {
                         display: inline-block;
                         background: linear-gradient(135deg, #fbbf24, #f59e0b);
-                        color: #1e3a5f;
+                        color: #1a1a1a;
                         font-weight: 800;
                         font-size: 1.3rem;
                         padding: 8px 20px;
@@ -950,7 +975,7 @@ if (!empty($url_logo_rs)) {
                         font-family: 'Courier New', monospace;
                         font-size: 1.5rem;
                         font-weight: 700;
-                        color: #1e3a5f;
+                        color: #1a1a1a;
                         letter-spacing: 2px;
                         user-select: all;
                         flex: 1;
@@ -958,7 +983,7 @@ if (!empty($url_logo_rs)) {
                     }
                     
                     .btn-copiar-codigo {
-                        background: linear-gradient(135deg, #3b82f6, #2563eb);
+                        background: linear-gradient(135deg, #E30613, #b8040f);
                         color: white;
                         border: none;
                         padding: 14px 20px;
@@ -972,9 +997,9 @@ if (!empty($url_logo_rs)) {
                         align-items: center;
                         gap: 6px;
                     }
-                    
+
                     .btn-copiar-codigo:hover {
-                        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+                        background: linear-gradient(135deg, #b8040f, #8b0209);
                         transform: scale(1.05);
                     }
                     
@@ -1007,7 +1032,7 @@ if (!empty($url_logo_rs)) {
                     
                     .publisher-name {
                         font-weight: 600;
-                        color: #1e3a5f;
+                        color: #1a1a1a;
                         font-size: 0.95rem;
                     }
                     
@@ -1023,7 +1048,7 @@ if (!empty($url_logo_rs)) {
                     
                     .trust-premium { background: #fef3c7; color: #92400e; }
                     .trust-recommended { background: #d1fae5; color: #065f46; }
-                    .trust-trusted { background: #dbeafe; color: #1e40af; }
+                    .trust-trusted { background: #fee2e2; color: #b8040f; }
                     .trust-verified { background: #f3f4f6; color: #374151; }
                     .trust-new { background: #f9fafb; color: #6b7280; }
                     
@@ -1121,8 +1146,8 @@ if (!empty($url_logo_rs)) {
                     }
                     
                     .ver-mas-item:hover {
-                        border-color: #3b82f6;
-                        box-shadow: 0 2px 8px rgba(59,130,246,0.1);
+                        border-color: #E30613;
+                        box-shadow: 0 2px 8px rgba(227,6,19,0.1);
                     }
                     
                     .ver-mas-avatar {
@@ -1141,7 +1166,7 @@ if (!empty($url_logo_rs)) {
                     .ver-mas-user {
                         font-weight: 600;
                         font-size: 0.85rem;
-                        color: #1e3a5f;
+                        color: #1a1a1a;
                     }
                     
                     .ver-mas-benefit {
@@ -1157,7 +1182,7 @@ if (!empty($url_logo_rs)) {
                     }
                     
                     .btn-usar-este {
-                        background: linear-gradient(135deg, #3b82f6, #2563eb);
+                        background: linear-gradient(135deg, #E30613, #b8040f);
                         color: white;
                         border: none;
                         padding: 8px 14px;
@@ -1486,13 +1511,13 @@ if (!empty($url_logo_rs)) {
             // Featured badge
             let featuredHTML = '';
             if (data.es_destacado) {
-                featuredHTML = '<div style="display: inline-block; background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #1e3a5f; font-size: 0.75rem; font-weight: 700; padding: 2px 10px; border-radius: 20px; margin-bottom: 10px;"><i class="fas fa-star"></i> Código Destacado</div><br>';
+                featuredHTML = '<div style="display: inline-block; background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #1a1a1a; font-size: 0.75rem; font-weight: 700; padding: 2px 10px; border-radius: 20px; margin-bottom: 10px;"><i class="fas fa-star"></i> Código Destacado</div><br>';
             }
             
             // Description
             let descHTML = '';
             if (data.descripcion && data.descripcion.length > 0) {
-                descHTML = '<div class="codigo-descripcion">' + escapeHTML(data.descripcion.substring(0, 200)) + '</div>';
+                descHTML = '<div class="codigo-descripcion">' + escapeHTMLWithBr(data.descripcion) + '</div>';
             }
             
             container.innerHTML = `
@@ -1694,6 +1719,10 @@ if (!empty($url_logo_rs)) {
             return div.innerHTML;
         }
 
+        function escapeHTMLWithBr(str) {
+            return escapeHTML(str).replace(/\n/g, '<br>');
+        }
+
         // --- Keep existing functionality ---
 
         // Tab functionality (legacy, for other tabs on page)
@@ -1800,6 +1829,56 @@ if (!empty($url_logo_rs)) {
 // Modal informativo de Trust Score (clicable en badges)
 include_once __DIR__ . '/../myphp/trust_info_modal.php';
 ?>
+
+<?php if (!empty($marca_faqs)): ?>
+<section class="container mt-4 mb-5" id="faqs-marca">
+    <h2 class="h4 mb-3">Preguntas frecuentes sobre <?php echo htmlspecialchars($marca['nombre'], ENT_QUOTES, 'UTF-8'); ?></h2>
+    <div class="accordion" id="accordionFAQ">
+        <?php foreach ($marca_faqs as $idx => $faq): ?>
+        <div class="accordion-item">
+            <h3 class="accordion-header" id="faqHead<?php echo $idx; ?>">
+                <button class="accordion-button <?php echo $idx > 0 ? 'collapsed' : ''; ?>" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#faqBody<?php echo $idx; ?>"
+                    aria-expanded="<?php echo $idx === 0 ? 'true' : 'false'; ?>"
+                    aria-controls="faqBody<?php echo $idx; ?>">
+                    <?php echo htmlspecialchars($faq['titulo'], ENT_QUOTES, 'UTF-8'); ?>
+                </button>
+            </h3>
+            <div id="faqBody<?php echo $idx; ?>" class="accordion-collapse collapse <?php echo $idx === 0 ? 'show' : ''; ?>"
+                aria-labelledby="faqHead<?php echo $idx; ?>" data-bs-parent="#accordionFAQ">
+                <div class="accordion-body">
+                    <?php echo nl2br(htmlspecialchars($faq['respuesta'], ENT_QUOTES, 'UTF-8')); ?>
+                </div>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</section>
+
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+        <?php
+        $faq_schema = [];
+        foreach ($marca_faqs as $faq) {
+            $faq_schema[] = json_encode([
+                '@type' => 'Question',
+                'name' => $faq['titulo'],
+                'acceptedAnswer' => [
+                    '@type' => 'Answer',
+                    'text' => $faq['respuesta']
+                ]
+            ], JSON_UNESCAPED_UNICODE);
+        }
+        echo implode(",\n        ", $faq_schema);
+        ?>
+    ]
+}
+</script>
+<?php endif; ?>
+
 </body>
 </html>
 
@@ -1870,7 +1949,7 @@ function show_code_item($codigo, $is_featured = false) {
         </div>
         
         <div class="code-description">
-            <?php echo htmlspecialchars($descripcion); ?>
+            <?php echo nl2br(htmlspecialchars($descripcion)); ?>
         </div>
         
         <div class="code-actions">

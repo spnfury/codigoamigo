@@ -740,7 +740,8 @@ function getMarcas($limit = null, $categoria = null, $excluye = null) {
     $collection_codigos = getCollectionCodigos();
 
     // Construir filtro de búsqueda para marcas
-    $filtro = ['estado' => 1]; 
+    // inactiva_seo: excluye marcas sin código nuevo en >12m para no mostrarlas en listados públicos
+    $filtro = ['estado' => 1, 'inactiva_seo' => ['$ne' => true]];
     if ($categoria) {
         $filtro['categoria_clave'] = $categoria;
     }

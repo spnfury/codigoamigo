@@ -254,6 +254,40 @@ if ($event->type == 'checkout.session.completed') {
                 'trace' => $e->getTraceAsString()
             ], 'ERROR');
         }
+
+        // Activar destacado en el código
+        try {
+            $collection_codigos = getCollectionCodigos();
+            $duracion_dias = ($tipo_destacado === 'super') ? DESTACADO_DURACION_SUPER : DESTACADO_DURACION_NORMAL;
+            $update_destacado = [
+                'destacado' => time(),
+                'tipo_destacado' => $tipo_destacado,
+                'fecha_destacado' => new MongoDB\BSON\UTCDateTime(),
+                'fecha_fin_destacado' => new MongoDB\BSON\UTCDateTime((time() + ($duracion_dias * 86400)) * 1000),
+                'aviso_expiracion_enviado' => false,
+                'aviso_expirado_enviado' => false,
+            ];
+            if ($tipo_destacado === 'super') {
+                $update_destacado['destacado_social'] = time();
+            }
+            $resultado_destaca = $collection_codigos->updateOne(
+                ['_id' => new MongoDB\BSON\ObjectId($metadata['codigo_id'])],
+                ['$set' => $update_destacado]
+            );
+            logWebhook("Código activado como destacado", [
+                'session_id' => $session->id ?? 'UNKNOWN',
+                'codigo_id' => $metadata['codigo_id'],
+                'tipo_destacado' => $tipo_destacado,
+                'duracion_dias' => $duracion_dias,
+                'modified' => $resultado_destaca->getModifiedCount()
+            ]);
+        } catch (Exception $e) {
+            logWebhook("ERROR: No se pudo activar destacado en código", [
+                'session_id' => $session->id ?? 'UNKNOWN',
+                'codigo_id' => $metadata['codigo_id'] ?? 'UNKNOWN',
+                'error' => $e->getMessage()
+            ], 'ERROR');
+        }
     }
     // También manejar recargas de saldo
     elseif ($tipo_metadata === 'recarga_saldo') {
@@ -629,7 +663,73 @@ elseif ($event->type === 'invoice.paid') {
             ], 'ERROR');
         }
     }
-} 
+}
+elseif ($event->type === 'invoice.payment_failed') {
+    $invoice = $event->data->object;
+
+    logWebhook("Pago de factura fallido", [
+        'invoice_id' => $invoice->id ?? 'UNKNOWN',
+        'subscription_id' => $invoice->subscription ?? 'UNKNOWN',
+        'attempt_count' => $invoice->attempt_count ?? 0,
+        'next_payment_attempt' => $invoice->next_payment_attempt ?? null,
+    ]);
+
+    if (isset($invoice->subscription) && !empty($invoice->subscription)) {
+        try {
+            require_once __DIR__ . '/../vendor/stripe/stripe-php/init.php';
+            require_once __DIR__ . '/../config/stripe.php';
+            \Stripe\Stripe::setApiKey(get_stripe_live_secret_key());
+
+            $subscription = \Stripe\Subscription::retrieve($invoice->subscription);
+            $tipo_suscripcion = $subscription->metadata->tipo ?? null;
+            $usuario_id = $subscription->metadata->usuario_id ?? null;
+
+            if ($tipo_suscripcion === 'suscripcion_vip' && $usuario_id) {
+                $collection_usuarios = getCollectionUsuarios();
+                $usuario = $collection_usuarios->findOne(['_id' => new MongoDB\BSON\ObjectId($usuario_id)]);
+
+                if ($usuario) {
+                    // Marcar fallo de pago en BD para tracking
+                    $collection_usuarios->updateOne(
+                        ['_id' => new MongoDB\BSON\ObjectId($usuario_id)],
+                        [
+                            '$set' => [
+                                'vip_pago_fallido' => true,
+                                'vip_pago_fallido_invoice' => $invoice->id,
+                                'vip_pago_fallido_intentos' => $invoice->attempt_count ?? 0,
+                                'vip_pago_fallido_proximo_intento' => isset($invoice->next_payment_attempt)
+                                    ? new MongoDB\BSON\UTCDateTime($invoice->next_payment_attempt * 1000)
+                                    : null,
+                                'vip_pago_fallido_fecha' => new MongoDB\BSON\UTCDateTime(),
+                            ],
+                        ]
+                    );
+
+                    // Enviar email solo en primer fallo (intento 1) para evitar spam
+                    if (($invoice->attempt_count ?? 1) <= 1) {
+                        if (!function_exists('enviarEmailVIPPagoFallidoReintento')) {
+                            include_once __DIR__ . '/../myphp/funciones_email.php';
+                        }
+                        if (function_exists('enviarEmailVIPPagoFallidoReintento')) {
+                            $proximo_intento = isset($invoice->next_payment_attempt)
+                                ? date('d/m/Y', $invoice->next_payment_attempt)
+                                : null;
+                            enviarEmailVIPPagoFallidoReintento($usuario, $proximo_intento);
+                            logWebhook("Email aviso pago fallido enviado", ['usuario_id' => $usuario_id]);
+                        } else {
+                            logWebhook("ERROR: enviarEmailVIPPagoFallidoReintento no existe", ['usuario_id' => $usuario_id], 'ERROR');
+                        }
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            logWebhook("ERROR: Excepción al procesar invoice.payment_failed", [
+                'invoice_id' => $invoice->id ?? 'UNKNOWN',
+                'error' => $e->getMessage()
+            ], 'ERROR');
+        }
+    }
+}
 else {
     // Tipo de evento no manejado
     logWebhook("INFO: Tipo de evento no manejado", [

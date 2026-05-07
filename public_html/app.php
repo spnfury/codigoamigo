@@ -296,6 +296,19 @@ if (filter_input(INPUT_GET, "continua_viendo", FILTER_SANITIZE_FULL_SPECIAL_CHAR
 
 }
 
+// Redirigir parámetros de tracking puros en homepage para evitar URLs duplicadas indexadas
+$tracking_only_params = ['ref', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'from'];
+$request_uri_path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+if ($request_uri_path === '/' && !empty($_SERVER['QUERY_STRING'])) {
+    $query_params = [];
+    parse_str($_SERVER['QUERY_STRING'], $query_params);
+    $non_tracking = array_diff_key($query_params, array_flip($tracking_only_params));
+    if (empty($non_tracking)) {
+        header('Location: https://www.codigoamigo.com/', true, 301);
+        exit;
+    }
+}
+
 
 include_once __DIR__ . '/inc/includes.php';
 include_once __DIR__ . '/myphp/funciones.php';
@@ -356,6 +369,11 @@ $app->get('/listado', function ($request, $respon) {
 // Ruta para URLs de Afiliados
 $app->get('/afiliados', function ($request, $respon) {
     include_once $_SERVER['DOCUMENT_ROOT'] . '/afiliados.php';
+});
+
+// Ranking público de top publicadores (gamification + social proof).
+$app->get('/lo-mas-publicado', function ($request, $respon) {
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/lo_mas_publicado.php';
 });
 
 // Ruta para Panel de Administración de Afiliados
@@ -1005,8 +1023,8 @@ $app->get('/', function ($request, $respon) {
      * Para header
      ************************************************/
 
-    $title = "Comparte tus códigos amigo y códigos descuento - gana dinero, servicios y tiempo";
-    $description = "Comparte códigos amigo y códigos de descuento con tus amigos y gana dinero, puntos o servicios ✅ - " . $author_web;
+    $title = "Códigos Amigo y Códigos Descuento — Ahorra en más de 200 marcas";
+    $description = "¿Qué es un código amigo? Un código exclusivo para registrarte con descuento en apps y servicios. Más de 200 marcas verificadas ✅ — CodigoAmigo.com";
     $imagen_social = "https://www.codigoamigo.com/img/logo_social_codigoamigo_final.jpg";
     if (filter_input(INPUT_GET, "page", FILTER_SANITIZE_STRING) > 1) {
         $title = $title . " | Página " . filter_input(INPUT_GET, "page", FILTER_SANITIZE_STRING);
@@ -1283,6 +1301,20 @@ $app->get('/destaca', function ($request, $respon, $args) {
 
 });
 
+$app->get('/destacar_codigo', function ($request, $respon, $args) {
+
+    global $author_web, $anula_adsense, $show_adsense, $show_addthis;
+
+    $show_adsense = 0;
+    $show_addthis = 0;
+    $anula_adsense = true;
+
+    include_once $_SERVER['DOCUMENT_ROOT'] . '/public/destacar_codigo.php';
+    $show_addthis = 0;
+    $show_adsense = 0;
+
+});
+
 
 $app->get('/estadisticas', function ($request, $respon, $args) {
 
@@ -1522,8 +1554,8 @@ $app->get('/listado-marcas', function ($request, $respon, $args) {
 
     global $author_web;
 
-    $title = "Nuestras marcas";
-    $description = "Lista de nuestras marcas - " . $GLOBALS["author"];
+    $title = "Todas las marcas con Código Amigo — Más de 200 marcas";
+    $description = "Directorio completo de marcas con código amigo verificado: apps de movilidad, neobancos, plataformas, restaurantes y mucho más. Encuentra tu marca y ahorra.";
     include_once $_SERVER['DOCUMENT_ROOT'] . '/public/listado_marcas.php';
 
 });
@@ -1944,7 +1976,9 @@ $app->get('/de-{marca}', function ($request, $respon, $args) {
 
             //$title = "🥇 Códigos Amigo de ".$marca["nombre"]." - ".$string_mejor_codigo . " en " . $numero_codigos." - Cupones descuento".$string_fecha;
             //$title = "🥇 ".$pre_txt.$marca["nombre"]." ".$string_mejor_codigo . " cupones descuento »" . $string_fecha;
-            $title = $pre_txt . $marca["nombre"] . "" . $string_mejor_codigo . "" . trim($string_fecha);
+            $tiene_beneficio = ($num_beneficio_euros + $num_beneficio_descuento + $num_beneficio_minutos) > 0;
+            $beneficio_txt = $tiene_beneficio ? " " . $string_mejor_codigo . " " : " ";
+            $title = $pre_txt . $marca["nombre"] . $beneficio_txt . trim($string_fecha);
 
 
         }
@@ -1958,7 +1992,7 @@ $app->get('/de-{marca}', function ($request, $respon, $args) {
             if ($marca["nombre_clave"] == 'lixsaai') {
                 $description = "Ahorra hasta 50€ con códigos de descuento de " . $marca["nombre"] . ". Códigos promocionales para servicios de IA y automatización válidos para" . $string_fecha . "$desc_icon - ¡Automatiza tu negocio y ahorra dinero!";
             } else {
-                $description = trim($string_mejor_codigo) . " con tu de código invitación " . $marca["nombre"] . ". Códigos descuento y cupones descuento válidos para" . $string_fecha . "$desc_icon - ¡Aprovecha y gana dinero";
+                $description = trim($string_mejor_codigo) . " con tu código invitación " . $marca["nombre"] . ". Códigos descuento y cupones descuento válidos para" . $string_fecha . "$desc_icon - ¡Aprovecha y gana dinero";
             }
 
             //Ahorra 200€ con tu código invitación Trade Republic. Códigos descuento y cupones válidos para julio 2024. ¡Aprovecha y gana dinero ahora!
@@ -1974,6 +2008,11 @@ $app->get('/de-{marca}', function ($request, $respon, $args) {
         $description_social = $description;
 
         $name_page = "marca";
+
+        // Cargar FAQs para template y condición noindex
+        include_once __DIR__ . '/myphp/funciones_faq.php';
+        $marca_faqs = getFAQsByMarca($marca["nombre_clave"]);
+        $marca_faqs_count = count($marca_faqs);
 
         // Incluir funciones modernas necesarias para marca_moderna.php
         include_once __DIR__ . '/myphp/_header_modern.php';
