@@ -1273,6 +1273,42 @@ if (!empty($url_logo_rs)) {
                             </div>
                         </div>
                         <?php endif; ?>
+
+                        <?php
+                        // Bloque SSR para Google: descripciones renderizadas en HTML estático
+                        // Visualmente oculto para usuarios (JS lo reemplaza), indexable por Googlebot
+                        $todos_codigos_seo = array_merge($lista_codigos_patrocinados ?? [], $lista_codigos ?? []);
+                        if (!empty($todos_codigos_seo)):
+                        ?>
+                        <section class="codigos-seo-list" aria-label="Códigos de <?php echo htmlspecialchars($marca['nombre']); ?>">
+                            <h2 style="font-size:1rem;color:#333;margin-bottom:8px;">Opiniones y códigos de <?php echo htmlspecialchars($marca['nombre']); ?></h2>
+                            <?php foreach ($todos_codigos_seo as $cs):
+                                if (is_object($cs)) $cs = (array)$cs;
+                                $cs_desc = trim(strip_tags($cs['descripcion'] ?? ''));
+                                if (empty($cs_desc)) continue;
+                                $cs_user = $cs['username'] ?? '';
+                                $cs_clicks = isset($cs['totalclicks']) ? (int)$cs['totalclicks'] : 0;
+                                $cs_benefit = isset($cs['num_beneficio']) ? $cs['num_beneficio'] : 0;
+                                $cs_tipo = $cs['tipo_descuento'] ?? '';
+                            ?>
+                            <div class="codigo-seo-item" itemscope itemtype="https://schema.org/Review">
+                                <?php if ($cs_user): ?>
+                                <span class="seo-autor" itemprop="author" itemscope itemtype="https://schema.org/Person">
+                                    <span itemprop="name"><?php echo htmlspecialchars($cs_user); ?></span>
+                                </span>
+                                <?php endif; ?>
+                                <p itemprop="reviewBody"><?php echo htmlspecialchars($cs_desc); ?></p>
+                                <?php if ($cs_benefit > 0): ?>
+                                <meta itemprop="description" content="Beneficio: <?php echo htmlspecialchars($cs_benefit . ' ' . $cs_tipo); ?>">
+                                <?php endif; ?>
+                                <?php if ($cs_clicks > 0): ?>
+                                <span class="seo-clicks"><?php echo number_format($cs_clicks, 0, ',', '.'); ?> personas lo usaron</span>
+                                <?php endif; ?>
+                            </div>
+                            <?php endforeach; ?>
+                        </section>
+                        <style>.codigos-seo-list{font-size:14px;color:#444;border-top:1px solid #eee;margin-top:16px;padding-top:12px;}.codigos-seo-list h2{font-size:1rem;}.codigo-seo-item{padding:8px 0;border-bottom:1px solid #f0f0f0;}.seo-autor{font-weight:600;font-size:13px;color:#E30613;}.seo-clicks{font-size:12px;color:#888;}</style>
+                        <?php endif; ?>
                     </div>
                 </div>
                 
