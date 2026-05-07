@@ -1775,7 +1775,7 @@ $app->get('/de-{marca}', function ($request, $respon, $args) {
             $array_filtro = array_merge($array_filtro, array("destacado" => 0));
 
 
-            $array_skip = array("limit" => (30 + $skip_patrocinados));
+            $array_skip = array("limit" => (50 + $skip_patrocinados));
             $array_skip = array_merge($array_skip, array("skip" => $skip_patrocinados));
 
             //TOMO LOS CODIGOS

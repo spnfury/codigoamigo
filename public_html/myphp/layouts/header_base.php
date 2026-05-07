@@ -78,6 +78,13 @@ if (!isset($panel)) {
             <link rel="canonical" href="<?php echo isset($GLOBALS["actual_url_limpia"]) ? $GLOBALS["actual_url_limpia"] : ''; ?>"/>
         <?php } ?>
 
+        <?php if(isset($links_meta["prev"])): ?>
+            <link rel="prev" href="<?php echo htmlspecialchars($links_meta["prev"], ENT_QUOTES, 'UTF-8'); ?>"/>
+        <?php endif; ?>
+        <?php if(isset($links_meta["next"]) && isset($codigos_restantes) && $codigos_restantes > 0): ?>
+            <link rel="next" href="<?php echo htmlspecialchars($links_meta["next"], ENT_QUOTES, 'UTF-8'); ?>"/>
+        <?php endif; ?>
+
         <!-- Open Graph -->
         <meta property="og:title" content="<?php echo $title_social ? $title_social : $title; ?>">
         <meta property="og:description" content="<?php echo $description_social ? $description_social : $description; ?>">
@@ -606,14 +613,17 @@ if (!isset($panel)) {
         $chat_script_version = file_exists($chat_script_path) ? filemtime($chat_script_path) : time();
         $current_user_id_value = isset($_SESSION['user_id']) ? (string)$_SESSION['user_id'] : '';
         $chat_logged_in = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
+        if (!function_exists('es_usuario_vip')) { @include_once __DIR__ . '/../funciones_usuario.php'; }
+        $chat_user_is_vip = $chat_logged_in && function_exists('es_usuario_vip') ? es_usuario_vip($current_user_id_value) : false;
         ?>
         <script>
             window.currentUserId = <?php echo json_encode($current_user_id_value); ?>;
             window.currentUserIdVar = window.currentUserId;
             window.codigoAmigoChatLoggedIn = <?php echo $chat_logged_in ? 'true' : 'false'; ?>;
+            window.codigoAmigoChatVip = <?php echo $chat_user_is_vip ? 'true' : 'false'; ?>;
         </script>
         <script src="/js/chat-modal.js?v=<?php echo $chat_script_version; ?>" defer></script>
-        
+
         <!-- VIP Styles and Code Viewer Modal -->
         <link rel="stylesheet" href="/css/vip-styles.css?v=<?php echo file_exists(__DIR__ . '/../../css/vip-styles.css') ? filemtime(__DIR__ . '/../../css/vip-styles.css') : time(); ?>">
         <?php
