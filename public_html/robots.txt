@@ -1,5 +1,7 @@
 User-agent: *
 Allow: /
+Disallow: /chollos
+Disallow: /chollos/
 Disallow: /usuario_*
 Disallow: /*?codigo=*
 Disallow: /*?continua_viendo=1
