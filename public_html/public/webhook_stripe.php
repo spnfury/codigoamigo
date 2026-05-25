@@ -1,10 +1,9 @@
 <?php
 require_once __DIR__ . '/../inc/includes.php';
+require_once __DIR__ . '/../config/stripe.php';
 require_once __DIR__ . '/../vendor/stripe/stripe-php/init.php';
 
-// Obtener el webhook secret desde una variable de entorno o configuración
-// IMPORTANTE: Configurar este valor en Stripe Dashboard > Webhooks > Tu webhook > Signing secret
-$endpoint_secret = $_ENV['STRIPE_WEBHOOK_SECRET'] ?? 'whsec_TU_WEBHOOK_SECRET_OBTENIDO_DEL_DASHBOARD';
+$endpoint_secret = get_stripe_webhook_secret();
 
 // Función para logging detallado
 function logWebhook($message, $data = null, $level = 'INFO') {
