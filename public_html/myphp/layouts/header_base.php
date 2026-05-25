@@ -108,7 +108,11 @@ if (!isset($panel)) {
         <link rel="stylesheet" href="/css/modern-design.css?v=<?php echo time(); ?>">
         <link rel="stylesheet" href="/css/mobile-header-new.css?v=<?php echo time(); ?>">
         <link rel="stylesheet" href="/css/mobile-new-design.css?v=<?php echo time(); ?>">
-        
+        <link rel="stylesheet" href="/css/site-v2.css?v=<?php echo file_exists($_SERVER['DOCUMENT_ROOT'] . '/css/site-v2.css') ? filemtime($_SERVER['DOCUMENT_ROOT'] . '/css/site-v2.css') : time(); ?>">
+        <link rel="stylesheet" href="/css/panel-v2.css?v=<?php echo file_exists($_SERVER['DOCUMENT_ROOT'] . '/css/panel-v2.css') ? filemtime($_SERVER['DOCUMENT_ROOT'] . '/css/panel-v2.css') : time(); ?>">
+
+        <!-- Motion stack desactivado (Lenis/GSAP causaban congelamiento en home) -->
+
         <style>
             /* Premium Instagram-style VIP Badges */
             .vip-avatar-wrapper {
@@ -749,6 +753,37 @@ if (!isset($panel)) {
                 object-fit: contain !important;
             }
         </style>
+
+        <!-- Schema.org: Organization + WebSite (sitewide) -->
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": "CódigoAmigo",
+            "alternateName": "Código Amigo",
+            "url": "https://www.codigoamigo.com",
+            "logo": "https://www.codigoamigo.com/img/logo.png",
+            "description": "Plataforma española para compartir y descubrir códigos amigo, códigos de referido y códigos de descuento de cientos de marcas.",
+            "sameAs": [
+                "https://www.facebook.com/codigoamigo",
+                "https://twitter.com/codigoamigo",
+                "https://www.instagram.com/codigoamigo"
+            ]
+        }
+        </script>
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "name": "CódigoAmigo",
+            "url": "https://www.codigoamigo.com",
+            "potentialAction": {
+                "@type": "SearchAction",
+                "target": "https://www.codigoamigo.com/?busqueda={search_term_string}",
+                "query-input": "required name=search_term_string"
+            }
+        }
+        </script>
     </head>
     <body>
     <?php
@@ -1213,7 +1248,7 @@ if (!isset($panel)) {
                         'mail' => $_SESSION['mail'] ?? '',
                         'img' => $usuario_completo['img'] ?? $_SESSION['img'] ?? '',
                         'avatar' => $usuario_completo['img'] ?? $_SESSION['img'] ?? '',
-                        'zumbido_saldo' => $_SESSION['zumbido_saldo'] ?? 0
+                        'zumbido_saldo' => $usuario_completo['zumbido_saldo'] ?? 0
                     ];
 
                     echo json_encode($userData);

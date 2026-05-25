@@ -10,6 +10,49 @@ get_header_new($title, $description, $title_social, $description_social, $imagen
 // Incluir funciones modernas para el sistema de encabezados
 include_once __DIR__ . '/../myphp/funciones_modern.php';
 
+// Schema.org: BreadcrumbList + Product (AggregateOffer) por marca
+$_marca_nombre = $marca['nombre'] ?? ($marca['nombre_clave'] ?? '');
+$_marca_clave = $marca['nombre_clave'] ?? '';
+$_marca_descripcion = $marca['descripcion'] ?? $description ?? '';
+$_marca_url = 'https://www.codigoamigo.com/de-' . $_marca_clave;
+$_marca_img = $url_logo_rs ?? '/img/no_image.png';
+if (strpos($_marca_img, 'http') !== 0) {
+    $_marca_img = 'https://www.codigoamigo.com' . $_marca_img;
+}
+if (!empty($_marca_nombre) && !empty($_marca_clave)) {
+    $_breadcrumb = [
+        '@context' => 'https://schema.org',
+        '@type' => 'BreadcrumbList',
+        'itemListElement' => [
+            ['@type' => 'ListItem', 'position' => 1, 'name' => 'Inicio', 'item' => 'https://www.codigoamigo.com'],
+            ['@type' => 'ListItem', 'position' => 2, 'name' => 'Marcas', 'item' => 'https://www.codigoamigo.com/listado-marcas'],
+            ['@type' => 'ListItem', 'position' => 3, 'name' => $_marca_nombre, 'item' => $_marca_url],
+        ],
+    ];
+    echo '<script type="application/ld+json">' . json_encode($_breadcrumb, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
+
+    $_product = [
+        '@context' => 'https://schema.org',
+        '@type' => 'Product',
+        'name' => 'Códigos amigo y de descuento de ' . $_marca_nombre,
+        'description' => mb_substr(strip_tags($_marca_descripcion ?: ('Códigos amigo, referido y descuento de ' . $_marca_nombre)), 0, 300),
+        'image' => $_marca_img,
+        'brand' => ['@type' => 'Brand', 'name' => $_marca_nombre],
+        'url' => $_marca_url,
+    ];
+    if (!empty($numero_codigos) && (int)$numero_codigos > 0) {
+        $_product['offers'] = [
+            '@type' => 'AggregateOffer',
+            'priceCurrency' => 'EUR',
+            'lowPrice' => '0',
+            'highPrice' => '0',
+            'offerCount' => (int)$numero_codigos,
+            'availability' => 'https://schema.org/InStock',
+        ];
+    }
+    echo '<script type="application/ld+json">' . json_encode($_product, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>' . "\n";
+}
+
 // Incluir funciones de Chollometro
 include_once __DIR__ . '/../myphp/funciones_chollometro.php';
 
