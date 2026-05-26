@@ -2,10 +2,22 @@
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <sitemap>
     <loc>https://www.codigoamigo.com/myphp/xml/sitemap_marcas.xml</loc>
-    <lastmod>2026-05-07</lastmod>
+    <lastmod>2026-05-26</lastmod>
   </sitemap>
   <sitemap>
     <loc>https://www.codigoamigo.com/myphp/xml/sitemap_categorias.xml</loc>
-    <lastmod>2026-05-07</lastmod>
+    <lastmod>2026-05-26</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>https://www.codigoamigo.com/myphp/xml/sitemap_estaticas.xml</loc>
+    <lastmod>2026-05-26</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>https://www.codigoamigo.com/myphp/xml/sitemap_guias.xml</loc>
+    <lastmod>2026-05-26</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>https://www.codigoamigo.com/myphp/xml/sitemap_comparativas.xml</loc>
+    <lastmod>2026-05-26</lastmod>
   </sitemap>
 </sitemapindex>

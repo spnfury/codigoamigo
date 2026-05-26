@@ -2069,6 +2069,23 @@ $app->get('/de-{marca}', function ($request, $respon, $args) {
 
 });
 
+// SEO pillar pages: head terms genéricos
+$app->get('/codigo-amigo', function ($request, $respon, $args) {
+    global $pillar_slug;
+    $pillar_slug = 'codigo-amigo';
+    include __DIR__ . '/public/pillar_seo.php';
+});
+$app->get('/codigo-referido', function ($request, $respon, $args) {
+    global $pillar_slug;
+    $pillar_slug = 'codigo-referido';
+    include __DIR__ . '/public/pillar_seo.php';
+});
+$app->get('/codigo-descuento', function ($request, $respon, $args) {
+    global $pillar_slug;
+    $pillar_slug = 'codigo-descuento';
+    include __DIR__ . '/public/pillar_seo.php';
+});
+
 $app->get('/que-es-{marca}', function ($request, $respon, $args) {
 
     global $que_es;
