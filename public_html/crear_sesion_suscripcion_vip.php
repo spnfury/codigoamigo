@@ -106,10 +106,24 @@ try {
         ]);
     }
     
+    // Cupón de bienvenida: 50% descuento primer mes (4,99€ en vez de 9,99€)
+    $coupon_primer_mes = 'vip_primer_mes_50';
+    try {
+        \Stripe\Coupon::retrieve($coupon_primer_mes);
+    } catch (\Stripe\Exception\InvalidRequestException $e) {
+        \Stripe\Coupon::create([
+            'id' => $coupon_primer_mes,
+            'percent_off' => 50,
+            'duration' => 'once',
+            'name' => 'VIP Bienvenida - 50% primer mes',
+            'metadata' => ['tipo' => 'vip_primer_mes']
+        ]);
+    }
+
     // URLs de retorno
     $success_url = $GLOBALS['website'] . 'public/success_vip.php?session_id={CHECKOUT_SESSION_ID}';
     $cancel_url = $GLOBALS['website'] . 'public/suscripcion_vip.php?cancelled=1';
-    
+
     // Crear la sesión de checkout
     $checkout_session = \Stripe\Checkout\Session::create([
         'mode' => 'subscription',
@@ -135,14 +149,17 @@ try {
         'success_url' => $success_url,
         'cancel_url' => $cancel_url,
         'locale' => 'es',
-        'allow_promotion_codes' => true
+        // Descuento 50% primer mes auto-aplicado (excluyente con allow_promotion_codes)
+        'discounts' => [
+            ['coupon' => $coupon_primer_mes]
+        ]
     ]);
     
     // Guardar el carrito abandonado (intención de checkout) en la BBDD
+    // para tracking de embudo + emails de recuperación (cron/recuperar_carritos_vip.php)
     try {
-        global $client, $db_name;
-        if ($client && $db_name) {
-            $db = $client->selectDatabase($db_name);
+        $db = createConnection();
+        if ($db) {
             $coll_checkouts = $db->selectCollection('vip_checkout_intents');
             $coll_checkouts->insertOne([
                 'usuario_id' => new MongoDB\BSON\ObjectId($user_id),
@@ -155,7 +172,7 @@ try {
         }
     } catch (Throwable $db_error) {
         // No detener el proceso de pago si falla el guardado estadístico
-        error_log("No se pudo guardar la intención de checkout VIP: " . $db_error->getMessage());
+        log_error("No se pudo guardar la intención de checkout VIP: " . $db_error->getMessage());
     }
     
     // Retornar la URL de checkout

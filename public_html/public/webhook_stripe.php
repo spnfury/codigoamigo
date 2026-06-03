@@ -405,6 +405,19 @@ if ($event->type == 'checkout.session.completed') {
             'metadata' => $metadata
         ]);
         
+        // Cerrar la intención de checkout (embudo de conversión)
+        try {
+            $db_intents = createConnection();
+            if ($db_intents && !empty($session->id)) {
+                $db_intents->selectCollection('vip_checkout_intents')->updateOne(
+                    ['session_id' => $session->id],
+                    ['$set' => ['status' => 'completed', 'completed_at' => new MongoDB\BSON\UTCDateTime()]]
+                );
+            }
+        } catch (Throwable $e) {
+            log_error("No se pudo cerrar intent VIP: " . $e->getMessage());
+        }
+
         // Esperar al evento subscription.created para activar completamente
         logWebhook("Checkout de suscripción VIP completado - esperando evento subscription.created", [
             'session_id' => $session->id ?? 'UNKNOWN',

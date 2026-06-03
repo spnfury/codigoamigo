@@ -302,7 +302,30 @@ get_header_modern($title, $description, '', '', '', true);
         }, 5000);
     </script>
     <?php else: ?>
-    
+
+    <!-- Tracking de conversión VIP (GA4) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-DVE5FZ2SZY"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-DVE5FZ2SZY');
+        // Evento purchase una sola vez por sesión de checkout (evita doble conteo en reload)
+        (function(){
+            var sid = <?php echo json_encode($session_id ?: ('vip_' . $user_id)); ?>;
+            var key = 'vip_purchase_' + sid;
+            if (!sessionStorage.getItem(key)) {
+                sessionStorage.setItem(key, '1');
+                gtag('event', 'purchase', {
+                    transaction_id: sid,
+                    value: 9.99,
+                    currency: 'EUR',
+                    items: [{ item_id: 'vip_subscription', item_name: 'Suscripción VIP', price: 9.99, quantity: 1 }]
+                });
+            }
+        })();
+    </script>
+
     <p class="success-description">
         Tu suscripción VIP está activa. Ahora tienes acceso a todas las ventajas exclusivas para maximizar tus ganancias.
     </p>

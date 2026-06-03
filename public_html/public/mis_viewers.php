@@ -41,6 +41,20 @@ $viewers = $viewers_data['viewers'] ?? [];
 $total_viewers = $viewers_data['total_viewers'] ?? 0;
 $total_potencial = $viewers_data['total_potencial'] ?? 0;
 
+// Prueba social: nº de publicadores VIP activos (para upsell)
+$total_vips_activos = 0;
+try {
+    $coll_u = getCollectionUsuarios();
+    if ($coll_u) {
+        $total_vips_activos = $coll_u->countDocuments([
+            'is_vip' => true,
+            'vip_expires_at' => ['$gt' => new MongoDB\BSON\UTCDateTime()]
+        ]);
+    }
+} catch (Throwable $e) {
+    log_error("No se pudo contar VIPs activos en mis_viewers: " . $e->getMessage());
+}
+
 // Calcular métricas extra
 $codigos_vistos_ids = [];
 $codigo_counts = [];
@@ -139,6 +153,11 @@ get_header_modern($title, $description, '', '', '', true);
     max-width: 1000px;
     margin: 0 auto;
     padding: 30px 20px 60px;
+    background: #0f0f1e;
+    color: #fff;
+    box-shadow: 0 0 0 100vmax #0f0f1e;
+    clip-path: inset(0 -100vmax);
+    position: relative;
 }
 
 /* --- Header --- */
@@ -981,15 +1000,24 @@ get_header_modern($title, $description, '', '', '', true);
     <?php if (!$is_vip && $total_viewers > 0): ?>
     <!-- VIP Upsell -->
     <div class="leads-vip-upsell">
-        <h3><i class="fas fa-crown"></i> ¡Tienes <?php echo $total_viewers; ?> leads esperando!</h3>
+        <?php $leads_urgencia = $count_no_contactados > 0 ? $count_no_contactados : $total_viewers; ?>
+        <h3><i class="fas fa-crown"></i> Tienes <?php echo $leads_urgencia; ?> <?php echo $count_no_contactados > 0 ? 'leads sin contactar' : 'leads esperando'; ?></h3>
         <p>
-            Hazte VIP para contactar directamente con los usuarios que han visto tus códigos.
-            Ayúdales a completar el proceso y ambos ganáis. Win-win.
+            <?php if ($total_potencial > 0): ?>
+            Hasta <strong><?php echo number_format($total_potencial, 0); ?>€</strong> en beneficios potenciales esperándote.
+            <?php endif; ?>
+            Hazte VIP para escribir directamente a los usuarios que han visto tus códigos y ayudarles a completar el proceso. Ambos ganáis.
         </p>
         <button class="btn-upgrade-vip" id="btnSubscribeVip">
             <i class="fas fa-bolt"></i>
-            Desbloquear por 9,99€/mes
+            Primer mes 4,99€ <span style="opacity:.75; font-weight:400;">(luego 9,99€/mes)</span>
         </button>
+        <?php if ($total_vips_activos >= 3): ?>
+        <p style="margin-top:12px; font-size:.85rem; opacity:.8;">
+            <i class="fas fa-users" style="color:#ffd700;"></i>
+            Ya hay <strong><?php echo $total_vips_activos; ?></strong> publicadores VIP contactando a sus leads.
+        </p>
+        <?php endif; ?>
 
         <div class="upsell-faq">
             <div class="upsell-faq-item" onclick="this.classList.toggle('open')">
@@ -1138,7 +1166,16 @@ get_header_modern($title, $description, '', '', '', true);
                         </a>
                     <?php endif; ?>
                 <?php else: ?>
-                    <button class="btn-lead-contact" title="Hazte VIP para contactar" onclick="openVipModal('<?php echo htmlspecialchars(addslashes($viewer['viewer_username'])); ?>', '<?php echo htmlspecialchars(addslashes($viewer['codigo_marca'])); ?>', '<?php echo number_format($viewer['codigo_beneficio'], 0, ',', '.'); ?>', '<?php echo htmlspecialchars(addslashes($viewer['tiempo_relativo'] ?? 'hace poco')); ?>')">
+                    <?php
+                    $no_vip_default_msg = '¡Hola! Vi que te interesó mi código de ' . $viewer['codigo_marca'] . '. ¿Necesitas ayuda?';
+                    $no_vip_codigo_ctx = [
+                        'codigoId' => $viewer['codigo_id'] ?? '',
+                        'marcaSlug' => $viewer['codigo_marca_slug'] ?? '',
+                        'marcaNombre' => $viewer['codigo_marca'] ?? '',
+                        'beneficio' => (int)($viewer['codigo_beneficio'] ?? 0)
+                    ];
+                    ?>
+                    <button class="btn-lead-contact" title="Enviar mensaje (responder requiere VIP)" onclick='openChatModal(<?php echo json_encode((string)$viewer['viewer_id']); ?>, <?php echo json_encode($viewer['viewer_username']); ?>, <?php echo json_encode($viewer['viewer_img'] ?? ''); ?>, <?php echo json_encode($no_vip_default_msg); ?>, <?php echo json_encode($no_vip_codigo_ctx); ?>)'>
                         <i class="fas fa-comment"></i> Chatear
                     </button>
                 <?php endif; ?>
@@ -1398,6 +1435,9 @@ document.getElementById('btnSubscribeMisLeads')?.addEventListener('click', async
     spinner.style.display = 'inline-block';
     
     try {
+        if (typeof gtag === 'function') {
+            gtag('event', 'begin_checkout', { currency: 'EUR', value: 9.99, source: 'modal_mis_leads', items: [{ item_id: 'vip_subscription', item_name: 'Suscripción VIP', price: 9.99, quantity: 1 }] });
+        }
         const response = await fetch('/crear_sesion_suscripcion_vip.php', {
             method: 'POST',
             headers: {
@@ -1437,6 +1477,9 @@ document.getElementById('btnSubscribeVip')?.addEventListener('click', async func
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
     try {
+        if (typeof gtag === 'function') {
+            gtag('event', 'begin_checkout', { currency: 'EUR', value: 9.99, source: 'upsell_no_vip', items: [{ item_id: 'vip_subscription', item_name: 'Suscripción VIP', price: 9.99, quantity: 1 }] });
+        }
         const response = await fetch('/crear_sesion_suscripcion_vip.php', { method: 'POST', headers: {'Content-Type':'application/json'} });
         const data = await response.json();
         if (data.success && data.checkout_url) {
