@@ -197,6 +197,58 @@ try {
     $conversion_rate_global = 0;
 }
 
+// ════════ KPI Verificación por código: emails enviados vs usuarios convertidos ════════
+$verif_labels = [];
+$verif_enviados = [];
+$verif_convertidos = [];
+$verif_total_enviados = 0;
+$verif_total_convertidos = 0;
+try {
+    $col_verif = createConnection()->selectCollection('verificacion_codigos');
+    $dias_kpi = 14;
+    $buckets_env = [];
+    $buckets_conv = [];
+    for ($i = $dias_kpi - 1; $i >= 0; $i--) {
+        $dia = date('Y-m-d', strtotime("-$i days"));
+        $verif_labels[] = date('d/m', strtotime("-$i days"));
+        $buckets_env[$dia] = 0;
+        $buckets_conv[$dia] = 0;
+    }
+    $desde = new MongoDB\BSON\UTCDateTime((strtotime("-$dias_kpi days 00:00:00")) * 1000);
+
+    // Enviados: cada doc = un email de código enviado
+    $agg_env = $col_verif->aggregate([
+        ['$match' => ['creado' => ['$gte' => $desde]]],
+        ['$group' => [
+            '_id' => ['$dateToString' => ['format' => '%Y-%m-%d', 'date' => '$creado', 'timezone' => 'Europe/Madrid']],
+            'n' => ['$sum' => 1]
+        ]]
+    ]);
+    foreach ($agg_env as $d) {
+        if (isset($buckets_env[$d['_id']])) { $buckets_env[$d['_id']] = $d['n']; }
+        $verif_total_enviados += $d['n'];
+    }
+
+    // Convertidos: docs verificados (por verificado_at)
+    $agg_conv = $col_verif->aggregate([
+        ['$match' => ['verificado' => true, 'verificado_at' => ['$gte' => $desde]]],
+        ['$group' => [
+            '_id' => ['$dateToString' => ['format' => '%Y-%m-%d', 'date' => '$verificado_at', 'timezone' => 'Europe/Madrid']],
+            'n' => ['$sum' => 1]
+        ]]
+    ]);
+    foreach ($agg_conv as $d) {
+        if (isset($buckets_conv[$d['_id']])) { $buckets_conv[$d['_id']] = $d['n']; }
+        $verif_total_convertidos += $d['n'];
+    }
+
+    $verif_enviados = array_values($buckets_env);
+    $verif_convertidos = array_values($buckets_conv);
+} catch (Throwable $e) {
+    log_error("KPI verificación dashboard: " . $e->getMessage());
+}
+$verif_tasa = $verif_total_enviados > 0 ? round(($verif_total_convertidos / $verif_total_enviados) * 100, 1) : 0;
+
 // Saldo total de todos los usuarios
 $pipeline_saldo = [
     ['$group' => [
@@ -803,6 +855,31 @@ $title = "Panel de Administración - Dashboard";
                         </div>
                     </div>
 
+                    <!-- KPI Verificación por código: emails enviados vs convertidos -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
+                                    <h5 class="card-title mb-0">
+                                        <i class="fas fa-envelope-open-text me-2"></i>Verificación por código — Emails enviados vs Convertidos (14 días)
+                                    </h5>
+                                    <div class="d-flex gap-3 align-items-center">
+                                        <span class="badge bg-primary" style="font-size:.85rem;">Enviados: <?php echo number_format($verif_total_enviados); ?></span>
+                                        <span class="badge bg-success" style="font-size:.85rem;">Convertidos: <?php echo number_format($verif_total_convertidos); ?></span>
+                                        <span class="badge bg-dark" style="font-size:.85rem;">Tasa: <?php echo $verif_tasa; ?>%</span>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <?php if ($verif_total_enviados == 0): ?>
+                                        <p class="text-muted mb-0">Aún no hay datos de verificación por código. Aparecerán cuando se registren nuevos usuarios.</p>
+                                    <?php else: ?>
+                                        <canvas id="graficaVerificacion" width="400" height="160"></canvas>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Gráfica de códigos destacados por tiempo -->
                     <div class="row mb-4">
                         <div class="col-12">
@@ -1169,8 +1246,48 @@ $title = "Panel de Administración - Dashboard";
                 }
             });
         });
+
+        // ════════ Gráfica KPI Verificación por código ════════
+        <?php if ($verif_total_enviados > 0): ?>
+        (function(){
+            var elV = document.getElementById('graficaVerificacion');
+            if (!elV) return;
+            new Chart(elV.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: <?php echo json_encode($verif_labels); ?>,
+                    datasets: [{
+                        label: 'Emails enviados',
+                        data: <?php echo json_encode($verif_enviados); ?>,
+                        borderColor: 'rgb(45, 91, 255)',
+                        backgroundColor: 'rgba(45, 91, 255, 0.15)',
+                        fill: true,
+                        tension: 0.3
+                    }, {
+                        label: 'Usuarios convertidos',
+                        data: <?php echo json_encode($verif_convertidos); ?>,
+                        borderColor: 'rgb(28, 161, 90)',
+                        backgroundColor: 'rgba(28, 161, 90, 0.15)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: { mode: 'index', intersect: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'Nº' } },
+                        x: { title: { display: true, text: 'Día' } }
+                    }
+                }
+            });
+        })();
+        <?php endif; ?>
     </script>
-    
+
 <?php get_footer(); ?>
 </body>
 </html>

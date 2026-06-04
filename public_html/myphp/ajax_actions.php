@@ -42,12 +42,6 @@ if ($_REQUEST) {
             show_estatistics($datos);
             break;
 
-        case "enviar_buzz_codigo":
-            enviar_buzz_codigo($datos);
-            break;
-
-
-
         case "login_user_facebook":
             login_user_facebook($datos);
             break;
@@ -58,6 +52,25 @@ if ($_REQUEST) {
 
         case "registrar_usuario":
             registrar_usuario($datos, $datos["origin"]);
+            break;
+
+        case "verificar_codigo":
+            header('Content-Type: application/json');
+            echo json_encode(verificar_codigo_cuenta($datos["correo"] ?? '', $datos["codigo"] ?? ''));
+            break;
+
+        case "reenviar_codigo":
+            header('Content-Type: application/json');
+            $col_u = getCollectionUsuarios();
+            $u = $col_u ? $col_u->findOne(['mail' => $datos["correo"] ?? '']) : null;
+            if (!$u) {
+                echo json_encode(['success' => false, 'error' => 'usuario', 'mensaje' => 'Usuario no encontrado.']);
+            } elseif ((int)($u['estado'] ?? 0) === 1) {
+                echo json_encode(['success' => false, 'error' => 'ya_activo', 'mensaje' => 'Tu cuenta ya está verificada.']);
+            } else {
+                $r = generar_y_enviar_codigo_verificacion($u['_id'], $u['mail'], $u['username'] ?? 'Usuario', 'reenvio', true);
+                echo json_encode($r);
+            }
             break;
 
         case "solicitar_activacion":
@@ -470,19 +483,22 @@ function solicitar_activacion($datos) {
         return;
     }
 
-    // Crear datos para enviar email de activación
-    $datos_usuario = [
-        'mail' => $usuario['mail'],
-        'username' => $usuario['username']
-    ];
-
-    // Enviar email de activación
-    $email_enviado = enviarMailActivacion($datos_usuario);
-
-    if ($email_enviado) {
-        echo "email_enviado";
+    // Enviar CÓDIGO de verificación (coherente con el nuevo flujo, anti-spam)
+    if (function_exists('generar_y_enviar_codigo_verificacion')) {
+        $r = generar_y_enviar_codigo_verificacion(
+            $usuario['_id'],
+            $usuario['mail'],
+            $usuario['username'] ?? 'Usuario',
+            'solicitud_activacion'
+        );
+        echo ($r['success'] ?? false) ? "email_enviado" : "error_envio";
     } else {
-        echo "error_envio";
+        // Fallback al método antiguo (enlace)
+        $email_enviado = enviarMailActivacion([
+            'mail' => $usuario['mail'],
+            'username' => $usuario['username']
+        ]);
+        echo $email_enviado ? "email_enviado" : "error_envio";
     }
 }
 

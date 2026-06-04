@@ -304,18 +304,6 @@
 
                 $_SESSION["username"] = $usuario_array["username"];
 
-                $_SESSION["zumbido_saldo"] = $usuario_array["zumbido_saldo"] ?? 0;
-
-                /* SUMO 1 ZUMBIDO POR LOGIN */
-                $collection_usuarios = getCollectionUsuarios();
-
-                $updateResult = $collection_usuarios->updateOne(
-                    ['_id' => new \MongoDB\BSON\ObjectId($_SESSION["user_id"])],
-                    ['$set' => ['zumbido_saldo' => $_SESSION["zumbido_saldo"]+1]]
-                    );
-
-                $_SESSION["zumbido_saldo"]+=1;
-
                 // Devolver datos del usuario en formato JSON para el frontend
                 $userData = [
                     'success' => true,
@@ -325,7 +313,7 @@
                         'mail' => $usuario_array["mail"],
                         'img' => $usuario_array["img"] ?? '',
                         'avatar' => $usuario_array["img"] ?? '',
-                        'zumbido_saldo' => $_SESSION["zumbido_saldo"]
+                        'zumbido_saldo' => $usuario_array["zumbido_saldo"] ?? 0
                     ],
                     'updateBottomMenu' => true // Flag para actualizar el menú inferior
                 ];
@@ -359,19 +347,7 @@
             $_SESSION["user_id"] = $id_usuario;
             $_SESSION["mail"] = $usuario["mail"];
             $_SESSION["username"] = $usuario["username"];
-            
-            $_SESSION["zumbido_saldo"] = $usuario["zumbido_saldo"] ?? 0;
-            
-            /* SUMO 1 ZUMBIDO POR LOGIN */
-            $collection_usuarios = getCollectionUsuarios();
-            
-            $updateResult = $collection_usuarios->updateOne(
-                ['_id' => new \MongoDB\BSON\ObjectId($_SESSION["user_id"])],
-                ['$set' => ['zumbido_saldo' => $_SESSION["zumbido_saldo"]+1]]
-                );
-            
-            $_SESSION["zumbido_saldo"]+=1;
-            
+
         } else { //Usuario antiguo
             
             echo "logueo";
@@ -386,21 +362,8 @@
             $id_usuario = ((string) new MongoDB\BSON\ObjectId($id_object));
             $_SESSION["user_id"] = $id_usuario;
             $_SESSION["mail"] = $usuario["mail"];
-            $_SESSION["username"] = $usuario["username"];            
-            
-            
-            $_SESSION["zumbido_saldo"] = $usuario["zumbido_saldo"] ?? 0;
-            
-            /* SUMO 1 ZUMBIDO POR LOGIN */
-            $collection_usuarios = getCollectionUsuarios();
-            
-            $updateResult = $collection_usuarios->updateOne(
-                ['_id' => new \MongoDB\BSON\ObjectId($_SESSION["user_id"])],
-                ['$set' => ['zumbido_saldo' => $_SESSION["zumbido_saldo"]+1]]
-                );
-            
-            $_SESSION["zumbido_saldo"]+=1;
-            
+            $_SESSION["username"] = $usuario["username"];
+
         }
     
     }
@@ -564,7 +527,18 @@
                     $result = $collection_usuarios->insertOne($data);
                     
                     if ($result->getInsertedId()) {
-                        enviar_mail_activacion($datos);
+                        // Verificación por CÓDIGO (4 dígitos, 10 min) en vez de enlace
+                        if (function_exists('generar_y_enviar_codigo_verificacion')) {
+                            generar_y_enviar_codigo_verificacion(
+                                $result->getInsertedId(),
+                                $datos['correo'],
+                                $datos['nombre'] ?? 'Usuario',
+                                'registro'
+                            );
+                        } else {
+                            // Fallback al método antiguo si el módulo no está disponible
+                            enviar_mail_activacion($datos);
+                        }
                         return true;
                     }
                 } catch(MongoCursorException $e) {
@@ -795,7 +769,6 @@ function google_login($datos) {
                 'mail' => $email,
                 'username' => $name,
                 'img' => $picture,
-                'zumbido_saldo' => 1,
                 'fecha_registro' => new MongoDB\BSON\UTCDateTime(),
                 'login_method' => 'google',
                 'estado' => 1 // Usuario verificado automáticamente con Google
@@ -898,52 +871,112 @@ function google_login($datos) {
     }
     
     /**
-     * Procesa la recompensa de referido cuando un usuario verifica su perfil
+     * Procesa la recompensa de referido cuando un usuario verifica su perfil.
+     *
+     * IMPORTANTE: solo recompensa al REFERIDO con +5€ (regalo de bienvenida).
+     * El REFERIDOR ya NO cobra al registrarse el invitado, sino al publicar
+     * éste su primer código (loop viral). Ver otorgar_bonus_primer_codigo().
      */
     function procesarRecompensaReferido($referidor_id, $email_referido) {
         $collection_usuarios = getCollectionUsuarios();
-        
-        try {
-            // 1. RECOMPENSA PARA EL REFERIDOR
-            $referidor = $collection_usuarios->findOne(['_id' => new MongoDB\BSON\ObjectId($referidor_id)]);
-            
-            if ($referidor) {
-                $saldo_actual_ref = $referidor['saldo'] ?? 0;
-                $nuevo_saldo_ref = $saldo_actual_ref + 5;
-                
-                $collection_usuarios->updateOne(
-                    ['_id' => new MongoDB\BSON\ObjectId($referidor_id)],
-                    ['$set' => ['saldo' => $nuevo_saldo_ref]]
-                );
-                
-                registrarTransaccionReferido($referidor_id, $email_referido, 5, 'Recompensa por invitar a un amigo');
-                enviarNotificacionReferido($referidor['mail'], $email_referido);
-            }
 
-            // 2. RECOMPENSA PARA EL REFERIDO (NUEVO USUARIO)
+        try {
+            // RECOMPENSA AL REFERIDO (nuevo usuario): +5€ regalo bienvenida
             $referido = $collection_usuarios->findOne(['mail' => $email_referido]);
-            
+
             if ($referido) {
                 $referido_id = (string)$referido['_id'];
                 $saldo_actual_new = $referido['saldo'] ?? 0;
                 $nuevo_saldo_new = $saldo_actual_new + 5;
-                
+
                 $collection_usuarios->updateOne(
                     ['_id' => $referido['_id']],
                     ['$set' => ['saldo' => $nuevo_saldo_new]]
                 );
-                
+
                 registrarTransaccionReferido($referido_id, $email_referido, 5, 'Regalo de bienvenida por invitación');
             }
-            
-            debug_log("Recompensas de referido procesadas (+5€ x2): Referidor=$referidor_id, Referido=$email_referido");
+
+            debug_log("Recompensa de referido procesada al invitado (+5€): Referidor=$referidor_id, Referido=$email_referido. La recompensa al referidor (+5€) se otorgará cuando el referido publique su primer código.");
             return true;
-            
+
         } catch (Exception $e) {
             debug_log("Error procesando recompensa de referido: " . $e->getMessage());
         }
-        
+
         return false;
+    }
+
+    /**
+     * Recompensa al referidor cuando su invitado publica su primer código.
+     * Idempotente: usa flag referidor_recompensado en el referido.
+     */
+    function recompensar_referidor_por_primer_codigo($referido_id) {
+        $collection_usuarios = getCollectionUsuarios();
+        $object_id = is_string($referido_id) ? new MongoDB\BSON\ObjectId($referido_id) : $referido_id;
+
+        $referido = $collection_usuarios->findOne(['_id' => $object_id]);
+        if (!$referido) return false;
+        if (empty($referido['referido_por'])) return false;
+        if (!empty($referido['referidor_recompensado'])) return false;
+
+        $referidor_id = $referido['referido_por'];
+
+        try {
+            $result = $collection_usuarios->updateOne(
+                ['_id' => $object_id, 'referidor_recompensado' => ['$ne' => true]],
+                ['$set' => ['referidor_recompensado' => true, 'referidor_recompensado_fecha' => new MongoDB\BSON\UTCDateTime()]]
+            );
+
+            if ($result->getModifiedCount() === 0) return false;
+
+            $referidor = $collection_usuarios->findOne(['_id' => new MongoDB\BSON\ObjectId($referidor_id)]);
+            if (!$referidor) return false;
+
+            $nuevo_saldo = ($referidor['saldo'] ?? 0) + 5;
+            $collection_usuarios->updateOne(
+                ['_id' => new MongoDB\BSON\ObjectId($referidor_id)],
+                ['$set' => ['saldo' => $nuevo_saldo]]
+            );
+
+            registrarTransaccionReferido($referidor_id, $referido['mail'] ?? '', 5, 'Recompensa porque tu invitado publicó su primer código');
+
+            // Email aviso al referidor
+            try {
+                if (!function_exists('enviarEmailConBrevoYRegistrar')) {
+                    include_once __DIR__ . '/email_helper.php';
+                }
+                $to_email = $referidor['mail'] ?? '';
+                $username = trim($referidor['username'] ?? 'Usuario');
+                if (!empty($to_email)) {
+                    $subject = '🎉 +5€ por tu invitado - CodigoAmigo';
+                    $html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"></head>'
+                          . '<body style="font-family:Segoe UI,Tahoma,sans-serif;background:#f4f4f4;margin:0;padding:0;">'
+                          . '<div style="max-width:600px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;">'
+                          . '<div style="background:linear-gradient(135deg,#27ae60,#16a085);color:#fff;padding:30px 20px;text-align:center;">'
+                          . '<h1 style="margin:0;">¡Bien hecho ' . htmlspecialchars($username, ENT_QUOTES, 'UTF-8') . '!</h1>'
+                          . '<p style="margin:10px 0 0;opacity:0.95;">Tu invitado ha publicado su primer código</p></div>'
+                          . '<div style="padding:30px;">'
+                          . '<p>Tu amigo <strong>' . htmlspecialchars($referido['mail'] ?? '', ENT_QUOTES, 'UTF-8') . '</strong> acaba de publicar su primer código en CodigoAmigo. Te hemos sumado <strong>+5€</strong> a tu saldo como recompensa.</p>'
+                          . '<div style="background:#f8f9fa;border-radius:8px;padding:20px;margin:25px 0;text-align:center;">'
+                          . '<p style="margin:5px 0 0;font-size:32px;font-weight:700;color:#27ae60;">+5,00€</p>'
+                          . '</div>'
+                          . '<p>Sigue invitando amigos y ganando recompensas reales cuando se activen.</p>'
+                          . '<p>Un saludo,<br>El equipo de CodigoAmigo</p>'
+                          . '</div></div></body></html>';
+                    $text = "¡Bien hecho $username!\n\nTu invitado " . ($referido['mail'] ?? '') . " ha publicado su primer código. Te hemos sumado +5€ a tu saldo.\n\nCodigoAmigo";
+                    enviarEmailConBrevoYRegistrar($to_email, $username, $subject, $html, 'recompensa_referidor_primer_codigo', $referidor_id, ['cantidad' => 5, 'referido_id' => (string)$referido_id], $text);
+                }
+            } catch (Throwable $e) {
+                debug_log("Error email recompensa referidor: " . $e->getMessage());
+            }
+
+            debug_log("Referidor recompensado por primer código del referido: referidor=$referidor_id, referido=" . (string)$referido_id);
+            return true;
+        } catch (Throwable $e) {
+            debug_log("Error en recompensar_referidor_por_primer_codigo: " . $e->getMessage());
+            return false;
+        }
     }
     
     /**
@@ -2318,7 +2351,93 @@ function google_login($datos) {
             return false;
         }
     }
-    
+
+    /**
+     * Otorga +1€ de bonus al usuario por publicar su primer código.
+     * Idempotente: solo se concede una vez (flag bonus_primer_codigo).
+     */
+    function otorgar_bonus_primer_codigo($user_id, $codigo_id, $marca) {
+        if (empty($user_id)) return false;
+
+        $collection_usuarios = getCollectionUsuarios();
+        $object_id = is_string($user_id) ? new MongoDB\BSON\ObjectId($user_id) : $user_id;
+
+        $usuario = $collection_usuarios->findOne(['_id' => $object_id]);
+        if (!$usuario) return false;
+
+        if (!empty($usuario['bonus_primer_codigo'])) {
+            return false;
+        }
+
+        $result = $collection_usuarios->updateOne(
+            ['_id' => $object_id, 'bonus_primer_codigo' => ['$ne' => true]],
+            [
+                '$inc' => ['saldo' => 1],
+                '$set' => [
+                    'bonus_primer_codigo' => true,
+                    'bonus_primer_codigo_fecha' => new MongoDB\BSON\UTCDateTime(),
+                    'bonus_primer_codigo_codigo_id' => (string)$codigo_id,
+                ],
+            ]
+        );
+
+        if ($result->getModifiedCount() > 0) {
+            $collection_transacciones = getCollectionTransacciones();
+            $collection_transacciones->insertOne([
+                'usuario_id' => (string)$user_id,
+                'tipo' => 'bonus_primer_codigo',
+                'cantidad' => 1,
+                'descripcion' => 'Bonus de bienvenida por publicar tu primer código',
+                'fecha' => new MongoDB\BSON\UTCDateTime(),
+                'estado' => 'completado',
+                'codigo_id' => (string)$codigo_id,
+                'marca' => $marca,
+            ]);
+
+            // Loop viral: si fue invitado, recompensar al referidor (+5€)
+            try {
+                recompensar_referidor_por_primer_codigo($user_id);
+            } catch (Throwable $e) {
+                debug_log("Error recompensando referidor: " . $e->getMessage());
+            }
+
+            // Email de aviso al usuario (best-effort)
+            try {
+                if (!function_exists('enviarEmailConBrevoYRegistrar')) {
+                    include_once __DIR__ . '/email_helper.php';
+                }
+                $to_email = $usuario['mail'] ?? '';
+                $username = trim($usuario['username'] ?? 'Usuario');
+                if (!empty($to_email)) {
+                    $subject = '¡+1€ de regalo por tu primer código! - CodigoAmigo';
+                    $html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"></head>'
+                          . '<body style="font-family:Segoe UI,Tahoma,sans-serif;background:#f4f4f4;margin:0;padding:0;">'
+                          . '<div style="max-width:600px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 4px 15px rgba(0,0,0,0.1);">'
+                          . '<div style="background:linear-gradient(135deg,#27ae60,#16a085);color:#fff;padding:30px 20px;text-align:center;">'
+                          . '<h1 style="margin:0;font-size:26px;">¡Bienvenido ' . htmlspecialchars($username, ENT_QUOTES, 'UTF-8') . '!</h1>'
+                          . '<p style="margin:10px 0 0;opacity:0.95;">Has publicado tu primer código</p></div>'
+                          . '<div style="padding:30px;">'
+                          . '<p>Te hemos sumado <strong>1€ de regalo</strong> en tu saldo como bienvenida.</p>'
+                          . '<div style="background:#f8f9fa;border-radius:8px;padding:20px;margin:25px 0;text-align:center;">'
+                          . '<p style="margin:0;color:#666;">Bonus de bienvenida</p>'
+                          . '<p style="margin:5px 0 0;font-size:32px;font-weight:700;color:#27ae60;">+1,00€</p>'
+                          . '</div>'
+                          . '<p>Cuanto más publiques, más posibilidad tienes de que otros usuarios usen tus códigos. Cada vez que alguien interactúa con tu código, ganas potencial de comisiones.</p>'
+                          . '<p>Un saludo,<br>El equipo de CodigoAmigo</p>'
+                          . '</div></div></body></html>';
+                    $text = "Bienvenido $username,\n\nTe hemos sumado 1€ de regalo por publicar tu primer código.\n\nCodigoAmigo";
+                    enviarEmailConBrevoYRegistrar($to_email, $username, $subject, $html, 'bonus_primer_codigo', (string)$user_id, ['cantidad'=>1, 'codigo_id'=>$codigo_id], $text);
+                }
+            } catch (Throwable $e) {
+                debug_log("Error email bonus primer código: " . $e->getMessage());
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
     /**
      * Obtiene la colección de viewers de códigos
      */

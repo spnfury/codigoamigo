@@ -29,6 +29,7 @@
 	include_once '/home/admin/web/codigoamigo.com/public_html'.'/myphp/funciones_marca.php';
 	include_once '/home/admin/web/codigoamigo.com/public_html'.'/myphp/funciones_codigo.php';
 	include_once '/home/admin/web/codigoamigo.com/public_html'.'/myphp/funciones_usuario.php';
+	include_once '/home/admin/web/codigoamigo.com/public_html'.'/myphp/funciones_verificacion.php';
 
 	include_once '/home/admin/web/codigoamigo.com/public_html'.'/myphp/_header.php';
 	include_once '/home/admin/web/codigoamigo.com/public_html'.'/myphp/_header_modern.php';
