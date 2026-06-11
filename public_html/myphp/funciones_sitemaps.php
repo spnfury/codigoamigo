@@ -370,8 +370,17 @@ function generarSitemapGuias() {
         $urlset = $xml->createElement("urlset");
         $urlset = $xml->appendChild($urlset);
         $urlset->setAttribute("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9");
-        
+
         $total = 0;
+
+        // Índice de guías (/guias) — landing canónica de la sección
+        $url = $urlset->appendChild($xml->createElement("url"));
+        $url->appendChild($xml->createElement("loc", $base_url . "/guias"));
+        $url->appendChild($xml->createElement("lastmod", $hoy));
+        $url->appendChild($xml->createElement("changefreq", "weekly"));
+        $url->appendChild($xml->createElement("priority", "0.9"));
+        $total++;
+
         foreach ($guias as $guia) {
             $slug = $guia['slug'] ?? '';
             if (empty($slug)) continue;
@@ -393,7 +402,7 @@ function generarSitemapGuias() {
             $url->appendChild($lastmod);
             $changefreq = $xml->createElement("changefreq", "monthly");
             $url->appendChild($changefreq);
-            $priority = $xml->createElement("priority", "0.8");
+            $priority = $xml->createElement("priority", "0.9");
             $url->appendChild($priority);
             $total++;
         }
@@ -402,7 +411,7 @@ function generarSitemapGuias() {
         $xml->save($sitemap_path);
         return ['success' => true, 'archivo' => $sitemap_path, 'url' => $base_url . '/myphp/xml/sitemap_guias.xml', 'total_urls' => $total, 'fecha' => $hoy];
     } catch (Throwable $e) {
-        error_log("Error al generar sitemap de guías: " . $e->getMessage());
+        log_error("Error al generar sitemap de guías: " . $e->getMessage());
         return ['success' => false, 'error' => $e->getMessage()];
     }
 }

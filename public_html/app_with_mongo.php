@@ -688,9 +688,41 @@ $app->get('/', function ($request, $response) {
 });
 
 // Ruta para Super Landings (Guías)
+// Índice de guías (/guias) — landing canónica de la sección
+$app->get('/guias', function ($request, $response, $args) {
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/funciones_modern.php';
+    include_once __DIR__ . '/myphp/_header_modern.php';
+    include_once __DIR__ . '/myphp/_super_landing_functions.php';
+
+    $guias = get_active_super_landings(100);
+
+    $GLOBALS['website'] = 'https://www.codigoamigo.com/';
+    $GLOBALS['actual_url'] = 'https://www.codigoamigo.com/guias';
+    $GLOBALS['header_modern_used'] = true;
+
+    $meta_title = 'Guías para ahorrar y ganar dinero | CodigoAmigo';
+    $meta_desc = 'Guías y comparativas sobre banca, neobancos y finanzas para empresas, autónomos y particulares. Elige la mejor opción y ahorra con códigos amigo.';
+    get_header_modern(
+        $meta_title,
+        $meta_desc,
+        'Guías de CodigoAmigo',
+        $meta_desc,
+        'https://www.codigoamigo.com/img/logo_codigoamigo_real4.png'
+    );
+
+    include __DIR__ . '/myphp/views/guias_index.php';
+
+    include_once __DIR__ . '/myphp/_footer.php';
+    get_footer_modern();
+
+    return $response;
+});
+
 $app->get('/guias/{slug}', function ($request, $response, $args) {
     $slug = $args['slug'];
-    
+
     // Incluir archivos necesarios
     include_once __DIR__ . '/inc/includes.php';
     include_once __DIR__ . '/myphp/funciones.php';

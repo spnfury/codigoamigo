@@ -1560,6 +1560,72 @@ function generate_publisher_latent_cta() {
 }
 
 // Función para generar la sección de marcas populares en la home
+/**
+ * Sección de guías destacadas para la home.
+ * Muestra hasta $limit super_landings activas como tarjetas con enlace a /guias.
+ */
+function generate_guias_section($limit = 4) {
+    // Asegurar que las funciones de super landings están disponibles
+    if (!function_exists('get_active_super_landings')) {
+        $sl = __DIR__ . '/_super_landing_functions.php';
+        if (file_exists($sl)) {
+            include_once $sl;
+        }
+    }
+    if (!function_exists('get_active_super_landings')) {
+        return '';
+    }
+
+    $guias = get_active_super_landings($limit);
+    if (empty($guias)) {
+        return '';
+    }
+
+    $html  = '<div class="guias-home-section"><div class="container">';
+    $html .= '<div class="section-title h2-style">Guías para ahorrar</div>';
+    $html .= '<p class="section-subtitle">Comparativas y guías prácticas con los mejores códigos amigo</p>';
+    $html .= '<div class="guias-home-grid">';
+
+    foreach ($guias as $g) {
+        $slug = htmlspecialchars($g['slug'] ?? '');
+        if ($slug === '') continue;
+        $titulo = htmlspecialchars($g['title'] ?? ($g['meta_title'] ?? 'Guía'));
+        $desc = htmlspecialchars($g['meta_description'] ?? '');
+        $desc_short = strlen($desc) > 110 ? substr($desc, 0, 107) . '...' : $desc;
+        $img = htmlspecialchars($g['hero_image'] ?? '');
+
+        $html .= '<a href="/guias/' . $slug . '" class="guia-home-card" title="' . $titulo . '">';
+        $html .= '<div class="guia-home-card-img"' . ($img ? ' style="background-image:url(\'' . $img . '\')"' : '') . '></div>';
+        $html .= '<div class="guia-home-card-body">';
+        $html .= '<h3>' . $titulo . '</h3>';
+        if ($desc_short) {
+            $html .= '<p>' . $desc_short . '</p>';
+        }
+        $html .= '<span class="guia-home-cta">Leer guía <i class="fas fa-arrow-right"></i></span>';
+        $html .= '</div></a>';
+    }
+
+    $html .= '</div>';
+    $html .= '<div style="text-align:center;margin-top:26px;">';
+    $html .= '<a href="/guias" class="btn" style="background:transparent;border:2px solid #E30613;color:#E30613;padding:12px 30px;border-radius:25px;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:8px;">Ver todas las guías <i class="fas fa-arrow-right"></i></a>';
+    $html .= '</div>';
+    $html .= '</div></div>';
+
+    $html .= '<style>
+    .guias-home-section { padding: 30px 0; }
+    .guias-home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 22px; }
+    .guia-home-card { display: flex; flex-direction: column; background: #fff; border: 1px solid #eee; border-radius: 14px; overflow: hidden; text-decoration: none; color: inherit; box-shadow: 0 6px 18px rgba(0,0,0,0.05); transition: transform .2s, box-shadow .2s; }
+    .guia-home-card:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(0,0,0,0.12); }
+    .guia-home-card-img { height: 130px; background-size: cover; background-position: center; background-color: #16213e; }
+    .guia-home-card-body { padding: 16px 18px; display: flex; flex-direction: column; flex-grow: 1; }
+    .guia-home-card-body h3 { font-size: 1.05rem; font-weight: 700; color: #1f2937; margin: 0 0 8px; line-height: 1.35; }
+    .guia-home-card-body p { font-size: 0.88rem; color: #6b7280; line-height: 1.5; flex-grow: 1; margin: 0 0 12px; }
+    .guia-home-cta { color: #E30613; font-weight: 700; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px; }
+    </style>';
+
+    return $html;
+}
+
 function generate_popular_brands_section($limit = 9) {
     $marcas_populares = get_popular_brands_for_home($limit);
     
