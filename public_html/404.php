@@ -227,6 +227,13 @@ html {
 </style>
 
 <?php
+// Algunas rutas incluyen este 404 sin haber cargado el header moderno
+if (!function_exists('get_header_modern')) {
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/funciones_modern.php';
+    include_once __DIR__ . '/myphp/_header_modern.php';
+}
 $title = $title ?? 'Página no encontrada';
 $description = $description ?? 'La página solicitada no existe';
 $title_social = $title_social ?? $title;
