@@ -936,8 +936,8 @@ $next_label = $labels_next[$current_threshold_idx] ?? '¡Máximo!';
     	
         $("#uploadedfile").change(function() {
             if (this.files && this.files[0]) {
-                if (this.files[0].size > 2000000) {
-                    alert("El archivo es demasiado grande. Máximo 2MB.");
+                if (this.files[0].size > 8000000) {
+                    alert("El archivo es demasiado grande. Máximo 8MB.");
                     $(this).val('');
                     return;
                 }

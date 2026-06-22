@@ -96,9 +96,9 @@
         $uploadedfileload = "true";
         
         // Validar tamaño
-        if (($file["uploadedfile"]['size']) > 2000000) {
+        if (($file["uploadedfile"]['size']) > 8000000) {
             $uploadedfile_size = $file['uploadedfile']['size'];
-            $msg = "Solo es posible subir fotos menores de 2MB";
+            $msg = "Solo es posible subir fotos menores de 8MB";
             $uploadedfileload = "false";
         }
         

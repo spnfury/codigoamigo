@@ -184,14 +184,14 @@ try {
     ]);
     
 } catch (\Stripe\Exception\ApiErrorException $e) {
-    error_log("Error de Stripe al crear sesión VIP: " . $e->getMessage());
+    log_error("Error de Stripe al crear sesión VIP: " . $e->getMessage());
     header('Content-Type: application/json');
     echo json_encode([
         'success' => false,
         'error' => 'Error al crear la sesión de pago: ' . $e->getMessage()
     ]);
 } catch (Exception $e) {
-    error_log("Error general al crear sesión VIP: " . $e->getMessage());
+    log_error("Error general al crear sesión VIP: " . $e->getMessage());
     header('Content-Type: application/json');
     echo json_encode([
         'success' => false,

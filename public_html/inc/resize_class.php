@@ -4,7 +4,7 @@ class img {
 	var $image = '';
 	var $formato = '';
 
-	function img($sourceFile,$formato=''){
+	function __construct($sourceFile,$formato=''){
 		
 		
 	

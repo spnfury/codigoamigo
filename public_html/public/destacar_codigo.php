@@ -39,6 +39,14 @@ if (!$codigo_id) {
 }
 
 $obj_id_codigo = new \MongoDB\BSON\ObjectId($codigo_id);
+
+// Defensivo: garantizar que las funciones de negocio están cargadas antes de usarlas.
+// myphp/funciones.php está envuelto en un guard global if(!function_exists('getFechaActualCorregida'))
+// que, en ciertos órdenes de include, se salta el archivo entero y deja getCodeByID() sin definir.
+if (!function_exists('getCodeByID')) {
+    require_once __DIR__ . '/../myphp/funciones.php';
+}
+
 $codigo = getCodeByID($obj_id_codigo);
 
 // Verificar que el código pertenece al usuario
