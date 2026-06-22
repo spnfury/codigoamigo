@@ -107,7 +107,17 @@ register_shutdown_function(function () {
             if (!defined('TELEGRAM_ADMIN_CHAT_ID')) {
                 @include_once __DIR__ . '/config/ai_config.php';
             }
-            Logger::critical("Fatal Error: " . $error['message'] . " in " . $error['file'] . " on line " . $error['line']);
+            $url = ($_SERVER['REQUEST_METHOD'] ?? 'GET') . ' '
+                 . (($_SERVER['HTTPS'] ?? '') === 'on' ? 'https://' : 'http://')
+                 . ($_SERVER['HTTP_HOST'] ?? 'codigoamigo.com')
+                 . ($_SERVER['REQUEST_URI'] ?? '');
+            $user = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 'anónimo';
+            Logger::critical(
+                "Fatal Error: " . $error['message']
+                . "\n📄 " . $error['file'] . ":" . $error['line']
+                . "\n🌐 " . $url
+                . "\n👤 usuario: " . $user
+            );
         }
     }
 });
@@ -138,8 +148,20 @@ $app->add(function ($request, $response, $next) {
             }
             
             $code = $exception->getCode();
-            // Errores 500 o excepciones no manejadas
-            Logger::critical("Uncaught Exception ({$code}): " . $exception->getMessage() . "\nTrace: " . $exception->getTraceAsString());
+            // Mensaje enriquecido: URL, ubicación, usuario y traza recortada
+            $url = ($_SERVER['REQUEST_METHOD'] ?? 'GET') . ' '
+                 . (($_SERVER['HTTPS'] ?? '') === 'on' ? 'https://' : 'http://')
+                 . ($_SERVER['HTTP_HOST'] ?? 'codigoamigo.com')
+                 . ($_SERVER['REQUEST_URI'] ?? '');
+            $user = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 'anónimo';
+            $trace = array_slice(explode("\n", $exception->getTraceAsString()), 0, 5);
+            Logger::critical(
+                "Uncaught Exception ({$code}): " . $exception->getMessage()
+                . "\n📄 " . $exception->getFile() . ":" . $exception->getLine()
+                . "\n🌐 " . $url
+                . "\n👤 usuario: " . $user
+                . "\n🔎 Trace:\n" . implode("\n", $trace)
+            );
         }
 
         throw $exception;
@@ -318,9 +340,54 @@ $app->get('/', function ($request, $response) {
 
     // Hero Section (movido desde header global)
     ?>
+    <?php
+    // ────────────────────────────────────────────────────────────────────────
+    // BANNER PROMOCIONES ACTIVAS (campañas referido tiempo limitado)
+    // ────────────────────────────────────────────────────────────────────────
+    if (function_exists('getMarcasConPromocionActiva')) {
+        $promos_activas_home = getMarcasConPromocionActiva();
+    } else {
+        @include_once __DIR__ . '/myphp/funciones_marca.php';
+        $promos_activas_home = function_exists('getMarcasConPromocionActiva') ? getMarcasConPromocionActiva() : [];
+    }
+    if (!empty($promos_activas_home)):
+    ?>
+    <div class="promo-banner-wrap" style="max-width:1200px;margin:0 auto 24px;padding:0 20px;">
+      <div style="background:linear-gradient(135deg,#FF6B35,#E30613);border-radius:16px;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;box-shadow:0 8px 24px rgba(227,6,19,0.25);">
+        <div style="display:flex;align-items:center;gap:16px;flex:1;min-width:280px;">
+          <div style="width:54px;height:54px;background:rgba(255,255,255,0.18);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.7rem;flex-shrink:0;">🔥</div>
+          <div style="color:#fff;">
+            <div style="font-size:0.7rem;font-weight:800;letter-spacing:1px;text-transform:uppercase;opacity:0.85;">Promo activa · tiempo limitado</div>
+            <?php $first = $promos_activas_home[0]; ?>
+            <div style="font-size:1.1rem;font-weight:800;line-height:1.25;">
+              <?php echo htmlspecialchars($first['nombre']); ?> ·
+              <?php echo htmlspecialchars($first['titulo'] ?: $first['bono']); ?>
+              <?php if ($first['dias_restantes'] >= 0): ?>
+                <span style="background:rgba(0,0,0,0.25);padding:2px 10px;border-radius:12px;font-size:0.85rem;margin-left:6px;">
+                  <?php echo $first['dias_restantes'] === 0 ? '⚡ acaba hoy' : '⏳ ' . $first['dias_restantes'] . ' día' . ($first['dias_restantes'] === 1 ? '' : 's'); ?>
+                </span>
+              <?php endif; ?>
+            </div>
+            <?php if (count($promos_activas_home) > 1): ?>
+              <div style="font-size:0.8rem;opacity:0.9;margin-top:4px;">+ <?php echo count($promos_activas_home) - 1; ?> marca<?php echo count($promos_activas_home) - 1 === 1 ? '' : 's'; ?> más en promoción</div>
+            <?php endif; ?>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <a href="/de-<?php echo htmlspecialchars($first['nombre_clave']); ?>" style="background:#fff;color:#E30613;padding:11px 22px;border-radius:30px;font-weight:800;text-decoration:none;font-size:0.9rem;white-space:nowrap;">Ver códigos <?php echo htmlspecialchars($first['nombre']); ?> →</a>
+          <a href="/promociones-activas" style="background:rgba(255,255,255,0.18);color:#fff;padding:11px 22px;border-radius:30px;font-weight:700;text-decoration:none;font-size:0.85rem;white-space:nowrap;border:1px solid rgba(255,255,255,0.3);">Todas las promos</a>
+        </div>
+      </div>
+    </div>
+    <?php endif; ?>
+
     <section class="hero-section">
-        <h1 class="hero-title">¡Encuentra los Mejores Descuentos!</h1>
-        <p class="hero-description">Códigos de descuento verificados y actualizados diariamente para que ahorres en tus compras favoritas</p>
+        <h1 class="hero-title">Descubre marcas nuevas. <span class="hero-title-accent">Gana compartiéndolas.</span></h1>
+        <p class="hero-description">Bonos, cashback y descuentos verificados de marcas que no sabías que existían. Comparte los tuyos y monetiza cuando alguien los usa.</p>
+        <div class="hero-dual-cta">
+            <a href="#codigos-destacados" class="hero-cta hero-cta-primary"><i class="fas fa-search"></i> Descubrir marcas</a>
+            <a href="/nuevo_codigo" class="hero-cta hero-cta-secondary"><i class="fas fa-coins"></i> Compartir y ganar</a>
+        </div>
     </section>
     <?php
     // VIP Awareness Banner en homepage (solo para usuarios logueados no-VIP)
@@ -363,23 +430,42 @@ $app->get('/', function ($request, $response) {
     // Generar contenido principal con diseño moderno
     echo '<div class="main-content">';
     
-    // AdSense Top
-    echo generate_adsense_container(get_adsense_top(), 'adsense-main-top', 'margin-bottom: 30px;');
+    // AdSense Top — contenido limitado y centrado
+    $ad_top_html = get_adsense_top();
+    if (trim($ad_top_html) !== '') {
+        echo '<div class="adsense-main-top" style="max-width:1200px;margin:0 auto 30px;padding:0 1rem;text-align:center;">' . $ad_top_html . '</div>';
+    }
 
     echo '<div class="codes-section">';
     
     // Mostrar códigos destacados primero (solo en la primera página)
     if(!isset($_GET['page']) || $_GET['page'] == 1) {
         if(!empty($lista_codigos_patrocinados)) {
+            echo '<a id="codigos-destacados"></a>';
             echo generate_modern_featured_cards($lista_codigos_patrocinados);
         }
-        
+
+        // Brand discovery: marcas que no conocías (efecto "ostras no sabía...")
+        if (function_exists('generate_brand_discovery_section')) {
+            echo generate_brand_discovery_section(8);
+        }
+
+        // CTA publishers latentes
+        if (function_exists('generate_publisher_latent_cta')) {
+            echo generate_publisher_latent_cta();
+        }
+
+        // Guías destacadas (SEO + tráfico a la sección de guías)
+        if (function_exists('generate_guias_section')) {
+            echo generate_guias_section(4);
+        }
+
         // Mostrar marcas populares (solo en la primera página)
         echo generate_popular_brands_section(9);
-        
+
         // Mostrar categorías populares (solo en la primera página)
         echo generate_popular_categories_section();
-        
+
 
     }
     
@@ -417,8 +503,11 @@ $app->get('/', function ($request, $response) {
     echo '</div>';
     echo '</div>';
     
-    // AdSense Entremedio
-    echo generate_adsense_container(get_adsense_entremedio(), 'adsense-home-middle', 'margin-top: 20px; margin-bottom: 20px;');
+    // AdSense Entremedio — contenido limitado y centrado
+    $ad_mid_html = get_adsense_entremedio();
+    if (trim($ad_mid_html) !== '') {
+        echo '<div class="adsense-home-middle" style="max-width:1200px;margin:30px auto;padding:0 1rem;text-align:center;">' . $ad_mid_html . '</div>';
+    }
 
     // Bloque de tendencias de búsqueda (solo home principal)
     if (!isset($_GET['page']) || (int)$_GET['page'] === 1) {
@@ -970,7 +1059,12 @@ $app->get('/comparar/{slug}', function ($request, $response, $args) {
     $GLOBALS['website'] = 'https://www.codigoamigo.com/';
     $GLOBALS['actual_url'] = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     $GLOBALS['header_modern_used'] = true;
-    
+
+    // Comparativas programáticas: noindex,follow. ~5000 páginas con ~2 clics/90d
+    // queman crawl budget y diluyen calidad del dominio. Se desindexan para
+    // reenfocar el crawl de Google en las páginas de marca (que sí rankean).
+    $GLOBALS['noindex'] = 1;
+
     get_header_modern(
         $title,
         $description,
@@ -1177,25 +1271,98 @@ $app->get('/ofertas/{termino}', function ($request, $response, $args) {
     echo '</nav>';
     echo '</div>';
 
+    echo '<style>
+    .search-hero {
+        position: relative;
+        text-align: center;
+        padding: 3rem 1.5rem 2.5rem;
+        margin: 1.5rem 0 2rem;
+        background: linear-gradient(135deg, #fff5f5 0%, #ffeaea 60%, #ffd9d9 100%);
+        border-radius: 24px;
+        border: 1px solid #ffd0d0;
+        overflow: hidden;
+    }
+    .search-hero::before {
+        content: "";
+        position: absolute; inset: 0;
+        background: radial-gradient(circle at 20% 20%, rgba(227,6,19,0.08), transparent 60%),
+                    radial-gradient(circle at 80% 80%, rgba(255,140,0,0.07), transparent 60%);
+        pointer-events: none;
+    }
+    .search-hero h1 {
+        position: relative;
+        font-size: clamp(1.8rem, 4vw, 2.6rem);
+        font-weight: 800;
+        color: #1a1a1a;
+        margin: 0 0 .6rem;
+        letter-spacing: -0.02em;
+    }
+    .search-hero h1 .term {
+        background: linear-gradient(90deg, #E30613, #ff6b35);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+    }
+    .search-hero p {
+        position: relative;
+        margin: 0;
+        color: #555;
+        font-size: 1.05rem;
+    }
+    .search-hero .hero-stats {
+        position: relative;
+        display: inline-flex;
+        gap: .6rem;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-top: 1.2rem;
+    }
+    .search-hero .stat-chip {
+        background: #fff;
+        border: 1px solid #ffd0d0;
+        color: #E30613;
+        padding: .45rem .9rem;
+        border-radius: 999px;
+        font-size: .85rem;
+        font-weight: 600;
+        box-shadow: 0 2px 6px rgba(227,6,19,0.08);
+    }
+    .search-hero .stat-chip i { margin-right: 6px; }
+    .section-subtitle {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #1a1a1a;
+        margin: 2rem 0 1rem;
+        padding-left: .9rem;
+        border-left: 4px solid #E30613;
+    }
+    </style>';
+
+    $total_resultados = count($codigos_destacados) + count($codigos_generales);
     echo '<div class="codes-section">';
-    echo '<div class="page-header glass-card animate-on-scroll">';
-    echo '<h1 class="premium-h1">Códigos descuento ' . htmlspecialchars($termino) . '</h1>';
-    echo '<p class="premium-subtitle">Cupones y ofertas verificadas en ' . date('Y') . '</p>';
+    echo '<section class="search-hero">';
+    echo '<h1>Códigos descuento <span class="term">' . htmlspecialchars($termino) . '</span></h1>';
+    echo '<p>Cupones y ofertas verificadas en ' . date('Y') . '</p>';
+    echo '<div class="hero-stats">';
+    echo '<span class="stat-chip"><i class="fas fa-tags"></i>' . $total_resultados . ' resultado' . ($total_resultados === 1 ? '' : 's') . '</span>';
+    if (!empty($codigos_destacados)) {
+        echo '<span class="stat-chip"><i class="fas fa-star"></i>' . count($codigos_destacados) . ' destacados</span>';
+    }
+    echo '<span class="stat-chip"><i class="fas fa-shield-alt"></i>Verificados</span>';
     echo '</div>';
-    
-    // Agregar contexto de búsqueda para AdSense (oculto pero presente en el DOM)
-    echo '<!-- Contexto para AdSense: búsqueda de ' . htmlspecialchars($termino) . ' -->';
-    echo '<div style="position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden;">';
+    echo '</section>';
+
+    // Contexto SEO oculto para AdSense
+    echo '<div style="position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden;" aria-hidden="true">';
     echo '<p>Búsqueda de códigos descuento ' . htmlspecialchars($termino) . ', cupones ' . htmlspecialchars($termino) . ', ofertas ' . htmlspecialchars($termino) . ', promociones ' . htmlspecialchars($termino) . '</p>';
     echo '</div>';
-    
-    // AdSense para búsqueda - Top
+
+    // AdSense Top — sólo render si hay anuncio real
     if (!empty($termino) && function_exists('get_adsense_search')) {
-        echo '<div class="adsense-search-top mb-4 mt-4" style="text-align: center; margin: 30px 0; padding: 30px; background: #f8f9fa; border-radius: 12px; border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.05); width: 100%; max-width: 100%; overflow: hidden; display: block; position: relative;">';
-        echo '<div style="min-height: 250px; width: 100%; max-width: 100%; display: block; position: relative;">';
-        echo get_adsense_search($termino, null, 'top');
-        echo '</div>';
-        echo '</div>';
+        $ad_top = get_adsense_search($termino, null, 'top');
+        if (trim($ad_top) !== '') {
+            echo '<div class="adsense-search-top" style="text-align:center;margin:20px 0;padding:20px;background:#fafafa;border-radius:12px;border:1px solid #eee;">' . $ad_top . '</div>';
+        }
     }
 
     
@@ -1216,55 +1383,49 @@ $app->get('/ofertas/{termino}', function ($request, $response, $args) {
         echo generate_modern_code_cards($codigos_generales);
         echo '</div>';
         
-        // AdSense para búsqueda - Bottom (cuando hay resultados)
+        // AdSense Bottom — sólo si hay anuncio real
         if (!empty($termino) && function_exists('get_adsense_search')) {
-            echo '<div class="adsense-search-bottom mb-4 mt-4" style="text-align: center; margin: 30px 0; padding: 30px; background: #f8f9fa; border-radius: 12px; border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.05); width: 100%; max-width: 100%; overflow: hidden; display: block; position: relative;">';
-            echo '<div style="min-height: 250px; width: 100%; max-width: 100%; display: block; position: relative;">';
-            echo '<h4 style="color: #333; margin-bottom: 20px; font-size: 18px;">Anuncios relacionados con: <strong style="color: #6c5ce7;">' . htmlspecialchars($termino) . '</strong></h4>';
-            echo '<p style="font-size: 12px; color: #666; margin-bottom: 15px;">Cupones y ofertas de ' . htmlspecialchars($termino) . '</p>';
-            echo get_adsense_search($termino, null, 'bottom');
-            echo '</div>';
-            echo '</div>';
+            $ad_bottom = get_adsense_search($termino, null, 'bottom');
+            if (trim($ad_bottom) !== '') {
+                echo '<div class="adsense-search-bottom" style="text-align:center;margin:30px 0;padding:20px;background:#fafafa;border-radius:12px;border:1px solid #eee;">';
+                echo '<h4 style="color:#333;margin-bottom:15px;font-size:15px;font-weight:600;">Anuncios relacionados con <strong style="color:#E30613;">' . htmlspecialchars($termino) . '</strong></h4>';
+                echo $ad_bottom;
+                echo '</div>';
+            }
         }
     }
 
     if (empty($codigos_destacados) && empty($codigos_generales)) {
-        echo '<div style="text-align: center; color: #ccc; padding: 2rem;">';
-        echo '<i class="fas fa-search" style="font-size: 3rem; margin-bottom: 1rem; color: #E30613;"></i>';
-        echo '<h3>No se encontraron códigos</h3>';
-        echo '<p>Intenta con otros términos de búsqueda</p>';
-        
-        // AdSense para búsqueda sin resultados - Middle
-        if (!empty($termino) && function_exists('get_adsense_search')) {
-            echo '<div class="adsense-search-no-results-middle mb-4 mt-4" style="text-align: center; margin: 30px 0; padding: 30px; background: #ffffff; border-radius: 12px; border: 2px solid #E30613; box-shadow: 0 2px 10px rgba(0,0,0,0.1); width: 100%; max-width: 100%; overflow: hidden; display: block; position: relative;">';
-            echo '<div style="min-height: 300px; width: 100%; max-width: 100%; display: block; position: relative;">';
-            echo '<h4 style="color: #333; margin-bottom: 20px; font-size: 18px;">Anuncios relacionados con: <strong style="color: #E30613;">' . htmlspecialchars($termino) . '</strong></h4>';
-            echo '<p style="font-size: 12px; color: #999; margin-bottom: 15px;">Cupones, ofertas y descuentos de ' . htmlspecialchars($termino) . '</p>';
-            echo get_adsense_search($termino, null, 'no-results-middle');
-            echo '</div>';
-            echo '</div>';
-        }
-        
-        echo '<div style="margin-top: 2rem; padding: 1.5rem; background: #fff; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: inline-block;">';
-        echo '<h4 style="color: #333; margin-bottom: 1rem;">¿Tienes un código para "' . htmlspecialchars($termino) . '"?</h4>';
-        echo '<p style="color: #666; margin-bottom: 1.5rem;">Sé el primero en publicar un código para esta marca o servicio</p>';
-        echo '<a href="/nuevo_codigo?marca=' . urlencode($termino) . '" class="btn" style="background: #E30613; color: white; padding: 12px 30px; border-radius: 25px; text-decoration: none; font-weight: 600; transition: all 0.3s ease; display: inline-block;">';
-        echo '<i class="fas fa-plus-circle" style="margin-right: 8px;"></i>';
-        echo 'Publicar Código</a>';
+        echo '<div class="no-results-card" style="text-align:center;padding:3rem 1.5rem;background:#fff;border:1px solid #eee;border-radius:20px;box-shadow:0 4px 20px rgba(0,0,0,0.04);margin:2rem 0;">';
+        echo '<div style="width:80px;height:80px;margin:0 auto 1.2rem;background:linear-gradient(135deg,#fff5f5,#ffeaea);border-radius:50%;display:flex;align-items:center;justify-content:center;">';
+        echo '<i class="fas fa-search" style="font-size:2rem;color:#E30613;"></i>';
         echo '</div>';
-        
-        // AdSense para búsqueda sin resultados - Bottom
-        if (!empty($termino) && function_exists('get_adsense_search')) {
-            echo '<div class="adsense-search-no-results-bottom mb-4 mt-4" style="text-align: center; margin: 30px 0; padding: 30px; background: #ffffff; border-radius: 12px; border: 2px solid #E30613; box-shadow: 0 2px 10px rgba(0,0,0,0.1); width: 100%; max-width: 100%; overflow: hidden; display: block; position: relative;">';
-            echo '<div style="min-height: 300px; width: 100%; max-width: 100%; display: block; position: relative;">';
-            echo '<h4 style="color: #333; margin-bottom: 20px; font-size: 18px;">Más anuncios sobre: <strong style="color: #E30613;">' . htmlspecialchars($termino) . '</strong></h4>';
-            echo '<p style="font-size: 12px; color: #999; margin-bottom: 15px;">Ofertas especiales de ' . htmlspecialchars($termino) . '</p>';
-            echo get_adsense_search($termino, null, 'no-results-bottom');
-            echo '</div>';
-            echo '</div>';
-        }
-        
+        echo '<h3 style="color:#1a1a1a;margin:0 0 .5rem;font-weight:700;">No se encontraron códigos para "' . htmlspecialchars($termino) . '"</h3>';
+        echo '<p style="color:#666;margin:0 0 1.8rem;">Prueba con otros términos o sé el primero en publicar uno.</p>';
+        echo '<a href="/nuevo_codigo?marca=' . urlencode($termino) . '" style="background:linear-gradient(135deg,#E30613,#ff6b35);color:#fff;padding:14px 32px;border-radius:999px;text-decoration:none;font-weight:700;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 15px rgba(227,6,19,0.3);">';
+        echo '<i class="fas fa-plus-circle"></i> Publicar código de ' . htmlspecialchars($termino);
+        echo '</a>';
+        echo '<ul style="list-style:none;padding:0;margin:2rem auto 0;max-width:420px;text-align:left;color:#666;font-size:.9rem;">';
+        echo '<li style="padding:.3rem 0;"><i class="fas fa-check" style="color:#28a745;margin-right:8px;"></i>Revisa la ortografía</li>';
+        echo '<li style="padding:.3rem 0;"><i class="fas fa-check" style="color:#28a745;margin-right:8px;"></i>Usa palabras más generales</li>';
+        echo '<li style="padding:.3rem 0;"><i class="fas fa-check" style="color:#28a745;margin-right:8px;"></i>Prueba sinónimos o el nombre de la marca</li>';
+        echo '</ul>';
         echo '</div>';
+
+        // AdSense no-results — sólo si hay anuncios reales
+        if (!empty($termino) && function_exists('get_adsense_search')) {
+            $ad_nr_mid = get_adsense_search($termino, null, 'no-results-middle');
+            if (trim($ad_nr_mid) !== '') {
+                echo '<div style="text-align:center;margin:30px 0;padding:20px;background:#fafafa;border-radius:12px;border:1px solid #eee;">';
+                echo '<h4 style="color:#333;font-size:15px;font-weight:600;margin-bottom:12px;">Anuncios relacionados con <strong style="color:#E30613;">' . htmlspecialchars($termino) . '</strong></h4>';
+                echo $ad_nr_mid;
+                echo '</div>';
+            }
+            $ad_nr_bot = get_adsense_search($termino, null, 'no-results-bottom');
+            if (trim($ad_nr_bot) !== '') {
+                echo '<div style="text-align:center;margin:30px 0;padding:20px;background:#fafafa;border-radius:12px;border:1px solid #eee;">' . $ad_nr_bot . '</div>';
+            }
+        }
     }
     
     // Mostrar chollos encontrados
@@ -1296,7 +1457,7 @@ $app->get('/ofertas/{termino}', function ($request, $response, $args) {
     }
 
     // Interlacado de pie (Marcas y Categorías)
-    echo '<div class="search-footer-interlinking" style="padding: 4rem 0; background: #0a0a0a;">';
+    echo '<div class="search-footer-interlinking" style="padding: 4rem 0; background: #fafbfc; border-top: 1px solid #e8e8ea;">';
     echo generate_popular_brands_section(9);
     echo generate_popular_categories_section();
     echo '</div>';
@@ -1560,8 +1721,13 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
             } catch (Exception $e) {
                 // Silencioso pero registrar para debug si es necesario
             }
+            // Desactivar AdSense ANTES del header para que no se cargue el script
+            // (los bloques in-feed/auto-ads se inyectan vía page-level cuando adsbygoogle.js está presente)
+            $GLOBALS['anula_adsense'] = true;
+            $anula_adsense = true;
+
             // Incluir el header moderno
-            
+
             // Llamar a la función del header moderno
             get_header_modern(
                 "Código amigo " . ucfirst($marca) . " (verificado) - CodigoAmigo.com",
@@ -1586,10 +1752,7 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
             
             // Incluir la nueva función de detalle
             include_once __DIR__ . '/myphp/funciones_code_detail.php';
-            
-            // Desactivar AdSense en el detalle del código para evitar bloque confuso
-            $GLOBALS['anula_adsense'] = true;
-            
+
             // Generar página de detalle
             echo generate_code_detail_page($codigo);
         } else {
@@ -1834,8 +1997,8 @@ $app->get('/login', function ($request, $response, $args) {
                 $_SESSION["user_id"] = ((string) new MongoDB\BSON\ObjectId($id_object));
                 $_SESSION["mail"] = $usuario["mail"];
                 $_SESSION["username"] = $usuario["username"];
-                $_SESSION["zumbido_saldo"] = $usuario["zumbido_saldo"] ?? 0;
-                
+
+
                 // Eliminar token para que sea de un solo uso
                 $collection_usuarios->updateOne(
                     ['_id' => $id_object],
@@ -2371,61 +2534,97 @@ $app->get('/mis-anuncios', function ($request, $response, $args) {
         error_log("Error procesando destacado en app_with_mongo: " . $e->getMessage());
     }
     
-    // Obtener códigos del usuario (DESPUÉS de procesar el destacado)
-    // Cargar TODOS los códigos del usuario (cualquier estado) para que pueda ver caducados/inactivos
-    $array_filtro = array("id_usuario" => new MongoDB\BSON\ObjectId($_SESSION["user_id"]));
+    // ========================================================================
+    // PAGINACIÓN + TABS (24 por página, filtro por estado vía ?estado=...)
+    // ========================================================================
+    $user_oid = new MongoDB\BSON\ObjectId($_SESSION["user_id"]);
+    $collection_codigos = getCollectionCodigos();
 
-    // Primero contar cuántos códigos tiene el usuario (todos los estados)
-    $total_codigos_usuario = count_all_listado_codigos_array($array_filtro);
-    
-    // Usar un límite más alto o sin límite para usuarios con muchos códigos
-    $limite_codigos = $total_codigos_usuario > 5000 ? 10000 : 5000;
+    // Tabs admitidos
+    $estado_tab = isset($_GET['estado']) ? $_GET['estado'] : 'todos';
+    $estados_validos = ['todos', 'activos', 'caducados', 'desactivados', 'inactivos', 'destacados'];
+    if (!in_array($estado_tab, $estados_validos, true)) {
+        $estado_tab = 'todos';
+    }
 
-    $array_skip = array("limit" => $limite_codigos);
-    $array_skip = array_merge($array_skip, array("sort" => array('fecha_publicacion' => -1)));
+    // Contadores por estado — un count() por categoría (cheap con índice por id_usuario)
+    $base_filter = ['id_usuario' => $user_oid];
+    $total_codigos_usuario = $collection_codigos->count($base_filter);
+    $num_activos      = $collection_codigos->count(array_merge($base_filter, ['$or' => [['estado' => 0], ['estado' => ['$exists' => false]]]]));
+    $num_caducados    = $collection_codigos->count(array_merge($base_filter, ['estado' => -3]));
+    $num_desactivados = $collection_codigos->count(array_merge($base_filter, ['estado' => -2]));
+    $num_inactivos    = $collection_codigos->count(array_merge($base_filter, ['estado' => -1]));
+    $num_destacados   = $collection_codigos->count(array_merge($base_filter, [
+        '$and' => [
+            ['$or' => [['estado' => 0], ['estado' => ['$exists' => false]]]],
+            ['destacado' => ['$gt' => 0]],
+        ]
+    ]));
 
-    $resultado_codigos = get_all_listado_codigos_array($array_filtro, $array_skip);
-    $listado_codigos = isset($resultado_codigos["results"]) ? $resultado_codigos["results"] : array();
+    // Filtro según tab
+    $array_filtro = $base_filter;
+    switch ($estado_tab) {
+        case 'activos':
+            $array_filtro['$or'] = [['estado' => 0], ['estado' => ['$exists' => false]]];
+            break;
+        case 'caducados':
+            $array_filtro['estado'] = -3;
+            break;
+        case 'desactivados':
+            $array_filtro['estado'] = -2;
+            break;
+        case 'inactivos':
+            $array_filtro['estado'] = -1;
+            break;
+        case 'destacados':
+            $array_filtro['$and'] = [
+                ['$or' => [['estado' => 0], ['estado' => ['$exists' => false]]]],
+                ['destacado' => ['$gt' => 0]],
+            ];
+            break;
+        // 'todos' → sin filtro adicional
+    }
+
+    // Paginación
+    $por_pagina = 24;
+    $pagina = isset($_GET['p']) ? max(1, (int)$_GET['p']) : 1;
+    $skip = ($pagina - 1) * $por_pagina;
+
+    $total_filtrado = $collection_codigos->count($array_filtro);
+    $total_paginas = max(1, (int)ceil($total_filtrado / $por_pagina));
+    if ($pagina > $total_paginas) {
+        $pagina = $total_paginas;
+        $skip = ($pagina - 1) * $por_pagina;
+    }
+
+    // Orden: estado desc (null/0 primero → activos arriba, caducados/desactivados al final),
+    // luego destacado desc (destacados arriba dentro de activos), luego fecha desc.
+    $cursor_codigos = $collection_codigos->find($array_filtro, [
+        'sort'  => ['estado' => -1, 'destacado' => -1, 'fecha_publicacion' => -1],
+        'skip'  => $skip,
+        'limit' => $por_pagina,
+    ]);
+    $listado_codigos = iterator_to_array($cursor_codigos);
     $num_codigos = count($listado_codigos);
-    
-    // Verificar si se están mostrando todos los códigos
-    $mostrando_todos = $num_codigos >= $total_codigos_usuario;
-    $codigos_ocultos = $total_codigos_usuario - $num_codigos;
 
-    // Contar códigos por estado
-    $num_activos = 0;
-    $num_caducados = 0;    // estado -3
-    $num_desactivados = 0; // estado -2
-    $num_inactivos = 0;    // estado -1
-    $num_sin_estado = 0;   // sin campo estado
+    // Compat: variables esperadas por el template legacy
+    $mostrando_todos = true;
+    $codigos_ocultos = 0;
+    $num_sin_estado = 0;
 
-    // Contar códigos por visibilidad (solo para activos)
-    $num_1_codes = 0; // Alta visibilidad (posición 1)
-    $num_2_codes = 0; // Media visibilidad (posición 2)
-    $num_3_codes = 0; // Baja visibilidad (posición 3+)
-
-    foreach($listado_codigos as $codigo) {
-        // Contar por estado
+    // Visibilidad — calcular sólo para los 24 visibles (no N+1 sobre miles)
+    $num_1_codes = 0;
+    $num_2_codes = 0;
+    $num_3_codes = 0;
+    foreach ($listado_codigos as $codigo) {
         $estado_codigo = isset($codigo['estado']) ? (int)$codigo['estado'] : null;
-        if ($estado_codigo === 0 || $estado_codigo === null) {
-            $num_activos++;
-            if ($estado_codigo === null) $num_sin_estado++;
-        } elseif ($estado_codigo === -3) {
-            $num_caducados++;
-        } elseif ($estado_codigo === -2) {
-            $num_desactivados++;
-        } elseif ($estado_codigo === -1) {
-            $num_inactivos++;
-        }
-
-        // Contar visibilidad solo para códigos activos
         $es_activo = ($estado_codigo === 0 || $estado_codigo === null);
         if ($es_activo && isset($codigo['marca']) && $codigo['marca'] !== null) {
-            $marca = getObjectMarca('nombre_clave', $codigo['marca']);
-            if($marca) {
+            $marca_obj = getObjectMarca('nombre_clave', $codigo['marca']);
+            if ($marca_obj) {
                 $posicion = get_posicion_codigo_en_marca($codigo['_id'], $codigo['marca']);
-                if($posicion == 1) $num_1_codes++;
-                elseif($posicion == 2) $num_2_codes++;
+                if ($posicion == 1) $num_1_codes++;
+                elseif ($posicion == 2) $num_2_codes++;
                 else $num_3_codes++;
             }
         }
@@ -2434,6 +2633,91 @@ $app->get('/mis-anuncios', function ($request, $response, $args) {
     // Incluir la página específica de mis anuncios
     include_once $_SERVER['DOCUMENT_ROOT'] . '/public/mis_anuncios.php';
     
+    return $response;
+});
+
+// ============================================================================
+// LANDING /promociones-activas — campañas referido tiempo limitado
+// ============================================================================
+$app->get('/promociones-activas', function ($request, $response, $args) {
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/funciones_marca.php';
+    include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true;
+
+    if (!isset($detect)) { $detect = new Mobile_Detect(); }
+    $GLOBALS['detect'] = $detect;
+
+    $promos = getMarcasConPromocionActiva();
+
+    get_header_modern(
+        'Promociones activas — bonos de referido por tiempo limitado',
+        'Marcas con campañas activas de referido: bonos extra por compartir tu código. Aprovecha antes de que acabe.'
+    );
+    ?>
+    <main style="max-width:1100px;margin:30px auto;padding:0 20px;">
+      <header style="text-align:center;margin-bottom:30px;">
+        <h1 style="margin:0 0 10px;font-size:2rem;font-weight:800;color:#1a1a2e;">🔥 Promociones activas ahora</h1>
+        <p style="color:#666;font-size:1.05rem;max-width:680px;margin:0 auto;">Marcas con bonos de referido extra por tiempo limitado. Comparte tu código antes de que acabe y multiplica tus ganancias.</p>
+      </header>
+
+      <?php if (empty($promos)): ?>
+        <div style="background:#fff;border-radius:14px;padding:50px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,0.06);">
+          <div style="font-size:3rem;margin-bottom:14px;">⏳</div>
+          <h2 style="margin:0 0 12px;color:#333;">Sin promociones activas ahora mismo</h2>
+          <p style="color:#666;">Vuelve pronto — solemos publicar campañas de N26, Revolut, Vinted y más.</p>
+          <a href="/" style="display:inline-block;margin-top:18px;background:#E30613;color:#fff;padding:12px 26px;border-radius:25px;font-weight:700;text-decoration:none;">Volver a la home</a>
+        </div>
+      <?php else: ?>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px;">
+          <?php foreach ($promos as $p): ?>
+            <article style="background:#fff;border-radius:14px;padding:22px;box-shadow:0 4px 14px rgba(0,0,0,0.06);border-left:6px solid <?php echo $p['dias_restantes'] <= 3 ? '#E30613' : '#FF9800'; ?>;display:flex;flex-direction:column;gap:12px;">
+              <div style="display:flex;align-items:center;gap:14px;">
+                <?php if (!empty($p['logo'])): ?>
+                  <img src="<?php echo htmlspecialchars($p['logo']); ?>" alt="<?php echo htmlspecialchars($p['nombre']); ?>" style="width:54px;height:54px;border-radius:12px;object-fit:contain;background:#f5f5f5;padding:6px;" loading="lazy">
+                <?php else: ?>
+                  <div style="width:54px;height:54px;border-radius:12px;background:linear-gradient(135deg,#FF6B35,#E30613);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:1.4rem;"><?php echo strtoupper(substr($p['nombre'], 0, 1)); ?></div>
+                <?php endif; ?>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:1.15rem;font-weight:800;color:#1a1a2e;"><?php echo htmlspecialchars($p['nombre']); ?></div>
+                  <?php if (!empty($p['bono'])): ?>
+                    <div style="font-size:0.95rem;color:#E30613;font-weight:700;">💰 <?php echo htmlspecialchars($p['bono']); ?></div>
+                  <?php endif; ?>
+                </div>
+              </div>
+
+              <?php if (!empty($p['titulo'])): ?>
+                <p style="margin:0;color:#444;font-size:0.95rem;line-height:1.5;"><?php echo htmlspecialchars($p['titulo']); ?></p>
+              <?php endif; ?>
+
+              <div style="display:flex;align-items:center;gap:8px;font-size:0.85rem;">
+                <?php if ($p['dias_restantes'] === 0): ?>
+                  <span style="background:#E30613;color:#fff;padding:5px 12px;border-radius:20px;font-weight:800;">⚡ Acaba HOY</span>
+                <?php elseif ($p['dias_restantes'] <= 3): ?>
+                  <span style="background:#E30613;color:#fff;padding:5px 12px;border-radius:20px;font-weight:800;">⏳ <?php echo $p['dias_restantes']; ?> día<?php echo $p['dias_restantes'] === 1 ? '' : 's'; ?></span>
+                <?php else: ?>
+                  <span style="background:#FFF3E0;color:#E65100;padding:5px 12px;border-radius:20px;font-weight:700;">⏳ <?php echo $p['dias_restantes']; ?> días</span>
+                <?php endif; ?>
+                <span style="color:#999;">hasta <?php echo date('d/m/Y', strtotime($p['fecha_fin'])); ?></span>
+              </div>
+
+              <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+                <a href="/de-<?php echo htmlspecialchars($p['nombre_clave']); ?>" style="flex:1;text-align:center;background:#E30613;color:#fff;padding:10px 14px;border-radius:10px;font-weight:700;text-decoration:none;font-size:0.9rem;">Ver códigos <?php echo htmlspecialchars($p['nombre']); ?></a>
+                <a href="/nuevo_codigo" style="text-align:center;background:#f5f5f5;color:#333;padding:10px 14px;border-radius:10px;font-weight:700;text-decoration:none;font-size:0.9rem;">+ Publicar el tuyo</a>
+              </div>
+            </article>
+          <?php endforeach; ?>
+        </div>
+
+        <section style="margin-top:40px;background:linear-gradient(135deg,#1a1a2e,#16213e);color:#fff;padding:30px;border-radius:16px;text-align:center;">
+          <h2 style="margin:0 0 12px;font-size:1.4rem;">¿Tienes código de alguna de estas marcas?</h2>
+          <p style="margin:0 0 18px;opacity:0.85;">Publícalo ahora. Durante la promoción cobras el bono extra cuando alguien lo use.</p>
+          <a href="/nuevo_codigo" style="display:inline-block;background:#FFD700;color:#1a1a2e;padding:14px 30px;border-radius:30px;font-weight:800;text-decoration:none;">Publicar mi código →</a>
+        </section>
+      <?php endif; ?>
+    </main>
+    <?php
     return $response;
 });
 

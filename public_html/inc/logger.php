@@ -102,16 +102,17 @@ class Logger {
         $recursion_guard = true;
 
         $icon = $level === 'CRITICAL' ? '🚨' : '⚠️';
-        $telegramMessage = "{$icon} *{$level} en CodigoAmigo*\n\n";
+        $telegramMessage = "{$icon} {$level} en CodigoAmigo\n\n";
         $telegramMessage .= strip_tags($message);
         $telegramMessage .= "\n\n⏰ " . date('Y-m-d H:i:s');
 
         try {
             $url = "https://api.telegram.org/bot" . TELEGRAM_BOT_TOKEN . "/sendMessage";
+            // Sin parse_mode: texto plano. Markdown rechazaba (HTTP 400) mensajes
+            // con _ * [ ] desbalanceados (típico en traces de error) y se perdía la alerta.
             $data = [
                 'chat_id' => TELEGRAM_ADMIN_CHAT_ID,
-                'text' => $telegramMessage,
-                'parse_mode' => 'Markdown'
+                'text' => $telegramMessage
             ];
 
             $options = [
