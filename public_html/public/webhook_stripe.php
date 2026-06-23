@@ -99,7 +99,9 @@ if ($event->type == 'checkout.session.completed') {
         'amount_total' => $session->amount_total ?? 'UNKNOWN',
         'currency' => $session->currency ?? 'UNKNOWN',
         'has_metadata' => isset($session->metadata),
-        'metadata_keys' => isset($session->metadata) ? array_keys((array)$session->metadata) : []
+        'metadata_keys' => isset($session->metadata)
+            ? array_keys(($session->metadata instanceof \Stripe\StripeObject) ? $session->metadata->toArray() : (array)$session->metadata)
+            : []
     ]);
     
     // Validar que el pago fue exitoso
@@ -124,7 +126,12 @@ if ($event->type == 'checkout.session.completed') {
     }
     
     // Convertir metadata a array para facilitar el acceso
-    $metadata = (array)$session->metadata;
+    // OJO: $session->metadata es un \Stripe\StripeObject; (array) expone
+    // props internas (_values, _opts...) con bytes nulos en vez de las claves.
+    // Hay que usar ->toArray() para obtener las claves reales (tipo, codigo_id...).
+    $metadata = ($session->metadata instanceof \Stripe\StripeObject)
+        ? $session->metadata->toArray()
+        : (array)$session->metadata;
     $tipo_metadata = $metadata['tipo'] ?? null;
     
     logWebhook("Metadata de sesión", [

@@ -20,6 +20,7 @@ $categorias = [
 
 // Usar el header moderno
 include_once __DIR__ . '/../myphp/_header_modern.php';
+include_once __DIR__ . '/../myphp/_footer.php';
 
 echo '<div class="main-content">';
 echo '<div class="codes-section">';
@@ -29,7 +30,16 @@ echo '<h1 class="section-title">Nuestras Categorías</h1>';
 echo '<p style="text-align: center; color: #ccc; margin-bottom: 3rem; font-size: 1.1rem;">Explora códigos de descuento organizados por categorías</p>';
 
 // Generar grid de categorías
-echo generate_modern_categories($categorias);
+echo '<div class="categories-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem;">';
+foreach ($categorias as $cat) {
+    $nombre = htmlspecialchars($cat['nombre'], ENT_QUOTES, 'UTF-8');
+    $total = (int) $cat['total_codigos'];
+    echo '<a href="/categoria/' . urlencode($cat['nombre']) . '" class="category-card" style="display:block;padding:1.5rem;border-radius:12px;background:rgba(255,255,255,0.05);text-align:center;text-decoration:none;color:inherit;">';
+    echo '<div class="category-name" style="font-weight:700;font-size:1.1rem;">' . $nombre . '</div>';
+    echo '<div class="category-count" style="color:#888;font-size:0.9rem;">' . $total . ' códigos</div>';
+    echo '</a>';
+}
+echo '</div>';
 
 echo '</div>';
 echo '</div>';
