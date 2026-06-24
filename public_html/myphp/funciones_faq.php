@@ -364,22 +364,11 @@ function generarFAQsGroq($marca_clave, $marca_nombre) {
         'temperature' => defined('AI_TEMPERATURE') ? AI_TEMPERATURE : 0.7
     ];
     
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, defined('GROQ_API_URL') ? GROQ_API_URL : 'https://api.groq.com/openai/v1/chat/completions');
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . $api_key,
-        'Content-Type: application/json'
-    ]);
-    curl_setopt($ch, CURLOPT_TIMEOUT, defined('AI_TIMEOUT') ? AI_TIMEOUT : 30);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-    
-    $response = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    curl_close($ch);
+    // Groq con rotación de claves + fallback de modelo (ver groq_request en ai_config)
+    $__g = groq_request($data);
+    $response  = $__g['body'];
+    $http_code = $__g['http'];
+    $error = '';
     
     if ($error) {
         error_log("Error cURL Groq: " . $error);
