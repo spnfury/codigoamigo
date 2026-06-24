@@ -74,8 +74,16 @@ if (!isset($panel)) {
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 
-        <?php if(!isset($_GET["page"])){ ?>
-            <link rel="canonical" href="<?php echo isset($GLOBALS["actual_url_limpia"]) ? $GLOBALS["actual_url_limpia"] : ''; ?>"/>
+        <?php if(!isset($_GET["page"])){
+            // Canonical: usa el global si la ruta lo definió (marcas, ofertas);
+            // si no, lo deriva de la URI actual para que home/categorías/landings
+            // nunca queden con canonical vacío. Fuerza siempre www + https.
+            $canonical = (isset($GLOBALS["actual_url_limpia"]) && $GLOBALS["actual_url_limpia"] !== '')
+                ? $GLOBALS["actual_url_limpia"]
+                : 'https://www.codigoamigo.com' . strtok($_SERVER['REQUEST_URI'] ?? '/', '?');
+            $canonical = preg_replace('#^https?://(www\.)?codigoamigo\.com#', 'https://www.codigoamigo.com', $canonical);
+        ?>
+            <link rel="canonical" href="<?php echo htmlspecialchars($canonical, ENT_QUOTES, 'UTF-8'); ?>"/>
         <?php } ?>
 
         <?php if(isset($links_meta["prev"])): ?>

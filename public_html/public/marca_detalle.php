@@ -478,6 +478,28 @@ $faq_lines_to_display[] = [
     'q' => '¿Qué son los niveles de confianza?',
     'a' => 'Cada código tiene 1-5 estrellas según calidad del código y actividad del usuario publicador.'
 ];
+
+// Schema FAQPage: estructura las mismas FAQs que se muestran abajo (línea ~872)
+// para que Google entienda el contenido. Pendiente histórico (ver :272).
+$faq_schema_items = [];
+foreach ($faq_lines_to_display as $faq) {
+    $fq = trim($faq['q'] ?? '');
+    $fa = trim(strip_tags($faq['a'] ?? ''));
+    if ($fq === '' || $fa === '') continue;
+    $faq_schema_items[] = [
+        '@type' => 'Question',
+        'name' => $fq,
+        'acceptedAnswer' => ['@type' => 'Answer', 'text' => $fa],
+    ];
+}
+if (!empty($faq_schema_items)) {
+    $schema_faqpage = [
+        '@context' => 'https://schema.org',
+        '@type' => 'FAQPage',
+        'mainEntity' => $faq_schema_items,
+    ];
+    echo '<script type="application/ld+json">' . json_encode($schema_faqpage, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>';
+}
 ?>
 
 <div class="cav2">
@@ -859,6 +881,10 @@ $faq_lines_to_display[] = [
           <div><?php echo nl2br($seo_que_es); ?></div>
         <?php elseif (!empty($brand_intro_html)): ?>
           <?php echo $brand_intro_html; ?>
+        <?php elseif (!empty(trim($descripcion_larga))): /* descripción rica en DB (HTML), no se mostraba */ ?>
+          <div><?php echo $descripcion_larga; ?></div>
+        <?php elseif (!empty(trim($descripcion_marca))): ?>
+          <p><?php echo nl2br(htmlspecialchars($descripcion_marca, ENT_QUOTES, 'UTF-8')); ?></p>
         <?php else: ?>
           <p><?php echo htmlspecialchars($nombre_marca); ?> es una de las marcas líderes en su sector. Aprovecha los códigos promocionales compartidos por nuestra comunidad para conseguir descuentos exclusivos en tu próxima compra.</p>
         <?php endif; ?>

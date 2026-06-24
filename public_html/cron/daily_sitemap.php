@@ -41,6 +41,24 @@ $sitemap_path = __DIR__ . '/../myphp/xml/sitemap_marcas.xml';
 file_put_contents($sitemap_path, $xml);
 $log("Sitemap marcas regenerado: $count URLs");
 
+// ─── 1b. Refrescar sitemap_categorias.xml (re-sella lastmod, mantiene XML válido) ───
+// Las categorías son fijas; aquí solo se actualiza la fecha para que no quede estancado.
+$cat_path = __DIR__ . '/../myphp/xml/sitemap_categorias.xml';
+if (file_exists($cat_path)) {
+    $cat_old = file_get_contents($cat_path);
+    preg_match_all('#<loc>(https://[^<]+)</loc>#', $cat_old, $cat_m);
+    if (!empty($cat_m[1])) {
+        $cat_xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+        $cat_xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+        foreach ($cat_m[1] as $loc) {
+            $cat_xml .= "  <url>\n    <loc>{$loc}</loc>\n    <lastmod>{$today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.8</priority>\n  </url>\n";
+        }
+        $cat_xml .= '</urlset>' . "\n";
+        file_put_contents($cat_path, $cat_xml);
+        $log("Sitemap categorias refrescado: " . count($cat_m[1]) . " URLs");
+    }
+}
+
 // ─── 2. Actualizar sitemap index ───
 $index_xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
 $index_xml .= '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
@@ -51,7 +69,9 @@ $sitemaps = [
     'myphp/xml/sitemap_categorias.xml',
     'myphp/xml/sitemap_estaticas.xml',
     'myphp/xml/sitemap_guias.xml',
-    'myphp/xml/sitemap_comparativas.xml',
+    // sitemap_comparativas.xml excluido: ~5000 páginas programáticas con ~2 clics/90d.
+    // Ahora noindex (ver ruta /comparar/ en app_with_mongo.php). Fuera del índice para
+    // reenfocar el crawl de Google en páginas de marca.
 ];
 foreach ($sitemaps as $sm) {
     $index_xml .= "  <sitemap>\n    <loc>{$base_url}/{$sm}</loc>\n    <lastmod>{$today}</lastmod>\n  </sitemap>\n";
