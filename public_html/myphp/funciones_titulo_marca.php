@@ -63,9 +63,9 @@ function get_ultimo_ahorro_marca($marca_nombre_clave, $lista_codigos) {
         case 'euros':
             return "【 ahorra " . $num_beneficio . "€ 】";
         case '% de descuento':
-            return $num_beneficio . " % DESC.";
+            return " " . $num_beneficio . " % DESC.";
         case 'minutos gratis':
-            return $num_beneficio . " MIN. GRATIS";
+            return " " . $num_beneficio . " MIN. GRATIS";
         default:
             // Si no hay tipo específico, asumir euros
             return "【 ahorra " . $num_beneficio . "€ 】";
@@ -207,11 +207,31 @@ function generate_descripcion_marca_mejorada($marca, $lista_codigos, $numero_cod
                 }
             }
             if (!empty($kw_terms)) {
-                $descripcion .= ". Búsquedas: " . implode(', ', array_slice($kw_terms, 0, 2));
+                // Solo añadir la cola de keywords si cabe en el snippet (~155 chars);
+                // si no, se omite entera para no dejar "Búsquedas:" colgando.
+                $tail = ". Búsquedas: " . implode(', ', array_slice($kw_terms, 0, 2));
+                if (mb_strlen($descripcion . $tail) <= 155) {
+                    $descripcion .= $tail;
+                }
             }
         }
     }
-    
+
+    // Cap de seguridad a ~155 chars (Google trunca el snippet ahí). Corta en
+    // frontera de palabra y elimina cualquier "Búsquedas:" parcial residual.
+    $descripcion = trim($descripcion);
+    if (mb_strlen($descripcion) > 155) {
+        $cut = mb_substr($descripcion, 0, 155);
+        $sp = mb_strrpos($cut, ' ');
+        if ($sp !== false && $sp > 120) {
+            $cut = mb_substr($cut, 0, $sp);
+        }
+        $descripcion = $cut;
+    }
+    // Quitar cola "Búsquedas..." si quedó incompleta tras el recorte
+    $descripcion = preg_replace('/\.?\s*Búsquedas:.*$/u', '', $descripcion);
+    $descripcion = rtrim(trim($descripcion), " ,.-");
+
     return $descripcion;
 }
 ?>
