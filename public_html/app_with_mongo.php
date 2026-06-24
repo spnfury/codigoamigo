@@ -463,6 +463,9 @@ $app->get('/', function ($request, $response) {
         // Mostrar marcas populares (solo en la primera página)
         echo generate_popular_brands_section(9);
 
+        // Bloque de enlace interno hacia marcas cercanas a página 1 (SEO)
+        echo render_marcas_oportunidad();
+
         // Mostrar categorías populares (solo en la primera página)
         echo generate_popular_categories_section();
 
@@ -3547,7 +3550,12 @@ $app->get('/felicidades_destacar', function ($request, $response, $args) {
     
     $title = "¡Código destacado exitosamente!";
     $description = "Tu código ha sido destacado correctamente en " . $author_web;
-    
+
+    // Incluir archivos necesarios (getCodeByID, getObjectMarca, get_header_new, get_footer)
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/funciones_modern.php';
+
     include_once $_SERVER['DOCUMENT_ROOT'] . '/public/felicidades_destacar.php';
     
     return $response;
@@ -3555,10 +3563,15 @@ $app->get('/felicidades_destacar', function ($request, $response, $args) {
 
 $app->get('/destaca', function ($request, $response, $args) {
     global $author_web;
-    
+
     $title = "Destaca tu código";
     $description = "Haz que tu código destaque en " . $author_web;
-    
+
+    // Incluir archivos necesarios (getCodeByID, getObjectMarca, get_header_new, get_footer)
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/funciones_modern.php';
+
     include_once $_SERVER['DOCUMENT_ROOT'] . '/public/destaca.php';
     
     return $response;

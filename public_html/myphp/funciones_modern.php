@@ -1626,6 +1626,45 @@ function generate_guias_section($limit = 4) {
     return $html;
 }
 
+/**
+ * Bloque de enlace interno "Marcas en tendencia": enlaza desde el home (alta
+ * autoridad) las marcas que rankean cerca de página 1 (franja GSC, cacheada por
+ * cron/generar_marcas_oportunidad.php) con anchor text descriptivo, para
+ * concentrar link equity en las que más opción tienen de subir. Devuelve ''
+ * si no hay cache.
+ */
+function render_marcas_oportunidad() {
+    $path = __DIR__ . '/data/marcas_oportunidad.json';
+    if (!is_file($path)) return '';
+    $data = json_decode((string)file_get_contents($path), true);
+    $marcas = $data['marcas'] ?? [];
+    if (empty($marcas)) return '';
+
+    $html  = '<section class="marcas-tendencia-section"><div class="container">';
+    $html .= '<div class="section-title h2-style">Marcas en tendencia</div>';
+    $html .= '<p class="section-subtitle">Las marcas más buscadas ahora mismo. Encuentra sus códigos de descuento verificados.</p>';
+    $html .= '<div class="marcas-tendencia-grid">';
+    foreach ($marcas as $m) {
+        $slug   = $m['slug'] ?? '';
+        if ($slug === '') continue;
+        $nombre = mb_convert_case(mb_strtolower($m['nombre'] ?? $slug, 'UTF-8'), MB_CASE_TITLE, 'UTF-8');
+        $html .= '<a class="marca-tendencia-chip" href="/de-' . htmlspecialchars($slug, ENT_QUOTES, 'UTF-8')
+              . '" title="Códigos descuento ' . htmlspecialchars($nombre, ENT_QUOTES, 'UTF-8') . '">'
+              . 'Códigos descuento <strong>' . htmlspecialchars($nombre, ENT_QUOTES, 'UTF-8') . '</strong></a>';
+    }
+    $html .= '</div></div></section>';
+    $html .= '<style>
+    .marcas-tendencia-section{padding:32px 0;}
+    .marcas-tendencia-grid{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:18px;}
+    .marca-tendencia-chip{display:inline-flex;align-items:center;gap:4px;padding:9px 16px;border-radius:24px;
+        background:#fff;border:1px solid #eee;color:#444;text-decoration:none;font-size:.85rem;
+        box-shadow:0 1px 3px rgba(0,0,0,.05);transition:all .15s ease;}
+    .marca-tendencia-chip strong{color:#E30613;font-weight:700;}
+    .marca-tendencia-chip:hover{border-color:#E30613;transform:translateY(-1px);box-shadow:0 3px 8px rgba(227,6,19,.12);}
+    </style>';
+    return $html;
+}
+
 function generate_popular_brands_section($limit = 9) {
     $marcas_populares = get_popular_brands_for_home($limit);
     
@@ -2459,10 +2498,10 @@ function get_modern_additional_css() {
         --accent-glow: 0 0 15px rgba(227, 6, 19, 0.2);
     }
 
-    /* Base Body Refinement */
+    /* Base Body Refinement — light theme V4 */
     body {
-        background-color: var(--deep-dark) !important;
-        color: #e0e0e0 !important;
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
     }
 
     /* Glassmorphism Class */
@@ -2687,7 +2726,8 @@ function get_modern_additional_css() {
     .featured-section {
         margin: 3rem 0;
         padding: 2rem 0;
-        background: linear-gradient(135deg, var(--dark-gray) 0%, #1A1A1A 100%);
+        background: linear-gradient(135deg, #ffffff 0%, #f7f8fa 100%);
+        border: 1px solid #e8e8ea;
         border-radius: 20px;
     }
 
