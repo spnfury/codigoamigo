@@ -3129,7 +3129,11 @@ $app->get('/{categoria}-comparte-y-gana', function ($request, $response, $args) 
 
     // Generar contenido de la página de categoría
     echo generate_category_page_layout($categoria_url . '-comparte-y-gana', $nombre_categoria, $descripcion_categoria, $marcas_categoria);
-    
+
+    // Contenido SEO (intro rico + FAQs + schema FAQPage) — convierte la página
+    // de categoría de thin content a cuerpo real para competir por head terms.
+    echo render_categoria_seo($categoria_url);
+
     // CSS adicional
     echo get_modern_additional_css();
     

@@ -1665,6 +1665,54 @@ function render_marcas_oportunidad() {
     return $html;
 }
 
+/**
+ * Contenido SEO de página de categoría: intro rico + FAQs + schema FAQPage.
+ * Lee categorias.seo_html / seo_faqs (generado por cron/generar_categorias_seo.php).
+ * Convierte las páginas de categoría (thin content) en páginas con cuerpo real
+ * para competir por términos de cabecera. Devuelve '' si no hay contenido.
+ */
+function render_categoria_seo($nombre_clave) {
+    try {
+        $db = createConnection();
+        $cat = $db->categorias->findOne(
+            ['nombre_clave' => $nombre_clave, 'estado' => 1],
+            ['projection' => ['seo_html' => 1, 'seo_faqs' => 1]]
+        );
+    } catch (\Throwable $e) {
+        return '';
+    }
+    if (!$cat) return '';
+
+    $intro = trim($cat['seo_html'] ?? '');
+    $faqs  = isset($cat['seo_faqs']) ? (array) $cat['seo_faqs'] : [];
+    if ($intro === '' && empty($faqs)) return '';
+
+    $out = '<section class="cat-seo-section"><div class="container">';
+    if ($intro !== '') {
+        $out .= '<div class="cat-seo-intro">' . $intro . '</div>';
+    }
+    if (!empty($faqs)) {
+        $items = [];
+        $out .= '<div class="cat-seo-faq"><h2 class="h2-style">Preguntas frecuentes</h2>';
+        foreach ($faqs as $f) {
+            $q = trim($f['q'] ?? '');
+            $a = trim($f['a'] ?? '');
+            if ($q === '' || $a === '') continue;
+            $out .= '<details class="cat-faq-item"><summary>' . htmlspecialchars($q, ENT_QUOTES, 'UTF-8')
+                  . '</summary><div><p>' . htmlspecialchars($a, ENT_QUOTES, 'UTF-8') . '</p></div></details>';
+            $items[] = ['@type' => 'Question', 'name' => $q, 'acceptedAnswer' => ['@type' => 'Answer', 'text' => $a]];
+        }
+        $out .= '</div>';
+        if (!empty($items)) {
+            $schema = ['@context' => 'https://schema.org', '@type' => 'FAQPage', 'mainEntity' => $items];
+            $out .= '<script type="application/ld+json">' . json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>';
+        }
+    }
+    $out .= '</div></section>';
+    $out .= '<style>.cat-seo-section{padding:28px 0;}.cat-seo-intro{max-width:860px;margin:0 auto 22px;line-height:1.7;color:#444;}.cat-seo-intro p{margin:0 0 12px;}.cat-seo-faq{max-width:860px;margin:0 auto;}.cat-seo-faq h2{font-size:1.3rem;margin:0 0 14px;}.cat-faq-item{border:1px solid #eee;border-radius:10px;padding:12px 16px;margin-bottom:10px;background:#fff;}.cat-faq-item summary{font-weight:600;cursor:pointer;color:#222;}.cat-faq-item div{margin-top:8px;color:#555;}</style>';
+    return $out;
+}
+
 function generate_popular_brands_section($limit = 9) {
     $marcas_populares = get_popular_brands_for_home($limit);
     
