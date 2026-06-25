@@ -3022,8 +3022,8 @@ $app->get('/listado-categorias', function ($request, $response, $args) {
     // Incluir archivos necesarios
     include_once __DIR__ . '/inc/includes.php';
     
-    $title = "Nuestras categorías";
-    $description = "Lista de nuestras categorías - " . (isset($GLOBALS["author"]) ? $GLOBALS["author"] : "Código Amigo");
+    $title = "Categorías de códigos de descuento y cupones | CodigoAmigo";
+    $description = "Todas las categorías de códigos de descuento: alimentación, viajes, banca, telefonía, cursos y más. Encuentra cupones y códigos amigo verificados para ahorrar.";
     $title_social = $title;
     $description_social = $description;
     $imagen_social = "https://www.codigoamigo.com/img/logo_codigoamigo_real4.png";
@@ -3400,8 +3400,8 @@ $app->get('/listado-marcas', function ($request, $response, $args) {
     include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/_header_modern.php';
     $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
     
-    $title = "Listado de marcas";
-    $description = "Todas las marcas disponibles en " . (isset($GLOBALS["author"]) ? $GLOBALS["author"] : "Código Amigo");
+    $title = "Todas las marcas con códigos de descuento y referido | CodigoAmigo";
+    $description = "Explora todas las marcas con códigos de descuento, cupones y códigos amigo verificados por la comunidad. Encuentra tu marca y ahorra en tu próxima compra.";
     include __DIR__ . '/public/listado_marcas.php';
     
     return $response;
