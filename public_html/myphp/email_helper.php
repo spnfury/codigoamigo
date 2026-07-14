@@ -85,7 +85,15 @@ function enviarEmailSMTPBrevo($to_email, $to_name, $subject, $html_content, $tex
 
 // Función wrapper que registra en el log después del envío
 function enviarEmailConBrevoYRegistrar($to_email, $to_name, $subject, $html_content, $tipo, $usuario_id = null, $detalles = [], $text_content = '', $from_email = 'noreply@codigoamigo.com', $from_name = 'Código Amigo') {
-    
+
+    // Validar email antes de cualquier procesamiento — evita excepciones de Brevo SMTP
+    $to_email_trim = is_string($to_email) ? strtolower(trim($to_email)) : '';
+    if (!filter_var($to_email_trim, FILTER_VALIDATE_EMAIL)) {
+        error_log("enviarEmailConBrevoYRegistrar: email destinatario inválido — tipo=$tipo usuario=$usuario_id email='" . (string)$to_email . "'");
+        return ['success' => false, 'error' => 'Email destinatario inválido: ' . (string)$to_email];
+    }
+    $to_email = $to_email_trim;
+
     // Añadir footer de desuscripción a emails no transaccionales
     $tipos_transaccionales = ['activacion_usuario', 'recuperacion_password', 'contacto_form', 'codigo_publicado'];
     if (!in_array($tipo, $tipos_transaccionales)) {
@@ -166,34 +174,56 @@ function usuarioAceptaEmail($usuario_id, $tipo_email) {
         'destacado_expirado' => 'email_destacados',
         'destacado_auto_renovado' => 'email_destacados',
         'destacado_saldo_insuficiente' => 'email_destacados',
+        // Reenganche / win-back (marketing): debe ser opt-out-able
+        'reengagement_publicar' => 'email_reengagement',
+        'reengagement_vip_publicador' => 'email_reengagement',
+        'winback_vip_caducado' => 'email_reengagement',
+        'power_publisher_vip' => 'email_reengagement',
+        'cross_sell_destacar_vip' => 'email_reengagement',
+        'followup_ia_modal_vip' => 'email_reengagement',
     ];
-    
+
     $campo = $mapa_preferencias[$tipo_email] ?? null;
-    
-    // Si el tipo no está mapeado, enviar por defecto
-    if (!$campo) {
-        return true;
-    }
-    
-    // Buscar preferencia del usuario
+
+    // Buscar usuario (siempre, para comprobar estado de baja además de la preferencia)
     try {
         $collection_usuarios = getCollectionUsuarios();
+        $projection = ['estado' => 1, 'email_marketing' => 1];
+        if ($campo) {
+            $projection[$campo] = 1;
+        }
         $usuario = $collection_usuarios->findOne(
             ['_id' => new \MongoDB\BSON\ObjectId($usuario_id)],
-            ['projection' => [$campo => 1]]
+            ['projection' => $projection]
         );
-        
+
         if (!$usuario) {
             return true; // usuario no encontrado, enviar por defecto
         }
-        
+
+        // GUARD BAJA/ELIMINADO: nunca enviar marketing a cuentas con estado negativo
+        // (estado=-3 baja por usuario, otros estados negativos = suspendida/eliminada).
+        if (isset($usuario['estado']) && (int)$usuario['estado'] < 0) {
+            return false;
+        }
+
+        // Opt-out global de marketing (si el usuario lo ha desactivado, respetar).
+        if (isset($usuario['email_marketing']) && (int)$usuario['email_marketing'] === 0) {
+            return false;
+        }
+
+        // Si el tipo no está mapeado a un campo específico, enviar por defecto
+        if (!$campo) {
+            return true;
+        }
+
         // Si el campo no existe en el documento, default = 1 (activo)
         if (!isset($usuario[$campo])) {
             return true;
         }
-        
+
         return (int)$usuario[$campo] === 1;
-        
+
     } catch (\Exception $e) {
         error_log("Error comprobando preferencia email ($tipo_email) para usuario $usuario_id: " . $e->getMessage());
         return true; // En caso de error, enviar por defecto
@@ -204,7 +234,7 @@ function usuarioAceptaEmail($usuario_id, $tipo_email) {
  * Envía email usando Brevo SMTP como principal y SendGrid como fallback
  */
 function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text_content = '', $from_email = 'noreply@codigoamigo.com', $from_name = 'Código Amigo') {
-    
+
     // Validar parámetros
     if (empty($to_email) || empty($to_name) || empty($subject) || empty($html_content)) {
         error_log("Error enviarEmailConBrevo: Parámetros inválidos - to_email: $to_email, to_name: $to_name");
@@ -212,6 +242,16 @@ function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text
             'success' => false,
             'method' => '',
             'error' => 'Parámetros inválidos'
+        ];
+    }
+
+    // Validar formato email destinatario — evita excepciones SMTP
+    if (!filter_var(trim((string)$to_email), FILTER_VALIDATE_EMAIL)) {
+        error_log("Error enviarEmailConBrevo: email destinatario malformado: '" . (string)$to_email . "'");
+        return [
+            'success' => false,
+            'method' => '',
+            'error' => 'Email destinatario inválido: ' . (string)$to_email
         ];
     }
     

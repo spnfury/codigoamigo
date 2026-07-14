@@ -6,10 +6,12 @@ require_once __DIR__ . '/../vendor/stripe/stripe-php/init.php';
 $endpoint_secret = get_stripe_webhook_secret();
 
 // Función para logging detallado
+// Antes usaba error_log() en crudo: con este pool FPM (sin error_log ni
+// catch_workers_output configurados) el mensaje no llegaba a NINGÚN fichero
+// - los fallos de cobro de suscripciones eran indiagnosticables.
 function logWebhook($message, $data = null, $level = 'INFO') {
-    $timestamp = date('Y-m-d H:i:s');
-    $logMessage = "[WEBHOOK $level] [$timestamp] $message";
-    
+    $logMessage = "[WEBHOOK] $message";
+
     if ($data !== null) {
         if (is_object($data) || is_array($data)) {
             $logMessage .= " | Data: " . json_encode($data, JSON_UNESCAPED_UNICODE);
@@ -17,8 +19,14 @@ function logWebhook($message, $data = null, $level = 'INFO') {
             $logMessage .= " | Data: " . $data;
         }
     }
-    
-    error_log($logMessage);
+
+    if ($level === 'ERROR' && function_exists('log_error')) {
+        log_error($logMessage);
+    } elseif (function_exists('log_info')) {
+        log_info($logMessage);
+    } else {
+        error_log($logMessage);
+    }
 }
 
 // Obtener el payload y la firma
@@ -294,6 +302,87 @@ if ($event->type == 'checkout.session.completed') {
                 'error' => $e->getMessage()
             ], 'ERROR');
         }
+
+        // Cerrar la intención de checkout (evita email de recuperación de un pago ya completado)
+        try {
+            $db_intents = createConnection();
+            if ($db_intents && !empty($session->id)) {
+                $db_intents->selectCollection('destacar_checkout_intents')->updateOne(
+                    ['session_id' => $session->id],
+                    ['$set' => ['status' => 'completed', 'completed_at' => new MongoDB\BSON\UTCDateTime()]]
+                );
+            }
+        } catch (Throwable $e) {
+            if (function_exists('log_error')) { log_error("No se pudo cerrar intent destacar: " . $e->getMessage()); }
+        }
+
+        // Cross-sell VIP: si el comprador no es VIP, ofrecerle la suscripción
+        // (10€/mes de saldo cubre destacados como el que acaba de pagar aparte).
+        // Envuelto en try/catch propio para no afectar el pago ya confirmado.
+        try {
+            $usuario_id_str = $metadata['usuario_id'];
+            if (!es_usuario_vip($usuario_id_str)) {
+                $usuario_comprador = $collection_usuarios->findOne(['_id' => new MongoDB\BSON\ObjectId($usuario_id_str)]);
+                $cooldown_ok = true;
+                if ($usuario_comprador && isset($usuario_comprador['email_post_compra_destacado_fecha'])) {
+                    $last = $usuario_comprador['email_post_compra_destacado_fecha'];
+                    if ($last instanceof MongoDB\BSON\UTCDateTime && $last->toDateTime()->getTimestamp() > strtotime('-30 days')) {
+                        $cooldown_ok = false;
+                    }
+                }
+
+                if ($usuario_comprador && $cooldown_ok
+                    && !empty($usuario_comprador['mail'])
+                    && filter_var($usuario_comprador['mail'], FILTER_VALIDATE_EMAIL)
+                    && (!function_exists('usuarioAceptaEmail') || usuarioAceptaEmail($usuario_id_str, 'cross_sell_destacar_vip'))
+                ) {
+                    if (!function_exists('enviarEmailConBrevoYRegistrar')) {
+                        include_once __DIR__ . '/../myphp/funciones_destacados_email.php';
+                    }
+
+                    $username_comprador = trim($usuario_comprador['username'] ?? 'Usuario');
+                    $cantidad_pagada = number_format($cantidad, 2, ',', '.');
+
+                    $contenido = '
+                        <p style="margin-top:0;">Hola <strong>' . htmlspecialchars($username_comprador) . '</strong>,</p>
+                        <p>Acabas de pagar <strong>' . $cantidad_pagada . '€</strong> por destacar tu código. Con VIP, ese gasto te habría salido gratis.</p>
+
+                        <div style="background-color:#f4f7fa;border-radius:10px;padding:20px;margin:25px 0;">
+                            <p style="margin:0 0 12px 0;color:#222;font-weight:700;font-size:16px;">Con VIP (9,99€/mes) consigues:</p>
+                            <p style="margin:0 0 8px 0;color:#444;font-size:14px;">&#10003; <strong>10€ de saldo gratis cada mes</strong> para destacar tus códigos, sin pagar de tu bolsillo</p>
+                            <p style="margin:0 0 8px 0;color:#444;font-size:14px;">&#10003; <strong>Badge verificado</strong> — más confianza, más clics</p>
+                            <p style="margin:0 0 8px 0;color:#444;font-size:14px;">&#10003; <strong>Chat ilimitado</strong> y <strong>auto-renovación</strong> de tus destacados</p>
+                        </div>
+
+                        <div style="background-color:#fdf3f4;border:1px solid #f8d7da;border-radius:8px;padding:14px 16px;">
+                            <p style="margin:0;color:#c7254e;font-weight:600;font-size:14px;">Primer mes a mitad de precio: 4,99€.</p>
+                        </div>';
+
+                    $html = _templateBaseDestacadoEmail('Esto te habría salido gratis con VIP', $contenido, 'Hazte VIP ahora', 'https://www.codigoamigo.com/public/suscripcion_vip.php');
+                    $text = "Hola $username_comprador,\n\nAcabas de pagar $cantidad_pagada€ por destacar tu código. Con VIP (9,99€/mes, primer mes 4,99€) consigues 10€ de saldo gratis cada mes, badge verificado, chat ilimitado y auto-renovación de destacados.\n\nHazte VIP: https://www.codigoamigo.com/public/suscripcion_vip.php";
+
+                    $resultado_email = enviarEmailConBrevoYRegistrar(
+                        $usuario_comprador['mail'], $username_comprador,
+                        "$username_comprador, esto te habría salido gratis con VIP",
+                        $html, 'cross_sell_destacar_vip', $usuario_id_str,
+                        ['cantidad_pagada' => $cantidad, 'codigo_id' => $metadata['codigo_id']],
+                        $text
+                    );
+
+                    if (!empty($resultado_email['success'])) {
+                        $collection_usuarios->updateOne(
+                            ['_id' => new MongoDB\BSON\ObjectId($usuario_id_str)],
+                            ['$set' => ['email_post_compra_destacado_fecha' => new MongoDB\BSON\UTCDateTime()]]
+                        );
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            logWebhook("ERROR: No se pudo enviar cross-sell VIP post-compra destacado", [
+                'session_id' => $session->id ?? 'UNKNOWN',
+                'error' => $e->getMessage()
+            ], 'ERROR');
+        }
     }
     // También manejar recargas de saldo
     elseif ($tipo_metadata === 'recarga_saldo') {
@@ -386,6 +475,19 @@ if ($event->type == 'checkout.session.completed') {
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ], 'ERROR');
+        }
+
+        // Cerrar la intención de checkout (evita email de recuperación de un pago ya completado)
+        try {
+            $db_intents = createConnection();
+            if ($db_intents && !empty($session->id)) {
+                $db_intents->selectCollection('destacar_checkout_intents')->updateOne(
+                    ['session_id' => $session->id],
+                    ['$set' => ['status' => 'completed', 'completed_at' => new MongoDB\BSON\UTCDateTime()]]
+                );
+            }
+        } catch (Throwable $e) {
+            if (function_exists('log_error')) { log_error("No se pudo cerrar intent recarga: " . $e->getMessage()); }
         }
     }
     // Manejar suscripción premium
@@ -504,8 +606,8 @@ elseif ($event->type === 'customer.subscription.deleted' || $event->type === 'cu
     
     // Verificar si es una suscripción premium
     if ($tipo_suscripcion === 'suscripcion_premium') {
-        // Si la suscripción fue cancelada o eliminada
-        if ($event->type === 'deleted' || $subscription->status === 'canceled' || $subscription->cancel_at_period_end === true) {
+        // Si la suscripción fue cancelada, eliminada, 'unpaid' (dunning agotado) o programada
+        if ($event->type === 'deleted' || $subscription->status === 'canceled' || $subscription->status === 'unpaid' || $subscription->cancel_at_period_end === true) {
             if ($usuario_id) {
                 if (!function_exists('desactivarSuscripcionPremium')) {
                     include_once __DIR__ . '/../myphp/funciones_premium.php';
@@ -550,8 +652,10 @@ elseif ($event->type === 'customer.subscription.deleted' || $event->type === 'cu
             include_once __DIR__ . '/../myphp/funciones_usuario.php';
         }
         
-        // Si la suscripción fue cancelada o eliminada
-        if ($event->type === 'deleted' || $subscription->status === 'canceled') {
+        // Si la suscripción fue cancelada, eliminada o marcada 'unpaid' (dunning agotado).
+        // 'unpaid' importa: si Stripe deja de reintentar y NO cancela, sin esto el
+        // usuario mantendría VIP gratis hasta vip_expires_at.
+        if ($event->type === 'deleted' || $subscription->status === 'canceled' || $subscription->status === 'unpaid') {
             if ($usuario_id) {
                 $resultado = desactivar_vip($usuario_id);
                 logWebhook($resultado ? "Suscripción VIP desactivada exitosamente" : "ERROR: No se pudo desactivar suscripción VIP", [

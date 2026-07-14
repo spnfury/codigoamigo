@@ -1409,6 +1409,7 @@
             
             // Si NO es VIP, mostrar modal de ventajas VIP directamente
             if (!window.isVipUser) {
+                $.post('/ajax/track_evento_vip.php', { tipo: 'modal_ia_bloqueada' });
                 $('#modal-vip-upgrade').modal('show');
                 return;
             }
