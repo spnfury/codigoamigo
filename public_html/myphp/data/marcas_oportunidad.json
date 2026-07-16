@@ -1,0 +1,486 @@
+{
+    "generado": "2026-07-16T16:42:38+02:00",
+    "franja": "pos 8-25",
+    "marcas": [
+        {
+            "slug": "honestgreenrestaurant",
+            "nombre": "HONEST GREEN RESTAURANT",
+            "impr": 743,
+            "pos": 11
+        },
+        {
+            "slug": "cheerz",
+            "nombre": "CHEERZ",
+            "impr": 563,
+            "pos": 24.8
+        },
+        {
+            "slug": "yego",
+            "nombre": "YEGO",
+            "impr": 461,
+            "pos": 15.9
+        },
+        {
+            "slug": "pagostore",
+            "nombre": "PAGOSTORE",
+            "impr": 363,
+            "pos": 10.2
+        },
+        {
+            "slug": "etoro",
+            "nombre": "ETORO",
+            "impr": 238,
+            "pos": 22.6
+        },
+        {
+            "slug": "plenitude",
+            "nombre": "PLENITUDE",
+            "impr": 222,
+            "pos": 10.6
+        },
+        {
+            "slug": "goiko",
+            "nombre": "GOIKO",
+            "impr": 213,
+            "pos": 22.7
+        },
+        {
+            "slug": "ionos",
+            "nombre": "IONOS",
+            "impr": 210,
+            "pos": 14.5
+        },
+        {
+            "slug": "cleverea",
+            "nombre": "CLEVEREA",
+            "impr": 207,
+            "pos": 9.8
+        },
+        {
+            "slug": "bunqbanco",
+            "nombre": "BUNQ BANCO",
+            "impr": 192,
+            "pos": 10.9
+        },
+        {
+            "slug": "elevenfit",
+            "nombre": "ELEVENFIT",
+            "impr": 184,
+            "pos": 9.1
+        },
+        {
+            "slug": "weward",
+            "nombre": "WEWARD",
+            "impr": 182,
+            "pos": 12.3
+        },
+        {
+            "slug": "360imprimir",
+            "nombre": "360 IMPRIMIR",
+            "impr": 136,
+            "pos": 19
+        },
+        {
+            "slug": "meru",
+            "nombre": "MERU",
+            "impr": 125,
+            "pos": 10
+        },
+        {
+            "slug": "amovens",
+            "nombre": "AMOVENS",
+            "impr": 116,
+            "pos": 12.3
+        },
+        {
+            "slug": "webel",
+            "nombre": "WEBEL",
+            "impr": 82,
+            "pos": 19.6
+        },
+        {
+            "slug": "vividmoney",
+            "nombre": "VIVID MONEY",
+            "impr": 75,
+            "pos": 20.4
+        },
+        {
+            "slug": "promosapp",
+            "nombre": "PROMOS APP",
+            "impr": 74,
+            "pos": 10.5
+        },
+        {
+            "slug": "digi",
+            "nombre": "DIGI",
+            "impr": 69,
+            "pos": 23
+        },
+        {
+            "slug": "ilernaonline",
+            "nombre": "ILERNA ONLINE",
+            "impr": 68,
+            "pos": 21.9
+        },
+        {
+            "slug": "momoven",
+            "nombre": "MOMOVEN",
+            "impr": 66,
+            "pos": 11.7
+        },
+        {
+            "slug": "sotysolar",
+            "nombre": "SOTYSOLAR",
+            "impr": 65,
+            "pos": 10.1
+        },
+        {
+            "slug": "fintonic",
+            "nombre": "Fintonic",
+            "impr": 62,
+            "pos": 11.9
+        },
+        {
+            "slug": "wesmartpark",
+            "nombre": "WESMARTPARK",
+            "impr": 60,
+            "pos": 15.5
+        },
+        {
+            "slug": "xceed",
+            "nombre": "XCEED",
+            "impr": 58,
+            "pos": 12.6
+        },
+        {
+            "slug": "bird",
+            "nombre": "BIRD",
+            "impr": 58,
+            "pos": 10.8
+        },
+        {
+            "slug": "dribo",
+            "nombre": "DRIBO",
+            "impr": 53,
+            "pos": 14.6
+        },
+        {
+            "slug": "bigsupps",
+            "nombre": "BIG SUPPS",
+            "impr": 53,
+            "pos": 18.5
+        },
+        {
+            "slug": "wonduu",
+            "nombre": "WONDUU",
+            "impr": 52,
+            "pos": 8.1
+        },
+        {
+            "slug": "voi",
+            "nombre": "VOI",
+            "impr": 52,
+            "pos": 8.3
+        },
+        {
+            "slug": "heygen",
+            "nombre": "HEYGEN",
+            "impr": 52,
+            "pos": 9.6
+        },
+        {
+            "slug": "starcitizen",
+            "nombre": "STAR CITIZEN",
+            "impr": 50,
+            "pos": 19.3
+        },
+        {
+            "slug": "bucmi",
+            "nombre": "Bucmi",
+            "impr": 48,
+            "pos": 8.9
+        },
+        {
+            "slug": "smartick",
+            "nombre": "SMARTICK",
+            "impr": 47,
+            "pos": 10.3
+        },
+        {
+            "slug": "freecash",
+            "nombre": "FREE CASH ",
+            "impr": 43,
+            "pos": 15.4
+        },
+        {
+            "slug": "google",
+            "nombre": "GOOGLE ",
+            "impr": 39,
+            "pos": 23.9
+        },
+        {
+            "slug": "letyshops",
+            "nombre": "LETYSHOPS",
+            "impr": 38,
+            "pos": 15.6
+        },
+        {
+            "slug": "monese",
+            "nombre": "MONESE",
+            "impr": 36,
+            "pos": 14.5
+        },
+        {
+            "slug": "divain",
+            "nombre": "DIVAIN",
+            "impr": 36,
+            "pos": 19.3
+        },
+        {
+            "slug": "beruby",
+            "nombre": "Beruby",
+            "impr": 35,
+            "pos": 10.7
+        },
+        {
+            "slug": "plum",
+            "nombre": "PLUM",
+            "impr": 35,
+            "pos": 11.2
+        },
+        {
+            "slug": "attapoll",
+            "nombre": "ATTAPOLL",
+            "impr": 33,
+            "pos": 13.6
+        },
+        {
+            "slug": "primeopinion",
+            "nombre": "PRIME OPINION",
+            "impr": 33,
+            "pos": 14.2
+        },
+        {
+            "slug": "voltio",
+            "nombre": "VOLTIO",
+            "impr": 32,
+            "pos": 14.8
+        },
+        {
+            "slug": "housers",
+            "nombre": "Housers",
+            "impr": 31,
+            "pos": 24
+        },
+        {
+            "slug": "urbansportsclub",
+            "nombre": "URBAN SPORTS CLUB",
+            "impr": 31,
+            "pos": 13
+        },
+        {
+            "slug": "verse",
+            "nombre": "Verse",
+            "impr": 28,
+            "pos": 18.4
+        },
+        {
+            "slug": "gelt",
+            "nombre": "GELT",
+            "impr": 27,
+            "pos": 22.3
+        },
+        {
+            "slug": "maclear",
+            "nombre": "MACLEAR",
+            "impr": 27,
+            "pos": 8.7
+        },
+        {
+            "slug": "tarjetaplazo",
+            "nombre": "TARJETA PLAZO",
+            "impr": 27,
+            "pos": 20.6
+        },
+        {
+            "slug": "togetherprice",
+            "nombre": "TOGETHER PRICE",
+            "impr": 27,
+            "pos": 8.1
+        },
+        {
+            "slug": "chippio",
+            "nombre": "CHIPPIO",
+            "impr": 25,
+            "pos": 13.7
+        },
+        {
+            "slug": "elhadepilacionlaser",
+            "nombre": "ELHA DEPILACIÓN LÁSER",
+            "impr": 25,
+            "pos": 21.9
+        },
+        {
+            "slug": "getaround",
+            "nombre": "GETAROUND",
+            "impr": 25,
+            "pos": 11.5
+        },
+        {
+            "slug": "coinmaster",
+            "nombre": "COIN MASTER",
+            "impr": 22,
+            "pos": 12.5
+        },
+        {
+            "slug": "makecom",
+            "nombre": "MAKE.COM",
+            "impr": 22,
+            "pos": 18.3
+        },
+        {
+            "slug": "smartmeapp",
+            "nombre": "SMARTME APP",
+            "impr": 22,
+            "pos": 13.9
+        },
+        {
+            "slug": "tuio",
+            "nombre": "TUIO",
+            "impr": 21,
+            "pos": 12.1
+        },
+        {
+            "slug": "marmota",
+            "nombre": "MARMOTA",
+            "impr": 20,
+            "pos": 24.8
+        },
+        {
+            "slug": "universae",
+            "nombre": "UNIVERSAE",
+            "impr": 20,
+            "pos": 9.7
+        },
+        {
+            "slug": "scribd",
+            "nombre": "SCRIBD",
+            "impr": 19,
+            "pos": 14.4
+        },
+        {
+            "slug": "blackcatcard",
+            "nombre": "BLACKCATCARD",
+            "impr": 18,
+            "pos": 18.2
+        },
+        {
+            "slug": "helloprima",
+            "nombre": "helloprima ",
+            "impr": 18,
+            "pos": 16.8
+        },
+        {
+            "slug": "brighty",
+            "nombre": "BRIGHTY",
+            "impr": 17,
+            "pos": 19.4
+        },
+        {
+            "slug": "xtb",
+            "nombre": "XTB",
+            "impr": 17,
+            "pos": 15.8
+        },
+        {
+            "slug": "boacompra",
+            "nombre": "BOACOMPRA",
+            "impr": 16,
+            "pos": 21.2
+        },
+        {
+            "slug": "freecashcom",
+            "nombre": "FREECASH.COM",
+            "impr": 16,
+            "pos": 17.7
+        },
+        {
+            "slug": "apapel",
+            "nombre": "Apapel",
+            "impr": 16,
+            "pos": 22.5
+        },
+        {
+            "slug": "macadam",
+            "nombre": "MACADAM",
+            "impr": 15,
+            "pos": 9.2
+        },
+        {
+            "slug": "innotestes",
+            "nombre": "INNOTEST.ES",
+            "impr": 15,
+            "pos": 12.8
+        },
+        {
+            "slug": "spliiitcom",
+            "nombre": "SPLIIIT.COM",
+            "impr": 15,
+            "pos": 13.9
+        },
+        {
+            "slug": "luckyday",
+            "nombre": "LUCKY DAY",
+            "impr": 14,
+            "pos": 13.1
+        },
+        {
+            "slug": "tappwater",
+            "nombre": "TAPPWATER",
+            "impr": 14,
+            "pos": 13.6
+        },
+        {
+            "slug": "inbestme",
+            "nombre": "In Best Me",
+            "impr": 13,
+            "pos": 22.2
+        },
+        {
+            "slug": "givvy",
+            "nombre": "GIVVY",
+            "impr": 12,
+            "pos": 14.8
+        },
+        {
+            "slug": "bingx",
+            "nombre": "BINGX",
+            "impr": 11,
+            "pos": 20.3
+        },
+        {
+            "slug": "jumptask",
+            "nombre": "JUMPTASK",
+            "impr": 11,
+            "pos": 17.4
+        },
+        {
+            "slug": "wise",
+            "nombre": "WISE",
+            "impr": 10,
+            "pos": 24
+        },
+        {
+            "slug": "kwai",
+            "nombre": "KWAI",
+            "impr": 9,
+            "pos": 20.7
+        },
+        {
+            "slug": "airhopping",
+            "nombre": "AIRHOPPING",
+            "impr": 9,
+            "pos": 12.2
+        }
+    ]
+}

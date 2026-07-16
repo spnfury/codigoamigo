@@ -20,7 +20,7 @@ require_once __DIR__ . '/../myphp/funciones_marca.php';
 $opts    = getopt('', ['min-pos:', 'max-pos:', 'limit:']);
 $min_pos = isset($opts['min-pos']) ? (float)$opts['min-pos'] : 8;
 $max_pos = isset($opts['max-pos']) ? (float)$opts['max-pos'] : 25;
-$limit   = isset($opts['limit'])   ? max(1, (int)$opts['limit']) : 40;
+$limit   = isset($opts['limit'])   ? max(1, (int)$opts['limit']) : 80;
 
 $db = createConnection();
 
