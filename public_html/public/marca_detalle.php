@@ -248,24 +248,29 @@ if (function_exists('obtenerFlashPromosPorMarca')) {
     ];
     echo '<script type="application/ld+json">' . json_encode($offer_schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . '</script>';
 
-    // Schema BreadcrumbList (Nueva implementación)
+    // Schema BreadcrumbList — Inicio → Categoría → Marca (silo de categoría para
+    // enlace interno). Calculamos aquí una sola vez la categoría (clave/label/url)
+    // y la reutilizamos en el breadcrumb VISIBLE de abajo para que coincidan
+    // (requisito de Google: structured data debe reflejar migas visibles).
+    $bc_cat_clave = $marca_info['categoria_clave'] ?? '';
+    $bc_cat_label = $bc_cat_clave ? ucfirst(str_replace('-', ' ', $bc_cat_clave)) : '';
+    $bc_cat_url   = $bc_cat_clave
+        ? (function_exists('link_categoria') ? link_categoria($bc_cat_clave) : 'https://www.codigoamigo.com/' . $bc_cat_clave . '-comparte-y-gana')
+        : '';
+
+    $bc_items = [
+        ['@type' => 'ListItem', 'position' => 1, 'name' => 'Inicio', 'item' => 'https://www.codigoamigo.com'],
+    ];
+    $bc_pos = 2;
+    if ($bc_cat_clave) {
+        $bc_items[] = ['@type' => 'ListItem', 'position' => $bc_pos++, 'name' => $bc_cat_label, 'item' => $bc_cat_url];
+    }
+    $bc_items[] = ['@type' => 'ListItem', 'position' => $bc_pos, 'name' => $nombre_marca, 'item' => 'https://www.codigoamigo.com/de-' . (isset($marca) ? $marca : '')];
+
     $schema_breadcrumb = [
         '@context' => 'https://schema.org',
         '@type' => 'BreadcrumbList',
-        'itemListElement' => [
-            [
-                '@type' => 'ListItem',
-                'position' => 1,
-                'name' => 'Inicio',
-                'item' => 'https://www.codigoamigo.com'
-            ],
-            [
-                '@type' => 'ListItem',
-                'position' => 2,
-                'name' => $nombre_marca,
-                'item' => 'https://www.codigoamigo.com/de-' . (isset($marca) ? $marca : '')
-            ]
-        ]
+        'itemListElement' => $bc_items,
     ];
     echo '<script type="application/ld+json">' . json_encode($schema_breadcrumb, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . '</script>';
 
@@ -440,11 +445,12 @@ $cat_clave = $marca_info['categoria_clave'] ?? '';
 if (!empty($cat_clave) && function_exists('getMarcas')) {
     $similares_raw = @getMarcas(8, $cat_clave, [$marca]);
     foreach ($similares_raw as $ms) {
-        if (empty($ms['imagen'])) continue;
+        // Antes se saltaban las marcas sin logo (perdían enlace interno horizontal).
+        // Ahora se incluyen; el render usa placeholder de iniciales si falta imagen.
         $marcas_similares[] = [
             'nombre' => $ms['nombre'],
             'slug'   => $ms['nombre_clave'],
-            'imagen' => $ms['imagen'],
+            'imagen' => $ms['imagen'] ?? '',
             'num'    => $ms['numero_codigos'] ?? 0,
         ];
     }
@@ -545,6 +551,15 @@ if (!empty($faq_schema_items)) {
 
   <!-- MAIN -->
   <main class="cav2-main">
+
+    <!-- BREADCRUMB visible (alineado con el schema BreadcrumbList de arriba) -->
+    <nav class="cav2-breadcrumb" aria-label="Ruta de navegación" style="font-size:.85rem;color:#6b7280;margin-bottom:14px;">
+      <a href="/" style="color:inherit;text-decoration:none;">Inicio</a>
+      <?php if (!empty($bc_cat_clave)): ?>
+        <span aria-hidden="true"> › </span><a href="<?php echo htmlspecialchars($bc_cat_url); ?>" style="color:inherit;text-decoration:none;"><?php echo htmlspecialchars($bc_cat_label); ?></a>
+      <?php endif; ?>
+      <span aria-hidden="true"> › </span><span style="color:#111;"><?php echo htmlspecialchars($nombre_marca); ?></span>
+    </nav>
 
     <!-- POSICIONAMIENTO / ESTADÍSTICAS DEL CÓDIGO DEL USUARIO -->
     <?php
@@ -888,6 +903,23 @@ if (!empty($faq_schema_items)) {
         <?php else: ?>
           <p><?php echo htmlspecialchars($nombre_marca); ?> es una de las marcas líderes en su sector. Aprovecha los códigos promocionales compartidos por nuestra comunidad para conseguir descuentos exclusivos en tu próxima compra.</p>
         <?php endif; ?>
+        <?php
+        // Enlace interno contextual (in-body) a marcas de misma categoría: reparte
+        // autoridad horizontal entre fichas y construye silo de categoría. Pesa más
+        // que el grid de logos al pie porque va dentro del cuerpo de texto.
+        if (!empty($marcas_similares)):
+            $incat = array_slice($marcas_similares, 0, 3);
+            $enlaces_incat = [];
+            foreach ($incat as $ic) {
+                $enlaces_incat[] = '<a href="/de-' . htmlspecialchars($ic['slug']) . '">códigos de ' . htmlspecialchars($ic['nombre']) . '</a>';
+            }
+            $n_incat = count($enlaces_incat);
+            $lista_incat = $n_incat === 1
+                ? $enlaces_incat[0]
+                : implode(', ', array_slice($enlaces_incat, 0, $n_incat - 1)) . ' y ' . $enlaces_incat[$n_incat - 1];
+        ?>
+        <p style="margin-top:14px;">¿Buscas más formas de ahorrar<?php echo ($bc_cat_label ? ' en ' . htmlspecialchars($bc_cat_label) : ''); ?>? Descubre también <?php echo $lista_incat; ?>.</p>
+        <?php endif; ?>
       </div>
     </section>
 
@@ -912,7 +944,11 @@ if (!empty($faq_schema_items)) {
         <?php foreach ($marcas_similares as $ms): ?>
         <a href="/de-<?php echo htmlspecialchars($ms['slug']); ?>" class="cav2-similar-card">
           <div class="cav2-similar-logo">
+            <?php if (!empty($ms['imagen'])): ?>
             <img src="<?php echo htmlspecialchars($ms['imagen']); ?>" alt="<?php echo htmlspecialchars($ms['nombre']); ?>" loading="lazy">
+            <?php else: ?>
+            <span style="font-size:1.4rem;font-weight:800;color:var(--c-brand);"><?php echo strtoupper(substr($ms['nombre'], 0, 2)); ?></span>
+            <?php endif; ?>
           </div>
           <div class="cav2-similar-name"><?php echo htmlspecialchars($ms['nombre']); ?></div>
           <div class="cav2-similar-meta"><?php echo (int)$ms['num']; ?> código<?php echo $ms['num'] == 1 ? '' : 's'; ?></div>
