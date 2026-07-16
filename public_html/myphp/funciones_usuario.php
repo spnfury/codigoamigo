@@ -298,6 +298,30 @@
     
         if(empty($usuario_array["username"])) {
 
+            // El match mail+pass falló. Averiguamos POR QUÉ para dar un error útil
+            // (estos casos generaban tickets de soporte con el genérico "no aparece
+            // en la base de datos"). Solo se ejecuta en la rama de fallo.
+            try {
+                $por_mail = $collection_usuarios->findOne(['mail' => $mail]);
+                if ($por_mail) {
+                    // La cuenta existe pero la contraseña no casó.
+                    if (isset($por_mail['login_method']) && $por_mail['login_method'] === 'google') {
+                        echo json_encode(['success' => false, 'error' => 'Esta cuenta se creó con Google. Entra pulsando el botón "Continuar con Google" en lugar de email y contraseña.']);
+                        return;
+                    }
+                    echo json_encode(['success' => false, 'error' => 'La contraseña no es correcta. Si la has olvidado, usa "¿Has olvidado tu contraseña?" para restablecerla.']);
+                    return;
+                }
+                // No hay cuenta con ese email: ¿tecleó su nombre de usuario en vez del email?
+                $por_username = $collection_usuarios->findOne(['username' => $mail]);
+                if ($por_username) {
+                    echo json_encode(['success' => false, 'error' => 'Para entrar debes usar tu correo electrónico (no el nombre de usuario) junto con tu contraseña.']);
+                    return;
+                }
+            } catch (Throwable $e) {
+                debug_log("login_user (diagnóstico de fallo): " . $e->getMessage());
+            }
+
             echo json_encode(['success' => false, 'error' => 'no_trobat']);
 
         }else {
