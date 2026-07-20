@@ -1559,6 +1559,31 @@ function generate_publisher_latent_cta() {
     return $html;
 }
 
+/**
+ * Banner de invitar amigos en el home. Solo usuarios logueados (el programa de
+ * referidos exige cuenta): el sistema existe desde hace tiempo pero nadie lo
+ * descubre porque solo vivía enterrado en un dropdown de perfil. Reusa las
+ * clases .publisher-cta-band ya estilizadas para no duplicar CSS.
+ */
+function generate_referral_home_banner() {
+    if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
+        return '';
+    }
+
+    $html  = '<div class="publisher-cta-band">';
+    $html .= '<div class="publisher-cta-content">';
+    $html .= '<div class="publisher-cta-eyebrow"><i class="fas fa-gift"></i> Invita y gana</div>';
+    $html .= '<h3 class="publisher-cta-title">Invita a un amigo y gana 5€</h3>';
+    $html .= '<p class="publisher-cta-desc">Tu amigo recibe 5€ al registrarse. Tú ganas otros 5€ cuando publique su primer código.</p>';
+    $html .= '</div>';
+    $html .= '<a href="/invitar-amigos" class="publisher-cta-btn">';
+    $html .= 'Invitar amigos <i class="fas fa-arrow-right"></i>';
+    $html .= '</a>';
+    $html .= '</div>';
+
+    return $html;
+}
+
 // Función para generar la sección de marcas populares en la home
 /**
  * Sección de guías destacadas para la home.

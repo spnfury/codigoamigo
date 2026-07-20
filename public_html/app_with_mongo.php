@@ -466,6 +466,11 @@ $app->get('/', function ($request, $response) {
         // Bloque de enlace interno hacia marcas cercanas a página 1 (SEO)
         echo render_marcas_oportunidad();
 
+        // Banner de invitar amigos (solo logueados)
+        if (function_exists('generate_referral_home_banner')) {
+            echo generate_referral_home_banner();
+        }
+
         // Mostrar categorías populares (solo en la primera página)
         echo generate_popular_categories_section();
 
@@ -1731,11 +1736,21 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
 
             // Incluir el header moderno
 
+            // Mes/año actual para frescura en título (mismo patrón que
+            // generate_titulo_marca_mejorado en funciones_titulo_marca.php)
+            $meses_es_detalle = [
+                1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril',
+                5 => 'Mayo', 6 => 'Junio', 7 => 'Julio', 8 => 'Agosto',
+                9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre'
+            ];
+            $fecha_detalle_actual = new DateTime();
+            $string_fecha_detalle = $meses_es_detalle[(int)$fecha_detalle_actual->format('n')] . ' ' . $fecha_detalle_actual->format('Y');
+
             // Llamar a la función del header moderno
             get_header_modern(
-                "Código amigo " . ucfirst($marca) . " (verificado) - CodigoAmigo.com",
-                "Usa este código amigo de " . ucfirst($marca) . " verificado por la comunidad. Ahorra hasta " . ($codigo_arr['num_beneficio'] ?? '') . "€ en tu Registro.",
-                "Código amigo " . ucfirst($marca) . " Verificado",
+                "Código amigo " . ucfirst($marca) . " (verificado) " . $string_fecha_detalle . " - CodigoAmigo.com",
+                "Usa este código amigo de " . ucfirst($marca) . " verificado por la comunidad. Ahorra hasta " . ($codigo_arr['num_beneficio'] ?? '') . "€ en tu Registro. Válido " . $string_fecha_detalle . ".",
+                "Código amigo " . ucfirst($marca) . " Verificado " . $string_fecha_detalle,
                 "Código amigo " . ucfirst($marca) . " (verificado) - ¡Ahorra ahora!",
                 "https://www.codigoamigo.com/img/logo_codigoamigo_real4.png"
             );

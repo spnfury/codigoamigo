@@ -181,6 +181,7 @@ function usuarioAceptaEmail($usuario_id, $tipo_email) {
         'power_publisher_vip' => 'email_reengagement',
         'cross_sell_destacar_vip' => 'email_reengagement',
         'followup_ia_modal_vip' => 'email_reengagement',
+        'promo_referidos_publicador' => 'email_reengagement',
     ];
 
     $campo = $mapa_preferencias[$tipo_email] ?? null;
