@@ -3,13 +3,38 @@
 $anula_adsense = true; // Esta variable será leída por el header para no mostrar Adsense
 
 // Obtener la información del código
-$codigo_id = new \MongoDB\BSON\ObjectId($_REQUEST["codigo"]);
-$codigo = getCodeByID($codigo_id); // Esta función ya existe en el sistema
+// El parámetro puede venir inválido (código borrado, enlace viejo, bot con
+// query fuzzing) — construir el ObjectId con un string no-hex fatal antes de
+// llegar al guard de abajo. Igual que el guard ya anticipaba, tratar como
+// "código no existe" en vez de reventar la página.
+try {
+    $codigo_id = new \MongoDB\BSON\ObjectId($_REQUEST["codigo"] ?? '');
+    $codigo = getCodeByID($codigo_id); // Esta función ya existe en el sistema
+} catch (\Throwable $e) {
+    $codigo_id = null;
+    $codigo = null;
+}
 
-$marca = getObjectMarca('nombre_clave', $codigo["marca"]);
-$marca_nombre = htmlspecialchars($codigo['marca']); // Obtenemos la marca directamente del código
+// Guard: el código puede no existir. Evita "array offset on null" + htmlspecialchars(null).
+$marca_clave  = is_array($codigo) ? ($codigo["marca"] ?? '') : '';
+$marca = $marca_clave ? getObjectMarca('nombre_clave', $marca_clave) : null;
+$marca_nombre = htmlspecialchars($marca_clave, ENT_QUOTES, 'UTF-8'); // marca directa del código
 
 $GLOBALS['header_modern_used'] = true; // Forzar el uso del footer moderno
+
+// Fallback seguro para el checkout inline de Stripe si el router no definió estos
+// globals: evita successUrl/cancelUrl vacías (redirect post-pago roto) y los
+// warnings "Undefined global variable". Dominio canónico como en crear_sesion_destacar.php.
+if (empty($GLOBALS["website"]))    { $GLOBALS["website"]    = "https://www.codigoamigo.com/"; }
+if (empty($GLOBALS["actual_url"])) { $GLOBALS["actual_url"] = 'https://' . ($_SERVER['HTTP_HOST'] ?? 'www.codigoamigo.com') . ($_SERVER['REQUEST_URI'] ?? '/'); }
+
+// Definir metadatos antes del header para evitar variables indefinidas
+$title              = $title              ?? ($marca_nombre ? "Destacar código de {$marca_nombre}" : "Destacar código");
+$description        = $description        ?? "Destaca tu código en CódigoAmigo y llega a más gente.";
+$title_social       = $title_social       ?? $title;
+$description_social = $description_social ?? $description;
+$imagen_social      = $imagen_social      ?? '';
+
 get_header_new($title, $description, $title_social, $description_social, $imagen_social);
 
 
@@ -32,7 +57,7 @@ if ($is_sandbox_admin) {
 /* Primero de todo, comprobamos si tenemos que realizar algún cargo */
 
 
-if(count($_SESSION["compra_lead_sin_validar"]) > 0) {
+if(isset($_SESSION["compra_lead_sin_validar"]) && is_array($_SESSION["compra_lead_sin_validar"]) && count($_SESSION["compra_lead_sin_validar"]) > 0) {
 
 
 
