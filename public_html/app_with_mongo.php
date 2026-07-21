@@ -4129,7 +4129,7 @@ $app->post('/procesar_destacado_saldo', function ($request, $response, $args) {
         
         // Actualizar el código para destacarlo con duración fija
         $duracion_dias = ($tipo === 'super' || $tipo === 'super_landing') ? DESTACADO_DURACION_SUPER : DESTACADO_DURACION_NORMAL;
-        $auto_renovar = isset($params['auto_renovar']) && $params['auto_renovar'] === '1';
+        $auto_renovar = isset($_POST['auto_renovar']) && $_POST['auto_renovar'] === '1';
         $update_data_codigo = [
             'destacado' => time(),
             'tipo_destacado' => $tipo,

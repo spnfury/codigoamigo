@@ -1,5 +1,4 @@
 <?php
-file_put_contents(__DIR__ . '/debug_entry.log', "File loaded at " . date('Y-m-d H:i:s') . "\n", FILE_APPEND);
 // Al inicio del archivo, antes de cargar el header
 $anula_adsense = true; // Esta variable será leída por el header para no mostrar Adsense
 
@@ -38,7 +37,16 @@ if (!$codigo_id) {
     exit;
 }
 
-$obj_id_codigo = new \MongoDB\BSON\ObjectId($codigo_id);
+// Mismo caso que destaca.php: parámetro inválido (enlace viejo, código
+// borrado, bot) rompe la construcción del ObjectId con string no-hex —
+// tratar como "no encontrado" en vez de reventar la página del botón
+// principal de pago.
+try {
+    $obj_id_codigo = new \MongoDB\BSON\ObjectId($codigo_id);
+} catch (\Throwable $e) {
+    header("Location: /mis-anuncios");
+    exit;
+}
 
 // Defensivo: garantizar que las funciones de negocio están cargadas antes de usarlas.
 // myphp/funciones.php está envuelto en un guard global if(!function_exists('getFechaActualCorregida'))
@@ -87,23 +95,18 @@ $has_super_landing = false;
 $super_landing_title = '';
 $path_functions = realpath(__DIR__ . '/../myphp/funciones.php');
 $path_sl = realpath(__DIR__ . '/../myphp/_super_landing_functions.php');
-file_put_contents(__DIR__ . '/debug_destacar_logic.log', "Path functions: $path_functions\nPath SL: $path_sl\n", FILE_APPEND);
 
 if ($path_sl && file_exists($path_sl)) {
     // Use include_once to prevent redeclaration errors if functions.php was already loaded by header
     include_once $path_functions;
     include_once $path_sl;
-} else {
-    file_put_contents(__DIR__ . '/debug_destacar_logic.log', "ERROR: File not found: " . __DIR__ . '/../myphp/_super_landing_functions.php' . "\n", FILE_APPEND);
 }
 if (function_exists('get_active_super_landings')) {
     $all_sl = get_active_super_landings(50);
-    file_put_contents(__DIR__ . '/debug_destacar_logic.log', "Found " . count($all_sl) . " landings. Code brand: " . $codigo['marca'] . "\n");
     foreach ($all_sl as $sl) {
         if (isset($sl['linked_brand_slugs'])) {
             $brand_slugs = is_object($sl['linked_brand_slugs']) ? iterator_to_array($sl['linked_brand_slugs']) : $sl['linked_brand_slugs'];
             $match = in_array($codigo['marca'], $brand_slugs);
-            file_put_contents(__DIR__ . '/debug_destacar_logic.log', "Checking " . $sl['title'] . ": " . json_encode($brand_slugs) . " Match: " . ($match ? 'YES' : 'NO') . "\n", FILE_APPEND);
             if ($match) {
                 $has_super_landing = true;
                 $super_landing_title = $sl['title'] ?? 'Guía Oficial';
@@ -112,8 +115,6 @@ if (function_exists('get_active_super_landings')) {
             }
         }
     }
-} else {
-    file_put_contents(__DIR__ . '/debug_destacar_logic.log', "Function get_active_super_landings not found!\n", FILE_APPEND);
 }
 ?>
 
