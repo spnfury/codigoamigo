@@ -106,8 +106,11 @@ try {
     }
 
     $resultado = createNewCode($datos_codigo, $_SESSION["user_id"]);
-    unset($_SESSION['msg_error']);
     if ($resultado) {
+        // Solo limpiamos el error en caso de éxito. Si createNewCode falló y
+        // dejó un msg_error específico (beneficio > oficial, descripción corta,
+        // etc.), NO lo borramos para que el usuario vea el motivo real.
+        unset($_SESSION['msg_error']);
         /* 
         // Procesamiento de PDF temporalmente deshabilitado - pendiente de arreglar
         // Procesar PDF si se subió uno
@@ -216,11 +219,29 @@ try {
         // Redirigir a la página de felicitaciones
         header("Location: /codigo-publicado");
         exit;
+    } elseif (!empty($_SESSION['msg_error'])) {
+        // createNewCode ya dejó un motivo específico (beneficio > oficial,
+        // descripción demasiado corta, etc.). Preservamos ese mensaje y
+        // volvemos al formulario sin sobrescribirlo con el genérico.
+        $_SESSION['form_data'] = [
+            'marca' => $_POST['marca'] ?? '',
+            'marca_valor' => $marca,
+            'num_beneficio' => $num_beneficio,
+            'tipo_beneficio' => $tipo_beneficio,
+            'codigo' => $codigo,
+            'descuento' => $descuento,
+            'descripcion' => $descripcion,
+            'provincia' => $provincia,
+            'localidad' => $localidad,
+            'fecha_caducidad' => $fecha_caducidad
+        ];
+        header("Location: /nuevo_codigo");
+        exit;
     } else {
         // Determinar el tipo de error específico
         $marca_normalizada = normalizeMarcaName($marca);
-        
-        
+
+
         // Verificar el tipo específico de error
         try {
             $collection = getCollectionCodigos();

@@ -19,7 +19,10 @@ require_once __DIR__ . '/../myphp/funciones_marca.php';
 
 $opts    = getopt('', ['min-pos:', 'max-pos:', 'limit:']);
 $min_pos = isset($opts['min-pos']) ? (float)$opts['min-pos'] : 8;
-$max_pos = isset($opts['max-pos']) ? (float)$opts['max-pos'] : 25;
+// max-pos 35 (antes 25): GSC 2026-07 muestra el grueso de fichas con demanda
+// (iqos, skyscanner, finetwork, octopus...) en pos 25-35; sin enlace desde el
+// home se quedaban fuera del empuje de link equity.
+$max_pos = isset($opts['max-pos']) ? (float)$opts['max-pos'] : 35;
 $limit   = isset($opts['limit'])   ? max(1, (int)$opts['limit']) : 80;
 
 $db = createConnection();
