@@ -12,14 +12,35 @@ Disallow: /*-del-2021
 Disallow: /*-del-2022
 Disallow: /*-del-2023
 
-# Permitir explícitamente bots de IA para aparecer en ChatGPT, Perplexity, etc.
+# Bots de IA (ChatGPT, Perplexity, Claude...): bienvenidos, pero con los
+# mismos Disallow que el resto. OJO: un grupo User-agent específico REEMPLAZA
+# al grupo *, así que hay que repetir los Disallow en cada uno — un "Allow: /"
+# a secas les daba acceso a /usuario_* y demás basura y desperdiciaban crawl.
 User-agent: GPTBot
 Allow: /
+Disallow: /chollos
+Disallow: /chollos/
+Disallow: /usuario_*
+Disallow: /*?codigo=*
+Disallow: /*?continua_viendo=1
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /chollos
+Disallow: /chollos/
+Disallow: /usuario_*
+Disallow: /*?codigo=*
+Disallow: /*?continua_viendo=1
 
 User-agent: ChatGPT-User
 Allow: /
 
 User-agent: PerplexityBot
+Allow: /
+Disallow: /usuario_*
+Disallow: /*?codigo=*
+
+User-agent: Perplexity-User
 Allow: /
 
 User-agent: Google-Extended
@@ -30,11 +51,15 @@ Allow: /
 
 User-agent: anthropic-ai
 Allow: /
+Disallow: /usuario_*
+Disallow: /*?codigo=*
 
 User-agent: ClaudeBot
 Allow: /
+Disallow: /usuario_*
+Disallow: /*?codigo=*
 
 User-agent: cohere-ai
 Allow: /
 
-Sitemap: https://www.codigoamigo.com/sitemap.xml
+Sitemap: https://www.codigoamigo.com/sitemap.xml

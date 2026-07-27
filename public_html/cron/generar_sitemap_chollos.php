@@ -153,14 +153,15 @@ function pingSearchEnginesCron($sitemap_url) {
     }
     
     $indexnow_url = "https://www.bing.com/indexnow";
+    // Bug histórico: pingaba www.malprecio.com (copy-paste de otro portal),
+    // así que codigoamigo llevaba sin avisar a Bing/IndexNow desde el inicio.
     $data = [
-        "host" => "www.malprecio.com",
+        "host" => "www.codigoamigo.com",
         "key" => $key,
-        "keyLocation" => "https://www.malprecio.com/indexnow_key.txt",
+        "keyLocation" => "https://www.codigoamigo.com/indexnow_key.txt",
         "urlList" => [
-            "https://www.malprecio.com/sitemap.xml",
-            "https://www.malprecio.com/sitemap_chollos_detalle.xml",
-            "https://www.malprecio.com/chollos"
+            "https://www.codigoamigo.com/sitemap.xml",
+            "https://www.codigoamigo.com/sitemap_chollos_detalle.xml"
         ]
     ];
     
