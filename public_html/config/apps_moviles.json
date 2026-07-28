@@ -1,0 +1,44 @@
+{
+  "_comentario": "Manifiesto de apps móviles. Lo lee cron/recolectar_estado_apps.php, que vuelca el estado a myphp/data/apps_estado.json para que lo pinte public/admin_apps.php. Para dar de alta una app nueva basta con añadirla aquí.",
+  "apps": [
+    {
+      "id": "codigoamigo",
+      "nombre": "Código Amigo",
+      "ruta": "/home/admin/web/codigoamigo.com/mobile-app",
+      "tipo": "expo",
+      "web": "https://www.codigoamigo.com",
+      "tiendas": {
+        "android": "com.codigoamigo.app",
+        "ios": "com.codigoamigo.app"
+      },
+      "estado_objetivo": "publicar",
+      "notas": "Primera publicación pendiente."
+    },
+    {
+      "id": "planazosbcn",
+      "nombre": "PlanazosBCN",
+      "ruta": "/home/planazosbcn/mobile",
+      "tipo": "expo",
+      "web": "https://planazosbcn.com",
+      "tiendas": {
+        "android": null,
+        "ios": null
+      },
+      "estado_objetivo": "prototipo",
+      "notas": "Scaffold de Expo sin configurar: sin package/bundleId ni eas.json."
+    },
+    {
+      "id": "radargas",
+      "nombre": "RadarGas",
+      "ruta": "/var/www/radargas.com",
+      "tipo": "capacitor",
+      "web": "https://radargas.com",
+      "tiendas": {
+        "android": "com.radargas.app",
+        "ios": "com.radargas.app"
+      },
+      "estado_objetivo": "publicada",
+      "notas": "Ya en App Store y Google Play. Se compila fuera de este servidor (Mac del desarrollador): aquí no existen las carpetas android/ e ios/."
+    }
+  ]
+}
