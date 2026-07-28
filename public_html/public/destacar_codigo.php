@@ -12,9 +12,13 @@ if (strstr($_SERVER['SERVER_NAME'], "dev.")) {
 $http = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https://' : 'http://';
 $GLOBALS["actual_url"] = $http . $_SERVER["HTTP_HOST"] . $_SERVER["REQUEST_URI"];
 
-// Verificar que el usuario esté logueado
+// Verificar que el usuario esté logueado.
+// Se pasa la URL actual como redirect: sin él, quien llega desde un email de
+// campaña con la sesión caducada se logueaba y aterrizaba en el home — la
+// intención de compra se perdía justo antes de pagar.
 if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
-    header("Location: /login");
+    $volver = '/destacar_codigo' . (!empty($_GET['codigo']) ? '?codigo=' . urlencode($_GET['codigo']) : '');
+    header("Location: /login?redirect=" . urlencode($volver));
     exit;
 }
 
