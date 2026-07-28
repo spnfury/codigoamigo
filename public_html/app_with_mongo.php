@@ -1656,9 +1656,29 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
     $GLOBALS['actual_url'] = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     $GLOBALS['actual_url_limpia'] = 'https://www.codigoamigo.com/de-' . $marca;
 
-    // Incluir archivos necesarios
+    // Incluir archivos necesarios.
+    // funciones.php va primero y aparte: la comprobación de marca de más abajo
+    // solo necesita ese, y los siguientes (modern/adsense) emiten output al
+    // cargarse — si se incluyeran antes del 404, el body saldría con restos.
     include_once __DIR__ . '/inc/includes.php';
     include_once __DIR__ . '/myphp/funciones.php';
+
+    // Marca inexistente -> 404 real.
+    //
+    // Hasta 2026-07-28 CUALQUIER /de-loquesea respondía 200 con título
+    // generado ("Cupones descuento Asdfghjkl"), canonical auto-referente y
+    // sin noindex: un generador infinito de soft-404. Google penaliza ese
+    // patrón y gasta crawl budget en páginas vacías.
+    //
+    // Comprobado contra GSC antes de activarlo: de 601 URLs /de-* con datos
+    // en 90 días, 599 tienen marca en BD; las 2 huérfanas se resolvieron
+    // ('iqos iluma i' con un 301 a /de-iqos, 'nuevamarcatribbu' se deja caer).
+    // Las redirecciones de marca se comprueban antes, así que siguen vivas.
+    if (!getObjectMarca('nombre_clave', $marca)) {
+        log_info('404 marca inexistente', ['marca' => $marca, 'ref' => $_SERVER['HTTP_REFERER'] ?? '']);
+        return $response->withStatus(404)->withHeader('X-Robots-Tag', 'noindex');
+    }
+
     include_once __DIR__ . '/myphp/funciones_utilidades.php';
     include_once __DIR__ . '/myphp/funciones_modern.php';
     include_once __DIR__ . '/myphp/funciones_adsense.php';
