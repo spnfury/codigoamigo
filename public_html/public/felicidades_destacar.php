@@ -80,11 +80,16 @@ if ($metodo === 'tarjeta' && !empty($session_id)) {
         $fecha_fin = new DateTime();
         $fecha_fin->add(new DateInterval('P' . $duracion_dias . 'D'));
         
-        // Preparar datos de actualización
-        $auto_renovar = true; // Por defecto, habilitar auto-renovación para nuevos destacados
-        if (isset($session->metadata) && isset($session->metadata->auto_renovar) && $session->metadata->auto_renovar === '0') {
-            $auto_renovar = false;
-        }
+        // Preparar datos de actualización.
+        //
+        // La auto-renovación es OPT-IN: solo se activa si la sesión de Stripe
+        // trae auto_renovar === '1'. Antes el valor por defecto era true y solo
+        // se desactivaba con un '0' explícito; como crear_sesion_destacar.php
+        // ni siquiera enviaba ese metadato, todos los pagos quedaban con la
+        // renovación activada aunque la casilla fuese sin marcar. Es un cobro
+        // recurrente sin consentimiento, así que ante la duda no se activa.
+        $auto_renovar = isset($session->metadata->auto_renovar)
+            && $session->metadata->auto_renovar === '1';
         $update_data = [
             'estado' => 0, // Reactivar código si estaba desactivado/caducado (-2/-3)
             'destacado' => time(), // Usar timestamp en lugar de true para consistencia

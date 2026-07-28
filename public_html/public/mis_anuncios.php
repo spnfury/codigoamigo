@@ -93,6 +93,9 @@ try {
 <script src="/assets/js/mis-anuncios.js?<?php echo time(); ?>" defer></script>
 <script src="/assets/js/mis-anuncios-infinite.js?<?php echo time(); ?>" defer></script>
 <script src="/js/mass-message.js?v=<?php echo time(); ?>" defer></script>
+<!-- Define toggleAutoRenovar(): el interruptor de auto-renovación de cada
+     tarjeta lo invoca, pero esta página no cargaba el JS que lo define. -->
+<script src="/js/auto-renovar.js?v=<?php echo time(); ?>" defer></script>
 
 <style>
 /* ===========================================================================

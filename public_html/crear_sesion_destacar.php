@@ -20,6 +20,12 @@ if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
 $codigo_id = $_POST['codigo_id'] ?? '';
 $tipo = $_POST['tipo'] ?? 'normal';
 $sku = $_POST['sku'] ?? '';
+// El formulario envía auto_renovar ('1'/'0') pero hasta ahora no se leía ni se
+// pasaba a Stripe. Como felicidades_destacar.php daba por buena la renovación
+// cuando no encontraba el dato, TODOS los pagos acababan con auto-renovación
+// activada aunque el usuario dejara la casilla sin marcar (reportado por un
+// usuario el 2026-07-28). Solo cuenta como activada si llega un '1' explícito.
+$auto_renovar = (($_POST['auto_renovar'] ?? '0') === '1') ? '1' : '0';
 
 if (empty($codigo_id) || empty($sku)) {
     ob_clean();
@@ -50,7 +56,7 @@ if ($codigo["id_usuario"] != $_SESSION["user_id"]) {
 // Configurar Stripe según el usuario
 $collection_usuarios = getCollectionUsuarios();
 $usuario = $collection_usuarios->findOne(['_id' => new MongoDB\BSON\ObjectId($_SESSION["user_id"])]);
-$email_usuario = $usuario['email'] ?? '';
+$email_usuario = $usuario['mail'] ?? '';
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/stripe.php';
 $stripe_secret_key = get_stripe_secret_key($email_usuario, $_SESSION['user_id'] ?? null);
@@ -91,6 +97,14 @@ try {
         'success_url' => 'https://www.codigoamigo.com/felicidades_destacar?session_id={CHECKOUT_SESSION_ID}&codigo=' . $codigo_id . '&tipo=' . $tipo,
         'cancel_url' => 'https://www.codigoamigo.com/destacar_codigo?codigo=' . $codigo_id,
         'client_reference_id' => $codigo_id,
+        'customer_email' => $email_usuario ?: null,
+        'customer_creation' => 'always', // asocia Cliente en Stripe (si no, "Sin cliente asignado")
+        // Mensaje de beneficios justo antes del botón de pago, para mejorar conversión
+        'custom_text' => [
+            'submit' => [
+                'message' => 'Tu código pasará a la posición destacada, con más visibilidad y clics durante todo el periodo activo.'
+            ]
+        ],
         'metadata' => [
             'tipo' => 'destacar_codigo',
             'codigo_id' => $codigo_id,
@@ -98,12 +112,38 @@ try {
             'usuario_id' => $_SESSION["user_id"],
             'username' => $_SESSION["username"] ?? 'Usuario',
             'tipo_destacado' => $tipo,
+            'auto_renovar' => $auto_renovar,
             'descripcion' => substr($codigo['descripcion'] ?? '', 0, 200)
         ]
     ]);
-    
+
     error_log("Sesión Stripe creada exitosamente: " . $session->id);
-    
+
+    // Guardar intento de checkout para recuperación de carritos abandonados
+    // (mismo patrón que vip_checkout_intents, ver cron/recuperar_carritos_destacar.php).
+    // Antes esta versión (la que realmente ejecuta el JS de destacar_codigo.php) no
+    // guardaba nada aquí -> el cron de recuperación nunca encontraba carritos de
+    // "destacar código" que recuperar, aunque el cron sí corría cada 15 min.
+    try {
+        $db_intents = createConnection();
+        $coll_intents = $db_intents->selectCollection('destacar_checkout_intents');
+        $coll_intents->insertOne([
+            'session_id'     => $session->id,
+            'usuario_id'     => new MongoDB\BSON\ObjectId($_SESSION["user_id"]),
+            'codigo_id'      => $codigo_id,
+            'email'          => $email_usuario,
+            'username'       => $_SESSION["username"] ?? 'Usuario',
+            'marca'          => $codigo['marca'] ?? '',
+            'tipo'           => 'destacar_codigo',
+            'tipo_destacado' => $tipo,
+            'created_at'     => new MongoDB\BSON\UTCDateTime(time() * 1000),
+            'status'         => 'pending',
+            'recovery_email_sent' => false,
+        ]);
+    } catch (Exception $e) {
+        log_error("No se pudo guardar intento de checkout destacar: " . $e->getMessage());
+    }
+
     // Devolver JSON con la URL de la sesión
     ob_clean();
     header('Content-Type: application/json');

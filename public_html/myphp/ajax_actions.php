@@ -81,6 +81,10 @@ if ($_REQUEST) {
             editar_perfil($datos);
             break;
 
+        case "eliminar_cuenta":
+            eliminar_cuenta($datos);
+            break;
+
         case "desbanear_usuario":
             desbanear_usuario($datos);
             break;
@@ -341,7 +345,12 @@ if ($_REQUEST) {
                     echo json_encode(['success' => false, 'message' => 'No autorizado']);
                     exit;
                 }
-                $nuevo_valor = !(isset($codigo['auto_renovar_destacado']) && $codigo['auto_renovar_destacado'] === true);
+                // Comparación laxa a propósito: el campo se guarda unas veces
+                // como booleano true y otras como entero 1 (p. ej. desde
+                // admin_dashboard.php). Con `=== true` un valor 1 se leía como
+                // "desactivado", así que el toggle lo volvía a poner en true y
+                // el usuario no podía desactivar la renovación nunca.
+                $nuevo_valor = empty($codigo['auto_renovar_destacado']);
                 $collection_codigos->updateOne(
                     ['_id' => new MongoDB\BSON\ObjectId($codigo_id)],
                     ['$set' => ['auto_renovar_destacado' => $nuevo_valor]]
@@ -384,6 +393,66 @@ function update_marca($datos)
 
 }
 
+function eliminar_cuenta($datos)
+{
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    if (!isset($_SESSION['user_id'])) {
+        echo json_encode(['success' => false, 'message' => 'No autorizado. Inicia sesión de nuevo.']);
+        return;
+    }
+    $password = $datos['password'] ?? '';
+    if ($password === '') {
+        echo json_encode(['success' => false, 'message' => 'Introduce tu contraseña para confirmar.']);
+        return;
+    }
+    try {
+        $col_usuarios = getCollectionUsuarios();
+        $col_codigos  = getCollectionCodigos();
+        $userId = new \MongoDB\BSON\ObjectId((string)$_SESSION['user_id']);
+        $usuario = $col_usuarios->findOne(['_id' => $userId]);
+        if (!$usuario) {
+            echo json_encode(['success' => false, 'message' => 'Usuario no encontrado.']);
+            return;
+        }
+        // Verificar contraseña (comparación en claro, igual que login)
+        if (($usuario['pass'] ?? '') !== $password) {
+            echo json_encode(['success' => false, 'message' => 'Contraseña incorrecta.']);
+            return;
+        }
+        // Anonimizar: borrar PII + estado=-3 (baja por usuario). Misma lógica que el API.
+        $col_usuarios->updateOne(
+            ['_id' => $userId],
+            ['$set' => [
+                'estado'   => -3,
+                'mail'     => '',
+                'username' => 'deleted_user_' . substr((string)$userId, -6),
+                'pass'     => '',
+                'img'      => '',
+                'desc'     => '',
+                'telefono' => '',
+                'deleted_at' => new \MongoDB\BSON\UTCDateTime(),
+                'baja_solicitada_via' => 'web_self_service',
+            ]]
+        );
+        // Desvincular códigos (el contenido público permanece sin PII)
+        $col_codigos->updateMany(
+            ['id_usuario' => $userId],
+            ['$set' => ['id_usuario' => null, 'owner_deleted_at' => new \MongoDB\BSON\UTCDateTime()]]
+        );
+        // Cerrar sesión
+        $_SESSION = [];
+        if (ini_get('session.use_cookies')) {
+            $p = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000, $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+        }
+        session_destroy();
+        echo json_encode(['success' => true, 'message' => 'Tu cuenta ha sido eliminada. Gracias por haber usado CódigoAmigo.']);
+    } catch (\Exception $e) {
+        error_log('eliminar_cuenta Error: ' . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'No se pudo eliminar la cuenta. Inténtalo más tarde.']);
+    }
+}
+
 function editar_perfil($datos)
 {
     try {
@@ -397,6 +466,7 @@ function editar_perfil($datos)
             'email_competencia' => isset($datos['email_competencia']) ? (int)$datos['email_competencia'] : 1,
             'email_aperturas' => isset($datos['email_aperturas']) ? (int)$datos['email_aperturas'] : 1,
             'email_destacados' => isset($datos['email_destacados']) ? (int)$datos['email_destacados'] : 1,
+            'email_reengagement' => isset($datos['email_reengagement']) ? (int)$datos['email_reengagement'] : 1,
         ];
         
         // Solo actualizar contraseña si se proporciona y no está vacía
