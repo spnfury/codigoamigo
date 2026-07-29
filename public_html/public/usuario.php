@@ -113,22 +113,26 @@ $next_label = $labels_next[$current_threshold_idx] ?? '¡Máximo!';
                 <div class="ep-avatar-wrap">
                     <img src="<?php echo $data_usuario['img']; ?>" alt="Foto de perfil" class="ep-avatar-img">
                     <div class="ep-avatar-camera">
-                        <div class="dropdown">
-                            <button class="ep-camera-btn" type="button" data-toggle="dropdown" title="Cambiar foto de perfil">
-                                <i class="fas fa-camera"></i>
+                        <!-- Antes usaba el dropdown de Bootstrap 3 (data-toggle="dropdown").
+                             Reportado 2026-07-29: en producción el clic no abría nada — probable
+                             conflicto con algún otro handler global de la página, no reproducible
+                             de forma aislada. Se sustituye por un toggle propio sin depender de
+                             jQuery ni de la delegación de eventos de Bootstrap, mismo enfoque que
+                             el interruptor de auto-renovación arreglado el 2026-07-28. -->
+                        <button class="ep-camera-btn" type="button" id="ep-foto-toggle" title="Cambiar foto de perfil">
+                            <i class="fas fa-camera"></i>
+                        </button>
+                        <div class="ep-foto-menu" id="ep-foto-menu">
+                            <form id="form_cambiar_foto" enctype="multipart/form-data" action="/cambiar_foto_usuario" method="POST">
+                                <label for="uploadedfile" class="ep-foto-menu-item" style="cursor: pointer;">
+                                    <i class="fas fa-upload mr-2 text-primary"></i> Subir nueva foto
+                                </label>
+                                <input type="file" name="uploadedfile" id="uploadedfile" class="d-none" accept="image/jpeg,image/png,image/gif">
+                            </form>
+                            <div class="ep-foto-menu-divider"></div>
+                            <button class="ep-foto-menu-item ep-foto-menu-danger" type="button" id="eliminar_foto">
+                                <i class="fas fa-trash-alt mr-2"></i> Eliminar foto
                             </button>
-                            <div class="dropdown-menu shadow">
-                                <form id="form_cambiar_foto" enctype="multipart/form-data" action="/cambiar_foto_usuario" method="POST">
-                                    <label for="uploadedfile" class="dropdown-item mb-0" style="cursor: pointer;">
-                                        <i class="fas fa-upload mr-2 text-primary"></i> Subir nueva foto
-                                    </label>
-                                    <input type="file" name="uploadedfile" id="uploadedfile" class="d-none" accept="image/jpeg,image/png,image/gif">
-                                </form>
-                                <div class="dropdown-divider"></div>
-                                <button class="dropdown-item text-danger" type="button" id="eliminar_foto">
-                                    <i class="fas fa-trash-alt mr-2"></i> Eliminar foto
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -339,14 +343,51 @@ $next_label = $labels_next[$current_threshold_idx] ?? '¡Máximo!';
                             </label>
                         </div>
 
+                        <div class="ep-pref">
+                            <div class="ep-pref-info">
+                                <i class="fas fa-rotate-left ep-pref-icon"></i>
+                                <div>
+                                    <h6>Recordatorios para volver a publicar</h6>
+                                    <small>Recibir emails de reenganche cuando llevas tiempo sin publicar.</small>
+                                </div>
+                            </div>
+                            <label class="ep-switch">
+                                <input type="checkbox" name="email_reengagement" id="email_reengagement" <?php if(($data_usuario['email_reengagement'] ?? 1) == 1) echo "checked"; ?>>
+                                <span class="ep-slider"></span>
+                            </label>
+                        </div>
+
                         <div class="ep-save-row">
                             <button type="submit" class="ep-btn-save" id="modificar_usuario">
                                 <i class="fas fa-save"></i> Guardar Cambios
                             </button>
                         </div>
                     </form>
+
+                    <!-- ZONA PELIGROSA: baja de cuenta self-service -->
+                    <div class="ep-danger-zone">
+                        <h3 class="ep-section-title" style="color:#e74c3c;"><i class="fas fa-triangle-exclamation"></i> Eliminar cuenta</h3>
+                        <p class="ep-danger-text">Al eliminar tu cuenta se borrarán tus datos personales de forma permanente y dejarás de recibir cualquier email. Esta acción <strong>no se puede deshacer</strong>.</p>
+                        <button type="button" class="ep-btn-danger" id="btn_eliminar_cuenta">
+                            <i class="fas fa-user-slash"></i> Eliminar mi cuenta
+                        </button>
+                    </div>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal confirmación baja -->
+<div id="modal_eliminar_cuenta" class="ep-modal-overlay" style="display:none;">
+    <div class="ep-modal">
+        <h4><i class="fas fa-triangle-exclamation" style="color:#e74c3c;"></i> ¿Eliminar tu cuenta?</h4>
+        <p>Esta acción es <strong>permanente e irreversible</strong>. Se borrarán tus datos personales y cerrarás sesión. Introduce tu contraseña para confirmar.</p>
+        <input type="password" id="baja_password" class="ep-modal-input" placeholder="Tu contraseña" autocomplete="current-password">
+        <div id="baja_error" class="ep-modal-error" style="display:none;"></div>
+        <div class="ep-modal-actions">
+            <button type="button" class="ep-btn-cancel" id="btn_cancelar_baja">Cancelar</button>
+            <button type="button" class="ep-btn-danger" id="btn_confirmar_baja"><i class="fas fa-user-slash"></i> Eliminar definitivamente</button>
         </div>
     </div>
 </div>
@@ -441,6 +482,35 @@ $next_label = $labels_next[$current_threshold_idx] ?? '¡Máximo!';
     transform: scale(1.12);
     box-shadow: 0 4px 14px rgba(227,6,19,0.5);
 }
+.ep-foto-menu {
+    display: none;
+    position: absolute;
+    bottom: 44px;
+    right: 0;
+    min-width: 190px;
+    background: #222;
+    border: 1px solid #3a3a3a;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    padding: 6px;
+    z-index: 20;
+}
+.ep-foto-menu.is-open { display: block; }
+.ep-foto-menu-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    color: #eee;
+    padding: 9px 12px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    margin: 0;
+}
+.ep-foto-menu-item:hover { background: #333; }
+.ep-foto-menu-danger { color: #ff6b6b; }
+.ep-foto-menu-divider { height: 1px; background: #3a3a3a; margin: 5px 2px; }
 
 /* Hero info */
 .ep-hero-info { flex: 1; }
@@ -860,6 +930,64 @@ $next_label = $labels_next[$current_threshold_idx] ?? '¡Máximo!';
         padding: 15px 30px;
     }
 }
+
+/* ── Zona peligrosa + modal baja ── */
+.ep-danger-zone {
+    margin-top: 28px;
+    padding-top: 22px;
+    border-top: 1px solid rgba(231,76,60,0.25);
+}
+.ep-danger-text {
+    color: #b8b8b8;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin: 6px 0 16px;
+}
+.ep-btn-danger {
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 22px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: background .2s;
+}
+.ep-btn-danger:hover { background: #c0392b; }
+.ep-btn-danger:disabled { opacity: .6; cursor: not-allowed; }
+.ep-modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 9999;
+    align-items: center; justify-content: center;
+    padding: 20px;
+}
+.ep-modal {
+    background: #2a2a2a;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 28px;
+    max-width: 440px; width: 100%;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+.ep-modal h4 { color: #fff; margin: 0 0 12px; font-size: 1.25rem; }
+.ep-modal p { color: #b8b8b8; font-size: 0.9rem; line-height: 1.6; margin: 0 0 16px; }
+.ep-modal-input {
+    width: 100%; box-sizing: border-box;
+    background: #222; border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px; padding: 12px 14px; color: #fff; font-size: 0.95rem;
+}
+.ep-modal-error { color: #e74c3c; font-size: 0.85rem; margin-top: 10px; }
+.ep-modal-actions { display: flex; gap: 12px; margin-top: 20px; justify-content: flex-end; }
+.ep-btn-cancel {
+    background: transparent; color: #b8b8b8;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 10px; padding: 12px 22px; cursor: pointer; font-weight: 600;
+}
+.ep-btn-cancel:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
 </style>
 
 <script>
@@ -877,7 +1005,19 @@ $next_label = $labels_next[$current_threshold_idx] ?? '¡Máximo!';
             }
         });
 
-    	$("#eliminar_foto").click(function() {  
+        // Menú de cambiar/eliminar foto. Handler propio y explícito, sin
+        // data-toggle de Bootstrap — ver comentario junto al HTML.
+        $("#ep-foto-toggle").on('click', function(e) {
+            e.stopPropagation();
+            $("#ep-foto-menu").toggleClass('is-open');
+        });
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('#ep-foto-menu, #ep-foto-toggle').length) {
+                $("#ep-foto-menu").removeClass('is-open');
+            }
+        });
+
+    	$("#eliminar_foto").click(function() {
     	    if(confirm("¿Estás seguro de eliminar tu foto de perfil?")) {
         		$.post("/remove_photo_user", { 'mail' : $('#correo').val()});
         		location.reload();
@@ -895,6 +1035,7 @@ $next_label = $labels_next[$current_threshold_idx] ?? '¡Máximo!';
     		var email_competencia_val = $("#email_competencia").is(":checked") ? '1' : '0';
     		var email_aperturas_val = $("#email_aperturas").is(":checked") ? '1' : '0';
     		var email_destacados_val = $("#email_destacados").is(":checked") ? '1' : '0';
+    		var email_reengagement_val = $("#email_reengagement").is(":checked") ? '1' : '0';
 
     		$.ajax({
     			type: "POST",
@@ -905,6 +1046,7 @@ $next_label = $labels_next[$current_threshold_idx] ?? '¡Máximo!';
     				email_competencia: email_competencia_val,
     				email_aperturas: email_aperturas_val,
     				email_destacados: email_destacados_val,
+    				email_reengagement: email_reengagement_val,
     				nombre: $("#nombre").val(),
     				correo: $("#correo").val(),
     				password: $("#pass").val(),
@@ -933,7 +1075,48 @@ $next_label = $labels_next[$current_threshold_idx] ?? '¡Máximo!';
     			}
     		});
     	});
-    	
+
+    	// ── Baja de cuenta (self-service) ──
+    	$("#btn_eliminar_cuenta").on("click", function() {
+    		$("#baja_password").val("");
+    		$("#baja_error").hide().text("");
+    		$("#modal_eliminar_cuenta").css("display", "flex");
+    	});
+    	$("#btn_cancelar_baja").on("click", function() {
+    		$("#modal_eliminar_cuenta").hide();
+    	});
+    	$("#modal_eliminar_cuenta").on("click", function(e) {
+    		if (e.target === this) $(this).hide();
+    	});
+    	$("#btn_confirmar_baja").on("click", function() {
+    		var pass = $("#baja_password").val();
+    		if (!pass) { $("#baja_error").text("Introduce tu contraseña.").show(); return; }
+    		var btn = $(this);
+    		var orig = btn.html();
+    		btn.prop("disabled", true).html('<i class="fas fa-spinner fa-spin"></i> Eliminando...');
+    		$("#baja_error").hide();
+    		$.ajax({
+    			type: "POST",
+    			url: "/myphp/ajax_actions.php",
+    			data: { metodo: "eliminar_cuenta", password: pass },
+    			cache: false,
+    			dataType: "json",
+    			success: function(data) {
+    				if (data && data.success) {
+    					alert(data.message || "Tu cuenta ha sido eliminada.");
+    					window.location.href = "/";
+    				} else {
+    					btn.prop("disabled", false).html(orig);
+    					$("#baja_error").text(data.message || "No se pudo eliminar la cuenta.").show();
+    				}
+    			},
+    			error: function() {
+    				btn.prop("disabled", false).html(orig);
+    				$("#baja_error").text("Error de conexión. Inténtalo de nuevo.").show();
+    			}
+    		});
+    	});
+
         $("#uploadedfile").change(function() {
             if (this.files && this.files[0]) {
                 if (this.files[0].size > 8000000) {
@@ -947,7 +1130,7 @@ $next_label = $labels_next[$current_threshold_idx] ?? '¡Máximo!';
                     $(this).val('');
                     return;
                 }
-                $('.dropdown-menu').removeClass('show');
+                $("#ep-foto-menu").removeClass('is-open');
                 $("#form_cambiar_foto").submit();
             }
         });
