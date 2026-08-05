@@ -1,0 +1,230 @@
+<html><head><meta http-equiv='Content-Type' content='text/html; charset=utf-8'><title>Slim Application Error</title><style>body{margin:0;padding:30px;font:12px/1.5 Helvetica,Arial,Verdana,sans-serif;}h1{margin:0;font-size:48px;font-weight:normal;line-height:48px;}strong{display:inline-block;width:65px;}</style></head><body><h1>Slim Application Error</h1><p>The application could not run because of the following error:</p><h2>Details</h2><div><strong>Type:</strong> Error</div><div><strong>Message:</strong> Class &quot;Mobile_Detect&quot; not found</div><div><strong>File:</strong> /home/admin/web/codigoamigo.com/public_html/app_with_mongo.php</div><div><strong>Line:</strong> 785</div><h2>Trace</h2><pre>#0 [internal function]: Closure-&gt;{closure}()
+#1 /home/admin/web/codigoamigo.com/public_html/vendor/slim/slim/Slim/Handlers/Strategies/RequestResponse.php(40): call_user_func()
+#2 /home/admin/web/codigoamigo.com/public_html/vendor/slim/slim/Slim/Route.php(281): Slim\Handlers\Strategies\RequestResponse-&gt;__invoke()
+#3 /home/admin/web/codigoamigo.com/public_html/vendor/slim/slim/Slim/MiddlewareAwareTrait.php(117): Slim\Route-&gt;__invoke()
+#4 /home/admin/web/codigoamigo.com/public_html/vendor/slim/slim/Slim/Route.php(268): Slim\Route-&gt;callMiddlewareStack()
+#5 /home/admin/web/codigoamigo.com/public_html/vendor/slim/slim/Slim/App.php(503): Slim\Route-&gt;run()
+#6 /home/admin/web/codigoamigo.com/public_html/app_with_mongo.php(127): Slim\App-&gt;__invoke()
+#7 [internal function]: Closure-&gt;{closure}()
+#8 /home/admin/web/codigoamigo.com/public_html/vendor/slim/slim/Slim/DeferredCallable.php(57): call_user_func_array()
+#9 [internal function]: Slim\DeferredCallable-&gt;__invoke()
+#10 /home/admin/web/codigoamigo.com/public_html/vendor/slim/slim/Slim/MiddlewareAwareTrait.php(70): call_user_func()
+#11 /home/admin/web/codigoamigo.com/public_html/vendor/slim/slim/Slim/MiddlewareAwareTrait.php(117): Slim\App-&gt;Slim\{closure}()
+#12 /home/admin/web/codigoamigo.com/public_html/vendor/slim/slim/Slim/App.php(392): Slim\App-&gt;callMiddlewareStack()
+#13 /home/admin/web/codigoamigo.com/public_html/vendor/slim/slim/Slim/App.php(297): Slim\App-&gt;process()
+#14 /home/admin/web/codigoamigo.com/public_html/app_with_mongo.php(4632): Slim\App-&gt;run()
+#15 /home/admin/web/codigoamigo.com/public_html/index.php(4): require_once(&#039;...&#039;)
+#16 {main}</pre></body></html>
+<script>
+// JavaScript para el slider de marcas populares
+(function() {
+let currentSlide = 0;
+const slidesPerView = window.innerWidth <= 768 ? 1 : window.innerWidth <= 1024 ? 2 : 3;
+const totalSlides = Math.ceil(9 / slidesPerView); // 9 marcas totales
+
+function moveSlider(direction) {
+    const slider = document.getElementById('brandsSlider');
+    if (!slider) return;
+    
+    // En móvil, mover slide por slide. En desktop, mover por grupos
+    const moveAmount = window.innerWidth <= 768 ? 1 : slidesPerView;
+    const maxSlides = window.innerWidth <= 768 ? 9 - slidesPerView : Math.ceil(9 / slidesPerView);
+    
+    currentSlide += moveAmount * direction;
+    
+    // Limitar el rango
+    if (currentSlide < 0) {
+        currentSlide = maxSlides;
+    } else if (currentSlide > maxSlides) {
+        currentSlide = 0;
+    }
+    
+    // Calcular el desplazamiento
+    const slideWidth = 100 / slidesPerView;
+    const translateX = -(currentSlide * slideWidth);
+    
+    slider.style.transform = `translateX(${translateX}%)`;
+    
+    // Actualizar indicadores
+    updateDots();
+}
+
+function goToSlide(slideNumber) {
+    currentSlide = slideNumber - 1;
+    const slider = document.getElementById('brandsSlider');
+    if (!slider) return;
+    
+    const slideWidth = 100 / slidesPerView;
+    const translateX = -(currentSlide * slideWidth);
+    
+    slider.style.transform = `translateX(${translateX}%)`;
+    
+    // Actualizar indicadores
+    updateDots();
+}
+
+function updateDots() {
+    const dots = document.querySelectorAll('.dot');
+    dots.forEach((dot, index) => {
+        dot.classList.toggle('active', index === currentSlide);
+    });
+}
+
+// Inicializar cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar indicadores
+    updateDots();
+});
+
+// Redimensionar ventana
+window.addEventListener('resize', function() {
+    // Recalcular slides por vista
+    const newSlidesPerView = window.innerWidth <= 768 ? 1 : window.innerWidth <= 1024 ? 2 : 3;
+    if (newSlidesPerView !== slidesPerView) {
+        currentSlide = 0;
+        updateDots();
+    }
+});
+
+// SCROLL INFINITO PARA CÓDIGOS DESTACADOS
+let featuredCodesLoaded = 6;
+let featuredCodesPerLoad = 6;
+let isLoadingFeatured = false;
+
+function loadMoreFeaturedCodes() {
+    console.log('loadMoreFeaturedCodes llamada');
+    console.log('Estado:', {isLoadingFeatured, hasData: !!window.featuredCodesData});
+    
+    if (isLoadingFeatured || !window.featuredCodesData) {
+        console.log('No se puede cargar:', {isLoadingFeatured, hasData: !!window.featuredCodesData});
+        return;
+    }
+    
+    const loadMoreBtn = document.getElementById('loadMoreFeatured');
+    const featuredGrid = document.getElementById('featuredGrid');
+    const totalCodes = parseInt(loadMoreBtn.dataset.total);
+    
+    console.log('Elementos encontrados:', {loadMoreBtn: !!loadMoreBtn, featuredGrid: !!featuredGrid, totalCodes});
+    
+    if (featuredCodesLoaded >= totalCodes) {
+        loadMoreBtn.style.display = 'none';
+        return;
+    }
+    
+    isLoadingFeatured = true;
+    
+    // Mostrar estado de carga
+    loadMoreBtn.querySelector('.btn-text').style.display = 'none';
+    loadMoreBtn.querySelector('.btn-loading').style.display = 'flex';
+    loadMoreBtn.disabled = true;
+    
+    // Simular carga (en producción esto sería una llamada AJAX)
+    setTimeout(() => {
+        const startIndex = featuredCodesLoaded - 6; // Índice en el array de códigos restantes
+        const endIndex = Math.min(startIndex + featuredCodesPerLoad, window.featuredCodesData.length);
+        const codesToLoad = window.featuredCodesData.slice(startIndex, endIndex);
+        
+        console.log('Cargando códigos:', {startIndex, endIndex, codesToLoad: codesToLoad.length, totalData: window.featuredCodesData.length});
+        
+        // Añadir códigos al grid
+        const newCards = [];
+        codesToLoad.forEach((codigo, index) => {
+            const cardHtml = generateFeaturedCardHTML(codigo, featuredCodesLoaded + index);
+            const cardElement = document.createElement('div');
+            cardElement.innerHTML = cardHtml;
+            const actualCard = cardElement.firstElementChild;
+            actualCard.classList.add('featured-card-loading');
+            featuredGrid.appendChild(actualCard);
+            newCards.push(actualCard);
+        });
+        
+        featuredCodesLoaded = endIndex;
+        loadMoreBtn.dataset.loaded = featuredCodesLoaded;
+        
+        // Actualizar texto del botón
+        if (featuredCodesLoaded >= totalCodes) {
+            loadMoreBtn.style.display = 'none';
+        } else {
+            loadMoreBtn.querySelector('.btn-text').textContent = `Ver más códigos destacados (${totalCodes - featuredCodesLoaded} restantes)`;
+        }
+        
+        // Restaurar estado del botón
+        loadMoreBtn.querySelector('.btn-text').style.display = 'inline';
+        loadMoreBtn.querySelector('.btn-loading').style.display = 'none';
+        loadMoreBtn.disabled = false;
+        
+        isLoadingFeatured = false;
+        
+        // Animar las nuevas tarjetas inmediatamente después de añadirlas
+        newCards.forEach((card, index) => {
+            setTimeout(() => {
+                card.classList.remove('featured-card-loading');
+            }, index * 100);
+        });
+        
+    }, 1000); // Simular tiempo de carga
+}
+
+function generateFeaturedCardHTML(codigo, index) {
+    const brand = codigo.marca || 'Marca desconocida';
+    const description = codigo.descripcion || 'Descripción no disponible';
+    const codeId = codigo._id || '';
+    const benefit = codigo.num_beneficio || 0;
+    const ratings = codigo.num_valoraciones || 0;
+    const userId = codigo.id_usuario || '';
+    
+    // Obtener información del usuario (simplificado para JavaScript)
+    const username = codigo.usuario_username || 'Usuario';
+    const userImage = codigo.usuario_imagen || '/img/no_image.png';
+    
+    // Obtener información de la marca (simplificado para JavaScript)
+    const brandImage = codigo.marca_imagen || '/img/no_image.png';
+    
+    return `
+        <div class="featured-card">
+            <div class="featured-badge">
+                <i class="fas fa-star"></i>
+                <span>Destacado</span>
+            </div>
+            <div class="featured-brand">
+                <img src="${brandImage}" alt="${brand}" onerror="this.src='/img/no_image.png'">
+                <h3>${brand}</h3>
+            </div>
+            <div class="featured-publisher">
+                <img src="${userImage}" alt="${username}" onerror="this.src='/img/no_image.png'">
+                <span>${username}</span>
+            </div>
+            <p class="featured-description">${description}</p>
+            <div class="featured-benefit">
+                <span class="beneficio-icono">💰</span>
+                <span class="beneficio-cantidad">${benefit}€ beneficio</span>
+            </div>
+            <button class="featured-btn" onclick="window.location.href='/codigo/${codeId}'">Ver Código</button>
+        </div>
+    `;
+}
+
+// Inicializar scroll infinito cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+    const loadMoreBtn = document.getElementById('loadMoreFeatured');
+    if (loadMoreBtn) {
+        loadMoreBtn.addEventListener('click', loadMoreFeaturedCodes);
+        
+        // Scroll infinito automático
+        let scrollTimeout;
+        window.addEventListener('scroll', function() {
+            if (scrollTimeout) {
+                clearTimeout(scrollTimeout);
+            }
+            
+            scrollTimeout = setTimeout(() => {
+                if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000) {
+                    loadMoreFeaturedCodes();
+                }
+            }, 100);
+        });
+    }
+});
+})(); // Cerrar IIFE
+</script>
+

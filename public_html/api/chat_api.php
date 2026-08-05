@@ -43,6 +43,34 @@ $array_admins = [
 ];
 $es_admin = in_array($user_id, $array_admins);
 
+// VIP gating: lectura/listado solo para VIPs y admins. Envío permitido para todos.
+$es_vip_actual = $es_admin ? true : es_usuario_vip($user_id);
+$acciones_solo_vip = [
+    'get_conversaciones',
+    'get_conversaciones_usuario',
+    'get_mensajes',
+    'get_nuevos_mensajes',
+    'marcar_leido',
+    'search_mensajes',
+    'get_websocket_token',
+    'get_interacciones_codigo',
+    'archive_conversation',
+    'unarchive_conversation',
+    'pin_conversation',
+    'unpin_conversation',
+    'delete_conversation',
+    'enviar_masivo'
+];
+if (!$es_vip_actual && in_array($action, $acciones_solo_vip, true)) {
+    echo json_encode([
+        'success' => false,
+        'error' => 'Mensajería directa exclusiva para usuarios VIP. Hazte VIP para leer y responder mensajes.',
+        'requiere_vip' => true,
+        'cta_url' => '/suscripciones_y_creditos'
+    ]);
+    exit;
+}
+
 try {
     switch ($action) {
         case 'get_conversaciones':
@@ -379,23 +407,6 @@ try {
                 
                 $collection_mensajes = getCollectionMensajes();
                 if ($collection_mensajes) {
-                    // Verificar restricción VIP: no-VIP no puede iniciar conversaciones nuevas
-                    if (!$es_admin) {
-                        if (!function_exists('es_usuario_vip')) {
-                            include_once __DIR__ . '/../myphp/funciones_usuario.php';
-                        }
-                        $es_vip_remitente = es_usuario_vip($user_id);
-                        
-                        if (!$es_vip_remitente) {
-                            $existing_count = $collection_mensajes->countDocuments(['conversacion_id' => $conversacion_id_actual]);
-                            if ($existing_count === 0) {
-                                // No hay mensajes previos = sería iniciar una conversación nueva
-                                echo json_encode(['success' => false, 'error' => 'Solo los usuarios VIP pueden iniciar conversaciones. Hazte VIP para contactar directamente.']);
-                                exit;
-                            }
-                        }
-                    }
-                    
                     // Verificar si el destinatario ya ha contestado alguna vez
                     $ha_contestado = $collection_mensajes->countDocuments([
                         'conversacion_id' => $conversacion_id_actual,
@@ -409,12 +420,37 @@ try {
                             ['conversacion_id' => $conversacion_id_actual],
                             ['sort' => ['fecha' => -1], 'projection' => ['de_usuario_id' => 1]]
                         );
-                        
+
                         // Si el último mensaje fue enviado por el usuario actual, bloquear
                         if ($ultimo_mensaje && (string)$ultimo_mensaje['de_usuario_id'] === $user_id) {
                             echo json_encode(['success' => false, 'error' => 'Debes esperar a que el usuario te conteste por primera vez antes de enviarle otro mensaje.']);
                             exit;
                         }
+                    }
+                }
+            }
+
+            // Cap diario antispam para no-VIP: máximo 10 mensajes salientes por 24h
+            // VIPs y admins exentos. Frena floods sin bloquear uso legítimo.
+            if (!$es_vip_actual && !$es_admin) {
+                $collection_mensajes_cap = getCollectionMensajes();
+                if ($collection_mensajes_cap) {
+                    $cap_no_vip = 10;
+                    $cutoff_24h = new MongoDB\BSON\UTCDateTime((time() - 86400) * 1000);
+                    $user_object_id = new MongoDB\BSON\ObjectId($user_id);
+                    $msgs_ultimas_24h = $collection_mensajes_cap->countDocuments([
+                        'de_usuario_id' => ['$in' => [$user_id, $user_object_id]],
+                        'fecha' => ['$gte' => $cutoff_24h]
+                    ]);
+                    if ($msgs_ultimas_24h >= $cap_no_vip) {
+                        log_info("chat cap_no_vip alcanzado", ['user_id' => $user_id, 'count_24h' => $msgs_ultimas_24h]);
+                        echo json_encode([
+                            'success' => false,
+                            'error' => "Has alcanzado el límite de {$cap_no_vip} mensajes diarios. Hazte VIP para enviar mensajes sin límite y leer respuestas.",
+                            'requiere_vip' => true,
+                            'cta_url' => '/suscripciones_y_creditos'
+                        ]);
+                        exit;
                     }
                 }
             }

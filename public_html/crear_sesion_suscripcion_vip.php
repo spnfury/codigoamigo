@@ -152,6 +152,12 @@ try {
         // Descuento 50% primer mes auto-aplicado (excluyente con allow_promotion_codes)
         'discounts' => [
             ['coupon' => $coupon_primer_mes]
+        ],
+        // Mensaje de beneficios justo antes del botón de pago, para mejorar conversión
+        'custom_text' => [
+            'submit' => [
+                'message' => 'Al confirmar activas: badge verificado ✓, chat ilimitado con quien te contacte, y 10€ de saldo cada mes para destacar tus códigos. Primer mes a mitad de precio.'
+            ]
         ]
     ]);
     

@@ -49,8 +49,8 @@ Base: 16px (1rem)
 
 body {
     font-family: var(--font-family-base);
-    background-color: var(--dark-gray);
-    color: var(--text-white);
+    background-color: #ffffff;
+    color: #1a1a1a;
     line-height: 1.6;
     font-size: var(--font-size-base);
 }
@@ -2780,7 +2780,8 @@ body {
 
 /* CONTENIDO PRINCIPAL */
 .main-content {
-    background-color: var(--dark-gray);
+    background-color: #ffffff;
+    color: #1a1a1a;
     padding: 2rem;
     min-height: 100vh;
     height: 100%;

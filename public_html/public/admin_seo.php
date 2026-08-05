@@ -32,7 +32,7 @@ $avg_ctr = 0;
 $avg_position = 0;
 
 try {
-    $authJsonPath = __DIR__ . '/../private/google_credentials.json';
+    $authJsonPath = dirname(__DIR__, 2) . '/private/google_credentials.json';
     
     if (!file_exists($authJsonPath)) {
         throw new Exception("No se encontró el archivo de credenciales en private/google_credentials.json");

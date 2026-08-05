@@ -833,4 +833,68 @@ function getMarcas($limit = null, $categoria = null, $excluye = null) {
     return $array_final_marcas;
 }
 
+
+// ============================================================================
+// PROMOCIONES POR TIEMPO LIMITADO (referido boost de marcas tipo N26, Revolut…)
+// ============================================================================
+
+/**
+ * Devuelve los datos de promoción activa de una marca, o null si no hay.
+ * Una promoción está activa cuando:
+ *   - promo_activa == true
+ *   - promo_fecha_fin >= hoy (formato YYYY-MM-DD)
+ */
+function getPromocionMarca($marca_doc_o_clave) {
+    if (is_string($marca_doc_o_clave)) {
+        $marca = getObjectMarca('nombre_clave', $marca_doc_o_clave);
+    } else {
+        $marca = $marca_doc_o_clave;
+    }
+    if (!$marca || empty($marca['promo_activa'])) {
+        return null;
+    }
+    $fin = $marca['promo_fecha_fin'] ?? '';
+    $hoy = date('Y-m-d');
+    if (!$fin || $fin < $hoy) {
+        return null;
+    }
+    $dias_restantes = max(0, (int)floor((strtotime($fin) - strtotime($hoy)) / 86400));
+    return [
+        'titulo'         => $marca['promo_titulo']   ?? '',
+        'bono'           => $marca['promo_bono']     ?? '',
+        'fecha_fin'      => $fin,
+        'url'            => $marca['promo_url']      ?? '',
+        'dias_restantes' => $dias_restantes,
+        'nombre'         => $marca['nombre']         ?? '',
+        'nombre_clave'   => $marca['nombre_clave']   ?? '',
+        'logo'           => $marca['logo']           ?? '',
+    ];
+}
+
+/**
+ * Devuelve array de marcas con promoción vigente, ordenadas por fecha_fin asc
+ * (urgencia primero).
+ */
+function getMarcasConPromocionActiva() {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+
+    $hoy = date('Y-m-d');
+    $col = getCollectionMarcas();
+    $cursor = $col->find(
+        [
+            'promo_activa' => true,
+            'promo_fecha_fin' => ['$gte' => $hoy],
+        ],
+        ['sort' => ['promo_fecha_fin' => 1]]
+    );
+    $out = [];
+    foreach ($cursor as $m) {
+        $promo = getPromocionMarca($m);
+        if ($promo) $out[] = $promo;
+    }
+    $cache = $out;
+    return $out;
+}
+
 ?>

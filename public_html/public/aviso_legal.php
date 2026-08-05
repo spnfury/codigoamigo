@@ -1,8 +1,10 @@
 <?php
-// Incluir funciones necesarias
+// Bootstrap completo — header_base.php llama getMarcas() (funciones_marca.php) vía LayoutManager
+include_once __DIR__ . '/../inc/includes.php';
 include_once __DIR__ . '/../myphp/_header_modern.php';
+include_once __DIR__ . '/../myphp/_footer.php';
 
-get_header_new($title, $description);
+get_header_modern($title, $description);
 ?>
 
 <div class="container">
@@ -104,4 +106,4 @@ get_header_new($title, $description);
    </div>
 </div>
        
-<?php get_footer(); ?>
+<?php get_footer_modern(); ?>

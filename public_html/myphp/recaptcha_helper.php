@@ -3,8 +3,22 @@
  * Helper para validación de Google reCAPTCHA
  */
 
-// Clave secreta de reCAPTCHA
-define('RECAPTCHA_SECRET_KEY', '6LfyTegrAAAAAOnDI2_LSnJWf-knMy92ntWngpTQ');
+// Clave secreta de reCAPTCHA: leída de /private/api_secrets.php (fuera del
+// webroot, chmod 600), no hardcodeada. Rotar allí tras la exposición pública.
+if (!defined('RECAPTCHA_SECRET_KEY')) {
+    if (empty($_ENV['RECAPTCHA_SECRET_KEY'])) {
+        $_priv = dirname(__DIR__, 2) . '/private/api_secrets.php';
+        if (is_file($_priv)) {
+            require_once $_priv;
+        }
+    }
+    $_secret = $_ENV['RECAPTCHA_SECRET_KEY'] ?? '';
+    if ($_secret === '') {
+        $_g = getenv('RECAPTCHA_SECRET_KEY');
+        $_secret = ($_g !== false) ? $_g : '';
+    }
+    define('RECAPTCHA_SECRET_KEY', $_secret);
+}
 
 /**
  * Valida el token de reCAPTCHA con Google

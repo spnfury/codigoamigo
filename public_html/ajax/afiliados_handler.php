@@ -23,13 +23,16 @@ try {
             $url = $_POST['url'] ?? '';
             $nombre_plataforma = $_POST['nombre_plataforma'] ?? '';
             $descripcion = $_POST['descripcion'] ?? '';
-            
+            $red_afiliacion = $_POST['red_afiliacion'] ?? '';
+            $marca_clave = $_POST['marca_clave'] ?? '';
+            $marca_nombre = $_POST['marca_nombre'] ?? '';
+
             if (empty($url) || empty($nombre_plataforma)) {
                 echo json_encode(['success' => false, 'error' => 'URL y nombre de plataforma son obligatorios']);
                 exit;
             }
-            
-            $resultado = agregarUrlAfiliado($usuario_id, $url, $nombre_plataforma, $descripcion);
+
+            $resultado = agregarUrlAfiliado($usuario_id, $url, $nombre_plataforma, $descripcion, $red_afiliacion, $marca_clave, $marca_nombre);
             
             // Asegurarse de que el resultado tenga url_id si fue exitoso
             if ($resultado['success'] && isset($resultado['id'])) {
@@ -191,7 +194,10 @@ try {
             $datos = [
                 'url' => $_POST['url'] ?? '',
                 'nombre_plataforma' => $_POST['nombre_plataforma'] ?? '',
-                'descripcion' => $_POST['descripcion'] ?? ''
+                'descripcion' => $_POST['descripcion'] ?? '',
+                'red_afiliacion' => $_POST['red_afiliacion'] ?? '',
+                'marca_clave' => $_POST['marca_clave'] ?? '',
+                'marca_nombre' => $_POST['marca_nombre'] ?? ''
             ];
             
             if (empty($url_id)) {
@@ -203,6 +209,37 @@ try {
             echo json_encode($resultado);
             break;
             
+        case 'obtener_urls_agrupadas':
+            $resultado = obtenerUrlsAfiliadosAgrupadasPorMarca($usuario_id);
+            echo json_encode($resultado);
+            break;
+
+        case 'buscar_marcas':
+            $q = trim($_GET['q'] ?? '');
+            if (strlen($q) < 1) { echo json_encode(['success' => true, 'marcas' => []]); exit; }
+            try {
+                $db = createConnection();
+                $col = $db ? $db->selectCollection('marcas') : null;
+                if (!$col) { echo json_encode(['success' => false, 'error' => 'DB']); exit; }
+                $regex = new MongoDB\BSON\Regex(preg_quote($q, '/'), 'i');
+                $cursor = $col->find(
+                    ['$or' => [['nombre' => $regex], ['nombre_clave' => $regex]]],
+                    ['limit' => 15, 'projection' => ['nombre' => 1, 'nombre_clave' => 1, 'imagen' => 1]]
+                );
+                $marcas = [];
+                foreach ($cursor as $d) {
+                    $marcas[] = [
+                        'nombre' => $d['nombre'] ?? '',
+                        'nombre_clave' => $d['nombre_clave'] ?? '',
+                        'imagen' => $d['imagen'] ?? ''
+                    ];
+                }
+                echo json_encode(['success' => true, 'marcas' => $marcas]);
+            } catch (Throwable $e) {
+                echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            }
+            break;
+
         default:
             echo json_encode(['success' => false, 'error' => 'Método no válido']);
             break;

@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(journalctl -u php8.3-fpm --since \"3 days ago\" --no-pager)",
+      "Bash(sudo -n test -r /home/admin/web/codigoamigo.com/private/stripe_secrets.php)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git -C /home/admin/web/codigoamigo.com rev-parse --show-toplevel)",
+      "Bash(git -C /home/admin/web/codigoamigo.com status -s)",
+      "Bash(mongosh --quiet codigo_db --eval ' *)",
+      "Bash(grep -rn '\\\\$client\\\\|\\\\$db_name\\\\|vip_checkout_intents\\\\|selectDatabase' public/webhook_stripe.php cron/recuperar_carritos_vip.php)",
+      "Bash(sed -n '1,40p' public/success_vip.php)",
+      "Bash(sed -n '290,354p' public/success_vip.php)",
+      "Bash(crontab -u admin -l)",
+      "Bash(/usr/bin/php cron/recuperar_carritos_vip.php)",
+      "Bash(grep -n 'btnSubscribeVip\\\\|total_potencial\\\\|total_viewers\\\\|obtener_viewers\\\\|sin.*contact\\\\|contacted\\\\|$viewers\\\\|$is_vip\\\\|upsell\\\\|Hazte VIP\\\\|num_leads' public/mis_viewers.php)",
+      "Bash(sed -n '100,125p' public/mis_viewers.php)",
+      "Bash(sed -n '986,1035p' public/mis_viewers.php)",
+      "Bash(git commit -m 'VIP: arreglar tracking embudo + GA4 + palancas conversión *)",
+      "Bash(grep -niE 'countDocuments|\\\\$total|metric|kpi|<h[12]|card-title|stat-|->count\\\\\\(' public/admin_dashboard.php)",
+      "Bash(sed -n '805,830p' public/admin_dashboard.php)",
+      "Bash(sed -n '1110,1178p' public/admin_dashboard.php)",
+      "Bash(sed -n '205,235p' js/funciones.js)",
+      "Bash(sed -n '630,665p' js/funciones.js)",
+      "Bash(git commit -m 'Registro: verificación por código 4 dígitos + auto-login + KPI admin *)"
+    ]
+  }
+}

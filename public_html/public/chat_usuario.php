@@ -38,9 +38,163 @@ $username = $data_usuario['username'] ?? 'Usuario';
 $title = "Chat - $username";
 $description = "Sistema de mensajería de CodigoAmigo";
 
+// Paywall VIP: chat exclusivo para VIPs / admins
+if (!$es_vip_chat && !$es_admin_chat) {
+    // Contar mensajes pendientes para teaser
+    $mensajes_pendientes = 0;
+    try {
+        if (function_exists('getCollectionMensajes')) {
+            $coll_msg = getCollectionMensajes();
+            if ($coll_msg) {
+                $mensajes_pendientes = $coll_msg->countDocuments([
+                    'para_usuario_id' => ['$in' => [$user_id, new MongoDB\BSON\ObjectId($user_id)]],
+                    'leido' => false
+                ]);
+            }
+        }
+    } catch (Exception $e) {
+        $mensajes_pendientes = 0;
+    }
+
+    include_once __DIR__ . '/../myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true;
+    $GLOBALS['anula_adsense'] = true; // Sin publicidad en el chat, molesta y distrae de conversar
+    get_header_modern("Chat VIP - CódigoAmigo", "Mensajería directa exclusiva para usuarios VIP", '', '', '', false);
+    ?>
+    <div class="vip-chat-paywall">
+        <div class="paywall-card">
+            <div class="paywall-crown">
+                <i class="fas fa-crown"></i>
+            </div>
+            <h1>Mensajería directa solo para VIP</h1>
+            <?php if ($mensajes_pendientes > 0): ?>
+                <p class="paywall-pending">
+                    <i class="fas fa-envelope"></i>
+                    Tienes <strong><?php echo (int)$mensajes_pendientes; ?></strong>
+                    <?php echo $mensajes_pendientes === 1 ? 'mensaje sin leer' : 'mensajes sin leer'; ?>
+                </p>
+            <?php endif; ?>
+            <p class="paywall-desc">
+                Habla directamente con publicadores y usuarios interesados en tus códigos.
+                Cierra acuerdos sin intermediarios y maximiza tus beneficios.
+            </p>
+            <ul class="paywall-features">
+                <li><i class="fas fa-check-circle"></i> Lee y responde mensajes ilimitados</li>
+                <li><i class="fas fa-check-circle"></i> Contacta a quien ve tus códigos</li>
+                <li><i class="fas fa-check-circle"></i> Badge dorado en tu perfil</li>
+                <li><i class="fas fa-check-circle"></i> 10€/mes de saldo de regalo</li>
+            </ul>
+            <a href="/suscripciones_y_creditos" class="paywall-cta">
+                <i class="fas fa-crown"></i> Hazte VIP — 9,99€/mes
+            </a>
+            <p class="paywall-small">Cancela cuando quieras. Sin permanencia.</p>
+        </div>
+    </div>
+    <style>
+    .vip-chat-paywall {
+        min-height: 70vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+        background: linear-gradient(135deg, #fff8e6 0%, #fff 60%);
+    }
+    .paywall-card {
+        max-width: 560px;
+        width: 100%;
+        background: white;
+        border-radius: 24px;
+        padding: 40px 36px;
+        text-align: center;
+        box-shadow: 0 25px 60px rgba(227, 6, 19, 0.15);
+        border: 1px solid #fde8a8;
+    }
+    .paywall-crown {
+        width: 80px;
+        height: 80px;
+        margin: 0 auto 18px;
+        background: linear-gradient(135deg, #ffd700, #f9a825);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 12px 30px rgba(249, 168, 37, 0.35);
+    }
+    .paywall-crown i { color: white; font-size: 36px; }
+    .paywall-card h1 {
+        font-size: 1.7rem;
+        font-weight: 800;
+        color: #1a1a1a;
+        margin: 0 0 14px;
+    }
+    .paywall-pending {
+        background: linear-gradient(135deg, #fff3cd, #ffe69c);
+        color: #7a5400;
+        font-weight: 700;
+        padding: 12px 18px;
+        border-radius: 12px;
+        margin: 0 0 18px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .paywall-desc {
+        color: #555;
+        font-size: 1rem;
+        line-height: 1.5;
+        margin: 0 0 22px;
+    }
+    .paywall-features {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 26px;
+        text-align: left;
+        display: inline-block;
+    }
+    .paywall-features li {
+        padding: 6px 0;
+        color: #333;
+        font-size: 0.95rem;
+        font-weight: 500;
+    }
+    .paywall-features li i {
+        color: #28a745;
+        margin-right: 8px;
+    }
+    .paywall-cta {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        background: linear-gradient(135deg, #E30613, #FF4D4D);
+        color: white !important;
+        text-decoration: none !important;
+        padding: 16px 36px;
+        border-radius: 50px;
+        font-weight: 800;
+        font-size: 1.05rem;
+        box-shadow: 0 12px 30px rgba(227, 6, 19, 0.35);
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+    .paywall-cta:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 18px 40px rgba(227, 6, 19, 0.45);
+    }
+    .paywall-small {
+        margin: 14px 0 0;
+        color: #888;
+        font-size: 0.8rem;
+    }
+    </style>
+    <?php
+    if (function_exists('get_footer_modern')) { get_footer_modern(); }
+    die();
+}
+
 // Incluir header moderno
 include_once __DIR__ . '/../myphp/_header_modern.php';
 $GLOBALS['header_modern_used'] = true;
+$GLOBALS['anula_adsense'] = true; // Sin publicidad en el chat, molesta y distrae de conversar
 
 // Renderizar header
 get_header_modern($title, $description, '', '', '', false);
@@ -63,11 +217,6 @@ get_header_modern($title, $description, '', '', '', false);
                         <span class="sidebar-label">Bandeja de entrada</span>
                         <p class="sidebar-helper">Mensajes que recibes de la comunidad</p>
                     </div>
-                    <?php if($es_vip_chat || $es_admin_chat): ?>
-                    <button class="btn btn-sm btn-primary" id="newConversationBtn" title="Nueva conversación" style="display: block;">
-                        <i class="fas fa-plus"></i>
-                    </button>
-                    <?php endif; ?>
                 </div>
                 <div class="chat-tabs">
                     <button type="button" class="chat-tab active" data-tab="inbox">Mensajes</button>
@@ -138,41 +287,6 @@ get_header_modern($title, $description, '', '', '', false);
         </aside>
     </div>
 
-    <!-- Modal para buscar usuarios -->
-    <div class="modal fade" id="newConversationModal" tabindex="-1" role="dialog" aria-labelledby="newConversationModalLabel">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                    <h4 class="modal-title" id="newConversationModalLabel">Nueva conversación</h4>
-                </div>
-                <div class="modal-body">
-                    <input type="text" class="form-control mb-3" id="searchUsersInput" placeholder="Buscar usuario por nombre o email...">
-                    <div id="usersSearchResults" style="max-height: 300px; overflow-y: auto;">
-                        <p class="text-muted text-center">Escribe para buscar usuarios...</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal para búsqueda de mensajes -->
-    <div class="modal fade" id="searchMessagesModal" tabindex="-1" role="dialog" aria-labelledby="searchMessagesModalLabel">
-        <div class="modal-dialog modal-lg" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                    <h4 class="modal-title" id="searchMessagesModalLabel">Buscar en conversación</h4>
-                </div>
-                <div class="modal-body">
-                    <input type="text" class="form-control mb-3" id="searchMessagesInput" placeholder="Buscar mensajes...">
-                    <div id="searchMessagesResults" style="max-height: 400px; overflow-y: auto;">
-                        <p class="text-muted text-center">Escribe para buscar mensajes...</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 
 <!-- Menú contextual para conversaciones -->

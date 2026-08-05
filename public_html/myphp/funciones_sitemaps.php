@@ -92,14 +92,11 @@ function generarSitemapPrincipal($incluir_codigos = false) {
     $lastmod = $xml->createElement("lastmod", $hoy);
     $sitemap->appendChild($lastmod);
     
-    // Sitemap de comparativas
-    $sitemap = $xml->createElement("sitemap");
-    $sitemap = $sitemapindex->appendChild($sitemap);
-    $loc = $xml->createElement("loc", $base_url . "/myphp/xml/sitemap_comparativas.xml");
-    $sitemap->appendChild($loc);
-    $lastmod = $xml->createElement("lastmod", $hoy);
-    $sitemap->appendChild($lastmod);
-    
+    // Sitemap de comparativas DESACTIVADO: ~5000 páginas programáticas con ~2 clics/90d.
+    // Quemaban crawl budget y diluían calidad del dominio. Ahora noindex (ver ruta
+    // /comparar/ en app_with_mongo.php). No se listan en el índice para que Google
+    // reenfoque el crawl en las páginas de marca.
+
     // Sitemap de guías
     $sitemap = $xml->createElement("sitemap");
     $sitemap = $sitemapindex->appendChild($sitemap);
@@ -282,12 +279,15 @@ function generarSitemapComparativas($limite = 5000) {
     if (!$db) return ['success' => false, 'error' => 'Error de conexión'];
     
     try {
-        // Obtener marcas activas (estado=1) que tienen categoria_clave
+        // Obtener marcas activas (estado=1) que tienen categoria_clave.
+        // Excluir marcas marcadas como inactivas por SEO (sin actividad en >12 meses)
+        // para no diluir relevancia con páginas de códigos antiguos.
         $col_marcas = $db->selectCollection('marcas');
         $cursor = $col_marcas->find(
             [
                 'estado'         => 1,
-                'categoria_clave'=> ['$exists' => true, '$ne' => '']
+                'categoria_clave'=> ['$exists' => true, '$ne' => ''],
+                'inactiva_seo'   => ['$ne' => true],
             ],
             ['projection' => ['nombre_clave' => 1, 'categoria_clave' => 1]]
         );
@@ -481,10 +481,10 @@ function generarTodosLosSitemaps($opciones = []) {
     $resultado_categorias = generarSitemapCategorias();
     $resultados['sitemaps']['categorias'] = $resultado_categorias;
     
-    // Comparativas: pares de marcas de la misma categoría
-    $resultado_comparativas = generarSitemapComparativas($limite_comparativas);
-    $resultados['sitemaps']['comparativas'] = $resultado_comparativas;
-    
+    // Comparativas DESACTIVADAS: noindex + fuera del índice de sitemap (ver ruta /comparar/).
+    // ~5000 páginas programáticas con ~2 clics/90d quemaban crawl budget.
+    // $resultado_comparativas = generarSitemapComparativas($limite_comparativas);
+
     // Guías / Super Landings
     $resultado_guias = generarSitemapGuias();
     $resultados['sitemaps']['guias'] = $resultado_guias;

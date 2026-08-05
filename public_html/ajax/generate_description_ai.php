@@ -47,6 +47,7 @@ $is_vip = es_usuario_vip($user_id);
 
 // Si no es VIP, mostrar modal de ventajas VIP directamente
 if (!$is_vip) {
+    registrar_evento_vip_bloqueo($user_id, 'modal_ia_bloqueada');
     echo json_encode([
         'success' => false,
         'show_vip_modal' => true,

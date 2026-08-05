@@ -53,7 +53,7 @@ function getCollectionIngresosAfiliados() {
 /**
  * Añade una nueva URL de afiliado para un usuario
  */
-function agregarUrlAfiliado($usuario_id, $url, $nombre_plataforma, $descripcion = '') {
+function agregarUrlAfiliado($usuario_id, $url, $nombre_plataforma, $descripcion = '', $red_afiliacion = '', $marca_clave = '', $marca_nombre = '') {
     $collection = getCollectionAfiliados();
     if (!$collection) {
         return ['success' => false, 'error' => 'Error de conexión'];
@@ -65,7 +65,10 @@ function agregarUrlAfiliado($usuario_id, $url, $nombre_plataforma, $descripcion 
             'url' => $url,
             'nombre_plataforma' => $nombre_plataforma,
             'descripcion' => $descripcion,
-            'marcas' => [], // Array de marcas asociadas
+            'red_afiliacion' => $red_afiliacion,
+            'marca_clave' => $marca_clave,
+            'marca_nombre' => $marca_nombre,
+            'marcas' => [],
             'activo' => true,
             'fecha_creacion' => new MongoDB\BSON\UTCDateTime(),
             'fecha_actualizacion' => new MongoDB\BSON\UTCDateTime()
@@ -108,6 +111,9 @@ function obtenerUrlsAfiliadosUsuario($usuario_id) {
                 'url' => $documento['url'],
                 'nombre_plataforma' => $documento['nombre_plataforma'],
                 'descripcion' => $documento['descripcion'],
+                'red_afiliacion' => $documento['red_afiliacion'] ?? '',
+                'marca_clave' => $documento['marca_clave'] ?? '',
+                'marca_nombre' => $documento['marca_nombre'] ?? '',
                 'marcas' => $documento['marcas'] ?? [],
                 'fecha_creacion' => $documento['fecha_creacion']->toDateTime()->format('Y-m-d H:i:s')
             ];
@@ -333,6 +339,9 @@ function actualizarUrlAfiliado($url_id, $usuario_id, $datos) {
         if (isset($datos['url'])) $update_data['url'] = $datos['url'];
         if (isset($datos['nombre_plataforma'])) $update_data['nombre_plataforma'] = $datos['nombre_plataforma'];
         if (isset($datos['descripcion'])) $update_data['descripcion'] = $datos['descripcion'];
+        if (isset($datos['red_afiliacion'])) $update_data['red_afiliacion'] = $datos['red_afiliacion'];
+        if (isset($datos['marca_clave'])) $update_data['marca_clave'] = $datos['marca_clave'];
+        if (isset($datos['marca_nombre'])) $update_data['marca_nombre'] = $datos['marca_nombre'];
 
         $resultado = $collection->updateOne(
             [
@@ -760,6 +769,53 @@ function obtenerCodigosAsignadosAAfiliado($url_afiliado_id, $usuario_id) {
         error_log("Error al obtener códigos asignados: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
+}
+
+/**
+ * Catálogo de redes de afiliación conocidas
+ */
+function getRedesAfiliacion() {
+    return [
+        'impact'        => ['nombre' => 'Impact',         'color' => '#0066ff'],
+        'awin'          => ['nombre' => 'Awin',           'color' => '#ff6b00'],
+        'tradedoubler'  => ['nombre' => 'Tradedoubler',   'color' => '#00a651'],
+        'cj'            => ['nombre' => 'CJ Affiliate',   'color' => '#7c3aed'],
+        'rakuten'       => ['nombre' => 'Rakuten',        'color' => '#bf0000'],
+        'partnerize'    => ['nombre' => 'Partnerize',     'color' => '#00d4aa'],
+        'admitad'       => ['nombre' => 'Admitad',        'color' => '#f39c12'],
+        'effiliation'   => ['nombre' => 'Effiliation',    'color' => '#1abc9c'],
+        'amazon'        => ['nombre' => 'Amazon Partners','color' => '#ff9900'],
+        'directo'       => ['nombre' => 'Programa directo','color' => '#6c757d'],
+        'otro'          => ['nombre' => 'Otro',           'color' => '#999999'],
+    ];
+}
+
+/**
+ * Agrupa URLs de afiliado de usuario por marca_clave
+ */
+function obtenerUrlsAfiliadosAgrupadasPorMarca($usuario_id) {
+    $res = obtenerUrlsAfiliadosUsuario($usuario_id);
+    if (!$res['success']) return $res;
+
+    $grupos = [];
+    $sin_marca = [];
+    foreach ($res['urls'] as $u) {
+        $clave = $u['marca_clave'] ?? '';
+        if (empty($clave)) {
+            $sin_marca[] = $u;
+            continue;
+        }
+        if (!isset($grupos[$clave])) {
+            $grupos[$clave] = [
+                'marca_clave' => $clave,
+                'marca_nombre' => $u['marca_nombre'] ?: $clave,
+                'urls' => []
+            ];
+        }
+        $grupos[$clave]['urls'][] = $u;
+    }
+    ksort($grupos);
+    return ['success' => true, 'grupos' => $grupos, 'sin_marca' => $sin_marca];
 }
 
 ?>

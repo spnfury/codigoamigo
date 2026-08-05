@@ -1014,9 +1014,12 @@
                 </li>
             </ul>
 
-            <a href="/public/mis_viewers.php" class="btn-upgrade-now">
-                QUIERO SER VIP POR 9,99€
-            </a>
+            <button type="button" id="btn-vip-checkout" class="btn-upgrade-now" style="border: none; cursor: pointer; width: 100%; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+                <span class="btn-vip-text" style="display: inline-flex; align-items: center; gap: 6px;">
+                    Primer mes 4,99€ <span style="font-size: 13px; font-weight: 400; opacity: 0.85;">(luego 9,99€/mes)</span>
+                </span>
+                <span class="btn-vip-spinner" style="display: none;"><i class="fas fa-spinner fa-spin"></i></span>
+            </button>
             
             <p style="margin-top: 20px; color: #888; font-size: 13px;">Cancela en cualquier momento con un solo clic.</p>
           </div>
@@ -1457,6 +1460,57 @@
                 },
                 error: function() {
                     btn.removeClass('loading').html('<i class="fas fa-magic"></i> Completar con IA <span class="vip-badge-mini">VIP</span>');
+                    alert('Error de conexión. Inténtalo de nuevo.');
+                }
+            });
+        });
+
+        // Checkout directo desde modal VIP (bloqueo de IA)
+        $('#btn-vip-checkout').on('click', function() {
+            var btn = $(this);
+            var spinner = btn.find('.btn-vip-spinner');
+            var text = btn.find('.btn-vip-text');
+            
+            if (btn.hasClass('loading')) return;
+            
+            btn.addClass('loading');
+            text.hide();
+            spinner.show();
+            
+            $.ajax({
+                url: '/crear_sesion_suscripcion_vip.php',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ source: 'modal_ia_bloqueada' }),
+                dataType: 'json',
+                success: function(response) {
+                    btn.removeClass('loading');
+                    text.show();
+                    spinner.hide();
+                    
+                    if (response.success && response.checkout_url) {
+                        if (typeof gtag === 'function') {
+                            gtag('event', 'begin_checkout', {
+                                currency: 'EUR',
+                                value: 4.99,
+                                source: 'modal_ia_bloqueada',
+                                items: [{
+                                    item_id: 'vip_subscription',
+                                    item_name: 'Suscripción VIP',
+                                    price: 4.99,
+                                    quantity: 1
+                                }]
+                            });
+                        }
+                        window.location.href = response.checkout_url;
+                    } else {
+                        alert(response.error || 'No se pudo crear la sesión de pago. Inténtalo de nuevo.');
+                    }
+                },
+                error: function() {
+                    btn.removeClass('loading');
+                    text.show();
+                    spinner.hide();
                     alert('Error de conexión. Inténtalo de nuevo.');
                 }
             });

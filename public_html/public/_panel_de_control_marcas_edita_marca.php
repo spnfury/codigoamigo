@@ -25,12 +25,24 @@ if($_REQUEST["submit"]==1){//SUBMIT
 
     $collection_marcas = getCollectionMarcas();
 
+    // Promoción tiempo limitado (campañas referido marca)
+    $promo_activa     = !empty($_REQUEST["promo_activa"]) ? true : false;
+    $promo_titulo     = trim($_REQUEST["promo_titulo"] ?? '');
+    $promo_bono       = trim($_REQUEST["promo_bono"] ?? '');
+    $promo_fecha_fin  = trim($_REQUEST["promo_fecha_fin"] ?? '');
+    $promo_url        = trim($_REQUEST["promo_url"] ?? '');
+
     $updateResult = $collection_marcas->updateOne(
         ['_id' => new \MongoDB\BSON\ObjectId($_REQUEST["id_marca"]) ],
         ['$set' => [
             'descripción' => $_REQUEST["descripcion_marca_corta"],
             'descripción_larga' => $_REQUEST["descripcion_marca_larga"],
-            'video' => $_REQUEST["video_marca"]
+            'video' => $_REQUEST["video_marca"],
+            'promo_activa'    => $promo_activa,
+            'promo_titulo'    => $promo_titulo,
+            'promo_bono'      => $promo_bono,
+            'promo_fecha_fin' => $promo_fecha_fin,
+            'promo_url'       => $promo_url,
         ]]
     );
 
@@ -112,6 +124,36 @@ if($_REQUEST["submit"]==1){//SUBMIT
     					<textarea rows="1" cols="" class="form-control" id="video_marca" name="video_marca"><?php echo $marca["video"]; ?></textarea>
     				</div>
     			</div><br>
+
+    			<!-- ============================================================== -->
+    			<!-- PROMOCIÓN TIEMPO LIMITADO (referido boost marca, ej. N26 70€)   -->
+    			<!-- ============================================================== -->
+    			<div class="row" style="background:#FFF3E0;padding:20px;border-radius:12px;border-left:5px solid #FF9800;margin:20px 0;">
+    				<div class="col-md-12">
+    					<h2 style="color:#E65100;margin-top:0;">🔥 Promoción tiempo limitado</h2>
+    					<p style="color:#BF360C;font-size:0.9rem;">Activa para mostrar badge urgencia en cards, banner home y landing /promociones-activas.</p>
+    				</div>
+    				<div class="col-md-3">
+    					<label><strong>Activa</strong></label><br>
+    					<input type="checkbox" id="promo_activa" name="promo_activa" value="1" <?php echo !empty($marca["promo_activa"]) ? 'checked' : ''; ?>>
+    				</div>
+    				<div class="col-md-9">
+    					<label><strong>Título</strong> (ej. "Hasta 70€ por referido")</label>
+    					<input type="text" class="form-control" id="promo_titulo" name="promo_titulo" value="<?php echo htmlspecialchars($marca["promo_titulo"] ?? ''); ?>">
+    				</div>
+    				<div class="col-md-4" style="margin-top:10px;">
+    					<label><strong>Bono</strong> (ej. "70€")</label>
+    					<input type="text" class="form-control" id="promo_bono" name="promo_bono" value="<?php echo htmlspecialchars($marca["promo_bono"] ?? ''); ?>">
+    				</div>
+    				<div class="col-md-4" style="margin-top:10px;">
+    					<label><strong>Fecha fin</strong> (YYYY-MM-DD)</label>
+    					<input type="date" class="form-control" id="promo_fecha_fin" name="promo_fecha_fin" value="<?php echo htmlspecialchars($marca["promo_fecha_fin"] ?? ''); ?>">
+    				</div>
+    				<div class="col-md-4" style="margin-top:10px;">
+    					<label><strong>URL fuente</strong> (opcional)</label>
+    					<input type="text" class="form-control" id="promo_url" name="promo_url" value="<?php echo htmlspecialchars($marca["promo_url"] ?? ''); ?>">
+    				</div>
+    			</div>
 
     			<div class="row text-center">
     				<div class="col-md-6">

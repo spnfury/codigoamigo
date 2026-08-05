@@ -276,7 +276,8 @@ function(event, hint) {
 }
 JS;
 
-        $cachedSnippet = '<script src="https://browser.sentry-cdn.com/7.120.0/bundle.tracing.replay.min.js" crossorigin="anonymous"></script>' . "\n";
+        // Cambiado de bundle.tracing.replay.min.js a bundle.min.js (sin Replay/Tracing) para evitar congelar el navegador
+        $cachedSnippet = '<script src="https://browser.sentry-cdn.com/7.120.0/bundle.min.js" crossorigin="anonymous"></script>' . "\n";
         $cachedSnippet .= '<script>' . "\n";
         $cachedSnippet .= 'if (window.Sentry) {' . "\n";
         $cachedSnippet .= '  var sentryConfig = ' . json_encode($configJson, JSON_UNESCAPED_SLASHES) . ';' . "\n";

@@ -402,7 +402,7 @@ function eliminarCodigo(codigoId, marcaNombre) {
 
         if (data.success) {
             // Animar y remover la tarjeta del DOM
-            var card = document.querySelector('.code-card[data-codigo-id="' + codigoId + '"]');
+            var card = document.querySelector('.code-item[data-codigo-id="' + codigoId + '"]');
             if (card) {
                 card.style.transition = 'all 0.4s ease';
                 card.style.opacity = '0';

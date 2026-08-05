@@ -39,7 +39,6 @@ $configuraciones_default = [
         'registro_abierto' => true,
         'verificacion_email' => false,
         'saldo_inicial' => 0,
-        'zumbidos_iniciales' => 1,
         'max_codigos_por_usuario' => 50,
         'max_codigos_por_marca' => 1
     ],
@@ -143,7 +142,6 @@ if ($_POST) {
                     'registro_abierto' => isset($_POST['registro_abierto']),
                     'verificacion_email' => isset($_POST['verificacion_email']),
                     'saldo_inicial' => (float)($_POST['saldo_inicial'] ?? 0),
-                    'zumbidos_iniciales' => (int)($_POST['zumbidos_iniciales'] ?? 1),
                     'max_codigos_por_usuario' => (int)($_POST['max_codigos_por_usuario'] ?? 50),
                     'max_codigos_por_marca' => (int)($_POST['max_codigos_por_marca'] ?? 1)
                 ];
@@ -441,11 +439,6 @@ $title = "Configuración del Sistema - Panel de Administración";
                                         <label class="form-label">Saldo Inicial (€)</label>
                                         <input type="number" step="0.01" class="form-control" name="saldo_inicial" 
                                                value="<?php echo $configuraciones['usuarios']['saldo_inicial']; ?>">
-                                    </div>
-                                    <div class="col-md-3 mb-3">
-                                        <label class="form-label">Zumbidos Iniciales</label>
-                                        <input type="number" class="form-control" name="zumbidos_iniciales" 
-                                               value="<?php echo $configuraciones['usuarios']['zumbidos_iniciales']; ?>">
                                     </div>
                                     <div class="col-md-3 mb-3">
                                         <label class="form-label">Máx. Códigos por Usuario</label>

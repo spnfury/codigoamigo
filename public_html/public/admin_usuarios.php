@@ -226,9 +226,6 @@ switch ($sort_by) {
     case 'saldo':
         $sort_options = ['saldo' => $sort_direction];
         break;
-    case 'zumbidos':
-        $sort_options = ['zumbido_saldo' => $sort_direction];
-        break;
     case 'fecha_registro':
     default:
         $sort_options = ['_id' => $sort_direction];
@@ -510,7 +507,6 @@ $title = "Gestión de Usuarios - Panel de Administración";
                                             'email' => 'Email', 
                                             'estado' => 'Estado',
                                             'saldo' => 'Saldo',
-                                            'zumbidos' => 'Zumbidos',
                                             'fecha_registro' => 'Fecha de Registro'
                                         ];
                                         echo $columnas[$sort_by] ?? 'Fecha de Registro';
@@ -536,7 +532,6 @@ $title = "Gestión de Usuarios - Panel de Administración";
                                             <th><?php echo generarEnlaceOrdenamiento('estado', 'Estado', $sort_by, $sort_order); ?></th>
                                             <th>VIP</th>
                                             <th><?php echo generarEnlaceOrdenamiento('saldo', 'Saldo', $sort_by, $sort_order); ?></th>
-                                            <th><?php echo generarEnlaceOrdenamiento('zumbidos', 'Zumbidos', $sort_by, $sort_order); ?></th>
                                             <th><?php echo generarEnlaceOrdenamiento('fecha_registro', 'Registro', $sort_by, $sort_order); ?></th>
                                             <th>Acciones</th>
                                         </tr>
@@ -602,11 +597,8 @@ $title = "Gestión de Usuarios - Panel de Administración";
                                                 </span>
                                             </td>
                                             <td>
-                                                <span class="badge bg-info"><?php echo $usuario['zumbido_saldo'] ?? 0; ?></span>
-                                            </td>
-                                            <td>
                                                 <small class="text-muted">
-                                                    <?php 
+                                                    <?php
                                                     if (isset($usuario['fecha_registro'])) {
                                                         echo date('d/m/Y', strtotime($usuario['fecha_registro']));
                                                     } else {

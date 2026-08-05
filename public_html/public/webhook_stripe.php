@@ -359,7 +359,7 @@ if ($event->type == 'checkout.session.completed') {
                         </div>';
 
                     $html = _templateBaseDestacadoEmail('Esto te habría salido gratis con VIP', $contenido, 'Hazte VIP ahora', 'https://www.codigoamigo.com/public/suscripcion_vip.php');
-                    $text = "Hola $username_comprador,\n\nAcabas de pagar $cantidad_pagada€ por destacar tu código. Con VIP (9,99€/mes, primer mes 4,99€) consigues 10€ de saldo gratis cada mes, badge verificado, chat ilimitado y auto-renovación de destacados.\n\nHazte VIP: https://www.codigoamigo.com/public/suscripcion_vip.php";
+                    $text = "Hola $username_comprador,\n\nAcabas de pagar {$cantidad_pagada}€ por destacar tu código. Con VIP (9,99€/mes, primer mes 4,99€) consigues 10€ de saldo gratis cada mes, badge verificado, chat ilimitado y auto-renovación de destacados.\n\nHazte VIP: https://www.codigoamigo.com/public/suscripcion_vip.php";
 
                     $resultado_email = enviarEmailConBrevoYRegistrar(
                         $usuario_comprador['mail'], $username_comprador,
@@ -417,9 +417,24 @@ if ($event->type == 'checkout.session.completed') {
             exit();
         }
         
-        // Calcular cantidad de recarga
-        $cantidad_recarga = isset($metadata['saldo']) ? (float)$metadata['saldo'] : (isset($session->amount_total) ? ($session->amount_total / 100) : 0);
+        // Calcular cantidad de recarga.
+        // Defensa en profundidad: el saldo se deriva del paquete (tabla fija),
+        // no del metadata crudo — y se exige que lo cobrado coincida con el paquete.
+        $PAQUETES_RECARGA = ['20' => 25, '40' => 50, '100' => 150];
         $paquete = $metadata['paquete'] ?? 'N/A';
+        $importe_cobrado = isset($session->amount_total) ? ($session->amount_total / 100) : 0;
+
+        if (isset($PAQUETES_RECARGA[$paquete]) && (float)$paquete == $importe_cobrado) {
+            $cantidad_recarga = $PAQUETES_RECARGA[$paquete];
+        } else {
+            logWebhook("ALERTA: recarga con paquete/importe inconsistente, se abona lo cobrado", [
+                'session_id' => $session->id ?? 'UNKNOWN',
+                'paquete' => $paquete,
+                'importe_cobrado' => $importe_cobrado,
+                'saldo_metadata' => $metadata['saldo'] ?? null,
+            ], 'ERROR');
+            $cantidad_recarga = $importe_cobrado; // nunca más de lo pagado
+        }
         
         // Obtener saldo anterior antes de actualizar
         $collection_usuarios = getCollectionUsuarios();

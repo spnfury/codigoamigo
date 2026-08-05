@@ -37,10 +37,6 @@ $(document).ready(function () {
     console.log('[Chat] Configurando event handlers...');
     setupEventHandlers();
 
-    // Inicializar búsqueda
-    console.log('[Chat] Inicializando búsqueda...');
-    initSearch();
-
     // Intentar inicializar WebSocket (puede fallar si el servidor no está corriendo)
     console.log('[Chat] Intentando conectar WebSocket...');
     try {
@@ -161,6 +157,11 @@ function initWebSocket() {
         showFallbackNotification();
     });
 
+    // El servidor rechazó un mensaje/acción (antes se perdía en silencio)
+    chatWebSocket.on('error', function (data) {
+        showToast(data && data.message ? data.message : 'El servidor rechazó la acción', 'fas fa-exclamation-triangle');
+    });
+
     // Detectar si WebSocket no está disponible desde el inicio
     setTimeout(function () {
         if (!chatWebSocket.isConnected && !usePollingFallback) {
@@ -261,32 +262,6 @@ function setupEventHandlers() {
                 }
             }
         }, 3000);
-    });
-
-    // Nueva conversación
-    $('#newConversationBtn').on('click', function () {
-        $('#newConversationModal').simpleModal('show');
-        $('#searchUsersInput').val('');
-        $('#usersSearchResults').html('<p class="text-muted text-center">Escribe para buscar usuarios...</p>');
-    });
-
-    // Buscar usuarios
-    let searchTimeout = null;
-    $('#searchUsersInput').on('input', function () {
-        const query = $(this).val().trim();
-
-        if (searchTimeout) {
-            clearTimeout(searchTimeout);
-        }
-
-        if (query.length < 2) {
-            $('#usersSearchResults').html('<p class="text-muted text-center">Escribe para buscar usuarios...</p>');
-            return;
-        }
-
-        searchTimeout = setTimeout(function () {
-            searchUsers(query);
-        }, 300);
     });
 
     // Context menu para conversaciones
@@ -418,18 +393,7 @@ function openConversation(conversationId, otherUserId) {
                 <div class="chat-header-name">${escapeHtml(nombreChat)}</div>
                 <div class="chat-header-status"><span id="connectionStatus" class="status-dot online"></span> En línea</div>
             </div>
-            <div class="chat-header-actions">
-                <button class="header-action-btn" id="searchMessagesBtn" title="Buscar en esta conversación">
-                    <i class="fas fa-search"></i>
-                </button>
-            </div>
         `);
-
-        // Re-vincular evento de búsqueda
-        $('#searchMessagesBtn').on('click', function () {
-            $('#searchMessagesModal').simpleModal('show');
-            $('#searchMessagesInput').val('').focus();
-        });
     }
 
     // Cargar mensajes
@@ -657,12 +621,17 @@ function handleNewMessage(data) {
  */
 function sendMessage() {
     const messageText = $('#messageInput').val().trim();
-    if (!messageText || !currentConversationId) {
+    if (!messageText) {
+        return;
+    }
+    if (!currentConversationId) {
+        showToast('Selecciona una conversación antes de enviar', 'fas fa-exclamation-triangle');
         return;
     }
 
     const otherUserId = getOtherUserIdFromConversation(currentConversationId);
     if (!otherUserId) {
+        showToast('No se pudo identificar al destinatario', 'fas fa-exclamation-triangle');
         return;
     }
 
@@ -702,7 +671,12 @@ function sendMessage() {
                     $('#messageInput').val('');
                     loadMessages(currentConversationId);
                     loadConversations();
+                } else {
+                    showToast(response.error || 'No se pudo enviar el mensaje', 'fas fa-exclamation-triangle');
                 }
+            },
+            error: function () {
+                showToast('Error de conexión al enviar el mensaje', 'fas fa-exclamation-triangle');
             }
         });
     }
@@ -862,62 +836,6 @@ function filterConversations(query) {
     renderConversations(filtered);
 }
 
-function searchUsers(query) {
-    $.ajax({
-        url: '/api/chat_api.php',
-        method: 'POST',
-        data: {
-            action: 'buscar_usuarios',
-            busqueda: query
-        },
-        dataType: 'json',
-        success: function (response) {
-            if (response.success) {
-                renderUserSearchResults(response.usuarios);
-            }
-        }
-    });
-}
-
-function renderUserSearchResults(usuarios) {
-    const container = $('#usersSearchResults');
-
-    if (usuarios.length === 0) {
-        container.html('<p class="text-muted text-center">No se encontraron usuarios</p>');
-        return;
-    }
-
-    let html = '<div class="user-search-results">';
-    usuarios.forEach(function (usuario) {
-        html += `
-            <div class="user-search-item" data-user-id="${usuario._id}">
-                <div class="user-avatar">
-                    ${usuario.img ? `<img src="${usuario.img}" alt="${escapeHtml(usuario.username)}" onerror="this.onerror=null; this.src='https://www.codigoamigo.com/img/utilidades/usuario_sin_foto.jpg';">` : `<div class="avatar-placeholder">${getInitials(usuario.username)}</div>`}
-                </div>
-                <div class="user-info">
-                    <div class="user-name">${escapeHtml(usuario.username)}</div>
-                    <div class="user-email">${escapeHtml(usuario.mail)}</div>
-                </div>
-            </div>
-        `;
-    });
-    html += '</div>';
-
-    container.html(html);
-
-    $('.user-search-item').on('click', function () {
-        const userId = $(this).data('user-id');
-        startConversation(userId);
-        $('#newConversationModal').simpleModal('hide');
-    });
-}
-
-function startConversation(otherUserId) {
-    // Crear conversación con el usuario
-    const conversationId = crearConversacionId(otherUserId, userId);
-    openConversation(conversationId, otherUserId);
-}
-
 function loadUserProfile(userId) {
     $.ajax({
         url: '/api/chat_api.php',
@@ -1056,8 +974,6 @@ function loadCodeInteractions(otroUserId) {
 function renderCodeInteractions(data) {
     const container = $('#profileInteracciones');
     const otroUserId = data.usuario_id || getOtherUserIdFromConversation(currentConversationId);
-    const user = window.currentChatUser || {};
-    const otroNombre = user.username || 'Usuario';
 
     const contexto = data.contexto || 'directo'; // directo, yo_contacte, me_contactaron
     const codigoInfo = data.codigo_info || null;
@@ -1091,93 +1007,71 @@ function renderCodeInteractions(data) {
     const marcaSlug = (codigoInfo.marca || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const marcaPageUrl = '/de-' + marcaSlug;
 
-    // Determinar texto de contexto
-    let textoContexto = '';
+    // Icono/color de contexto: solo un indicador visual junto al nombre de marca
+    // (el texto "contactaste a X por su código" ya se ve en el propio hilo)
     let iconoContexto = '';
     let colorContexto = '';
 
     if (contexto === 'me_contactaron') {
-        if (soyOwner) {
-            textoContexto = `<strong>${escapeHtml(otroNombre)}</strong> te contactó por tu código de <a href="${marcaPageUrl}" target="_blank" style="color: var(--accent-color); text-decoration: none; font-weight: 700;">${marca}</a>`;
-            iconoContexto = 'fas fa-arrow-left';
-            colorContexto = 'var(--success-color)';
-        } else {
-            textoContexto = `<strong>${escapeHtml(otroNombre)}</strong> te contactó por su código de <a href="${marcaPageUrl}" target="_blank" style="color: var(--accent-color); text-decoration: none; font-weight: 700;">${marca}</a>`;
-            iconoContexto = 'fas fa-arrow-left';
-            colorContexto = 'var(--accent-color)';
-        }
+        iconoContexto = 'fas fa-arrow-left';
+        colorContexto = soyOwner ? 'var(--success-color)' : 'var(--accent-color)';
     } else if (contexto === 'yo_contacte') {
-        if (soyOwner) {
-            textoContexto = `Contactaste a <strong>${escapeHtml(otroNombre)}</strong> por tu código de <a href="${marcaPageUrl}" target="_blank" style="color: var(--accent-color); text-decoration: none; font-weight: 700;">${marca}</a>`;
-            iconoContexto = 'fas fa-arrow-right';
-            colorContexto = 'var(--accent-color)';
-        } else {
-            textoContexto = `Contactaste a <strong>${escapeHtml(otroNombre)}</strong> por su código de <a href="${marcaPageUrl}" target="_blank" style="color: var(--accent-color); text-decoration: none; font-weight: 700;">${marca}</a>`;
-            iconoContexto = 'fas fa-arrow-right';
-            colorContexto = 'var(--warning-color)';
-        }
+        iconoContexto = 'fas fa-arrow-right';
+        colorContexto = soyOwner ? 'var(--accent-color)' : 'var(--warning-color)';
     }
 
     const strCodigo = codigoInfo.str_codigo ? escapeHtml(codigoInfo.str_codigo) : '';
     const codigoUrl = codigoInfo.url ? escapeHtml(codigoInfo.url) : '';
     const linkHref = codigoUrl ? '/codigo/' + codigoUrl : marcaPageUrl;
 
+    // Nota: el texto "Contactaste a X por su código de Y" se quitó de aquí:
+    // ya se ve en la burbuja de contexto y en el mensaje de sistema del propio
+    // hilo de chat, duplicarlo en este panel era ruido, no información nueva.
     let html = `
         <div class="interacciones-section" style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--glass-border); border-radius: var(--radius-md); overflow: hidden;">
             <div style="padding: 1rem; background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--glass-border); display: flex; align-items: center; gap: 0.5rem;">
-                <i class="fas fa-link" style="color: var(--accent-color);"></i>
-                <span style="font-weight: 600; font-size: 0.9rem;">Contexto</span>
-            </div>
-
-            <!-- Texto de contexto -->
-            <div style="padding: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05);">
-                <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
-                    <i class="${iconoContexto}" style="color: ${colorContexto}; margin-top: 0.15rem; font-size: 0.9rem;"></i>
-                    <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0; line-height: 1.5;">${textoContexto}</p>
-                </div>
+                <i class="${iconoContexto}" style="color: ${colorContexto};"></i>
+                <span style="font-weight: 600; font-size: 0.9rem;">${marca}</span>
             </div>
 
             <!-- Tarjeta del código (Clickable) -->
             <div style="padding: 1rem;">
                 <a href="${linkHref}" target="_blank" style="text-decoration: none; color: inherit; display: block;" class="contexto-card-link">
-                    <div class="interaccion-item" data-codigo-id="${codigoInfo.codigo_id}" data-beneficio="${beneficio}" style="display: flex; flex-direction: column; padding: 1rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--glass-border); border-radius: 10px; transition: all 0.2s;">
-                        
-                        <!-- Cabecera de la Marca -->
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: ${strCodigo ? '0.85rem' : '0'};">
-                            <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                <div style="width: 38px; height: 38px; border-radius: 8px; background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.05)); display: flex; align-items: center; justify-content: center;">
-                                    <i class="fas fa-tag" style="font-size: 0.9rem; color: var(--warning-color);"></i>
-                                </div>
-                                <div>
-                                    <a href="${marcaPageUrl}" target="_blank" onclick="event.stopPropagation();" style="font-weight: 600; font-size: 1rem; color: white; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-color)'" onmouseout="this.style.color='white'">${marca}</a>
-                                    <div style="font-size: 0.8rem; color: var(--text-tertiary);">Beneficio: <span style="color: var(--warning-color); font-weight: 600;">${beneficio}€</span></div>
-                                </div>
+                    <div class="interaccion-item" data-codigo-id="${codigoInfo.codigo_id}" data-beneficio="${beneficio}" style="display: flex; flex-direction: column; gap: 0.65rem; padding: 1rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--glass-border); border-radius: 10px; transition: all 0.2s;">
+
+                        <!-- Fila 1: marca -->
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div style="width: 34px; height: 34px; flex-shrink: 0; border-radius: 8px; background: linear-gradient(135deg, rgba(227, 6, 19, 0.2), rgba(227, 6, 19, 0.05)); display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-tag" style="font-size: 0.85rem; color: var(--accent-color);"></i>
                             </div>
+                            <a href="${marcaPageUrl}" target="_blank" onclick="event.stopPropagation();" style="font-weight: 600; font-size: 1rem; color: white; text-decoration: none;" onmouseover="this.style.color='var(--accent-color)'" onmouseout="this.style.color='white'">${marca}</a>
+                            ${!soyOwner ? `<i class="fas fa-external-link-alt" style="color: var(--text-tertiary); font-size: 0.8rem; margin-left: auto;"></i>` : ''}
+                        </div>
+
+                        <!-- Fila 2: beneficio + acción del dueño, separadas del nombre para no amontonar -->
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05);">
+                            <span style="font-size: 0.8rem; color: var(--text-tertiary);">Beneficio: <strong style="color: var(--accent-color);">${beneficio}€</strong></span>
     `;
 
     // Toggle solo si SOY el dueño del código (alguien me contactó por mi código)
     if (soyOwner) {
         html += `
-                            <div onclick="event.preventDefault(); event.stopPropagation();" style="display: flex; align-items: center;">
+                            <div onclick="event.preventDefault(); event.stopPropagation();">
                                 <label class="apple-switch" title="${codigoCompletado ? 'Desmarcar' : '¿Ya usó tu código?'}" style="margin: 0;">
                                     <input type="checkbox" class="interaccion-toggle" ${codigoCompletado ? 'checked' : ''}>
                                     <span class="apple-slider"></span>
                                 </label>
                             </div>
         `;
-    } else {
-        html += `
-                            <i class="fas fa-external-link-alt" style="color: var(--text-tertiary); font-size: 0.85rem;"></i>
-        `;
     }
 
     html += `
                         </div>
-                        
-                        <!-- Código Destacado -->
+
+                        <!-- Código/enlace destacado -->
                         ${strCodigo ? `
-                        <div style="background: rgba(0,0,0,0.3); border: 1px dashed rgba(255, 255, 255, 0.2); border-radius: 8px; padding: 0.85rem; text-align: center; margin-top: 0.25rem;">
-                            <span style="font-family: monospace; font-size: 1.25rem; font-weight: 700; color: var(--accent-color); letter-spacing: 2px;">${strCodigo}</span>
+                        <div style="background: rgba(0,0,0,0.3); border: 1px dashed rgba(255, 255, 255, 0.2); border-radius: 8px; padding: 0.65rem; text-align: center; overflow-wrap: anywhere; word-break: break-all;">
+                            <span style="font-family: monospace; font-size: 0.9rem; font-weight: 700; color: var(--accent-color);">${strCodigo}</span>
                         </div>
                         ` : ''}
 
@@ -1318,113 +1212,6 @@ function updateUnreadBadge() {
         document.title = `(${totalUnread}) Mensajes - CodigoAmigo`;
     } else {
         document.title = 'Mensajes - CodigoAmigo';
-    }
-}
-
-function initSearch() {
-    // Botón de búsqueda (inicialmente desde el input, ahora desde el header dinámico)
-    $(document).on('click', '#searchMessagesBtn', function () {
-        if (!currentConversationId) {
-            return;
-        }
-        $('#searchMessagesModal').simpleModal('show');
-        $('#searchMessagesInput').val('').focus();
-    });
-
-    // Búsqueda de mensajes
-    let searchTimeout = null;
-    $('#searchMessagesInput').on('input', function () {
-        const query = $(this).val().trim();
-
-        if (searchTimeout) {
-            clearTimeout(searchTimeout);
-        }
-
-        if (query.length < 2) {
-            $('#searchMessagesResults').html('<p class="text-muted text-center">Escribe para buscar mensajes...</p>');
-            return;
-        }
-
-        searchTimeout = setTimeout(function () {
-            searchMessagesInConversation(query);
-        }, 300);
-    });
-}
-
-function searchMessagesInConversation(query) {
-    if (!currentConversationId) {
-        return;
-    }
-
-    $.ajax({
-        url: '/api/chat_api.php',
-        method: 'POST',
-        data: {
-            action: 'search_mensajes',
-            conversacion_id: currentConversationId,
-            query: query
-        },
-        dataType: 'json',
-        success: function (response) {
-            if (response.success) {
-                renderSearchResults(response.resultados, query);
-            }
-        }
-    });
-}
-
-function renderSearchResults(mensajes, query) {
-    const container = $('#searchMessagesResults');
-
-    if (mensajes.length === 0) {
-        container.html('<p class="text-muted text-center">No se encontraron mensajes</p>');
-        return;
-    }
-
-    let html = '<div class="search-results-list">';
-    mensajes.forEach(function (msg) {
-        const highlightedMessage = highlightText(msg.mensaje, query);
-        const date = formatMessageDate(msg.fecha);
-        const isOwn = msg.de_usuario_id === userId;
-
-        html += `
-            <div class="search-result-item ${isOwn ? 'own' : 'other'}" data-message-id="${msg._id}">
-                <div class="result-message">${highlightedMessage}</div>
-                <div class="result-date">${date}</div>
-            </div>
-        `;
-    });
-    html += '</div>';
-
-    container.html(html);
-
-    // Click en resultado para ir al mensaje
-    $('.search-result-item').on('click', function () {
-        const messageId = $(this).data('message-id');
-        scrollToMessage(messageId);
-        $('#searchMessagesModal').simpleModal('hide');
-    });
-}
-
-function highlightText(text, query) {
-    const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
-    return escapeHtml(text).replace(regex, '<mark>$1</mark>');
-}
-
-function escapeRegex(str) {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function scrollToMessage(messageId) {
-    const messageElement = $(`.chat-message[data-message-id="${messageId}"]`);
-    if (messageElement.length > 0) {
-        const container = $('#messagesList');
-        const scrollTop = messageElement.offset().top - container.offset().top + container.scrollTop() - 50;
-        container.animate({ scrollTop: scrollTop }, 500);
-        messageElement.addClass('highlight');
-        setTimeout(function () {
-            messageElement.removeClass('highlight');
-        }, 2000);
     }
 }
 

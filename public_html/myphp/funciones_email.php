@@ -543,4 +543,64 @@ function enviarEmailVIPPagoFallido($usuario, $motivo_decline = '', $card_last4 =
 
     return $resultado;
 }
+
+function enviarEmailVIPPagoFallidoReintento($usuario, $proximo_intento_fecha = null) {
+    if (!function_exists('enviarEmailConBrevoYRegistrar')) {
+        include_once __DIR__ . '/email_helper.php';
+    }
+
+    $to_email = $usuario['mail'] ?? $usuario['email'] ?? '';
+    $username = trim($usuario['username'] ?? 'Usuario');
+    $user_id  = isset($usuario['_id']) ? (string)$usuario['_id'] : null;
+
+    if (empty($to_email)) {
+        error_log("enviarEmailVIPPagoFallidoReintento: sin email para usuario $username");
+        return ['success' => false, 'error' => 'No email'];
+    }
+
+    $subject = "Hemos tenido un problema con tu pago VIP - CodigoAmigo";
+    $intento_html = $proximo_intento_fecha
+        ? '<p style="margin:5px 0;font-size:14px;color:#555;">Próximo intento de cobro: <strong>' . htmlspecialchars($proximo_intento_fecha) . '</strong></p>'
+        : '';
+
+    $html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"></head>'
+          . '<body style="font-family:Segoe UI,Tahoma,sans-serif;background:#f4f4f4;margin:0;padding:0;">'
+          . '<div style="max-width:600px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 4px 15px rgba(0,0,0,0.1);">'
+          . '<div style="background:linear-gradient(135deg,#f39c12,#d35400);color:#fff;padding:30px 20px;text-align:center;">'
+          . '<h1 style="margin:0;font-size:24px;">Hola ' . htmlspecialchars($username, ENT_QUOTES, 'UTF-8') . '</h1>'
+          . '<p style="margin:10px 0 0;opacity:0.95;">Problema con tu pago VIP</p></div>'
+          . '<div style="padding:30px;">'
+          . '<p>No hemos podido cobrar la renovación mensual de tu suscripción VIP (9,99€). Tu banco ha rechazado el cargo.</p>'
+          . '<div style="background:#fff8e1;border-left:4px solid #f39c12;border-radius:6px;padding:15px 20px;margin:20px 0;">'
+          . '<p style="margin:0;font-size:14px;color:#555;">Tu suscripción VIP <strong>sigue activa</strong> de momento. Reintentaremos automáticamente el cobro en los próximos días.</p>'
+          . $intento_html
+          . '</div>'
+          . '<p>Para evitar perder tu VIP, actualiza tus datos de pago:</p>'
+          . '<div style="text-align:center;margin:25px 0;">'
+          . '<a href="https://www.codigoamigo.com/suscripcion-vip" style="display:inline-block;background:linear-gradient(135deg,#ffd700,#E30613);color:#fff;padding:14px 32px;text-decoration:none;border-radius:30px;font-weight:700;">Actualizar tarjeta</a>'
+          . '</div>'
+          . '<p style="font-size:13px;color:#999;text-align:center;">Si todos los intentos fallan, cancelaremos automáticamente tu suscripción y desactivaremos los beneficios VIP.</p>'
+          . '<p>Un saludo,<br>El equipo de CodigoAmigo</p>'
+          . '</div></div></body></html>';
+
+    $text = "Hola $username,\n\nNo hemos podido cobrar la renovación mensual VIP (9,99€). Tu banco ha rechazado el cargo.\n\nTu VIP sigue activo de momento. Reintentaremos automáticamente."
+          . ($proximo_intento_fecha ? "\nPróximo intento: $proximo_intento_fecha" : "")
+          . "\n\nActualiza tu tarjeta: https://www.codigoamigo.com/suscripcion-vip\n\nSi todos los intentos fallan, cancelaremos la suscripción.\n\nEl equipo de CodigoAmigo";
+
+    $resultado = enviarEmailConBrevoYRegistrar(
+        $to_email,
+        $username,
+        $subject,
+        $html,
+        'vip_pago_fallido_reintento',
+        $user_id,
+        ['proximo_intento' => $proximo_intento_fecha],
+        $text
+    );
+
+    if (empty($resultado['success'])) {
+        error_log("Error enviando email VIP reintento a: $to_email - " . ($resultado['error'] ?? ''));
+    }
+    return $resultado;
+}
 ?>

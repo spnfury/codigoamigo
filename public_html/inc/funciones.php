@@ -103,8 +103,8 @@
         }
         
         // Validar tipo de archivo
-        if (!($file["uploadedfile"]['type'] =="image/jpeg" OR $file["uploadedfile"]['type'] =="image/gif" OR $file["uploadedfile"]['type'] =="image/png")) {
-            $msg = "Solo es posible subir archivos que sean imágenes.";
+        if (!($file["uploadedfile"]['type'] =="image/jpeg" OR $file["uploadedfile"]['type'] =="image/gif" OR $file["uploadedfile"]['type'] =="image/png" OR $file["uploadedfile"]['type'] =="image/webp")) {
+            $msg = "Solo es posible subir archivos que sean imágenes (JPG, PNG, GIF o WebP).";
             $uploadedfileload = "false";
         }
         

@@ -127,7 +127,7 @@ $next_label = $labels_next[$current_threshold_idx] ?? '¡Máximo!';
                                 <label for="uploadedfile" class="ep-foto-menu-item" style="cursor: pointer;">
                                     <i class="fas fa-upload mr-2 text-primary"></i> Subir nueva foto
                                 </label>
-                                <input type="file" name="uploadedfile" id="uploadedfile" class="d-none" accept="image/jpeg,image/png,image/gif">
+                                <input type="file" name="uploadedfile" id="uploadedfile" class="d-none" accept="image/jpeg,image/png,image/gif,image/webp">
                             </form>
                             <div class="ep-foto-menu-divider"></div>
                             <button class="ep-foto-menu-item ep-foto-menu-danger" type="button" id="eliminar_foto">
@@ -435,6 +435,13 @@ $next_label = $labels_next[$current_threshold_idx] ?? '¡Máximo!';
     top: 0; left: 0; right: 0;
     height: 4px;
     background: linear-gradient(90deg, var(--ep-primary), #FF4D4D);
+    border-radius: 24px 24px 0 0;
+}
+/* El menú de cambiar foto se abre hacia arriba desde el avatar; con
+   overflow:hidden el hero lo recorta (visible sobre todo en móvil).
+   Mientras el menú está abierto se permite el overflow. */
+.ep-hero.foto-menu-open {
+    overflow: visible;
 }
 .ep-hero-profile {
     display: flex;
@@ -1010,10 +1017,14 @@ $next_label = $labels_next[$current_threshold_idx] ?? '¡Máximo!';
         $("#ep-foto-toggle").on('click', function(e) {
             e.stopPropagation();
             $("#ep-foto-menu").toggleClass('is-open');
+            // Mientras el menú está abierto, permitir que sobresalga del hero
+            // (el hero tiene overflow:hidden y recortaba el menú, sobre todo en móvil)
+            $(this).closest('.ep-hero').toggleClass('foto-menu-open', $("#ep-foto-menu").hasClass('is-open'));
         });
         $(document).on('click', function(e) {
             if (!$(e.target).closest('#ep-foto-menu, #ep-foto-toggle').length) {
                 $("#ep-foto-menu").removeClass('is-open');
+                $('.ep-hero').removeClass('foto-menu-open');
             }
         });
 

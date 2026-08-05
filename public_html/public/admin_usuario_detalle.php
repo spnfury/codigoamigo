@@ -481,7 +481,7 @@ $title = "Detalle del Usuario - " . ($usuario['username'] ?? 'Usuario');
                                 <hr>
 
                                 <div class="row text-center">
-                                    <div class="col-6">
+                                    <div class="col-12">
                                         <h6 class="text-muted">Saldo Actual</h6>
                                         <span class="h5 <?php
                                             $saldo = $usuario['saldo'] ?? 0;
@@ -489,10 +489,6 @@ $title = "Detalle del Usuario - " . ($usuario['username'] ?? 'Usuario');
                                         ?>">
                                             €<?php echo number_format($saldo, 2); ?>
                                         </span>
-                                    </div>
-                                    <div class="col-6">
-                                        <h6 class="text-muted">Zumbidos</h6>
-                                        <span class="h5 text-primary"><?php echo $usuario['zumbido_saldo'] ?? 0; ?></span>
                                     </div>
                                 </div>
 
@@ -517,8 +513,24 @@ $title = "Detalle del Usuario - " . ($usuario['username'] ?? 'Usuario');
                                 $vip_sub_id = $usuario['vip_subscription_id'] ?? '';
                                 $vip_cancel_pending = !empty($usuario['vip_cancel_pending']);
                                 $vip_retention = !empty($usuario['vip_retention_applied']);
-                                $es_sub_real = $vip_sub_id && strpos($vip_sub_id, 'direct_activation_') !== 0;
+                                // Sub real Stripe = empieza con "sub_"
+                                $es_sub_real = $vip_sub_id && strpos($vip_sub_id, 'sub_') === 0;
                                 $stripe_sub_url = $es_sub_real ? 'https://dashboard.stripe.com/subscriptions/' . urlencode($vip_sub_id) : '';
+                                // Origen del VIP (no-pago)
+                                $vip_origen = '';
+                                if ($vip_sub_id && !$es_sub_real) {
+                                    if (strpos($vip_sub_id, 'direct_activation_') === 0) {
+                                        $vip_origen = 'MANUAL ADMIN';
+                                    } elseif (strpos($vip_sub_id, 'regalo_top_publicador_') === 0) {
+                                        $vip_origen = 'REGALO TOP PUBLICADOR';
+                                    } elseif (strpos($vip_sub_id, 'regalo_') === 0) {
+                                        $vip_origen = 'REGALO';
+                                    } elseif (strpos($vip_sub_id, 'bonus_') === 0) {
+                                        $vip_origen = 'BONUS';
+                                    } else {
+                                        $vip_origen = 'NO STRIPE';
+                                    }
+                                }
                                 ?>
                                 <div class="mb-3 p-3" style="background:linear-gradient(135deg,#fff8e1 0%,#fffaed 100%);border:1px solid #ffd700;border-radius:10px;">
                                     <div class="d-flex align-items-center justify-content-between mb-2">
@@ -550,7 +562,7 @@ $title = "Detalle del Usuario - " . ($usuario['username'] ?? 'Usuario');
                                                     </a>
                                                 <?php else: ?>
                                                     <code style="font-size:11px;"><?php echo htmlspecialchars($vip_sub_id); ?></code>
-                                                    <span class="badge bg-info" style="font-size:9px;">MANUAL</span>
+                                                    <span class="badge bg-info" style="font-size:9px;"><?php echo htmlspecialchars($vip_origen ?: 'MANUAL'); ?></span>
                                                 <?php endif; ?>
                                             </div>
                                         <?php endif; ?>

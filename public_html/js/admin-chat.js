@@ -211,39 +211,46 @@ function renderMessages(mensajes, replace = false) {
         $('#messagesList').html('');
         lastMessageId = null;
     }
-    
+
+    const conv = conversations.find(c => c.conversacion_id === currentConversationId);
+    const userImg = (conv && conv.usuario_img) || 'https://www.codigoamigo.com/img/utilidades/usuario_sin_foto.jpg';
+    const userName = conv ? conv.usuario_nombre : 'Usuario';
+    const adminImg = 'https://www.codigoamigo.com/img/logo_codigoamigo.png';
+
     let html = '';
     mensajes.forEach(function(msg) {
-        // msg.fecha ahora es un timestamp en milisegundos
         const fecha = msg.fecha ? new Date(msg.fecha) : new Date();
         const timeStr = formatDateTime(fecha);
         const isAdmin = msg.es_admin;
         const messageClass = isAdmin ? 'admin' : 'user';
-        
-        // Read receipt for admin messages
+        const senderLabel = isAdmin ? 'Tú (Admin)' : escapeHtml(userName);
+        const avatarUrl = isAdmin ? adminImg : userImg;
+
         let readReceipt = '';
         if (isAdmin) {
             if (msg.leido) {
-                readReceipt = '<span style="color: #3b82f6; font-size: 11px; margin-left: 5px;" title="Leído">✓✓</span>';
+                readReceipt = '<span class="read-receipt read" title="Leído">✓✓</span>';
             } else {
-                readReceipt = '<span style="color: rgba(255,255,255,0.5); font-size: 11px; margin-left: 5px;" title="No leído">✓✓</span>';
+                readReceipt = '<span class="read-receipt unread" title="No leído">✓✓</span>';
             }
         }
-        
+
         html += `
             <div class="message-item ${messageClass}">
-                <div>
+                <img src="${avatarUrl}" class="message-avatar" onerror="this.src='https://www.codigoamigo.com/img/utilidades/usuario_sin_foto.jpg'">
+                <div class="message-content">
+                    <div class="message-sender">${senderLabel}</div>
                     <div class="message-bubble">${escapeHtml(msg.mensaje)}</div>
                     <div class="message-time">${timeStr}${readReceipt}</div>
                 </div>
             </div>
         `;
-        
+
         if (!lastMessageId || msg._id > lastMessageId) {
             lastMessageId = msg._id;
         }
     });
-    
+
     $('#messagesList').append(html);
     scrollToBottom();
 }

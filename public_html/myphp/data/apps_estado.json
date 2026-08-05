@@ -1,6 +1,6 @@
 {
-    "generado": "2026-07-28T11:15:45+00:00",
-    "generado_human": "2026-07-28 11:15",
+    "generado": "2026-08-05T11:10:01+00:00",
+    "generado_human": "2026-08-05 11:10",
     "apps": [
         {
             "id": "codigoamigo",
@@ -95,7 +95,7 @@
             "git": {
                 "ultimo_commit": "95051d2",
                 "fecha": "2026-07-23",
-                "sin_commitear": 12,
+                "sin_commitear": 13,
                 "remote": "git@github.com:spnfury/planazosbcn.git"
             },
             "checklist": [

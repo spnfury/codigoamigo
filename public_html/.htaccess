@@ -9,6 +9,13 @@ RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 RewriteCond %{HTTP_HOST} ^codigoamigo\.com$ [NC]
 RewriteRule ^(.*)$ https://www.codigoamigo.com/$1 [R=301,L]
 
+# SEGURIDAD: bloquear scripts de debugging heredados (volcaban queries DB y
+# llegaban a filtrar la Secret Key de reCAPTCHA públicamente). Acceso denegado
+# a nivel de servidor; los ficheros siguen en disco para uso por CLI/SSH.
+<FilesMatch "^(debug_|test_|verify_|check_|dump_|extract_|parse_)">
+    Require all denied
+</FilesMatch>
+
 # Configuración SEO-Friendly y de Rendimiento
 # Cache-Control mejorado para SEO y rendimiento
 # Archivos estáticos: caché largo para mejor SEO

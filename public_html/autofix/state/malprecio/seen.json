@@ -1,0 +1,16 @@
+{
+    "1faf08a87ce69039": {
+        "estado": "manual",
+        "archivo": "/home/admin/web/malprecio.com/public_html/index.php",
+        "linea": 324,
+        "tipo": "Warning: file_exists(): open_basedir restriction in effect. File(/home/admin/web/malprecio.com/public_html/robots.txt/..;/.aws/credentials) is not within the allowed path(s): (/home/admin/.composer:/home/admin/web/malprecio.com/public_html:/home/admin/web/malprecio.com/private:/home/admin/tmp:/tmp:/var/www/html:/bin:/usr/bin:/usr/local/bin:/usr/share:/opt)",
+        "ts_ultimo": "2026-07-30 10:20:01"
+    },
+    "90909e88353fd36c": {
+        "estado": "manual",
+        "archivo": "/home/admin/web/malprecio.com/public_html/index.php",
+        "linea": 324,
+        "tipo": "Warning: file_exists(): open_basedir restriction in effect. File(/home/admin/web/malprecio.com/public_html/robots.txt/..;/sendgrid/.env) is not within the allowed path(s): (/home/admin/.composer:/home/admin/web/malprecio.com/public_html:/home/admin/web/malprecio.com/private:/home/admin/tmp:/tmp:/var/www/html:/bin:/usr/bin:/usr/local/bin:/usr/share:/opt)",
+        "ts_ultimo": "2026-07-30 10:20:03"
+    }
+}

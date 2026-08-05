@@ -36,6 +36,10 @@ class img {
 				//GIF
 				$this->image = ImageCreateFromGIF ($sourceFile);
 				$this->formato="GIF";
+			} elseif ($this->formato=="WEBP" || $this->formato=="webp" || $this->formato=="image/webp") {
+				//WEBP
+				$this->image = imagecreatefromwebp($sourceFile);
+				$this->formato="WEBP";
 			} elseif ($this->formato=="WBMP" || $this->formato=="image/wbmp") {
 				//WBMP
 				$this->image  = ImageCreateFromWBMP ($sourceFile);
@@ -141,6 +145,10 @@ class img {
 			//GIF
 			ImageGIF($this->image,$file);
 			//$this->formato="GIF";
+		} elseif ($this->formato=="WEBP" || $this->formato=="webp") {
+			//WEBP
+			imagewebp($this->image,$file,$calidad);
+			//$this->formato="WEBP";
 		} elseif ($this->formato=="WBMP") {
 			//WBMP
 			ImageWBMP($this->image,$file);

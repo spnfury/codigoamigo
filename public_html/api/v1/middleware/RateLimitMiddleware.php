@@ -15,6 +15,7 @@ class RateLimitMiddleware {
         'default' => ['requests' => 1000, 'window' => 3600], // 1000 req/hour
         'anonymous' => ['requests' => 100, 'window' => 3600], // 100 req/hour
         'auth' => ['requests' => 10, 'window' => 3600], // 10 req/hour for auth endpoints
+        'create_code' => ['requests' => 5, 'window' => 3600], // 5 códigos/hora por usuario (anti-spam)
     ];
     
     /**

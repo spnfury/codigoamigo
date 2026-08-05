@@ -65,7 +65,15 @@ try {
     // Crear sesión de Stripe
     $stripe = new \Stripe\StripeClient($stripe_secret_key);
     
-    error_log("Creando sesión Stripe para destacar código: $codigo_id, tipo: $tipo");
+    // FUNNEL: inicio de checkout "destacar" (contar intentos en logs/info/)
+    log_info("Creando sesión Stripe para destacar código: $codigo_id, tipo: $tipo", [
+        'evento' => 'checkout_destacar_inicio',
+        'user_id' => $_SESSION["user_id"],
+        'codigo_id' => $codigo_id,
+        'tipo_destacado' => $tipo,
+        'sku' => $sku,
+        'auto_renovar' => $auto_renovar,
+    ]);
     
     $line_items = [];
     if ($sku === 'super_landing_999') {
@@ -117,7 +125,13 @@ try {
         ]
     ]);
 
-    error_log("Sesión Stripe creada exitosamente: " . $session->id);
+    // FUNNEL: sesión creada OK (completar intentos -> éxitos en logs/info/)
+    log_info("Sesión Stripe creada exitosamente: " . $session->id, [
+        'evento' => 'checkout_destacar_sesion_creada',
+        'session_id' => $session->id,
+        'user_id' => $_SESSION["user_id"],
+        'codigo_id' => $codigo_id,
+    ]);
 
     // Guardar intento de checkout para recuperación de carritos abandonados
     // (mismo patrón que vip_checkout_intents, ver cron/recuperar_carritos_destacar.php).
@@ -151,8 +165,12 @@ try {
     exit;
     
 } catch (Exception $e) {
-    error_log("Error creando sesión Stripe: " . $e->getMessage());
-    error_log("Stack trace: " . $e->getTraceAsString());
+    log_error("Error creando sesión Stripe: " . $e->getMessage(), [
+        'evento' => 'checkout_destacar_error',
+        'user_id' => $_SESSION["user_id"] ?? null,
+        'codigo_id' => $codigo_id,
+        'trace' => $e->getTraceAsString(),
+    ]);
     
     ob_clean();
     header('Content-Type: application/json');

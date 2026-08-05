@@ -1414,10 +1414,10 @@ $categorias_usuario = $categorias_usuario_filtradas;
                 </div>
                 <?php else: // Si no está logueado ?>
                 <div class="user-chat-button-container" style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
-                    <a href="/login" class="btn-chat-user-profile" style="text-decoration: none;">
+                    <button type="button" class="btn-chat-user-profile btn-seguir-requiere-login" onclick="if(typeof openLoginModalWithRedirect==='function'){openLoginModalWithRedirect(window.location.href);}else{window.location.href='/login.php';}">
                         <i class="fas fa-user-plus"></i>
-                        <span>Inicia sesión para seguir</span>
-                    </a>
+                        <span class="seguir-text">Seguir</span>
+                    </button>
                 </div>
                 <?php endif; ?>
             </div>

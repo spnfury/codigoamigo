@@ -268,6 +268,10 @@ function isChatUserLoggedIn() {
     return typeof window.codigoAmigoChatLoggedIn !== 'undefined' ? !!window.codigoAmigoChatLoggedIn : false;
 }
 
+function isChatUserVip() {
+    return typeof window.codigoAmigoChatVip !== 'undefined' ? !!window.codigoAmigoChatVip : false;
+}
+
 function openChatModal(userId, userName, userImg, defaultMessage = null, codigoContexto = null) {
     // Si no hay usuario logueado, usar el sistema de login existente
     if (!isChatUserLoggedIn()) {
@@ -306,6 +310,15 @@ function loadOrCreateConversation(userId) {
     const codigoIdForConv = currentChatCodigoContexto && currentChatCodigoContexto.codigoId ? currentChatCodigoContexto.codigoId : null;
     const conversacionIdTemp = crearConversacionIdTemp(currentUserId, userId, codigoIdForConv);
     currentChatConversationId = conversacionIdTemp; // Establecer ID temporalmente
+
+    // No-VIP: no puede leer mensajes recibidos. Saltar fetch y mostrar UI escritura con disclaimer.
+    if (!isChatUserVip()) {
+        messagesContainer.innerHTML = '<div class="text-center text-muted p-4" style="margin-top:20px;">' +
+            '<div style="background: linear-gradient(135deg,#fff3cd,#ffe69c); width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; color: #b8860b; font-size: 24px;"><i class="fas fa-paper-plane"></i></div>' +
+            '<strong>Envía tu mensaje a ' + escapeHtml(currentChatUserName) + '</strong><br>' +
+            '<small style="display:block; margin-top:8px; color:#7a5400;">Tu mensaje se entregará. Para leer respuestas necesitas ser VIP. <a href="/suscripciones_y_creditos" style="color:#E30613; font-weight:700;">Hazte VIP</a></small></div>';
+        return;
+    }
 
     // Intentar cargar mensajes existentes
     $.ajax({
@@ -442,6 +455,15 @@ function sendChatMessage(event) {
                 if (response.mensaje_id) {
                     lastChatMessageId = response.mensaje_id;
                 }
+
+                // No-VIP: tras envío, mostrar disclaimer una sola vez (FOMO + transparencia)
+                if (!isChatUserVip() && !document.getElementById('chatNoVipDisclaimer')) {
+                    const disclaimerHTML = '<div id="chatNoVipDisclaimer" style="background: linear-gradient(135deg,#fff3cd,#ffe69c); border-radius: 12px; padding: 12px 16px; margin: 12px 0; text-align: center; font-size: 0.85rem; color: #7a5400;">' +
+                        '<i class="fas fa-info-circle"></i> Mensaje entregado. Para leer respuestas de ' + escapeHtml(currentChatUserName) + ', <a href="/suscripciones_y_creditos" style="color:#E30613; font-weight:800;">hazte VIP</a>.' +
+                        '</div>';
+                    messagesContainer.insertAdjacentHTML('beforeend', disclaimerHTML);
+                    scrollChatToBottom();
+                }
             } else {
                 // Error: mostrar visualmente
                 const tempMsg = messagesContainer.querySelector('[data-message-id="' + tempMessageId + '"]');
@@ -449,7 +471,19 @@ function sendChatMessage(event) {
                     tempMsg.querySelector('.chat-message-bubble').style.background = '#dc3545';
                     tempMsg.querySelector('.chat-message-bubble').title = 'Error al enviar';
                 }
-                alert('Error: ' + (response.error || 'No se pudo enviar'));
+
+                // Cap diario alcanzado u otra restricción VIP: mostrar CTA inline
+                if (response.requiere_vip) {
+                    const ctaUrl = response.cta_url || '/suscripciones_y_creditos';
+                    const ctaHTML = '<div style="background: linear-gradient(135deg,#fff3cd,#ffe69c); border-radius: 12px; padding: 14px 16px; margin: 12px 0; text-align: center; font-size: 0.9rem; color: #7a5400;">' +
+                        '<i class="fas fa-crown"></i> <strong>' + escapeHtml(response.error || 'Límite alcanzado') + '</strong><br>' +
+                        '<a href="' + ctaUrl + '" style="display:inline-block; margin-top:8px; background:#E30613; color:white; padding:8px 18px; border-radius:24px; text-decoration:none; font-weight:800;">Hazte VIP</a>' +
+                        '</div>';
+                    messagesContainer.insertAdjacentHTML('beforeend', ctaHTML);
+                    scrollChatToBottom();
+                } else {
+                    alert('Error: ' + (response.error || 'No se pudo enviar'));
+                }
             }
         },
         error: function () {
@@ -462,6 +496,9 @@ function sendChatMessage(event) {
 // Polling simplificado
 function startChatPolling() {
     stopChatPolling();
+
+    // No-VIP no puede leer mensajes — saltar polling (endpoint get_nuevos_mensajes está gated)
+    if (!isChatUserVip()) return;
 
     chatPollingInterval = setInterval(function () {
         if (!currentChatConversationId || !lastChatMessageId) return;
