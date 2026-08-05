@@ -1256,10 +1256,34 @@ $app->get('/ofertas/{termino}', function ($request, $response, $args) {
         'sort' => array('fecha_publicacion' => -1, '_id' => -1)
     );
 
-    $lista_codigos_generales = get_all_listado_codigos_array($general_filter, $general_options);
-    $codigos_generales = isset($lista_codigos_generales["results"]) && is_array($lista_codigos_generales["results"])
-        ? $lista_codigos_generales["results"]
-        : array();
+    // Relevancia: primero los códigos cuya MARCA coincide con el término;
+    // después los que solo lo mencionan en la descripción. Antes iban mezclados
+    // por fecha y buscar "netflix" mostraba primero marcas sin relación aparente.
+    $codigos_generales = array();
+    if (!empty($termino) && isset($regex)) {
+        $filtro_marca = $general_filter;
+        $filtro_marca['$or'] = array(array('marca' => $regex));
+        $res_marca = get_all_listado_codigos_array($filtro_marca, $general_options);
+        $codigos_generales = isset($res_marca["results"]) && is_array($res_marca["results"]) ? $res_marca["results"] : array();
+
+        $restante = 50 - count($codigos_generales);
+        if ($restante > 0) {
+            $filtro_desc = $general_filter;
+            $filtro_desc['$or'] = array(array('descripcion' => $regex));
+            $filtro_desc['marca'] = array('$not' => $regex);
+            $opciones_desc = $general_options;
+            $opciones_desc['limit'] = $restante;
+            $res_desc = get_all_listado_codigos_array($filtro_desc, $opciones_desc);
+            if (isset($res_desc["results"]) && is_array($res_desc["results"])) {
+                $codigos_generales = array_merge($codigos_generales, $res_desc["results"]);
+            }
+        }
+    } else {
+        $lista_codigos_generales = get_all_listado_codigos_array($general_filter, $general_options);
+        $codigos_generales = isset($lista_codigos_generales["results"]) && is_array($lista_codigos_generales["results"])
+            ? $lista_codigos_generales["results"]
+            : array();
+    }
 
 
 
