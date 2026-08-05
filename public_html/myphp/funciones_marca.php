@@ -157,7 +157,9 @@ function sube_imagen_marca($datos){
 //         error_reporting(E_ALL);
 //         ini_set("display_errors", "on");
 
-        $folder = "/var/www/vhosts/codigoamigo.com/httpdocs/img/panel_marcas/new/";
+        // Ruta del servidor actual (la anterior era del Plesk viejo y no existía:
+        // desde abr-2025 las imágenes no se guardaban en local)
+        $folder = $_SERVER['DOCUMENT_ROOT'] ? $_SERVER['DOCUMENT_ROOT'] . "/img/panel_marcas/new/" : "/home/admin/web/codigoamigo.com/public_html/img/panel_marcas/new/";
         $folder_ext = "https://www.codigoamigo.com/img/panel_marcas/new/";
 
 
@@ -235,11 +237,11 @@ function sube_imagen_marca($datos){
                 'Body' => ($data)
             ));
 
-            //$ruta_imagen = "https://cdn-codigoamigo.s3-eu-west-1.amazonaws.com//panel_marcas/new/".$imageName;
-            //$ruta_imagen = "https://d3hcf0nbuqjt3g.cloudfront.net/panel_marcas/new/".$imageName;
-            $ruta_imagen = "https://cdn.codigoamigo.com/panel_marcas/new/".$imageName;
-            
-            
+            // Guardar SIEMPRE la URL local en DB: cdn.codigoamigo.com devuelve 401
+            // (servicio caído). El putObject a Contabo queda como copia de respaldo.
+            $ruta_imagen = $folder_ext.$imageName;
+
+
         } catch (Exception $e) {
             echo 'Ha habido una excepción: ' . $e->getMessage() . "<br>";
 
