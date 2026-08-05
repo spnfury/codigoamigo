@@ -804,7 +804,12 @@ function getMarcas($limit = null, $categoria = null, $excluye = null) {
                 if (strpos($imagen_procesada, 'https://d3hcf0nbuqjt3g.cloudfront.net/') !== false) {
                     $imagen_procesada = str_replace("https://d3hcf0nbuqjt3g.cloudfront.net/", "https://www.codigoamigo.com/img/", $imagen_procesada);
                 }
-                
+                // cdn.codigoamigo.com devuelve 401 (servicio caído) — servir desde
+                // el propio dominio, donde los ficheros existen en /img/
+                if (strpos($imagen_procesada, 'https://cdn.codigoamigo.com/') !== false) {
+                    $imagen_procesada = str_replace("https://cdn.codigoamigo.com/", "https://www.codigoamigo.com/img/", $imagen_procesada);
+                }
+
                 if (strpos($imagen_procesada, 'http') !== 0) {
                     $imagen_procesada = 'https://www.codigoamigo.com' . (strpos($imagen_procesada, '/') === 0 ? '' : '/') . $imagen_procesada;
                 }

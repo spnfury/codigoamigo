@@ -308,11 +308,15 @@ register_shutdown_function( "fatal_handler" );
 	        // Añadir el conteo de códigos
 	        $marca->total_codigos = isset($conteo_marcas[$nombre_clave]) ? $conteo_marcas[$nombre_clave] : 0;
 	        
-	        // Procesar la imagen si existe
+	        // Procesar la imagen si existe.
+	        // cdn.codigoamigo.com devuelve 401 (servicio externo caído) — servir
+	        // siempre desde el propio dominio, donde los ficheros existen en /img/.
+	        // Antes se hacía la conversión inversa (local→cdn) y rompía todas las
+	        // imágenes de paneles de marca del sitio.
 	        if (isset($marca->imagen)) {
 	            $marca->imagen = str_replace(
-	                'https://www.codigoamigo.com/img/',
 	                'https://cdn.codigoamigo.com/',
+	                'https://www.codigoamigo.com/img/',
 	                $marca->imagen
 	            );
 	        }
