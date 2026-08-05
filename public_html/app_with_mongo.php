@@ -3422,6 +3422,12 @@ $app->get('/listado_marcas', function ($request, $response, $args) {
     return $response->withRedirect("https://www.codigoamigo.com/listado-marcas", 301);
 });
 
+// El menú (header_base, header_chollos, _header_mobile_new, funciones_modern)
+// enlaza a /marcas, que no tenía ruta y caía en la home (soft-404)
+$app->get('/marcas', function ($request, $response, $args) {
+    return $response->withRedirect("https://www.codigoamigo.com/listado-marcas", 301);
+});
+
 $app->get('/listado-marcas', function ($request, $response, $args) {
     global $author_web, $show_adsense, $name_page, $detect;
     include_once $_SERVER['DOCUMENT_ROOT'] . '/inc/includes.php';
