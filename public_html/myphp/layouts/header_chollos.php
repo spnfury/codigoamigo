@@ -724,7 +724,7 @@ if (!isset($panel)) {
                         </div>
 
                         <div class="user-profile" id="user-profile">
-                            <img src="" alt="Avatar" class="user-avatar-small" id="user-avatar">
+                            <img src="/img/user-default.png" alt="Avatar" class="user-avatar-small" id="user-avatar">
                             <span class="user-name-small" id="user-name">Usuario</span>
                             <i class="fas fa-chevron-down"></i>
                         </div>

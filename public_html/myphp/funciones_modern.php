@@ -764,7 +764,7 @@ function add_mobile_header_compact() {
         <a href="#" class="bottom-nav-item" id="profile-toggle">
             <div class="profile-container">
                 <i class="fas fa-user" id="profile-icon"></i>
-                <img src="" alt="Perfil" id="profile-image" style="display: none; width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">
+                <img src="/img/user-default.png" alt="Perfil" id="profile-image" style="display: none; width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">
                 <span id="profile-text">Iniciar sesión</span>
             </div>
         </a>
@@ -775,7 +775,7 @@ function add_mobile_header_compact() {
         <div class="profile-menu-content">
             <div class="profile-menu-header">
                 <div class="profile-info">
-                    <img src="" alt="Perfil" id="profile-menu-image" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                    <img src="/img/user-default.png" alt="Perfil" id="profile-menu-image" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
                     <div class="profile-details">
                         <div id="profile-menu-name" class="profile-name">Usuario</div>
                         <span id="profile-menu-email">usuario@email.com</span>
