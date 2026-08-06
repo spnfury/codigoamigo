@@ -196,23 +196,22 @@ function sube_imagen_marca($datos){
         $im->writeImages($folder.$imageName, true);
         //echo "si estoy";
 
-        /*$SYSTEM_CONF["AMAZON_KEY"] = 'AKIAIBGD6UYYDE7LWM3A';
-        $SYSTEM_CONF["AMAZON_SECRET"] = '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';
+        // Credenciales Contabo S3 desde env / private/api_secrets.php (fuera de git).
+        // Antes estaban hardcodeadas aquí (y las de AWS viejas comentadas, también en git).
+        $secrets_path = dirname(__DIR__, 3) . '/private/api_secrets.php';
+        if (is_readable($secrets_path)) {
+            require_once $secrets_path;
+        }
+        $s3_env = function ($key, $default = '') {
+            if (!empty($_ENV[$key])) return $_ENV[$key];
+            $v = getenv($key);
+            return ($v !== false && $v !== '') ? $v : $default;
+        };
 
-        $SYSTEM_CONF["AMAZON_BUCKET"] = "cdn-codigoamigo";*/
+        $SYSTEM_CONF["AMAZON_KEY"] = $s3_env('CONTABO_S3_KEY');
+        $SYSTEM_CONF["AMAZON_SECRET"] = $s3_env('CONTABO_S3_SECRET');
+        $SYSTEM_CONF["AMAZON_BUCKET"] = $s3_env('CONTABO_S3_BUCKET', 'codigoamigo-bucket');
 
-        /*$SYSTEM_CONF["AMAZON_KEY"] = 'AKIASARKPDPLQVRVKCFK';
-        $SYSTEM_CONF["AMAZON_SECRET"] = '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';*/
-        
-        $SYSTEM_CONF["AMAZON_KEY"] = 'd5092bd5c6f9b8f617a683dcb24d63df';
-        $SYSTEM_CONF["AMAZON_SECRET"] = 'aecdd53e2e31d664a5a602df52a41e1e';
-        
-        
-
-        $SYSTEM_CONF["AMAZON_BUCKET"] = "codigoamigo-bucket";
-
-
-        
         $s3 = S3Client::factory(array(
             'credentials' => array(
                 'key'    =>  $SYSTEM_CONF["AMAZON_KEY"],
@@ -220,7 +219,7 @@ function sube_imagen_marca($datos){
             ),
             'region' => 'eu2',
             'version' => 'latest',
-            'endpoint' => 'https://eu2.contabostorage.com/',
+            'endpoint' => $s3_env('CONTABO_S3_ENDPOINT', 'https://eu2.contabostorage.com/'),
             'use_path_style_endpoint' => true
         ));
         
