@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 if (!function_exists('createConnection')) {
     include_once __DIR__ . '/funciones.php';
@@ -35,7 +36,7 @@ function crear_notificacion($usuario_id, $tipo, $datos) {
         $result = $collection->insertOne($notificacion);
         return $result->getInsertedId();
     } catch (Exception $e) {
-        error_log("Error creando notificación: " . $e->getMessage());
+        log_error("Error creando notificación: " . $e->getMessage());
         return false;
     }
 }

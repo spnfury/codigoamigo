@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 session_start();
 
 // Verificar que el usuario esté logueado
@@ -245,8 +246,8 @@ try {
             break;
     }
 } catch (Exception $e) {
-    error_log("Error en afiliados_handler.php: " . $e->getMessage());
-    error_log("Error en afiliados_handler.php - Trace: " . $e->getTraceAsString());
+    log_error("Error en afiliados_handler.php: " . $e->getMessage());
+    log_error("Error en afiliados_handler.php - Trace: " . $e->getTraceAsString());
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'Error interno del servidor: ' . $e->getMessage()]);
 }

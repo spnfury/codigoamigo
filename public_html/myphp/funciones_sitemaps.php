@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 /**
  * Funciones para generar y gestionar sitemaps de CodigoAmigo
  */
@@ -17,7 +18,7 @@ function getCollectionSitemapLogs() {
     try {
         return $db->selectCollection('sitemap_logs');
     } catch (Throwable $e) {
-        error_log("Error al obtener colección de logs de sitemaps: " . $e->getMessage());
+        log_error("Error al obtener colección de logs de sitemaps: " . $e->getMessage());
         return null;
     }
 }
@@ -36,7 +37,7 @@ function registrarGeneracionSitemap($tipo, $resultado) {
         $collection->insertOne($log);
         return true;
     } catch (Throwable $e) {
-        error_log("Error al registrar log de sitemap: " . $e->getMessage());
+        log_error("Error al registrar log de sitemap: " . $e->getMessage());
         return false;
     }
 }
@@ -59,7 +60,7 @@ function obtenerHistorialSitemaps($limite = 50) {
         }
         return $historial;
     } catch (Throwable $e) {
-        error_log("Error al obtener historial de sitemaps: " . $e->getMessage());
+        log_error("Error al obtener historial de sitemaps: " . $e->getMessage());
         return [];
     }
 }
@@ -171,7 +172,7 @@ function generarSitemapMarcas() {
         $xml->save($sitemap_path);
         return ['success' => true, 'archivo' => $sitemap_path, 'url' => $base_url . '/myphp/xml/sitemap_marcas.xml', 'total_urls' => $total, 'fecha' => $hoy];
     } catch (Throwable $e) {
-        error_log("Error al generar sitemap de marcas: " . $e->getMessage());
+        log_error("Error al generar sitemap de marcas: " . $e->getMessage());
         return ['success' => false, 'error' => $e->getMessage()];
     }
 }
@@ -213,7 +214,7 @@ function generarSitemapCategorias() {
         $xml->save($sitemap_path);
         return ['success' => true, 'archivo' => $sitemap_path, 'url' => $base_url . '/myphp/xml/sitemap_categorias.xml', 'total_urls' => $total, 'fecha' => $hoy];
     } catch (Throwable $e) {
-        error_log("Error al generar sitemap de categorías: " . $e->getMessage());
+        log_error("Error al generar sitemap de categorías: " . $e->getMessage());
         return ['success' => false, 'error' => $e->getMessage()];
     }
 }
@@ -259,7 +260,7 @@ function generarSitemapCodigos($limite = 10000) {
         $xml->save($sitemap_path);
         return ['success' => true, 'archivo' => $sitemap_path, 'url' => $base_url . '/myphp/xml/sitemap_codigos.xml', 'total_urls' => $total, 'fecha' => $hoy];
     } catch (Throwable $e) {
-        error_log("Error al generar sitemap de códigos: " . $e->getMessage());
+        log_error("Error al generar sitemap de códigos: " . $e->getMessage());
         return ['success' => false, 'error' => $e->getMessage()];
     }
 }
@@ -337,7 +338,7 @@ function generarSitemapComparativas($limite = 5000) {
         $xml->save($sitemap_path);
         return ['success' => true, 'archivo' => $sitemap_path, 'url' => $base_url . '/myphp/xml/sitemap_comparativas.xml', 'total_urls' => $total, 'fecha' => $hoy];
     } catch (Throwable $e) {
-        error_log("Error al generar sitemap de comparativas: " . $e->getMessage());
+        log_error("Error al generar sitemap de comparativas: " . $e->getMessage());
         return ['success' => false, 'error' => $e->getMessage()];
     }
 }
@@ -460,7 +461,7 @@ function generarSitemapEstaticas() {
         $xml->save($sitemap_path);
         return ['success' => true, 'archivo' => $sitemap_path, 'url' => $base_url . '/myphp/xml/sitemap_estaticas.xml', 'total_urls' => count($paginas_estaticas), 'fecha' => $hoy];
     } catch (Throwable $e) {
-        error_log("Error al generar sitemap de páginas estáticas: " . $e->getMessage());
+        log_error("Error al generar sitemap de páginas estáticas: " . $e->getMessage());
         return ['success' => false, 'error' => $e->getMessage()];
     }
 }

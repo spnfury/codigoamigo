@@ -77,7 +77,7 @@ function enviarEmailSMTPBrevo($to_email, $to_name, $subject, $html_content, $tex
         
     } catch (Exception $e) {
         $resultado['error'] = "Error PHPMailer: " . $e->getMessage();
-        error_log("Error enviando email via Brevo SMTP: " . $e->getMessage());
+        log_error("Error enviando email via Brevo SMTP: " . $e->getMessage());
     }
     
     return $resultado;
@@ -89,7 +89,7 @@ function enviarEmailConBrevoYRegistrar($to_email, $to_name, $subject, $html_cont
     // Validar email antes de cualquier procesamiento — evita excepciones de Brevo SMTP
     $to_email_trim = is_string($to_email) ? strtolower(trim($to_email)) : '';
     if (!filter_var($to_email_trim, FILTER_VALIDATE_EMAIL)) {
-        error_log("enviarEmailConBrevoYRegistrar: email destinatario inválido — tipo=$tipo usuario=$usuario_id email='" . (string)$to_email . "'");
+        log_error("enviarEmailConBrevoYRegistrar: email destinatario inválido — tipo=$tipo usuario=$usuario_id email='" . (string)$to_email . "'");
         return ['success' => false, 'error' => 'Email destinatario inválido: ' . (string)$to_email];
     }
     $to_email = $to_email_trim;
@@ -226,7 +226,7 @@ function usuarioAceptaEmail($usuario_id, $tipo_email) {
         return (int)$usuario[$campo] === 1;
 
     } catch (\Exception $e) {
-        error_log("Error comprobando preferencia email ($tipo_email) para usuario $usuario_id: " . $e->getMessage());
+        log_error("Error comprobando preferencia email ($tipo_email) para usuario $usuario_id: " . $e->getMessage());
         return true; // En caso de error, enviar por defecto
     }
 }
@@ -238,7 +238,7 @@ function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text
 
     // Validar parámetros
     if (empty($to_email) || empty($to_name) || empty($subject) || empty($html_content)) {
-        error_log("Error enviarEmailConBrevo: Parámetros inválidos - to_email: $to_email, to_name: $to_name");
+        log_error("Error enviarEmailConBrevo: Parámetros inválidos - to_email: $to_email, to_name: $to_name");
         return [
             'success' => false,
             'method' => '',
@@ -248,7 +248,7 @@ function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text
 
     // Validar formato email destinatario — evita excepciones SMTP
     if (!filter_var(trim((string)$to_email), FILTER_VALIDATE_EMAIL)) {
-        error_log("Error enviarEmailConBrevo: email destinatario malformado: '" . (string)$to_email . "'");
+        log_error("Error enviarEmailConBrevo: email destinatario malformado: '" . (string)$to_email . "'");
         return [
             'success' => false,
             'method' => '',
@@ -276,7 +276,7 @@ function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text
         }
         
     } catch (Exception $e) {
-        error_log("Error enviando email via Brevo SMTP: " . $e->getMessage());
+        log_error("Error enviando email via Brevo SMTP: " . $e->getMessage());
         $resultado['error'] = "Brevo SMTP: " . $e->getMessage();
     }
     
@@ -308,7 +308,7 @@ function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text
         }
         
     } catch (Exception $e) {
-        error_log("Error enviando email via SendGrid (fallback): " . $e->getMessage());
+        log_error("Error enviando email via SendGrid (fallback): " . $e->getMessage());
         $resultado['error'] .= " | SendGrid: " . $e->getMessage();
     }
     
@@ -339,7 +339,7 @@ function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text
         }
         
     } catch (Exception $e) {
-        error_log("Error enviando email via Elastic Email (último recurso): " . $e->getMessage());
+        log_error("Error enviando email via Elastic Email (último recurso): " . $e->getMessage());
         $resultado['error'] .= " | Elastic Email: " . $e->getMessage();
     }
     
@@ -363,7 +363,7 @@ function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text
     }
 
     // Si todos los métodos fallan
-    error_log("Error: No se pudo enviar email a " . $to_email . " con ningún método. Errores: " . $resultado['error']);
+    log_error("Error: No se pudo enviar email a " . $to_email . " con ningún método. Errores: " . $resultado['error']);
     mandaBot("Error crítico: No se pudo enviar email a " . $to_email . " con ningún método. Errores: " . $resultado['error']);
 
     return $resultado;

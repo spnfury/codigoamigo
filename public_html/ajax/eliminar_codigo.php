@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 /**
  * AJAX: Eliminar un código del usuario
  * Verifica sesión y propiedad, elimina de MongoDB, devuelve JSON.
@@ -58,7 +59,7 @@ try {
     $resultado = $collection->deleteOne(['_id' => new MongoDB\BSON\ObjectId($codigo_id)]);
 
     if ($resultado->getDeletedCount() > 0) {
-        error_log("Código eliminado via AJAX: codigo_id=$codigo_id user_id=" . $_SESSION["user_id"]);
+        log_info("Código eliminado via AJAX: codigo_id=$codigo_id user_id=" . $_SESSION["user_id"]);
         echo json_encode([
             'success' => true, 
             'message' => 'Código eliminado correctamente.',
@@ -69,6 +70,6 @@ try {
     }
 
 } catch (Exception $e) {
-    error_log("Error al eliminar código via AJAX: " . $e->getMessage());
+    log_error("Error al eliminar código via AJAX: " . $e->getMessage());
     echo json_encode(['success' => false, 'error' => 'Error interno. Inténtalo de nuevo.']);
 }

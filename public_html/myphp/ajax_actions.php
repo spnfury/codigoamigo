@@ -280,15 +280,15 @@ if ($_REQUEST) {
                     // Score mínimo de 0.5 (recomendación oficial de Google para v3)
                     if ($recaptchaScore >= 0.5) {
                         $recaptchaValidado = true;
-                        error_log("reCAPTCHA OK: score $recaptchaScore (IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida') . ")");
+                        log_info("reCAPTCHA OK: score $recaptchaScore (IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida') . ")");
                     } else {
                         // Score bajo = posible spam
                         $motivoRechazo = "Score bajo: $recaptchaScore";
-                        error_log("reCAPTCHA score bajo: " . $recaptchaScore . " (IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida') . "). Usuario: " . ($datos['nombre'] ?? 'anon'));
+                        log_warning("reCAPTCHA score bajo: " . $recaptchaScore . " (IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida') . "). Usuario: " . ($datos['nombre'] ?? 'anon'));
                     }
                 } else {
                     $motivoRechazo = "Error validación: " . ($resultado['error'] ?? 'desconocido');
-                    error_log("reCAPTCHA validación fallida técnica: " . $motivoRechazo . " (IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida') . ")");
+                    log_warning("reCAPTCHA validación fallida técnica: " . $motivoRechazo . " (IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida') . ")");
                 }
             }
             
@@ -297,7 +297,7 @@ if ($_REQUEST) {
             // Si es un error técnico (invalid keys, timeout), también intentamos permitirlo si la IP es limpia.
             if (!$recaptchaValidado) {
                 if (permiteContactoSinRecaptcha()) {
-                    error_log("reCAPTCHA FALLBACK ACTIVADO (Motivo: $motivoRechazo). Permitiendo envío para IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'unk'));
+                    log_warning("reCAPTCHA FALLBACK ACTIVADO (Motivo: $motivoRechazo). Permitiendo envío para IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'unk'));
                     $recaptchaValidado = true; 
                     $datos['_sistema_nota'] = "Verificado mediante fallback de seguridad. Motivo: $motivoRechazo. IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida');
                 } else {
@@ -448,7 +448,7 @@ function eliminar_cuenta($datos)
         session_destroy();
         echo json_encode(['success' => true, 'message' => 'Tu cuenta ha sido eliminada. Gracias por haber usado CódigoAmigo.']);
     } catch (\Exception $e) {
-        error_log('eliminar_cuenta Error: ' . $e->getMessage());
+        log_error('eliminar_cuenta Error: ' . $e->getMessage());
         echo json_encode(['success' => false, 'message' => 'No se pudo eliminar la cuenta. Inténtalo más tarde.']);
     }
 }
@@ -456,7 +456,7 @@ function eliminar_cuenta($datos)
 function editar_perfil($datos)
 {
     try {
-        error_log("editar_perfil START with datos: " . json_encode($datos));
+        log_info("editar_perfil START with datos: " . json_encode($datos));
         $collection_usuarios = getCollectionUsuarios();
         
         // Preparar datos para actualizar
@@ -483,13 +483,13 @@ function editar_perfil($datos)
             $updateData['whatsapp'] = $datos['whatsapp'];
         }
         
-        error_log("editar_perfil updateData: " . json_encode($updateData));
+        log_info("editar_perfil updateData: " . json_encode($updateData));
         $updateResult = $collection_usuarios->updateOne(
             ['mail' => $datos["correo"]],
             ['$set' => $updateData]
         );
         
-        error_log("editar_perfil Result - Matched: " . $updateResult->getMatchedCount() . ", Modified: " . $updateResult->getModifiedCount());
+        log_info("editar_perfil Result - Matched: " . $updateResult->getMatchedCount() . ", Modified: " . $updateResult->getModifiedCount());
         
         if ($updateResult->getModifiedCount() > 0 || $updateResult->getMatchedCount() > 0) {
             echo json_encode(['success' => true, 'message' => 'Usuario modificado correctamente']);
@@ -497,7 +497,7 @@ function editar_perfil($datos)
             echo json_encode(['success' => false, 'message' => 'No se realizaron cambios']);
         }
     } catch (Exception $e) {
-        error_log("editar_perfil Error: " . $e->getMessage());
+        log_error("editar_perfil Error: " . $e->getMessage());
         echo json_encode(['success' => false, 'message' => 'Error al modificar datos: ' . $e->getMessage()]);
     }
 }
@@ -648,7 +648,7 @@ function check_session() {
         }
     } catch (Exception $e) {
         // Error al obtener el usuario - sesión inválida
-        error_log("Error en check_session: " . $e->getMessage());
+        log_error("Error en check_session: " . $e->getMessage());
         clearCurrentSession();
         $response = [
             'success' => false,

@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/inc/logger.php';
 // Bypass completo temporal para Cloudflare
 // Este archivo fuerza el bypass de TODAS las protecciones
 
@@ -21,7 +22,7 @@ header_remove('CF-Country');
 header_remove('CF-IPCountry');
 
 // Log del bypass
-error_log("ULTRA BYPASS ACTIVATED - IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown') . " - UA: " . ($_SERVER['HTTP_USER_AGENT'] ?? 'unknown'));
+log_warning("ULTRA BYPASS ACTIVATED - IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown') . " - UA: " . ($_SERVER['HTTP_USER_AGENT'] ?? 'unknown'));
 
 // Redirigir al sitio principal con bypass forzado
 $redirect_url = '/index.php?cf_bypass=1&force=1&ultra=1&direct=1&timestamp=' . time();

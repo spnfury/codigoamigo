@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/inc/logger.php';
 session_start();
 require_once __DIR__ . '/inc/conexion.php';
 require_once __DIR__ . '/myphp/funciones.php';
@@ -102,7 +103,7 @@ try {
     exit;
 
 } catch (Exception $e) {
-    error_log("Error creating Stripe session for Super destacado: " . $e->getMessage());
+    log_error("Error creating Stripe session for Super destacado: " . $e->getMessage());
     $_SESSION['msg_error'] = "Error al procesar el pago: " . $e->getMessage();
     header('Location: /destacar_super.php?codigo_id=' . $codigo_id);
     exit;

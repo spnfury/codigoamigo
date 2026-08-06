@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 /**
  * Funciones generales para la gestión de chollos
@@ -27,7 +28,7 @@ function getCollectionChollos() {
         $collection = $db->selectCollection('chollos');
         return $collection;
     } catch (Throwable $e) {
-        error_log("Error al obtener colección de chollos: " . $e->getMessage());
+        log_error("Error al obtener colección de chollos: " . $e->getMessage());
         return null;
     }
 }
@@ -131,7 +132,7 @@ function crearChollo($datos) {
                     }
                 }
             } catch (Exception $e) {
-                error_log("Error al notificar a seguidores sobre nuevo chollo: " . $e->getMessage());
+                log_error("Error al notificar a seguidores sobre nuevo chollo: " . $e->getMessage());
             }
             // --- FIN NOTIFICACIÓN ---
 
@@ -140,7 +141,7 @@ function crearChollo($datos) {
             return ['success' => false, 'error' => 'Error al insertar chollo'];
         }
     } catch (Throwable $e) {
-        error_log("Error al crear chollo: " . $e->getMessage());
+        log_error("Error al crear chollo: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -226,7 +227,7 @@ function obtenerChollos($filtros = []) {
 
         return $chollos;
     } catch (Throwable $e) {
-        error_log("Error al obtener chollos: " . $e->getMessage());
+        log_error("Error al obtener chollos: " . $e->getMessage());
         return [];
     }
 }
@@ -295,7 +296,7 @@ function obtenerCholloPorId($id, $incrementar_clicks = false) {
             'total_comentarios' => $doc['total_comentarios'] ?? 0
         ];
     } catch (Throwable $e) {
-        error_log("Error al obtener chollo por ID: " . $e->getMessage());
+        log_error("Error al obtener chollo por ID: " . $e->getMessage());
         return null;
     }
 }
@@ -360,7 +361,7 @@ function actualizarChollo($id, $datos) {
             return ['success' => false, 'error' => 'Chollo no encontrado'];
         }
     } catch (Throwable $e) {
-        error_log("Error al actualizar chollo: " . $e->getMessage());
+        log_error("Error al actualizar chollo: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -389,7 +390,7 @@ function eliminarChollo($id) {
             return ['success' => false, 'error' => 'Chollo no encontrado'];
         }
     } catch (Throwable $e) {
-        error_log("Error al eliminar chollo: " . $e->getMessage());
+        log_error("Error al eliminar chollo: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -438,7 +439,7 @@ function obtenerEstadisticasChollos() {
             'por_categoria' => $por_categoria
         ];
     } catch (Throwable $e) {
-        error_log("Error al obtener estadísticas de chollos: " . $e->getMessage());
+        log_error("Error al obtener estadísticas de chollos: " . $e->getMessage());
         return [];
     }
 }
@@ -490,11 +491,11 @@ function registrarClickChollo($chollo_id, $datos_adicionales = []) {
             
             // Añadir datos adicionales si se proporcionan
             if (!empty($datos_adicionales)) {
-                error_log("DEBUG registrarClickChollo: Datos adicionales antes de merge: " . json_encode($datos_adicionales));
+                log_info("DEBUG registrarClickChollo: Datos adicionales antes de merge: " . json_encode($datos_adicionales));
                 $click_data = array_merge($click_data, $datos_adicionales);
-                error_log("DEBUG registrarClickChollo: Referer después de merge: " . ($click_data['referer'] ?? 'NULL'));
+                log_info("DEBUG registrarClickChollo: Referer después de merge: " . ($click_data['referer'] ?? 'NULL'));
             } else {
-                error_log("DEBUG registrarClickChollo: No datos adicionales");
+                log_info("DEBUG registrarClickChollo: No datos adicionales");
             }
             
             // Añadir user_id si hay sesión
@@ -511,7 +512,7 @@ function registrarClickChollo($chollo_id, $datos_adicionales = []) {
         
         return true;
     } catch (Exception $e) {
-        error_log("Error al registrar click de chollo: " . $e->getMessage());
+        log_error("Error al registrar click de chollo: " . $e->getMessage());
         return false;
     }
 }
@@ -529,7 +530,7 @@ function getCollectionHistorialChollos() {
         $collection = $db->selectCollection('chollos_clicks');
         return $collection;
     } catch (Throwable $e) {
-        error_log("Error al obtener colección de historial de chollos: " . $e->getMessage());
+        log_error("Error al obtener colección de historial de chollos: " . $e->getMessage());
         return null;
     }
 }
@@ -630,7 +631,7 @@ function obtenerEstadisticasChollo($chollo_id) {
             'ultimos_clicks' => $ultimos_clicks
         ];
     } catch (Exception $e) {
-        error_log("Error al obtener estadísticas de chollo: " . $e->getMessage());
+        log_error("Error al obtener estadísticas de chollo: " . $e->getMessage());
         return [
             'total_clicks' => 0,
             'clicks_hoy' => 0,

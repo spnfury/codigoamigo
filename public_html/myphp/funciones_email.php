@@ -40,7 +40,7 @@ function registrarEmailLog($to_email, $to_name, $subject, $tipo, $usuario_id = n
         
         return false;
     } catch (Exception $e) {
-        error_log("Error al registrar email log: " . $e->getMessage());
+        log_error("Error al registrar email log: " . $e->getMessage());
         return false;
     }
 }
@@ -65,9 +65,9 @@ function enviarEmailSaldoCargado($usuario, $cantidad, $nuevo_saldo, $motivo) {
     
     // Log del envío
     if ($enviado) {
-        error_log("Email de saldo enviado exitosamente a: " . $to . " - Cantidad: " . $cantidad . "€");
+        log_info("Email de saldo enviado exitosamente a: " . $to . " - Cantidad: " . $cantidad . "€");
     } else {
-        error_log("Error al enviar email de saldo a: " . $to);
+        log_error("Error al enviar email de saldo a: " . $to);
     }
     
     return $enviado;
@@ -304,7 +304,7 @@ function enviarEmailBienvenidaVIP($usuario) {
     $user_id = isset($usuario['_id']) ? (string)$usuario['_id'] : null;
     
     if (empty($to_email)) {
-        error_log("enviarEmailBienvenidaVIP: No email found for user $username");
+        log_error("enviarEmailBienvenidaVIP: No email found for user $username");
         return false;
     }
     
@@ -427,9 +427,9 @@ function enviarEmailBienvenidaVIP($usuario) {
     );
     
     if ($resultado['success']) {
-        error_log("Email de bienvenida VIP enviado a: $to_email");
+        log_info("Email de bienvenida VIP enviado a: $to_email");
     } else {
-        error_log("Error enviando email de bienvenida VIP a: $to_email - " . ($resultado['error'] ?? ''));
+        log_error("Error enviando email de bienvenida VIP a: $to_email - " . ($resultado['error'] ?? ''));
     }
 
     return $resultado;
@@ -446,7 +446,7 @@ function enviarEmailVIPPagoFallido($usuario, $motivo_decline = '', $card_last4 =
     $user_id = isset($usuario['_id']) ? (string)$usuario['_id'] : null;
 
     if (empty($to_email)) {
-        error_log("enviarEmailVIPPagoFallido: No email found for user $username");
+        log_error("enviarEmailVIPPagoFallido: No email found for user $username");
         return ['success' => false, 'error' => 'No email'];
     }
 
@@ -536,9 +536,9 @@ function enviarEmailVIPPagoFallido($usuario, $motivo_decline = '', $card_last4 =
     );
 
     if ($resultado['success']) {
-        error_log("Email VIP pago fallido enviado a: $to_email");
+        log_info("Email VIP pago fallido enviado a: $to_email");
     } else {
-        error_log("Error enviando email VIP pago fallido a: $to_email - " . ($resultado['error'] ?? ''));
+        log_error("Error enviando email VIP pago fallido a: $to_email - " . ($resultado['error'] ?? ''));
     }
 
     return $resultado;
@@ -554,7 +554,7 @@ function enviarEmailVIPPagoFallidoReintento($usuario, $proximo_intento_fecha = n
     $user_id  = isset($usuario['_id']) ? (string)$usuario['_id'] : null;
 
     if (empty($to_email)) {
-        error_log("enviarEmailVIPPagoFallidoReintento: sin email para usuario $username");
+        log_error("enviarEmailVIPPagoFallidoReintento: sin email para usuario $username");
         return ['success' => false, 'error' => 'No email'];
     }
 
@@ -599,7 +599,7 @@ function enviarEmailVIPPagoFallidoReintento($usuario, $proximo_intento_fecha = n
     );
 
     if (empty($resultado['success'])) {
-        error_log("Error enviando email VIP reintento a: $to_email - " . ($resultado['error'] ?? ''));
+        log_error("Error enviando email VIP reintento a: $to_email - " . ($resultado['error'] ?? ''));
     }
     return $resultado;
 }

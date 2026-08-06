@@ -8,11 +8,11 @@ require_once __DIR__ . '/myphp/funciones_modern.php';
 require_once __DIR__ . '/myphp/funciones_amazon_services.php';
 
 $slug = $_GET['slug'] ?? '';
-error_log("Amazon Detail Executed for slug: " . $slug);
+log_info("Amazon Detail Executed for slug: " . $slug);
 $service = getAmazonServiceBySlug($slug);
 
 if (!$service) {
-    error_log("Service not found for slug: " . $slug);
+    log_warning("Service not found for slug: " . $slug);
     header("Location: /amazon");
     exit;
 }

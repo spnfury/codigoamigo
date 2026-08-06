@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
     // Usar el header moderno
     get_header_modern($title, $description);
 
@@ -11,39 +12,39 @@
         include_once __DIR__ . '/../myphp/funciones_usuario.php';
 
         // Debug: mostrar información del código recibido
-        error_log("Código de activación recibido: " . $codigo_activacion);
+        log_info("Código de activación recibido: " . $codigo_activacion);
 
         // Desencriptar el código para obtener el email
         $email_usuario = desencriptar($codigo_activacion);
-        error_log("Email desencriptado: " . $email_usuario);
+        log_info("Email desencriptado: " . $email_usuario);
 
         if ($email_usuario && filter_var($email_usuario, FILTER_VALIDATE_EMAIL)) {
-            error_log("Email válido: " . $email_usuario);
+            log_info("Email válido: " . $email_usuario);
 
             // Buscar al usuario por email
             $usuario = getObjectUser('mail', $email_usuario);
-            error_log("Usuario encontrado: " . ($usuario ? 'Sí' : 'No'));
-            error_log("Estado del usuario: " . ($usuario ? $usuario['estado'] : 'N/A'));
+            log_info("Usuario encontrado: " . ($usuario ? 'Sí' : 'No'));
+            log_info("Estado del usuario: " . ($usuario ? $usuario['estado'] : 'N/A'));
 
             if ($usuario && $usuario['estado'] == 0) {
                 // Activar al usuario
                 $activacion_resultado = activar_usuario($email_usuario);
-                error_log("Resultado de activación: " . ($activacion_resultado ? 'Éxito' : 'Error'));
+                log_info("Resultado de activación: " . ($activacion_resultado ? 'Éxito' : 'Error'));
 
                 if ($activacion_resultado) {
                     $activacion_exitosa = true;
-                    error_log("Usuario activado correctamente: " . $email_usuario);
+                    log_info("Usuario activado correctamente: " . $email_usuario);
                 } else {
                     $error_activacion = "Error al activar el usuario en la base de datos";
-                    error_log("Error al activar usuario: " . $email_usuario);
+                    log_error("Error al activar usuario: " . $email_usuario);
                 }
             } else {
                 $error_activacion = "Usuario no encontrado o ya activado";
-                error_log("Usuario no encontrado o ya activado: " . $email_usuario . " - Estado: " . ($usuario ? $usuario['estado'] : 'No encontrado'));
+                log_warning("Usuario no encontrado o ya activado: " . $email_usuario . " - Estado: " . ($usuario ? $usuario['estado'] : 'No encontrado'));
             }
         } else {
             $error_activacion = "Código de activación inválido";
-            error_log("Código de activación inválido: " . $codigo_activacion . " -> " . $email_usuario);
+            log_error("Código de activación inválido: " . $codigo_activacion . " -> " . $email_usuario);
         }
     }
 ?>

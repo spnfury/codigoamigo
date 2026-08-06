@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/inc/logger.php';
 // Iniciar sesión
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -105,7 +106,7 @@ try {
     $collection_transacciones->insertOne($transaccion);
 
     // Log de la transacción
-    error_log("Destacado con saldo exitoso - Usuario: " . $_SESSION["user_id"] . ", Código: " . $codigo_id);
+    log_info("Destacado con saldo exitoso - Usuario: " . $_SESSION["user_id"] . ", Código: " . $codigo_id);
 
     header('Content-Type: application/json');
     echo json_encode([
@@ -115,7 +116,7 @@ try {
     ]);
 
 } catch (Exception $e) {
-    error_log("Error procesando destacado con saldo: " . $e->getMessage());
+    log_error("Error procesando destacado con saldo: " . $e->getMessage());
     header('Content-Type: application/json');
     echo json_encode(['error' => 'Error interno del servidor: ' . $e->getMessage()]);
 }

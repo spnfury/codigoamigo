@@ -4,6 +4,7 @@ namespace CodigoAmigo\WebSocket;
 use Ratchet\MessageComponentInterface;
 use Ratchet\ConnectionInterface;
 use MongoDB\Client;
+include_once __DIR__ . '/../inc/logger.php';
 
 class ChatHandler implements MessageComponentInterface {
     protected $clients;
@@ -117,7 +118,7 @@ class ChatHandler implements MessageComponentInterface {
      * Cuando hay un error
      */
     public function onError(ConnectionInterface $conn, \Exception $e) {
-        error_log("WebSocket Error: " . $e->getMessage());
+        log_error("WebSocket Error: " . $e->getMessage());
         $conn->close();
     }
     
@@ -190,7 +191,7 @@ class ChatHandler implements MessageComponentInterface {
             
             return false;
         } catch (\Exception $e) {
-            error_log("Error validando auth: " . $e->getMessage());
+            log_error("Error validando auth: " . $e->getMessage());
             if (session_status() === PHP_SESSION_ACTIVE) {
                 session_write_close();
             }
@@ -347,7 +348,7 @@ class ChatHandler implements MessageComponentInterface {
                 ]);
             }
         } catch (\Exception $e) {
-            error_log("Error broadcasting user status: " . $e->getMessage());
+            log_error("Error broadcasting user status: " . $e->getMessage());
         }
     }
     

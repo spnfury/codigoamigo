@@ -65,7 +65,7 @@ try {
         ]]
     );
 
-    error_log("[VIP REACTIVATE] Usuario $user_id reactivó suscripción VIP");
+    log_info("[VIP REACTIVATE] Usuario $user_id reactivó suscripción VIP");
 
     echo json_encode([
         'success' => true,
@@ -73,9 +73,9 @@ try {
     ]);
 
 } catch (\Stripe\Exception\ApiErrorException $e) {
-    error_log("[VIP REACTIVATE ERROR] Stripe: " . $e->getMessage());
+    log_error("[VIP REACTIVATE ERROR] Stripe: " . $e->getMessage());
     echo json_encode(['success' => false, 'error' => 'Error al reactivar: ' . $e->getMessage()]);
 } catch (Exception $e) {
-    error_log("[VIP REACTIVATE ERROR] General: " . $e->getMessage());
+    log_error("[VIP REACTIVATE ERROR] General: " . $e->getMessage());
     echo json_encode(['success' => false, 'error' => 'Error interno del servidor']);
 }

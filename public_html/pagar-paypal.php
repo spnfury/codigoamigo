@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/inc/logger.php';
 // Iniciar buffer de salida para evitar output accidental
 ob_start();
 
@@ -56,7 +57,7 @@ if ($precio != $precio_valido) {
 }
 
 // Registrar intento de pago
-error_log("Creando orden PayPal para destacar código: $codigo_id, tipo: $tipo, precio: $precio");
+log_info("Creando orden PayPal para destacar código: $codigo_id, tipo: $tipo, precio: $precio");
 
 try {
     // Para PayPal no necesitamos crear una sesión previa como con Stripe
@@ -91,8 +92,8 @@ try {
     exit;
 
 } catch (Exception $e) {
-    error_log("Error creando orden PayPal: " . $e->getMessage());
-    error_log("Stack trace: " . $e->getTraceAsString());
+    log_error("Error creando orden PayPal: " . $e->getMessage());
+    log_error("Stack trace: " . $e->getTraceAsString());
 
     ob_clean();
     header('Content-Type: application/json');

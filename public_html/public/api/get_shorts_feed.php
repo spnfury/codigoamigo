@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../../inc/logger.php';
 // API Endpoint para obtener el feed de shorts (estilo TikTok)
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -148,7 +149,7 @@ try {
                     ]);
                 }
             } catch (Exception $log_err) {
-                error_log("Error logging shorts search: " . $log_err->getMessage());
+                log_error("Error logging shorts search: " . $log_err->getMessage());
             }
 
             // Generar URL correcta con categoría usando el helper del sistema
@@ -273,6 +274,6 @@ try {
     ]);
 
 } catch (Exception $e) {
-    error_log("Error in get_shorts_feed.php: " . $e->getMessage());
+    log_error("Error in get_shorts_feed.php: " . $e->getMessage());
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 }

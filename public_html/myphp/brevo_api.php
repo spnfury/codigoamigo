@@ -60,18 +60,18 @@ function enviarNewsletterBrevoAPI($to_email, $to_name, $subject, $html_content, 
     if (empty(BREVO_API_KEY) || BREVO_API_KEY === 'xkeysib-YOUR_API_KEY_HERE') {
         // Intentar usar SMTP como fallback si está configurado
         if (defined('BREVO_SMTP_USERNAME') && !empty(BREVO_SMTP_USERNAME)) {
-            error_log("Brevo API key no configurada, usando SMTP como fallback");
+            log_warning("Brevo API key no configurada, usando SMTP como fallback");
             return enviarNewsletterBrevoSMTP($to_email, $to_name, $subject, $html_content, $text_content, $from_email, $from_name, $tags);
         }
         $resultado['error'] = 'BREVO_API_KEY no configurada y SMTP no disponible';
-        error_log("Error Brevo API: API key no configurada y SMTP no disponible");
+        log_error("Error Brevo API: API key no configurada y SMTP no disponible");
         return $resultado;
     }
     
     // Validar parámetros
     if (empty($to_email) || empty($subject) || empty($html_content)) {
         $resultado['error'] = 'Parámetros inválidos';
-        error_log("Error Brevo API: Parámetros inválidos - to_email: $to_email");
+        log_error("Error Brevo API: Parámetros inválidos - to_email: $to_email");
         return $resultado;
     }
     
@@ -128,7 +128,7 @@ function enviarNewsletterBrevoAPI($to_email, $to_name, $subject, $html_content, 
     } catch (\Exception $e) {
         // Error
         $resultado['error'] = "Error Brevo API: " . $e->getMessage();
-        error_log("Error Brevo API: " . $e->getMessage());
+        log_error("Error Brevo API: " . $e->getMessage());
     }
     
     return $resultado;
@@ -204,7 +204,7 @@ function enviarNewsletterBrevoSMTP($to_email, $to_name, $subject, $html_content,
         
     } catch (Exception $e) {
         $resultado['error'] = "Error Brevo SMTP: " . $mail->ErrorInfo;
-        error_log("Error Brevo SMTP: " . $mail->ErrorInfo);
+        log_error("Error Brevo SMTP: " . $mail->ErrorInfo);
     }
     
     return $resultado;
@@ -277,7 +277,7 @@ function verificarLimitesBrevo() {
         
     } catch (\Exception $e) {
         $resultado['error'] = "Error al verificar cuenta: " . $e->getMessage();
-        error_log("Error al verificar límites Brevo: " . $e->getMessage());
+        log_error("Error al verificar límites Brevo: " . $e->getMessage());
     }
     
     return $resultado;

@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 /**
  * AJAX: Reactivar un código caducado/desactivado
  * Cambia el estado del código a 0 (activo) y actualiza la fecha de publicación
@@ -78,6 +79,6 @@ try {
     }
     
 } catch (Exception $e) {
-    error_log("Error al reactivar código: " . $e->getMessage());
+    log_error("Error al reactivar código: " . $e->getMessage());
     echo json_encode(['success' => false, 'error' => 'Error interno. Inténtalo de nuevo.']);
 }

@@ -110,7 +110,7 @@ function obtenerSesionesFaltantes($stripe_key, $dias) {
         }
         
     } catch (Exception $e) {
-        error_log("Monitor Stripe: Error obteniendo sesiones: " . $e->getMessage());
+        log_error("Monitor Stripe: Error obteniendo sesiones: " . $e->getMessage());
         return [];
     }
     
@@ -137,7 +137,7 @@ if (count($sesiones_faltantes) >= $umbral_alerta) {
     $mensaje .= "php " . __DIR__ . "/sync_stripe_transactions_cli.php --dias=$dias_revisar --modo=live --confirmar\n";
     
     // Log del problema
-    error_log("MONITOR STRIPE: " . $mensaje);
+    log_error("MONITOR STRIPE: " . $mensaje);
     
     // Intentar enviar email de alerta (si hay función de email configurada)
     if (function_exists('enviar_email_admin')) {
@@ -147,7 +147,7 @@ if (count($sesiones_faltantes) >= $umbral_alerta) {
                 $mensaje
             );
         } catch (Exception $e) {
-            error_log("Monitor Stripe: Error enviando email: " . $e->getMessage());
+            log_error("Monitor Stripe: Error enviando email: " . $e->getMessage());
         }
     }
     

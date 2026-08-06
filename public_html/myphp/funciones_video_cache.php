@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 /**
  * Funciones de caché para videos de YouTube
  * Guarda y recupera videos de MongoDB para evitar scraping repetitivo
@@ -44,7 +45,7 @@ function getCachedVideos($search_term, $type = 'shorts') {
         
         return null;
     } catch (Exception $e) {
-        error_log("Error getting cached videos: " . $e->getMessage());
+        log_error("Error getting cached videos: " . $e->getMessage());
         return null;
     }
 }
@@ -80,7 +81,7 @@ function setCachedVideos($search_term, $videos, $type = 'shorts', $ttl_hours = 4
         
         return true;
     } catch (Exception $e) {
-        error_log("Error saving cached videos: " . $e->getMessage());
+        log_error("Error saving cached videos: " . $e->getMessage());
         return false;
     }
 }
@@ -227,7 +228,7 @@ function getYoutubeVideoStatsWithCache($videoId) {
         return $stats;
         
     } catch (Exception $e) {
-        error_log("Error in getYoutubeVideoStatsWithCache: " . $e->getMessage());
+        log_error("Error in getYoutubeVideoStatsWithCache: " . $e->getMessage());
         return ['likes' => 0, 'comments' => 0, 'views' => 0];
     }
 }

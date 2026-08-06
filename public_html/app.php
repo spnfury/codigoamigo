@@ -323,7 +323,7 @@ $container['errorHandler'] = function($c) {
         }
         
         if (!function_exists('codigoamigo_is_sentry_initialized') || !codigoamigo_is_sentry_initialized()) {
-            error_log('[EXCEPTION] '.get_class($exception).': '.$exception->getMessage().' in '.$exception->getFile().':'.$exception->getLine()."\n".$exception->getTraceAsString());
+            log_error('[EXCEPTION] '.get_class($exception).': '.$exception->getMessage().' in '.$exception->getFile().':'.$exception->getLine()."\n".$exception->getTraceAsString());
         }
         return $c['response']->withStatus(500)->write('Internal Server Error');
     };
@@ -336,7 +336,7 @@ $container['notFoundHandler'] = function($c) {
         // Los 404 los seguimos logeando a error_log o podemos enviarlos como mensajes a Sentry
         // Por ahora, minimizamos escritura a disco
         if (!function_exists('codigoamigo_is_sentry_initialized') || !codigoamigo_is_sentry_initialized()) {
-             error_log('[404] '.$request->getUri());
+             log_warning('[404] '.$request->getUri());
         }
         return $c['response']->withStatus(404)->write('Not Found');
     };
@@ -890,7 +890,7 @@ $app->get('/ofertas/{termino}', function ($request, $respon, $args) {
             }
         } catch (Throwable $e) { 
             // Log del error pero no bloquear la búsqueda
-            error_log("Error registrando búsqueda: " . $e->getMessage());
+            log_error("Error registrando búsqueda: " . $e->getMessage());
         }
     }
 
@@ -1057,9 +1057,9 @@ $app->post('/google_sign', function ($request, $respon) {
             'success' => false,
             'error' => 'Respuesta vacía del servicio de autenticación'
         ]);
-        error_log('[google_sign route] Respuesta vacía después de incluir google-sign-in.php');
+        log_error('[google_sign route] Respuesta vacía después de incluir google-sign-in.php');
     } elseif ($trimmedPayload[0] !== '{' && $trimmedPayload[0] !== '[') {
-        error_log('[google_sign route] Respuesta inesperada: ' . substr($trimmedPayload, 0, 400));
+        log_error('[google_sign route] Respuesta inesperada: ' . substr($trimmedPayload, 0, 400));
     }
 
     $respon->getBody()->write($trimmedPayload);
@@ -1170,7 +1170,7 @@ $app->get('/bienvenido_de_nuevo', function ($request, $respon) {
         }
         
     } catch (Exception $e) {
-        error_log("Error activando usuario: " . $e->getMessage());
+        log_error("Error activando usuario: " . $e->getMessage());
         echo "Error: No se pudo activar el usuario. Inténtalo de nuevo.";
         die;
     }
@@ -2396,7 +2396,7 @@ $app->post('/modificar_codigo/{codigo_id}', function ($request, $response, $args
 
     } catch (Exception $e) {
         // Log del error para debugging
-        error_log("Error en modificar_codigo: " . $e->getMessage());
+        log_error("Error en modificar_codigo: " . $e->getMessage());
         
         $_SESSION['msg_error'] = "Error interno del servidor al modificar el código";
         return $response->withRedirect($GLOBALS["website"]);
@@ -2445,7 +2445,7 @@ $app->post('/borrar_codigo/{codigo_id}', function ($request, $response, $args) {
         return $response->withRedirect($url_marca);
 
     } catch (Exception $e) {
-        error_log("Error al borrar código: " . $e->getMessage());
+        log_error("Error al borrar código: " . $e->getMessage());
         $_SESSION['msg_error'] = "Error interno del servidor";
         return $response->withRedirect('/');
     }
@@ -2682,7 +2682,7 @@ $app->post('/cambio_password', function ($request, $response) {
         return $response->withRedirect('/cambiar_password?msg=ok');
         
     } catch (Exception $e) {
-        error_log("Error en cambio_password: " . $e->getMessage());
+        log_error("Error en cambio_password: " . $e->getMessage());
         return $response->withRedirect('/cambiar_password?msg_error=ok');
     }
 });

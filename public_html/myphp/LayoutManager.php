@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 class LayoutManager {
     
@@ -78,7 +79,7 @@ class LayoutManager {
         } else {
             // Fallback if specific layout file missing: use original monolithic header for safety for now
             // OR create a simple fallback. Let's try to notify dev.
-            error_log("Layout file missing: " . $file_path);
+            log_error("Layout file missing: " . $file_path);
             // Ideally we should have a reliable fallback.
             // For this refactor, I will ensure the files exist.
         }

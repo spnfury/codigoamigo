@@ -100,7 +100,7 @@ try {
                 'id_usuario' => new MongoDB\BSON\ObjectId($_SESSION["user_id"])
             ]);
         } catch (Exception $e) {
-            error_log("Error al borrar código para reemplazo: " . $e->getMessage());
+            log_error("Error al borrar código para reemplazo: " . $e->getMessage());
             // Continuamos intentando crear el nuevo aunque falle el borrado (MongoDB manejará unicidad si hay índice, sino se creará duplicado que luego se detectará)
         }
     }
@@ -212,7 +212,7 @@ try {
                 }
             }
         } catch (Exception $e) {
-            error_log("Error al notificar a seguidores sobre nuevo código: " . $e->getMessage());
+            log_error("Error al notificar a seguidores sobre nuevo código: " . $e->getMessage());
         }
         // --- FIN NOTIFICACIÓN ---
 
@@ -296,7 +296,7 @@ try {
     }
     
 } catch (Exception $e) {
-    error_log("Error al publicar código: " . $e->getMessage());
+    log_error("Error al publicar código: " . $e->getMessage());
     $_SESSION['msg_error'] = "Error al publicar el código. Inténtalo de nuevo.";
     
     // Preservar datos del formulario en la sesión para el error

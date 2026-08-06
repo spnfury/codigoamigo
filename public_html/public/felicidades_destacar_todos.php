@@ -40,7 +40,7 @@ try {
     }
 
 } catch (Exception $e) {
-    error_log("Error verificando pago de destacar todos: " . $e->getMessage());
+    log_error("Error verificando pago de destacar todos: " . $e->getMessage());
     header("Location: /mis-anuncios?error=error_verificacion_pago");
     exit;
 }
@@ -96,7 +96,7 @@ foreach ($codigos_usuario as $codigo) {
                         $_SESSION["user_id"],
                         $codigo_actualizado
                     );
-                    error_log("Notificaciones de competencia home enviadas desde destacar todos: $emails_enviados");
+                    log_info("Notificaciones de competencia home enviadas desde destacar todos: $emails_enviados");
                     $notificacion_enviada = true; // Marcar para no enviar múltiples veces
                 }
             }
@@ -110,7 +110,7 @@ foreach ($codigos_usuario as $codigo) {
 
     } catch (Exception $e) {
         $errores[] = "Error destacando código " . $codigo['codigo'] . ": " . $e->getMessage();
-        error_log("Error destacando código " . $codigo['_id'] . ": " . $e->getMessage());
+        log_error("Error destacando código " . $codigo['_id'] . ": " . $e->getMessage());
     }
 }
 
@@ -132,7 +132,7 @@ if (!empty($codigos_destacados)) {
         $collection_historial->insertOne($historial_entry);
 
     } catch (Exception $e) {
-        error_log("Error guardando historial de destacar todos: " . $e->getMessage());
+        log_error("Error guardando historial de destacar todos: " . $e->getMessage());
     }
 }
 

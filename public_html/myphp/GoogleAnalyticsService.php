@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 /**
  * Google Analytics Service
  * Handles GA4 API integration for CodigoAmigo and Casinuevo
@@ -30,10 +31,10 @@ class GoogleAnalyticsService {
                 $this->client->setAuthConfig($credentialsPath);
                 $this->client->addScope('https://www.googleapis.com/auth/analytics.readonly');
             } else {
-                error_log('Google Analytics credentials file not found at: ' . $credentialsPath);
+                log_error('Google Analytics credentials file not found at: ' . $credentialsPath);
             }
         } catch (Exception $e) {
-            error_log('Error initializing Google Analytics client: ' . $e->getMessage());
+            log_error('Error initializing Google Analytics client: ' . $e->getMessage());
             throw $e;
         }
     }
@@ -84,7 +85,7 @@ class GoogleAnalyticsService {
             return $this->parseResponse($response);
             
         } catch (Exception $e) {
-            error_log('Error fetching analytics data: ' . $e->getMessage());
+            log_error('Error fetching analytics data: ' . $e->getMessage());
             return $this->getMockData($site); // Fallback to mock data for development
         }
     }
@@ -137,7 +138,7 @@ class GoogleAnalyticsService {
             return $this->parseTopPagesResponse($response);
             
         } catch (Exception $e) {
-            error_log('Error fetching top pages: ' . $e->getMessage());
+            log_error('Error fetching top pages: ' . $e->getMessage());
             return [];
         }
     }
@@ -180,7 +181,7 @@ class GoogleAnalyticsService {
             return $this->parseTrafficSourcesResponse($response);
             
         } catch (Exception $e) {
-            error_log('Error fetching traffic sources: ' . $e->getMessage());
+            log_error('Error fetching traffic sources: ' . $e->getMessage());
             return [];
         }
     }
@@ -222,7 +223,7 @@ class GoogleAnalyticsService {
             return $this->parseDeviceResponse($response);
             
         } catch (Exception $e) {
-            error_log('Error fetching device breakdown: ' . $e->getMessage());
+            log_error('Error fetching device breakdown: ' . $e->getMessage());
             return [];
         }
     }

@@ -51,13 +51,13 @@ if (!$is_vip && !empty($session_id)) {
                     // Activar suscripción VIP manualmente
                     if (activar_vip($user_id, $session->subscription, $expires_at)) {
                         $is_vip = true;
-                        error_log("VIP activado por fallback en success_vip.php para usuario $user_id");
+                        log_info("VIP activado por fallback en success_vip.php para usuario $user_id");
                     }
                 }
             }
         }
     } catch (Exception $e) {
-        error_log("Error en fallback de success_vip.php: " . $e->getMessage());
+        log_error("Error en fallback de success_vip.php: " . $e->getMessage());
     }
 }
 

@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 // Al inicio del archivo, antes de cargar el header
 $anula_adsense = true; // Esta variable será leída por el header para no mostrar Adsense
 
@@ -31,7 +32,7 @@ try {
         $saldo_usuario = (float) $usuario['saldo'];
     }
 } catch (Exception $e) {
-    error_log("Error obteniendo saldo del usuario: " . $e->getMessage());
+    log_error("Error obteniendo saldo del usuario: " . $e->getMessage());
 }
 
 // Obtener la información del código
@@ -64,7 +65,7 @@ $codigo = getCodeByID($obj_id_codigo);
 // Verificar que el código pertenece al usuario
 if (!$codigo || $codigo["id_usuario"] != $_SESSION["user_id"]) {
     // Log del intento de acceso no autorizado
-    error_log("Acceso no autorizado a destacar código - Usuario: " . $_SESSION["user_id"] . ", Código: " . $codigo_id . ", Propietario: " . ($codigo ? $codigo["id_usuario"] : "No encontrado"));
+    log_warning("Acceso no autorizado a destacar código - Usuario: " . $_SESSION["user_id"] . ", Código: " . $codigo_id . ", Propietario: " . ($codigo ? $codigo["id_usuario"] : "No encontrado"));
     
     // Mostrar mensaje de error y redirigir
     $_SESSION['error_message'] = 'No tienes permisos para destacar este código.';

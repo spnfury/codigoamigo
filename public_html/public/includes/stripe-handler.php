@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../../inc/logger.php';
 function procesarPagoPendiente($datos_pago, $stripe_config) {
     try {
         \Stripe\Stripe::setApiKey($stripe_config['secret_key']);
@@ -22,7 +23,7 @@ function procesarPagoPendiente($datos_pago, $stripe_config) {
             exit;
         }
     } catch(Exception $e) {
-        error_log("Error en procesamiento de pago: " . $e->getMessage());
+        log_error("Error en procesamiento de pago: " . $e->getMessage());
         header("location:" . $GLOBALS["website"] . "error?msg=pago_fallido");
         exit;
     }

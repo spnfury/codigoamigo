@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 /**
  * API para el sistema de comentarios de chollos
@@ -149,6 +150,6 @@ try {
             break;
     }
 } catch (Throwable $e) {
-    error_log("Error en API de comentarios de chollos: " . $e->getMessage());
+    log_error("Error en API de comentarios de chollos: " . $e->getMessage());
     echo json_encode(['success' => false, 'error' => 'Error interno del servidor']);
 }

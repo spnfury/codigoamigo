@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 /**
  * Página de marca optimizada y renovada
  * Versión final con código limpio, funcional y bien estructurado
@@ -13,7 +14,7 @@ require_once __DIR__ . '/marca_config.php';
 // Validar datos de entrada
 $errors = validate_brand_page_data($marca, $lista_codigos, $lista_codigos_patrocinados);
 if (!empty($errors)) {
-    error_log('Errores en datos de marca: ' . implode(', ', $errors));
+    log_error('Errores en datos de marca: ' . implode(', ', $errors));
     // Redirigir a página de error o mostrar mensaje
 }
 

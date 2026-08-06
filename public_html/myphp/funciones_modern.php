@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 // Función para detectar URLs y extraer códigos de descuento
 function detect_url_and_extract_code($codigo_text) {
     // Patrones para detectar URLs
@@ -549,7 +550,7 @@ function get_brand_info($marca_clave) {
         }
     } catch (Exception $e) {
         // Si hay error, continuar con el fallback
-        error_log("Error obteniendo información de marca: " . $e->getMessage());
+        log_error("Error obteniendo información de marca: " . $e->getMessage());
     }
     
     // Fallback si no se encuentra la marca - usar imágenes específicas para marcas conocidas
@@ -3786,7 +3787,7 @@ function generate_featured_brands_slider($limit = 6) {
     
     // Debug temporal - remover después
     if (isset($_GET['debug'])) {
-        error_log("DEBUG generate_featured_brands_slider: " . count($marcas) . " marcas encontradas");
+        log_info("DEBUG generate_featured_brands_slider: " . count($marcas) . " marcas encontradas");
     }
     
     if(empty($marcas)) {
@@ -4153,7 +4154,7 @@ function get_featured_brands_for_home($limit = 6) {
             ];
         }
     } catch (Exception $e) {
-        error_log("Error obteniendo marcas destacadas: " . $e->getMessage());
+        log_error("Error obteniendo marcas destacadas: " . $e->getMessage());
     }
     
     return $marcas_destacadas;
@@ -4313,7 +4314,7 @@ function get_usuarios_activos_footer($limit = 12) {
         return $resultado;
 
     } catch (Exception $e) {
-        error_log('get_usuarios_activos_footer error: ' . $e->getMessage());
+        log_error('get_usuarios_activos_footer error: ' . $e->getMessage());
         return [];
     }
 }

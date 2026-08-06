@@ -99,7 +99,7 @@ try {
         'stripe_coupon_id' => $coupon_id
     ]);
 
-    error_log("[VIP RETENTION] Usuario $user_id aceptó oferta de retención (4,99€ próximo mes)");
+    log_info("[VIP RETENTION] Usuario $user_id aceptó oferta de retención (4,99€ próximo mes)");
 
     echo json_encode([
         'success' => true,
@@ -108,9 +108,9 @@ try {
     ]);
 
 } catch (\Stripe\Exception\ApiErrorException $e) {
-    error_log("[VIP RETENTION ERROR] Stripe: " . $e->getMessage());
+    log_error("[VIP RETENTION ERROR] Stripe: " . $e->getMessage());
     echo json_encode(['success' => false, 'error' => 'Error al aplicar la oferta: ' . $e->getMessage()]);
 } catch (Exception $e) {
-    error_log("[VIP RETENTION ERROR] General: " . $e->getMessage());
+    log_error("[VIP RETENTION ERROR] General: " . $e->getMessage());
     echo json_encode(['success' => false, 'error' => 'Error interno del servidor']);
 }

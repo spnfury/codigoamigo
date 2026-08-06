@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 session_start();
 require_once '../app_with_mongo.php';
 include_once __DIR__ . '/../myphp/funciones.php';
@@ -135,7 +136,7 @@ try {
                     $user_id,
                     $codigo_actualizado
                 );
-                error_log("Notificaciones de competencia home enviadas: $emails_enviados");
+                log_info("Notificaciones de competencia home enviadas: $emails_enviados");
             }
         }
         
@@ -177,7 +178,7 @@ try {
     }
     
 } catch (Exception $e) {
-    error_log("Error destacando código: " . $e->getMessage());
+    log_error("Error destacando código: " . $e->getMessage());
     $_SESSION['msg_error'] = "Error destacando el código. Contacta con soporte.";
     header("Location: https://www.codigoamigo.com/mis-anuncios");
     exit;

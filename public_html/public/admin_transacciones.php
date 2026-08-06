@@ -166,7 +166,7 @@ try {
     ])->toArray();
     
 } catch (Exception $e) {
-    error_log("Error al obtener transacciones: " . $e->getMessage());
+    log_error("Error al obtener transacciones: " . $e->getMessage());
     $transacciones = [];
 }
 

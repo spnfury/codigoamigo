@@ -525,7 +525,7 @@ try {
                 
                 echo json_encode(['success' => true, 'usuarios' => $resultado]);
             } catch (Throwable $e) {
-                error_log("Error al buscar usuarios: " . $e->getMessage());
+                log_error("Error al buscar usuarios: " . $e->getMessage());
                 echo json_encode(['success' => false, 'error' => 'Error al buscar usuarios']);
             }
             break;
@@ -541,7 +541,7 @@ try {
             try {
                 $usuario_obj = get_object_user('_id', new MongoDB\BSON\ObjectId($usuario_chat_id));
             } catch (Throwable $e) {
-                error_log("Error al obtener usuario para chat: " . $e->getMessage());
+                log_error("Error al obtener usuario para chat: " . $e->getMessage());
                 $usuario_obj = null;
             }
 
@@ -607,7 +607,7 @@ try {
                     }
                 }
             } catch (Throwable $e) {
-                error_log("Error al obtener estadísticas de usuario: " . $e->getMessage());
+                log_error("Error al obtener estadísticas de usuario: " . $e->getMessage());
             }
             
             $respuesta_usuario = [
@@ -731,7 +731,7 @@ try {
                 
                 echo json_encode($resultado_ctx);
             } catch (Throwable $e) {
-                error_log("Error en get_interacciones_codigo: " . $e->getMessage());
+                log_error("Error en get_interacciones_codigo: " . $e->getMessage());
                 echo json_encode(['success' => false, 'error' => 'Error interno del servidor']);
             }
             break;
@@ -813,7 +813,7 @@ try {
                  }
                  echo json_encode(['success' => true]);
              } catch (Throwable $e) {
-                 error_log("Error en toggle_codigo_completado: " . $e->getMessage());
+                 log_error("Error en toggle_codigo_completado: " . $e->getMessage());
                  echo json_encode(['success' => false, 'error' => $e->getMessage()]);
              }
              break;
@@ -962,7 +962,7 @@ try {
             break;
     }
 } catch (Exception $e) {
-    error_log("Error en chat_api.php: " . $e->getMessage());
+    log_error("Error en chat_api.php: " . $e->getMessage());
     echo json_encode(['success' => false, 'error' => 'Error interno del servidor']);
 }
 ?>

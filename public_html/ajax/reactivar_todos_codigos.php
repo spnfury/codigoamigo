@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 /**
  * AJAX: Reactivar TODOS los códigos caducados del usuario
  * Cambia el estado a 0 (activo) y actualiza la fecha de publicación
@@ -69,6 +70,6 @@ try {
     }
     
 } catch (Exception $e) {
-    error_log("Error masivo reactivar códigos: " . $e->getMessage());
+    log_error("Error masivo reactivar códigos: " . $e->getMessage());
     echo json_encode(['success' => false, 'error' => 'Error de conexión interno.']);
 }

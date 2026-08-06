@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 /**
  * Funciones para el sistema de votación de chollos
@@ -24,7 +25,7 @@ function getCollectionCholloVotos() {
     try {
         return $db->selectCollection('chollo_votos');
     } catch (Throwable $e) {
-        error_log("Error al obtener colección de votos: " . $e->getMessage());
+        log_error("Error al obtener colección de votos: " . $e->getMessage());
         return null;
     }
 }
@@ -145,7 +146,7 @@ function votarChollo($chollo_id, $usuario_id, $tipo) {
             ];
         }
     } catch (Throwable $e) {
-        error_log("Error al votar chollo: " . $e->getMessage());
+        log_error("Error al votar chollo: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno'];
     }
 }
@@ -207,7 +208,7 @@ function actualizarTemperaturaChollo($chollo_id) {
         
         return $temperatura;
     } catch (Exception $e) {
-        error_log("Error al actualizar temperatura: " . $e->getMessage());
+        log_error("Error al actualizar temperatura: " . $e->getMessage());
         return 0;
     }
 }
@@ -270,7 +271,7 @@ function obtenerChollosMasCalientes($limite = 5) {
         
         return $chollos;
     } catch (Throwable $e) {
-        error_log("Error al obtener chollos más calientes: " . $e->getMessage());
+        log_error("Error al obtener chollos más calientes: " . $e->getMessage());
         return [];
     }
 }
@@ -370,7 +371,7 @@ function obtenerChollosMasCalientes24h($limite = 5, $categoria = null) {
         
         return $chollos;
     } catch (Throwable $e) {
-        error_log("Error al obtener chollos calientes 24h: " . $e->getMessage());
+        log_error("Error al obtener chollos calientes 24h: " . $e->getMessage());
         return [];
     }
 }
@@ -441,7 +442,7 @@ function obtenerChollosMasPopulares24h($limite = 5, $categoria = null) {
         
         return $chollos;
     } catch (Throwable $e) {
-        error_log("Error al obtener chollos populares 24h: " . $e->getMessage());
+        log_error("Error al obtener chollos populares 24h: " . $e->getMessage());
         return [];
     }
 }
@@ -513,7 +514,7 @@ function obtenerChollosMasCalientes7d($limite = 5, $categoria = null) {
         
         return $chollos;
     } catch (Throwable $e) {
-        error_log("Error al obtener chollos calientes 7d: " . $e->getMessage());
+        log_error("Error al obtener chollos calientes 7d: " . $e->getMessage());
         return [];
     }
 }
@@ -585,7 +586,7 @@ function obtenerChollosMasPopulares7d($limite = 5, $categoria = null) {
         
         return $chollos;
     } catch (Throwable $e) {
-        error_log("Error al obtener chollos populares 7d: " . $e->getMessage());
+        log_error("Error al obtener chollos populares 7d: " . $e->getMessage());
         return [];
     }
 }
@@ -657,7 +658,7 @@ function obtenerChollosMasCalientes30d($limite = 5, $categoria = null) {
         
         return $chollos;
     } catch (Throwable $e) {
-        error_log("Error al obtener chollos calientes 30d: " . $e->getMessage());
+        log_error("Error al obtener chollos calientes 30d: " . $e->getMessage());
         return [];
     }
 }
@@ -729,7 +730,7 @@ function obtenerChollosMasPopulares30d($limite = 5, $categoria = null) {
         
         return $chollos;
     } catch (Throwable $e) {
-        error_log("Error al obtener chollos populares 30d: " . $e->getMessage());
+        log_error("Error al obtener chollos populares 30d: " . $e->getMessage());
         return [];
     }
 }

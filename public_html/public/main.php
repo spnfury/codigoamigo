@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 // Inicializar variables meta si no están definidas
 if (!isset($title)) $title = 'Códigos Descuento - CodigoAmigo.com';
@@ -68,9 +69,9 @@ $numero_codigos_format = number_format($numero_codigos, 0, ',', '.');
             }
         } catch (Exception $e) {
             // Silenciar errores en producción, solo log
-            error_log("Error en generate_featured_brands_slider: " . $e->getMessage());
+            log_error("Error en generate_featured_brands_slider: " . $e->getMessage());
         } catch (Throwable $e) {
-            error_log("Error fatal en generate_featured_brands_slider: " . $e->getMessage());
+            log_error("Error fatal en generate_featured_brands_slider: " . $e->getMessage());
         }
     }
     ?>

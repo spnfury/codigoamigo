@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 /**
  * Procesador automático de newsletters
  * 
@@ -66,7 +67,7 @@ try {
 } catch (Throwable $e) {
     $error_msg = "Error crítico en procesamiento: " . $e->getMessage() . " en línea " . $e->getLine();
     escribirLog($error_msg, $log_file);
-    error_log($error_msg);
+    log_error($error_msg);
     exit(1);
 }
 

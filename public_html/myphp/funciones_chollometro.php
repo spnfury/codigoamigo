@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 /**
  * Funciones para el diseño estilo Chollometro
@@ -28,7 +29,7 @@ function generate_chollometro_code_card($codigo, $is_featured = false) {
         }
     } catch (Exception $e) {
         // Si hay error obteniendo el usuario, continuar con valores por defecto
-        error_log("Error obteniendo usuario en generate_chollometro_code_card: " . $e->getMessage());
+        log_error("Error obteniendo usuario en generate_chollometro_code_card: " . $e->getMessage());
     }
     
     // Obtener información de la marca

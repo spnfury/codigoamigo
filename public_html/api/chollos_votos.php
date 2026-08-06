@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 /**
  * API para el sistema de votación de chollos
@@ -23,12 +24,12 @@ try {
     switch ($action) {
         case 'votar':
             // Debug logs
-            error_log("Intento de voto. Usuario ID: " . ($usuario_id ?? 'NULL'));
-            error_log("POST data: " . print_r($_POST, true));
+            log_info("Intento de voto. Usuario ID: " . ($usuario_id ?? 'NULL'));
+            log_info("POST data: " . print_r($_POST, true));
 
             // Verificar autenticación
             if (!$usuario_id) {
-                error_log("Error: Usuario no autenticado al votar");
+                log_error("Error: Usuario no autenticado al votar");
                 echo json_encode(['success' => false, 'error' => 'No autenticado']);
                 exit;
             }
@@ -38,13 +39,13 @@ try {
             $tipo = $_POST['tipo'] ?? ''; // 'positivo' o 'negativo'
             
             if (empty($chollo_id) || empty($tipo)) {
-                error_log("Error: Parámetros faltantes. Chollo: $chollo_id, Tipo: $tipo");
+                log_error("Error: Parámetros faltantes. Chollo: $chollo_id, Tipo: $tipo");
                 echo json_encode(['success' => false, 'error' => 'Parámetros faltantes']);
                 exit;
             }
             
             $resultado = votarChollo($chollo_id, $usuario_id, $tipo);
-            error_log("Resultado votarChollo: " . print_r($resultado, true));
+            log_info("Resultado votarChollo: " . print_r($resultado, true));
             
             echo json_encode($resultado);
             break;
@@ -125,6 +126,6 @@ try {
             break;
     }
 } catch (Throwable $e) {
-    error_log("Error en API de votos de chollos: " . $e->getMessage());
+    log_error("Error en API de votos de chollos: " . $e->getMessage());
     echo json_encode(['success' => false, 'error' => 'Error interno del servidor']);
 }

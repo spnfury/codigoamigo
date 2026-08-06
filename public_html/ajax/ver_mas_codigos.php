@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 /**
  * AJAX endpoint: Obtener todos los códigos de una marca con sus trust scores.
  * 
@@ -39,7 +40,7 @@ try {
     ]);
     
 } catch (Exception $e) {
-    error_log("Error en ver_mas_codigos.php: " . $e->getMessage());
+    log_error("Error en ver_mas_codigos.php: " . $e->getMessage());
     echo json_encode([
         'success' => false,
         'message' => 'Error interno del servidor'

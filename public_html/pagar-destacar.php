@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/inc/logger.php';
 // Iniciar buffer de salida para evitar output accidental
 ob_start();
 
@@ -22,16 +23,16 @@ $tipo = $_POST['tipo'] ?? 'normal';
 $sku = $_POST['sku'] ?? '';
 
 // Debug logs
-error_log("=== DEBUG crear_sesion_destacar.php ===");
-error_log("REQUEST_METHOD: " . $_SERVER['REQUEST_METHOD']);
-error_log("POST data: " . json_encode($_POST));
-error_log("GET data: " . json_encode($_GET));
-error_log("codigo_id: " . $codigo_id);
-error_log("tipo: " . $tipo);
-error_log("sku: " . $sku);
+log_info("=== DEBUG crear_sesion_destacar.php ===");
+log_info("REQUEST_METHOD: " . $_SERVER['REQUEST_METHOD']);
+log_info("POST data: " . json_encode($_POST));
+log_info("GET data: " . json_encode($_GET));
+log_info("codigo_id: " . $codigo_id);
+log_info("tipo: " . $tipo);
+log_info("sku: " . $sku);
 
 if (empty($codigo_id) || empty($sku)) {
-    error_log("ERROR: Datos incompletos");
+    log_error("ERROR: Datos incompletos");
     ob_clean();
     header('Content-Type: application/json');
     echo json_encode(['error' => 'Datos incompletos']);
@@ -105,8 +106,8 @@ try {
     exit;
     
 } catch (Exception $e) {
-    error_log("Error creando sesión Stripe: " . $e->getMessage());
-    error_log("Stack trace: " . $e->getTraceAsString());
+    log_error("Error creando sesión Stripe: " . $e->getMessage());
+    log_error("Stack trace: " . $e->getTraceAsString());
     
     ob_clean();
     header('Content-Type: application/json');

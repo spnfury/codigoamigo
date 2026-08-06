@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 // Incluir funciones de conexión a MongoDB
 if (!function_exists('createConnection')) {
@@ -27,7 +28,7 @@ function getCollectionAfiliados() {
         $collection_afiliados = $db->selectCollection('afiliados_urls');
         return $collection_afiliados;
     } catch (Throwable $e) {
-        error_log("Error al obtener colección de afiliados: " . $e->getMessage());
+        log_error("Error al obtener colección de afiliados: " . $e->getMessage());
         return null;
     }
 }
@@ -45,7 +46,7 @@ function getCollectionIngresosAfiliados() {
         $collection_ingresos = $db->selectCollection('afiliados_ingresos');
         return $collection_ingresos;
     } catch (Throwable $e) {
-        error_log("Error al obtener colección de ingresos afiliados: " . $e->getMessage());
+        log_error("Error al obtener colección de ingresos afiliados: " . $e->getMessage());
         return null;
     }
 }
@@ -82,7 +83,7 @@ function agregarUrlAfiliado($usuario_id, $url, $nombre_plataforma, $descripcion 
             return ['success' => false, 'error' => 'Error al insertar URL'];
         }
     } catch (Throwable $e) {
-        error_log("Error al agregar URL afiliado: " . $e->getMessage());
+        log_error("Error al agregar URL afiliado: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -121,7 +122,7 @@ function obtenerUrlsAfiliadosUsuario($usuario_id) {
 
         return ['success' => true, 'urls' => $urls];
     } catch (Throwable $e) {
-        error_log("Error al obtener URLs afiliados: " . $e->getMessage());
+        log_error("Error al obtener URLs afiliados: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -156,7 +157,7 @@ function agregarMarcaUrlAfiliado($url_id, $marca_nombre, $marca_id = null) {
             return ['success' => false, 'error' => 'URL no encontrada'];
         }
     } catch (Throwable $e) {
-        error_log("Error al agregar marca a URL: " . $e->getMessage());
+        log_error("Error al agregar marca a URL: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -190,7 +191,7 @@ function registrarIngresosAfiliado($url_id, $usuario_id, $monto, $periodo, $capt
             return ['success' => false, 'error' => 'Error al registrar ingresos'];
         }
     } catch (Throwable $e) {
-        error_log("Error al registrar ingresos: " . $e->getMessage());
+        log_error("Error al registrar ingresos: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -229,7 +230,7 @@ function obtenerIngresosAfiliadosUsuario($usuario_id, $url_id = null) {
 
         return ['success' => true, 'ingresos' => $ingresos];
     } catch (Throwable $e) {
-        error_log("Error al obtener ingresos: " . $e->getMessage());
+        log_error("Error al obtener ingresos: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -283,7 +284,7 @@ function obtenerEstadisticasIngresosUsuario($usuario_id) {
         $estadisticas[0]['urls_activas'] = $urls_activas;
         return ['success' => true, 'estadisticas' => $estadisticas[0]];
     } catch (Throwable $e) {
-        error_log("Error al obtener estadísticas: " . $e->getMessage());
+        log_error("Error al obtener estadísticas: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -317,7 +318,7 @@ function eliminarUrlAfiliado($url_id, $usuario_id) {
             return ['success' => false, 'error' => 'URL no encontrada'];
         }
     } catch (Throwable $e) {
-        error_log("Error al eliminar URL: " . $e->getMessage());
+        log_error("Error al eliminar URL: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -357,7 +358,7 @@ function actualizarUrlAfiliado($url_id, $usuario_id, $datos) {
             return ['success' => false, 'error' => 'URL no encontrada'];
         }
     } catch (Throwable $e) {
-        error_log("Error al actualizar URL: " . $e->getMessage());
+        log_error("Error al actualizar URL: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -433,7 +434,7 @@ function obtenerCodigosSinAfiliado($usuario_id) {
 
         return ['success' => true, 'marcas' => $marcas_agrupadas];
     } catch (Throwable $e) {
-        error_log("Error al obtener códigos sin afiliado: " . $e->getMessage());
+        log_error("Error al obtener códigos sin afiliado: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -481,7 +482,7 @@ function obtenerCodigosSinAfiliadoPorMarca($usuario_id, $marca_clave) {
 
         return ['success' => true, 'codigos' => $codigos];
     } catch (Throwable $e) {
-        error_log("Error al obtener códigos sin afiliado por marca: " . $e->getMessage());
+        log_error("Error al obtener códigos sin afiliado por marca: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -555,7 +556,7 @@ function asignarMultiplesCodigosAAfiliado($codigos_ids, $url_afiliado_id, $usuar
             return ['success' => false, 'error' => 'No se pudo asignar ningún código'];
         }
     } catch (Throwable $e) {
-        error_log("Error al asignar múltiples códigos: " . $e->getMessage());
+        log_error("Error al asignar múltiples códigos: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -604,7 +605,7 @@ function obtenerEstadisticasAfiliadosConCodigos($usuario_id) {
 
         return ['success' => true, 'afiliados' => $afiliados_con_codigos];
     } catch (Throwable $e) {
-        error_log("Error al obtener estadísticas afiliados: " . $e->getMessage());
+        log_error("Error al obtener estadísticas afiliados: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -676,7 +677,7 @@ function asignarCodigoAAfiliado($codigo_id, $url_afiliado_id, $usuario_id) {
             return ['success' => false, 'error' => 'No se pudo asignar el código'];
         }
     } catch (Throwable $e) {
-        error_log("Error al asignar código a afiliado: " . $e->getMessage());
+        log_error("Error al asignar código a afiliado: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -726,7 +727,7 @@ function desasignarCodigoDeAfiliado($codigo_id, $usuario_id) {
             return ['success' => false, 'error' => 'No se pudo desasignar el código'];
         }
     } catch (Throwable $e) {
-        error_log("Error al desasignar código de afiliado: " . $e->getMessage());
+        log_error("Error al desasignar código de afiliado: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -766,7 +767,7 @@ function obtenerCodigosAsignadosAAfiliado($url_afiliado_id, $usuario_id) {
 
         return ['success' => true, 'codigos' => $codigos];
     } catch (Throwable $e) {
-        error_log("Error al obtener códigos asignados: " . $e->getMessage());
+        log_error("Error al obtener códigos asignados: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }

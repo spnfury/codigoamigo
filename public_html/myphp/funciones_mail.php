@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 include_once __DIR__ . '/email_helper.php';
 // Plantilla visual moderna (_templateBaseDestacadoEmail) para las conversiones
@@ -48,7 +49,7 @@ use SendGrid\Mail\ReplyTo;
         if ($resultado['success']) {
             return "success";
         } else {
-            error_log("Error enviando email de contacto: " . $resultado['error']);
+            log_error("Error enviando email de contacto: " . $resultado['error']);
             return "error";
         }
 
@@ -96,7 +97,7 @@ use SendGrid\Mail\ReplyTo;
         // Comprobar preferencia del usuario destinatario
         $id_usuario_codigo = $codigo_to_show['id_usuario'] ?? null;
         if ($id_usuario_codigo && !usuarioAceptaEmail((string)$id_usuario_codigo, 'apertura_codigo')) {
-            error_log("Email apertura_codigo NO enviado a $correo: usuario ha desactivado esta notificación");
+            log_info("Email apertura_codigo NO enviado a $correo: usuario ha desactivado esta notificación");
             return;
         }
 
@@ -150,7 +151,7 @@ use SendGrid\Mail\ReplyTo;
         // Comprobar preferencia del usuario destinatario
         $id_usuario_codigo = $codigo_to_show['id_usuario'] ?? null;
         if ($id_usuario_codigo && !usuarioAceptaEmail((string)$id_usuario_codigo, 'competencia')) {
-            error_log("Email competencia NO enviado a $correo: usuario ha desactivado esta notificación");
+            log_info("Email competencia NO enviado a $correo: usuario ha desactivado esta notificación");
             return false;
         }
 
@@ -200,9 +201,9 @@ use SendGrid\Mail\ReplyTo;
         );
 
         if (!$resultado['success']) {
-            error_log("Error enviando email de competencia a " . $to_email . ": " . $resultado['error']);
+            log_error("Error enviando email de competencia a " . $to_email . ": " . $resultado['error']);
         } else {
-            error_log("Email de competencia enviado correctamente a " . $to_email . " via " . $resultado['method']);
+            log_info("Email de competencia enviado correctamente a " . $to_email . " via " . $resultado['method']);
         }
 
         return $resultado['success'];
@@ -216,7 +217,7 @@ use SendGrid\Mail\ReplyTo;
         // Comprobar preferencia del usuario destinatario
         $id_usuario_codigo = $codigo_to_show['id_usuario'] ?? null;
         if ($id_usuario_codigo && !usuarioAceptaEmail((string)$id_usuario_codigo, 'competencia_home')) {
-            error_log("Email competencia_home NO enviado a $correo: usuario ha desactivado esta notificación");
+            log_info("Email competencia_home NO enviado a $correo: usuario ha desactivado esta notificación");
             return false;
         }
 
@@ -264,9 +265,9 @@ use SendGrid\Mail\ReplyTo;
         );
 
         if (!$resultado['success']) {
-            error_log("Error enviando email de competencia home a " . $to_email . ": " . $resultado['error']);
+            log_error("Error enviando email de competencia home a " . $to_email . ": " . $resultado['error']);
         } else {
-            error_log("Email de competencia home enviado correctamente a " . $to_email . " via " . $resultado['method']);
+            log_info("Email de competencia home enviado correctamente a " . $to_email . " via " . $resultado['method']);
         }
 
         return $resultado['success'];
@@ -288,7 +289,7 @@ use SendGrid\Mail\ReplyTo;
             if (!$codigo_nuevo_info) {
                 $codigo_nuevo = getCodeByID(new \MongoDB\BSON\ObjectId($codigo_id_nuevo));
                 if (!$codigo_nuevo) {
-                    error_log("Error: No se pudo obtener información del código $codigo_id_nuevo");
+                    log_error("Error: No se pudo obtener información del código $codigo_id_nuevo");
                     return 0;
                 }
             } else {
@@ -298,7 +299,7 @@ use SendGrid\Mail\ReplyTo;
             // Obtener información del usuario que destacó
             $usuario_nuevo = getObjectUser('_id', new \MongoDB\BSON\ObjectId($usuario_id_nuevo));
             if (!$usuario_nuevo) {
-                error_log("Error: No se pudo obtener información del usuario $usuario_id_nuevo");
+                log_error("Error: No se pudo obtener información del usuario $usuario_id_nuevo");
                 return 0;
             }
             $datos_usuario_nuevo = get_array_de_usuario($usuario_nuevo);
@@ -363,14 +364,14 @@ use SendGrid\Mail\ReplyTo;
                     continue;
                 }
                 if (!filter_var($email_usuario, FILTER_VALIDATE_EMAIL)) {
-                    error_log("Email competencia_home_super inválido, saltado: $email_usuario (usuario $usuario_id_home)");
+                    log_warning("Email competencia_home_super inválido, saltado: $email_usuario (usuario $usuario_id_home)");
                     $emails_enviados[$email_usuario] = true;
                     continue;
                 }
 
                 // Comprobar preferencia del usuario destinatario
                 if (!usuarioAceptaEmail($usuario_id_home, 'competencia_home_super')) {
-                    error_log("Email competencia_home_super NO enviado a $email_usuario: usuario ha desactivado esta notificación");
+                    log_info("Email competencia_home_super NO enviado a $email_usuario: usuario ha desactivado esta notificación");
                     continue;
                 }
 
@@ -434,17 +435,17 @@ use SendGrid\Mail\ReplyTo;
 
                 if ($resultado['success']) {
                     $emails_enviados_count++;
-                    error_log("Email de competencia home (super) enviado a " . $to_email);
+                    log_info("Email de competencia home (super) enviado a " . $to_email);
                 } else {
-                    error_log("Error enviando email de competencia home (super) a " . $to_email . ": " . $resultado['error']);
+                    log_error("Error enviando email de competencia home (super) a " . $to_email . ": " . $resultado['error']);
                 }
             }
 
-            error_log("Total de emails de competencia home enviados: $emails_enviados_count");
+            log_info("Total de emails de competencia home enviados: $emails_enviados_count");
             return $emails_enviados_count;
 
         } catch (Exception $e) {
-            error_log("Error en notificar_competencia_home_destacado_super: " . $e->getMessage());
+            log_error("Error en notificar_competencia_home_destacado_super: " . $e->getMessage());
             return 0;
         }
     }
@@ -517,9 +518,9 @@ use SendGrid\Mail\ReplyTo;
         );
 
         if (!$resultado['success']) {
-            error_log("Error enviando email de código publicado a " . $to_email . ": " . $resultado['error']);
+            log_error("Error enviando email de código publicado a " . $to_email . ": " . $resultado['error']);
         } else {
-            error_log("Email de código publicado enviado correctamente a " . $to_email . " via " . $resultado['method']);
+            log_info("Email de código publicado enviado correctamente a " . $to_email . " via " . $resultado['method']);
         }
 
         return $resultado['success'];

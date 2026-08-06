@@ -47,7 +47,7 @@ if ($metodo === 'tarjeta' && !empty($session_id)) {
         $is_test = strpos($session_id, 'cs_test_') === 0;
         $stripe_secret_key = $is_test ? get_stripe_test_secret_key() : get_stripe_live_secret_key();
         
-        error_log("Verificando sesión Stripe: $session_id (modo: " . ($is_test ? 'TEST' : 'LIVE') . ")");
+        log_info("Verificando sesión Stripe: $session_id (modo: " . ($is_test ? 'TEST' : 'LIVE') . ")");
         
         $stripe = new \Stripe\StripeClient($stripe_secret_key);
         
@@ -55,7 +55,7 @@ if ($metodo === 'tarjeta' && !empty($session_id)) {
         
         // Verificar que el pago fue exitoso
         if ($session->payment_status !== 'paid') {
-            error_log("ERROR: Sesión Stripe no pagada - Session: $session_id, Status: " . $session->payment_status);
+            log_error("ERROR: Sesión Stripe no pagada - Session: $session_id, Status: " . $session->payment_status);
             throw new Exception("El pago no fue completado. Estado: " . $session->payment_status);
         }
         
@@ -68,7 +68,7 @@ if ($metodo === 'tarjeta' && !empty($session_id)) {
         }
         
         if (!$codigo_coincide) {
-            error_log("ERROR: Código no coincide - Session: $session_id, Código esperado: $codigo_id, Client ref: " . ($session->client_reference_id ?? 'N/A'));
+            log_error("ERROR: Código no coincide - Session: $session_id, Código esperado: $codigo_id, Client ref: " . ($session->client_reference_id ?? 'N/A'));
             throw new Exception("El código de la sesión no coincide");
         }
         
@@ -105,7 +105,7 @@ if ($metodo === 'tarjeta' && !empty($session_id)) {
         // Para destacado "super", establecer también destacado_social (aparece en home y tiene prioridad)
         if ($tipo === 'super') {
             $update_data['destacado_social'] = time();
-            error_log("Destacado SUPER: Estableciendo destacado_social para código $codigo_id");
+            log_info("Destacado SUPER: Estableciendo destacado_social para código $codigo_id");
         }
         
         $resultado_destacado = $collection_codigos->updateOne(
@@ -114,7 +114,7 @@ if ($metodo === 'tarjeta' && !empty($session_id)) {
         );
         
         if ($resultado_destacado->getModifiedCount() > 0) {
-            error_log("SUCCESS: Código destacado correctamente - Código ID: $codigo_id, Tipo: $tipo, Destacado: " . $update_data['destacado']);
+            log_info("SUCCESS: Código destacado correctamente - Código ID: $codigo_id, Tipo: $tipo, Destacado: " . $update_data['destacado']);
             
             // Si es destacado super, notificar a todos los usuarios con códigos en el home
             if ($tipo === 'super') {
@@ -125,7 +125,7 @@ if ($metodo === 'tarjeta' && !empty($session_id)) {
                         $_SESSION["user_id"],
                         $codigo_actualizado
                     );
-                    error_log("Notificaciones de competencia home enviadas: $emails_enviados");
+                    log_info("Notificaciones de competencia home enviadas: $emails_enviados");
                 }
             }
             
@@ -136,20 +136,20 @@ if ($metodo === 'tarjeta' && !empty($session_id)) {
             $marca_clave = $codigo['marca'] ?? '';
             if ($marca_clave) {
                 $notifs = notificarCompetenciaDestacado($marca_clave, $_SESSION["user_id"], $tipo);
-                error_log("Notificaciones competencia marca ($marca_clave): $notifs enviadas");
+                log_info("Notificaciones competencia marca ($marca_clave): $notifs enviadas");
             }
             
             // Verificar que se actualizó correctamente
             $codigo_verificado = $collection_codigos->findOne(['_id' => new MongoDB\BSON\ObjectId($codigo_id)]);
             if ($codigo_verificado) {
                 $destacado_verificado = isset($codigo_verificado['destacado']) ? $codigo_verificado['destacado'] : 'NO';
-                error_log("VERIFICACIÓN: Código $codigo_id tiene destacado = $destacado_verificado");
+                log_info("VERIFICACIÓN: Código $codigo_id tiene destacado = $destacado_verificado");
             }
         } else {
             if ($resultado_destacado->getMatchedCount() == 0) {
-                error_log("ERROR: Código no encontrado para destacar - Código ID: $codigo_id");
+                log_error("ERROR: Código no encontrado para destacar - Código ID: $codigo_id");
             } else {
-                error_log("WARNING: Código encontrado pero no se modificó - Código ID: $codigo_id (puede que ya esté destacado con los mismos valores)");
+                log_warning("WARNING: Código encontrado pero no se modificó - Código ID: $codigo_id (puede que ya esté destacado con los mismos valores)");
             }
         }
         
@@ -200,22 +200,22 @@ if ($metodo === 'tarjeta' && !empty($session_id)) {
             try {
                 $resultado_insert = $collection_transacciones->insertOne($transaccion);
                 if ($resultado_insert->getInsertedCount() > 0) {
-                    error_log("✓ Transacción registrada desde felicidades_destacar.php (backup): " . $session_id);
+                    log_info("✓ Transacción registrada desde felicidades_destacar.php (backup): " . $session_id);
                 } else {
-                    error_log("WARNING: InsertOne no devolvió insertedCount > 0 para sesión: " . $session_id);
+                    log_warning("WARNING: InsertOne no devolvió insertedCount > 0 para sesión: " . $session_id);
                 }
             } catch (Exception $e) {
-                error_log("ERROR al insertar transacción desde felicidades_destacar.php: " . $e->getMessage());
+                log_error("ERROR al insertar transacción desde felicidades_destacar.php: " . $e->getMessage());
                 // No lanzar excepción aquí para no bloquear el flujo
             }
         } else {
-            error_log("INFO: Transacción ya existe en MongoDB (probablemente registrada por webhook): " . $session_id);
+            log_info("INFO: Transacción ya existe en MongoDB (probablemente registrada por webhook): " . $session_id);
         }
     } catch (\Stripe\Exception\InvalidRequestException $e) {
-        error_log("ERROR Stripe: Sesión no encontrada o inválida - Session: $session_id, Error: " . $e->getMessage());
+        log_error("ERROR Stripe: Sesión no encontrada o inválida - Session: $session_id, Error: " . $e->getMessage());
         // Si la sesión no existe, podría ser un problema de timing o de clave incorrecta
     } catch (Exception $e) {
-        error_log("ERROR verificando pago Stripe: " . $e->getMessage() . " | Session: $session_id");
+        log_error("ERROR verificando pago Stripe: " . $e->getMessage() . " | Session: $session_id");
         // No establecer $pago_exitoso = false aquí, dejar que el flujo continúe
     }
 } elseif ($metodo === 'saldo') {

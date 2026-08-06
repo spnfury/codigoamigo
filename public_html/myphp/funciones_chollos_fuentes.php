@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 // Incluir funciones de conexión a MongoDB
 if (!function_exists('createConnection')) {
@@ -22,7 +23,7 @@ function getCollectionChollosFuentes() {
         $collection_fuentes = $db->selectCollection('chollos_fuentes');
         return $collection_fuentes;
     } catch (Throwable $e) {
-        error_log("Error al obtener colección de fuentes: " . $e->getMessage());
+        log_error("Error al obtener colección de fuentes: " . $e->getMessage());
         return null;
     }
 }
@@ -64,7 +65,7 @@ function crearFuente($datos) {
             return ['success' => false, 'error' => 'Error al insertar fuente'];
         }
     } catch (Throwable $e) {
-        error_log("Error al crear fuente: " . $e->getMessage());
+        log_error("Error al crear fuente: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -136,7 +137,7 @@ function obtenerFuentes($filtros = []) {
 
         return $fuentes;
     } catch (Throwable $e) {
-        error_log("Error al obtener fuentes: " . $e->getMessage());
+        log_error("Error al obtener fuentes: " . $e->getMessage());
         return [];
     }
 }
@@ -185,7 +186,7 @@ function obtenerFuentePorId($id) {
                 : ''
         ];
     } catch (Throwable $e) {
-        error_log("Error al obtener fuente por ID: " . $e->getMessage());
+        log_error("Error al obtener fuente por ID: " . $e->getMessage());
         return null;
     }
 }
@@ -227,7 +228,7 @@ function actualizarFuente($id, $datos) {
             return ['success' => false, 'error' => 'Fuente no encontrada'];
         }
     } catch (Throwable $e) {
-        error_log("Error al actualizar fuente: " . $e->getMessage());
+        log_error("Error al actualizar fuente: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -256,7 +257,7 @@ function eliminarFuente($id) {
             return ['success' => false, 'error' => 'Fuente no encontrada'];
         }
     } catch (Throwable $e) {
-        error_log("Error al eliminar fuente: " . $e->getMessage());
+        log_error("Error al eliminar fuente: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -311,7 +312,7 @@ function actualizarUltimaSincronizacion($fuente_id, $mensajes_procesados = 0, $u
             return ['success' => false, 'error' => 'Fuente no encontrada'];
         }
     } catch (Throwable $e) {
-        error_log("Error al actualizar última sincronización: " . $e->getMessage());
+        log_error("Error al actualizar última sincronización: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -354,7 +355,7 @@ function obtenerEstadisticasFuentes() {
             'por_tipo' => $por_tipo
         ];
     } catch (Throwable $e) {
-        error_log("Error al obtener estadísticas de fuentes: " . $e->getMessage());
+        log_error("Error al obtener estadísticas de fuentes: " . $e->getMessage());
         return [];
     }
 }

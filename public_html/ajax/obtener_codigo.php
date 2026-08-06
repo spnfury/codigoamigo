@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 /**
  * AJAX endpoint: Obtener un código aleatorio ponderado para una marca.
  * 
@@ -55,14 +56,14 @@ try {
             $session_id = session_id();
             registrar_vista_codigo($resultado['codigo_id'], $viewer_user_id, $session_id);
         } catch (Throwable $e_vista) {
-            error_log("obtener_codigo.php: Error registrando vista: " . $e_vista->getMessage());
+            log_error("obtener_codigo.php: Error registrando vista: " . $e_vista->getMessage());
         }
     }
     
     echo json_encode($resultado);
     
 } catch (Exception $e) {
-    error_log("Error en obtener_codigo.php: " . $e->getMessage());
+    log_error("Error en obtener_codigo.php: " . $e->getMessage());
     echo json_encode([
         'success' => false,
         'message' => 'Error interno del servidor'

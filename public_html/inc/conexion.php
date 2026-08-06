@@ -950,7 +950,7 @@ register_shutdown_function( "fatal_handler" );
 	        
         // Normalizar marca y buscar/crear marca existente
         $marca_normalizada = normalizeMarcaName($datos['marca']);
-        error_log("createNewCode - Datos recibidos: marca=" . $datos['marca'] . ", url_imagen=" . ($datos['url_imagen'] ?? 'null') . ", categoria_valor=" . ($datos['categoria_valor'] ?? 'null') . ", categoria_clave=" . ($datos['categoria_clave'] ?? 'null'));
+        log_info("createNewCode - Datos recibidos: marca=" . $datos['marca'] . ", url_imagen=" . ($datos['url_imagen'] ?? 'null') . ", categoria_valor=" . ($datos['categoria_valor'] ?? 'null') . ", categoria_clave=" . ($datos['categoria_clave'] ?? 'null'));
         $marca_existente = findOrCreateMarca(
             $datos['marca'],
             $marca_normalizada,

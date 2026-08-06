@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 /**
  * Configuración y funciones auxiliares para la página de marca
  */
@@ -352,7 +353,7 @@ function get_analytics_config() {
  */
 function track_analytics_event($event_name, $parameters = []) {
     // Aquí se implementaría la integración con Google Analytics, Facebook Pixel, etc.
-    error_log("Analytics Event: {$event_name} - " . json_encode($parameters));
+    log_info("Analytics Event: {$event_name} - " . json_encode($parameters));
 }
 
 /**

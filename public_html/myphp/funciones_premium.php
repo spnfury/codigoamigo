@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 /**
  * FUNCIONES PARA GESTIÓN DE SUSCRIPCIONES PREMIUM Y PROMOCIONES
@@ -27,7 +28,7 @@ function getCollectionPromociones() {
         $collection = $db->selectCollection('promociones_codigos');
         return $collection;
     } catch (Throwable $e) {
-        error_log("Error al obtener colección de promociones: " . $e->getMessage());
+        log_error("Error al obtener colección de promociones: " . $e->getMessage());
         return null;
     }
 }
@@ -91,7 +92,7 @@ function esUsuarioPremium($usuario_id) {
 
         return false;
     } catch (Throwable $e) {
-        error_log("Error al verificar usuario premium: " . $e->getMessage());
+        log_error("Error al verificar usuario premium: " . $e->getMessage());
         return false;
     }
 }
@@ -133,7 +134,7 @@ function activarSuscripcionPremium($usuario_id, $stripe_subscription_id, $meses 
 
         return $updateResult->getModifiedCount() > 0 || $updateResult->getMatchedCount() > 0;
     } catch (Throwable $e) {
-        error_log("Error al activar suscripción premium: " . $e->getMessage());
+        log_error("Error al activar suscripción premium: " . $e->getMessage());
         return false;
     }
 }
@@ -166,7 +167,7 @@ function desactivarSuscripcionPremium($usuario_id) {
 
         return $updateResult->getModifiedCount() > 0 || $updateResult->getMatchedCount() > 0;
     } catch (Throwable $e) {
-        error_log("Error al desactivar suscripción premium: " . $e->getMessage());
+        log_error("Error al desactivar suscripción premium: " . $e->getMessage());
         return false;
     }
 }
@@ -194,7 +195,7 @@ function obtenerSuscripcionPremium($usuario_id) {
 
         return $usuario['suscripcion_premium'] ?? null;
     } catch (Throwable $e) {
-        error_log("Error al obtener suscripción premium: " . $e->getMessage());
+        log_error("Error al obtener suscripción premium: " . $e->getMessage());
         return null;
     }
 }
@@ -229,7 +230,7 @@ function obtenerPromocionActiva($codigo_id) {
 
         return $promocion;
     } catch (Throwable $e) {
-        error_log("Error al obtener promoción activa: " . $e->getMessage());
+        log_error("Error al obtener promoción activa: " . $e->getMessage());
         return null;
     }
 }
@@ -312,7 +313,7 @@ function crearPromocionCodigo($codigo_id, $precio_promocional, $fecha_fin, $usua
 
         return ['success' => false, 'error' => 'Error al crear la promoción'];
     } catch (Throwable $e) {
-        error_log("Error al crear promoción: " . $e->getMessage());
+        log_error("Error al crear promoción: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno: ' . $e->getMessage()];
     }
 }
@@ -348,7 +349,7 @@ function obtenerPromocionesUsuario($usuario_id, $solo_activas = false) {
 
         return $promociones;
     } catch (Throwable $e) {
-        error_log("Error al obtener promociones de usuario: " . $e->getMessage());
+        log_error("Error al obtener promociones de usuario: " . $e->getMessage());
         return [];
     }
 }
@@ -377,7 +378,7 @@ function validarPromocionesExpiradas() {
 
         return $result->getModifiedCount();
     } catch (Throwable $e) {
-        error_log("Error al validar promociones expiradas: " . $e->getMessage());
+        log_error("Error al validar promociones expiradas: " . $e->getMessage());
         return 0;
     }
 }
@@ -406,7 +407,7 @@ function eliminarPromocion($promocion_id, $usuario_id) {
 
         return $result->getDeletedCount() > 0;
     } catch (Throwable $e) {
-        error_log("Error al eliminar promoción: " . $e->getMessage());
+        log_error("Error al eliminar promoción: " . $e->getMessage());
         return false;
     }
 }

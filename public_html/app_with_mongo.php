@@ -1162,14 +1162,14 @@ $app->get('/ofertas/{termino}', function ($request, $response, $args) {
         try {
             $record_result = record_search_term($termino);
             if (!$record_result) {
-                error_log("Error registrando búsqueda (record_search_term devolvió false): " . $termino);
+                log_error("Error registrando búsqueda (record_search_term devolvió false): " . $termino);
             }
         } catch (Throwable $e) {
-            error_log("Error registrando búsqueda simplificada: " . $e->getMessage());
+            log_error("Error registrando búsqueda simplificada: " . $e->getMessage());
         }
     } else {
         if (!$fromTrends && !function_exists('record_search_term')) {
-            error_log("Error: record_search_term no existe al intentar registrar: " . $termino);
+            log_error("Error: record_search_term no existe al intentar registrar: " . $termino);
         }
     }
 
@@ -1907,11 +1907,11 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
         
         // Debug: Verificar ordenamiento de códigos destacados
         if (!empty($codigos_destacados) && isset($_GET['debug_destacados'])) {
-            error_log("DEBUG DESTACADOS - Total: " . count($codigos_destacados));
+            log_info("DEBUG DESTACADOS - Total: " . count($codigos_destacados));
             foreach ($codigos_destacados as $idx => $cod) {
                 $destacado_val = isset($cod['destacado']) ? $cod['destacado'] : 'NO';
                 $destacado_social_val = isset($cod['destacado_social']) ? $cod['destacado_social'] : 'NO';
-                error_log("  [$idx] ID: " . (string)$cod['_id'] . " | destacado: $destacado_val | destacado_social: $destacado_social_val");
+                log_info("  [$idx] ID: " . (string)$cod['_id'] . " | destacado: $destacado_val | destacado_social: $destacado_social_val");
             }
         }
         
@@ -2068,7 +2068,7 @@ $app->get('/login', function ($request, $response, $args) {
                 );
             }
         } catch (Throwable $e) {
-            error_log("Error in autologin: " . $e->getMessage());
+            log_error("Error in autologin: " . $e->getMessage());
         }
     }
     
@@ -2584,16 +2584,16 @@ $app->get('/mis-anuncios', function ($request, $response, $args) {
                 if (function_exists('destacar_codigo_moderno')) {
                     $resultado = destacar_codigo_moderno($codigo_id_qs, $tipo_qs);
                     if ($resultado) {
-                        error_log("Código destacado exitosamente: $codigo_id_qs, tipo: $tipo_qs");
+                        log_info("Código destacado exitosamente: $codigo_id_qs, tipo: $tipo_qs");
                     } else {
-                        error_log("Error al destacar código: $codigo_id_qs");
+                        log_error("Error al destacar código: $codigo_id_qs");
                     }
                 }
                 $_SESSION['last_destacado_notify'] = $codigo_id_qs;
             }
         }
     } catch (Exception $e) {
-        error_log("Error procesando destacado en app_with_mongo: " . $e->getMessage());
+        log_error("Error procesando destacado en app_with_mongo: " . $e->getMessage());
     }
     
     // ========================================================================
@@ -3761,7 +3761,7 @@ $app->post('/ajax_actions', function ($request, $response, $args) {
             
             return $response->write(json_encode($result));
         } catch (Exception $e) {
-            error_log('Error en favoritos: ' . $e->getMessage());
+            log_error('Error en favoritos: ' . $e->getMessage());
             return $response->write(json_encode(['success' => false, 'message' => 'Error al procesar la solicitud']));
         }
     }
@@ -3828,7 +3828,7 @@ $app->post('/ajax', function ($request, $response, $args) {
             
             return $response->write(json_encode($result));
         } catch (Exception $e) {
-            error_log('Error en favoritos: ' . $e->getMessage());
+            log_error('Error en favoritos: ' . $e->getMessage());
             return $response->write(json_encode(['success' => false, 'message' => 'Error al procesar la solicitud']));
         }
     }
@@ -3888,7 +3888,7 @@ $app->post('/ajax/', function ($request, $response, $args) {
             
             return $response->write(json_encode($result));
         } catch (Exception $e) {
-            error_log('Error en favoritos: ' . $e->getMessage());
+            log_error('Error en favoritos: ' . $e->getMessage());
             return $response->write(json_encode(['success' => false, 'message' => 'Error al procesar la solicitud']));
         }
     }
@@ -4310,7 +4310,7 @@ $app->post('/procesar_destacado_saldo', function ($request, $response, $args) {
                                 $bg_notify_data['user_id'],
                                 $codigo_actualizado
                             );
-                            error_log("Notificaciones de competencia home enviadas (background): $emails_enviados");
+                            log_info("Notificaciones de competencia home enviadas (background): $emails_enviados");
                         }
                     }
                     
@@ -4320,10 +4320,10 @@ $app->post('/procesar_destacado_saldo', function ($request, $response, $args) {
                             require_once __DIR__ . '/myphp/funciones_destacados_email.php';
                         }
                         $notifs = notificarCompetenciaDestacado($bg_notify_data['marca_clave'], $bg_notify_data['user_id'], $bg_notify_data['tipo']);
-                        error_log("Notificaciones competencia marca (background) ({$bg_notify_data['marca_clave']}): $notifs enviadas");
+                        log_info("Notificaciones competencia marca (background) ({$bg_notify_data['marca_clave']}): $notifs enviadas");
                     }
                 } catch (\Exception $e) {
-                    error_log("Error enviando notificaciones en background: " . $e->getMessage());
+                    log_error("Error enviando notificaciones en background: " . $e->getMessage());
                 }
             });
             
@@ -4409,9 +4409,9 @@ $app->post('/google_sign', function ($request, $response, $args) {
             'success' => false,
             'error' => 'Respuesta vacía del servicio de autenticación'
         ]);
-        error_log('[google_sign route] Respuesta vacía después de incluir google-sign-in.php');
+        log_error('[google_sign route] Respuesta vacía después de incluir google-sign-in.php');
     } elseif ($trimmedPayload[0] !== '{' && $trimmedPayload[0] !== '[') {
-        error_log('[google_sign route] Respuesta inesperada: ' . substr($trimmedPayload, 0, 400));
+        log_error('[google_sign route] Respuesta inesperada: ' . substr($trimmedPayload, 0, 400));
     }
 
     $response->getBody()->write($trimmedPayload);

@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 /**
  * Funciones para obtener y gestionar keywords SEO de marcas
  * Fuentes: Google Suggest (gratis) + Google Search Console (API ya conectada)
@@ -265,7 +266,7 @@ function save_brand_keywords($brand_slug, $keywords) {
         
         return $result->getModifiedCount() > 0 || $result->getMatchedCount() > 0;
     } catch (Exception $e) {
-        error_log("Error saving brand keywords for $brand_slug: " . $e->getMessage());
+        log_error("Error saving brand keywords for $brand_slug: " . $e->getMessage());
         return false;
     }
 }
@@ -297,7 +298,7 @@ function get_brand_keywords($brand_slug) {
         
         return null;
     } catch (Exception $e) {
-        error_log("Error getting brand keywords for $brand_slug: " . $e->getMessage());
+        log_error("Error getting brand keywords for $brand_slug: " . $e->getMessage());
         return null;
     }
 }

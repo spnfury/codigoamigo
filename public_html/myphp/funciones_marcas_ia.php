@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 /**
  * Funciones para generar contenido de marcas usando IA
@@ -60,12 +61,12 @@ function generarDescripcionMarcaIA($nombre_marca, $categoria = '') {
     $error = '';
 
     if ($error) {
-        error_log("Error cURL Groq (contenido marca): " . $error);
+        log_error("Error cURL Groq (contenido marca): " . $error);
         return ['success' => false, 'error' => 'Error de conexión: ' . $error];
     }
 
     if ($http_code !== 200) {
-        error_log("Error HTTP Groq (contenido marca): " . $http_code . " - " . $response);
+        log_error("Error HTTP Groq (contenido marca): " . $http_code . " - " . $response);
         return ['success' => false, 'error' => 'Error de API: ' . $http_code];
     }
 
@@ -152,12 +153,12 @@ function generarDescripcionLargaMarcaIA($nombre_marca, $categoria = '') {
     $error = '';
 
     if ($error) {
-        error_log("Error cURL Groq (descripción larga marca): " . $error);
+        log_error("Error cURL Groq (descripción larga marca): " . $error);
         return ['success' => false, 'error' => 'Error de conexión: ' . $error];
     }
 
     if ($http_code !== 200) {
-        error_log("Error HTTP Groq (descripción larga marca): " . $http_code . " - " . $response);
+        log_error("Error HTTP Groq (descripción larga marca): " . $http_code . " - " . $response);
         return ['success' => false, 'error' => 'Error de API: ' . $http_code];
     }
 
@@ -216,12 +217,12 @@ function generarVentajaMarcaIA($nombre_marca, $categoria = '', $numero_ventaja =
     $error = '';
 
     if ($error) {
-        error_log("Error cURL Groq (ventaja marca): " . $error);
+        log_error("Error cURL Groq (ventaja marca): " . $error);
         return ['success' => false, 'error' => 'Error de conexión: ' . $error];
     }
 
     if ($http_code !== 200) {
-        error_log("Error HTTP Groq (ventaja marca): " . $http_code . " - " . $response);
+        log_error("Error HTTP Groq (ventaja marca): " . $http_code . " - " . $response);
         return ['success' => false, 'error' => 'Error de API: ' . $http_code];
     }
 
@@ -281,12 +282,12 @@ function buscarImagenesMarca($nombre_marca, $limite = 10) {
     curl_close($ch);
 
     if ($error) {
-        error_log("Error cURL Google Images: " . $error);
+        log_error("Error cURL Google Images: " . $error);
         return ['success' => false, 'error' => 'Error de conexión: ' . $error];
     }
 
     if ($http_code !== 200) {
-        error_log("Error HTTP Google Images: " . $http_code . " - " . $response);
+        log_error("Error HTTP Google Images: " . $http_code . " - " . $response);
         return ['success' => false, 'error' => 'Error de API: ' . $http_code];
     }
 

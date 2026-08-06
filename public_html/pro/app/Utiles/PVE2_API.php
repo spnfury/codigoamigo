@@ -3,6 +3,7 @@
 namespace App\Utiles;
 
 use \App\Utiles\PVE2_Exception;
+include_once __DIR__ . '/../../../inc/logger.php';
 
 class PVE2_API {
 	protected $hostname;
@@ -205,7 +206,7 @@ class PVE2_API {
 		$action_response_array = json_decode($body_response, true);
 
 		$action_response_export = var_export($action_response_array, true);
-		error_log("----------------------------------------------\n" .
+		log_info("----------------------------------------------\n" .
 			"FULL RESPONSE:\n\n{$action_response}\n\nEND FULL RESPONSE\n\n" .
 			"Headers:\n\n{$header_response}\n\nEnd Headers\n\n" .
 			"Data:\n\n{$body_response}\n\nEnd Data\n\n" .
@@ -226,20 +227,20 @@ class PVE2_API {
 					return $action_response_array['data'];
 				}
 			} else {
-				error_log("This API Request Failed.\n" .
+				log_error("This API Request Failed.\n" .
 					"HTTP Response - {$split_http_response_line[1]}\n" .
 					"HTTP Error - {$split_headers[0]}");
 				return false;
 			}
 		} else {
-			error_log("Error - Invalid HTTP Response.\n" . var_export($split_headers, true));
+			log_error("Error - Invalid HTTP Response.\n" . var_export($split_headers, true));
 			return false;
 		}
 
 		if (!empty($action_response_array['data'])) {
 			return $action_response_array['data'];
 		} else {
-			error_log("\$action_response_array['data'] is empty. Returning false.\n" .
+			log_error("\$action_response_array['data'] is empty. Returning false.\n" .
 				var_export($action_response_array['data'], true));
 			return false;
 		}
@@ -261,7 +262,7 @@ class PVE2_API {
 			$this->cluster_node_list = $nodes_array;
 			return true;
 		} else {
-			error_log(" Empty list of nodes returned in this cluster.");
+			log_error(" Empty list of nodes returned in this cluster.");
 			return false;
 		}
 	}

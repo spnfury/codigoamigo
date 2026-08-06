@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 /**
  * Funciones para YouTube y extracción de productos
@@ -36,7 +37,7 @@ function callYoutubeAPIWithRotation($endpoint, $params) {
             $data = json_decode($response, true);
             // Si hay error de cuota, probar con la siguiente llave
             if (isset($data['error']['errors'][0]['reason']) && $data['error']['errors'][0]['reason'] === 'quotaExceeded') {
-                error_log("YouTube Quota exceeded for key: " . substr($key, 0, 8) . "...");
+                log_warning("YouTube Quota exceeded for key: " . substr($key, 0, 8) . "...");
                 continue;
             }
             

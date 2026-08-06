@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../../inc/logger.php';
 /**
  * Content Cache Service
  * Maneja el cacheo de contenido generado para chollos
@@ -40,7 +41,7 @@ o
             
             return $content;
         } catch (Exception $e) {
-            error_log("Error getting cached content: " . $e->getMessage());
+            log_error("Error getting cached content: " . $e->getMessage());
             return null;
         }
     }
@@ -59,7 +60,7 @@ o
             
             return true;
         } catch (Exception $e) {
-            error_log("Error caching content: " . $e->getMessage());
+            log_error("Error caching content: " . $e->getMessage());
             return false;
         }
     }
@@ -75,7 +76,7 @@ o
             );
             return true;
         } catch (Exception $e) {
-            error_log("Error invalidating cache: " . $e->getMessage());
+            log_error("Error invalidating cache: " . $e->getMessage());
             return false;
         }
     }
@@ -94,7 +95,7 @@ o
             
             return $result->getModifiedCount();
         } catch (Exception $e) {
-            error_log("Error cleaning expired cache: " . $e->getMessage());
+            log_error("Error cleaning expired cache: " . $e->getMessage());
             return 0;
         }
     }

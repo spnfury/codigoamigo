@@ -1,5 +1,6 @@
 
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 // Ensure db connection functions are available
 require_once __DIR__ . '/funciones.php';
@@ -24,7 +25,7 @@ if (!function_exists('get_super_landing_by_slug')) {
             
             return null;
         } catch (Exception $e) {
-            error_log("Error obteniendo super landing: " . $e->getMessage());
+            log_error("Error obteniendo super landing: " . $e->getMessage());
             return null;
         }
     }

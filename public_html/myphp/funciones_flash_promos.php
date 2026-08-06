@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 /**
  * Obtiene la colección de flash_promos
@@ -13,7 +14,7 @@ function getCollectionFlashPromos() {
         $collection = $db->selectCollection('flash_promos');
         return $collection;
     } catch (Throwable $e) {
-        error_log("Error al obtener colección de flash_promos: " . $e->getMessage());
+        log_error("Error al obtener colección de flash_promos: " . $e->getMessage());
         return null;
     }
 }
@@ -62,7 +63,7 @@ function obtenerFlashPromosPorMarca($marca_clave) {
 
         return $promos;
     } catch (Throwable $e) {
-        error_log("Error al obtener flash promos: " . $e->getMessage());
+        log_error("Error al obtener flash promos: " . $e->getMessage());
         return [];
     }
 }

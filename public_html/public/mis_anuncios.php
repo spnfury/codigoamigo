@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 // Verificar que la sesión esté iniciada y que el usuario esté logueado
 if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"]) || $_SESSION["user_id"] == "") {
     header("Location: https://www.codigoamigo.com/login");
@@ -781,7 +782,7 @@ function filterByVisibility(visibility){
                     }
                 } catch (Exception $e) {
                     // Si hay error, usar valores por defecto
-                    error_log("Error obteniendo información del código destacado: " . $e->getMessage());
+                    log_error("Error obteniendo información del código destacado: " . $e->getMessage());
                 }
                 
                 // Mensaje por defecto si no se encontró la marca

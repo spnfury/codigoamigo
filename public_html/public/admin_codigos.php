@@ -559,7 +559,7 @@ try {
     
     $datos_grafica_codigos = $collection_codigos->aggregate($pipeline_codigos_fecha)->toArray();
 } catch (Exception $e) {
-    error_log("Error en agregación de códigos por fecha: " . $e->getMessage());
+    log_error("Error en agregación de códigos por fecha: " . $e->getMessage());
     $datos_grafica_codigos = [];
     $agrupar_por = 'day';
 }

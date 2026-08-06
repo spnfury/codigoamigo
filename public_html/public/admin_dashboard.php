@@ -95,7 +95,7 @@ try {
         'fecha_modificacion' => ['$gte' => date('Y-m-d', strtotime('today'))]
     ]);
 } catch (Exception $e) {
-    error_log("Error en conteo de actualizados hoy: " . $e->getMessage());
+    log_error("Error en conteo de actualizados hoy: " . $e->getMessage());
     $codigos_actualizados_hoy = 0;
 }
 
@@ -105,7 +105,7 @@ try {
         'fecha_modificacion' => ['$gte' => date('Y-m-d', strtotime('-30 days'))]
     ]);
 } catch (Exception $e) {
-    error_log("Error en conteo de actualizados 30d: " . $e->getMessage());
+    log_error("Error en conteo de actualizados 30d: " . $e->getMessage());
     $codigos_actualizados_30d = 0;
 }
 
@@ -121,7 +121,7 @@ try {
         'fecha_destacado' => ['$gte' => $fecha_hoy]
     ]);
 } catch (Exception $e) {
-    error_log("Error en conteo de destacados hoy: " . $e->getMessage());
+    log_error("Error en conteo de destacados hoy: " . $e->getMessage());
     $codigos_destacados_hoy = 0;
     $codigos_destacados_super_hoy = 0;
 }
@@ -148,7 +148,7 @@ try {
     ];
     $datos_grafica_destacados = $collection_codigos->aggregate($pipeline_destacados_tiempo)->toArray();
 } catch (Exception $e) {
-    error_log("Error en agregación de destacados: " . $e->getMessage());
+    log_error("Error en agregación de destacados: " . $e->getMessage());
     $datos_grafica_destacados = [];
 }
 
@@ -173,7 +173,7 @@ try {
         ]
     )->toArray();
 } catch (Exception $e) {
-    error_log("Error en consulta de destacados recientes: " . $e->getMessage());
+    log_error("Error en consulta de destacados recientes: " . $e->getMessage());
     $codigos_destacados_recientes = [];
 }
 
@@ -191,7 +191,7 @@ try {
     $total_clicks_global = $resultado_impressions[0]['total_clicks'] ?? 0;
     $conversion_rate_global = $total_impressions_global > 0 ? round(($total_clicks_global / $total_impressions_global) * 100, 2) : 0;
 } catch (Exception $e) {
-    error_log("Error en agregación de impresiones: " . $e->getMessage());
+    log_error("Error en agregación de impresiones: " . $e->getMessage());
     $total_impressions_global = 0;
     $total_clicks_global = 0;
     $conversion_rate_global = 0;
@@ -307,7 +307,7 @@ try {
                     $transaccion['usuario_img'] = '';
                 }
             } catch (Exception $e) {
-                error_log("Error al obtener usuario para transacción: " . $e->getMessage());
+                log_error("Error al obtener usuario para transacción: " . $e->getMessage());
                 $transaccion['usuario_nombre'] = 'Error al cargar';
                 $transaccion['usuario_img'] = '';
             }
@@ -318,7 +318,7 @@ try {
     }
     unset($transaccion); // Liberar referencia
 } catch (Exception $e) {
-    error_log("Error en consulta de transacciones recientes: " . $e->getMessage());
+    log_error("Error en consulta de transacciones recientes: " . $e->getMessage());
     $transacciones_recientes = [];
 }
 

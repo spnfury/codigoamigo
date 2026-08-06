@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 /**
  * Funciones de email para el sistema de destacados
  * 
@@ -73,7 +74,7 @@ function enviarEmailDestacadoExpiraPronto($usuario, $codigo, $marca_nombre, $dia
     // Comprobar preferencia del usuario
     $uid = (string)($usuario['_id'] ?? '');
     if ($uid && !usuarioAceptaEmail($uid, 'destacado_expira_pronto')) {
-        error_log("Email destacado_expira_pronto NO enviado a $email: usuario ha desactivado esta notificación");
+        log_info("Email destacado_expira_pronto NO enviado a $email: usuario ha desactivado esta notificación");
         return false;
     }
 
@@ -127,7 +128,7 @@ function enviarEmailDestacadoExpirado($usuario, $codigo, $marca_nombre) {
     // Comprobar preferencia del usuario
     $uid = (string)($usuario['_id'] ?? '');
     if ($uid && !usuarioAceptaEmail($uid, 'destacado_expirado')) {
-        error_log("Email destacado_expirado NO enviado a $email: usuario ha desactivado esta notificación");
+        log_info("Email destacado_expirado NO enviado a $email: usuario ha desactivado esta notificación");
         return false;
     }
 
@@ -178,7 +179,7 @@ function enviarEmailDestacadoAutoRenovado($usuario, $codigo, $marca_nombre, $nue
     // Comprobar preferencia del usuario
     $uid = (string)($usuario['_id'] ?? '');
     if ($uid && !usuarioAceptaEmail($uid, 'destacado_auto_renovado')) {
-        error_log("Email destacado_auto_renovado NO enviado a $email: usuario ha desactivado esta notificación");
+        log_info("Email destacado_auto_renovado NO enviado a $email: usuario ha desactivado esta notificación");
         return false;
     }
 
@@ -219,7 +220,7 @@ function enviarEmailDestacadoSaldoInsuficiente($usuario, $codigo, $marca_nombre,
     // Comprobar preferencia del usuario
     $uid = (string)($usuario['_id'] ?? '');
     if ($uid && !usuarioAceptaEmail($uid, 'destacado_saldo_insuficiente')) {
-        error_log("Email destacado_saldo_insuficiente NO enviado a $email: usuario ha desactivado esta notificación");
+        log_info("Email destacado_saldo_insuficiente NO enviado a $email: usuario ha desactivado esta notificación");
         return false;
     }
 
@@ -344,7 +345,7 @@ function notificarCompetenciaDestacado($marca_nombre_clave, $nuevo_usuario_id, $
             
             // Verificar que acepta emails de competencia
             if (!usuarioAceptaEmail($uid, 'destacado_competencia')) {
-                error_log("Email destacado_competencia NO enviado a usuario $uid: ha desactivado esta notificación");
+                log_info("Email destacado_competencia NO enviado a usuario $uid: ha desactivado esta notificación");
                 $usuarios_notificados[] = $uid;
                 continue;
             }
@@ -355,7 +356,7 @@ function notificarCompetenciaDestacado($marca_nombre_clave, $nuevo_usuario_id, $
             }
             $usuarios_notificados[] = $uid;
         } catch (Throwable $e) {
-            error_log("Error notificando competencia a usuario $uid: " . $e->getMessage());
+            log_error("Error notificando competencia a usuario $uid: " . $e->getMessage());
         }
     }
     
