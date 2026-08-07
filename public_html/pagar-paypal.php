@@ -6,7 +6,7 @@ ob_start();
 session_start();
 
 // Incluir archivos necesarios
-include_once __DIR__ . '/../inc/includes.php';
+include_once __DIR__ . '/inc/includes.php'; // ruta corregida: heredaba '../' de cuando vivía en public/
 
 // Verificar que el usuario esté logueado
 if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"])) {
