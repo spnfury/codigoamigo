@@ -240,24 +240,27 @@ function generate_code_detail_page($codigo) {
             // Código oculto para mostrar después del reveal
             $html .= '<div class="code-url-section code-revealed-section" style="display: none;" data-codigo="' . htmlspecialchars($code_info['url'] ?? '', ENT_QUOTES, 'UTF-8') . '">';
             $html .= '<div class="url-label"><i class="fas fa-link"></i> Enlace directo:</div>';
-            $html .= '<a href="' . htmlspecialchars($code_info['url'] ?? '') . '" target="_blank" class="code-url-link">';
+            // Clic saliente vía /salir.php: registra el clickout por marca (datos para
+            // afiliación) y redirige a la URL original (o afiliada si hay programa)
+            $html .= '<a href="/salir.php?codigo=' . htmlspecialchars($code_id, ENT_QUOTES, 'UTF-8') . '" rel="nofollow noopener" target="_blank" class="code-url-link">';
             $html .= '<i class="fas fa-external-link-alt"></i>';
             $html .= '<span>' . htmlspecialchars($code_info['url'] ?? '') . '</span>';
             $html .= '</a>';
             $html .= '</div>';
             $html .= '<div class="code-text" id="codeText" style="display: none;">' . htmlspecialchars($code_info['url'] ?? '') . '</div>';
         } else {
-            // Propietarios ven el enlace directamente
+            // Propietarios ven el enlace directamente (clic saliente vía /salir.php
+            // para registrar el clickout; el texto visible sigue siendo la URL real)
             $html .= '<div class="code-url-section">';
             $html .= '<div class="url-label"><i class="fas fa-link"></i> Enlace directo:</div>';
-            $html .= '<a href="' . htmlspecialchars($code_info['url'] ?? '') . '" target="_blank" class="code-url-link">';
+            $html .= '<a href="/salir.php?codigo=' . htmlspecialchars($code_id, ENT_QUOTES, 'UTF-8') . '" rel="nofollow noopener" target="_blank" class="code-url-link">';
             $html .= '<i class="fas fa-external-link-alt"></i>';
             $html .= '<span>' . htmlspecialchars($code_info['url'] ?? '') . '</span>';
             $html .= '</a>';
             $html .= '</div>';
             $urlTrimmed = trim((string)($code_info['url'] ?? ''));
             $html .= '<div class="code-text" id="codeText" style="display: none;">' . htmlspecialchars($urlTrimmed) . '</div>';
-            $html .= '<button class="btn-copy-code" onclick="window.open(\'' . htmlspecialchars($urlTrimmed, ENT_QUOTES, 'UTF-8') . '\', \'_blank\')">';
+            $html .= '<button class="btn-copy-code" onclick="window.open(\'/salir.php?codigo=' . htmlspecialchars($code_id, ENT_QUOTES, 'UTF-8') . '\', \'_blank\')">';
             $html .= '<i class="fas fa-external-link-alt"></i> Ir a la web';
             $html .= '</button>';
         }
