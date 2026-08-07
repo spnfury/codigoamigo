@@ -1991,7 +1991,25 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
         }
         
         $numero_codigos = $total_codigos; // Total para la paginación
-        
+
+        // Ficha sin códigos activos -> noindex,follow.
+        //
+        // El 404 de arriba solo cubre marcas que no existen en BD. Una marca que
+        // SÍ existe pero se ha quedado sin códigos vigentes seguía devolviendo 200
+        // indexable, con description "0 códigos verificados válidos para <mes>":
+        // el mismo soft-404 por otra puerta (38 fichas así a 2026-08-07).
+        //
+        // Es reversible solo: en cuanto alguien publica un código para la marca,
+        // $total_codigos deja de ser 0 y la ficha vuelve al índice sin tocar nada.
+        // Se deja follow para no cortar el flujo de enlaces del silo de marcas.
+        //
+        // Solo meta robots, no X-Robots-Tag: a esta altura de la ruta los includes
+        // de _header_modern/adsense ya han emitido output, así que un withHeader()
+        // aquí llegaría tarde y provocaría "headers already sent".
+        if ($total_codigos === 0) {
+            $GLOBALS['noindex'] = 1;
+        }
+
         // Generar título y descripción mejorados
         $titulo_mejorado = generate_titulo_marca_mejorado($marca_info, $codigos);
         $descripcion_mejorada = generate_descripcion_marca_mejorada($marca_info, $codigos, $numero_codigos);
@@ -2913,6 +2931,61 @@ $app->get('/blog', function ($request, $response, $args) {
     
     return $response;
 });
+
+// ─── Baja de correo en un clic (sin login) ───
+//
+// GET  = la persona pincha el enlace del pie del correo.
+// POST = el proveedor (Gmail, Yahoo...) ejecuta la baja por su cuenta cuando el
+//        usuario pulsa "Cancelar suscripción" en su bandeja: es el one-click de
+//        la RFC 8058, y sin él los correos de volumen se filtran a spam.
+//
+// El enlace va firmado con HMAC, así que no hace falta sesión y nadie puede dar
+// de baja a otra persona cambiando el parámetro de la URL.
+$baja_email_handler = function ($request, $response, $args) {
+    global $noindex;
+    $noindex = 1;
+
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/funciones_baja_email.php';
+
+    $email = (string)($request->getQueryParam('e') ?? ($request->getParsedBody()['e'] ?? ''));
+    $token = (string)($request->getQueryParam('t') ?? ($request->getParsedBody()['t'] ?? ''));
+
+    $ok = $email !== '' && baja_email_token_valido($email, $token);
+    if ($ok) {
+        registrar_baja_email($email, $request->getMethod() === 'POST' ? 'one-click' : 'enlace');
+    } else {
+        log_info('[baja_email] intento con firma inválida', ['email' => $email]);
+    }
+
+    // El one-click del proveedor no enseña nada a nadie: solo espera un 200.
+    if ($request->getMethod() === 'POST') {
+        return $response->withStatus($ok ? 200 : 400)->withHeader('Content-Type', 'text/plain');
+    }
+
+    $titulo = $ok ? 'Baja confirmada' : 'Enlace no válido';
+    $mensaje = $ok
+        ? 'Hemos dado de baja a <strong>' . htmlspecialchars($email, ENT_QUOTES, 'UTF-8') . '</strong>. No volverás a recibir nuestros correos.'
+        : 'Este enlace de baja no es válido o ha caducado. Escríbenos y lo hacemos a mano.';
+
+    $response->getBody()->write(
+        '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">'
+        . '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        . '<meta name="robots" content="noindex"><title>' . $titulo . ' - Código Amigo</title></head>'
+        . '<body style="margin:0;background:#f4f7fa;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,Arial,sans-serif;">'
+        . '<div style="max-width:520px;margin:60px auto;background:#fff;border-radius:12px;padding:40px 32px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.05);">'
+        . '<img src="https://www.codigoamigo.com/img/logo_codigoamigo.png" alt="Código Amigo" style="max-width:160px;margin-bottom:24px;">'
+        . '<h1 style="font-size:22px;color:#222;margin:0 0 16px;">' . $titulo . '</h1>'
+        . '<p style="color:#555;line-height:1.6;margin:0 0 28px;">' . $mensaje . '</p>'
+        . '<a href="https://www.codigoamigo.com" style="background:#E30613;color:#fff;padding:14px 30px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;">Volver a Código Amigo</a>'
+        . '</div></body></html>'
+    );
+
+    return $response->withStatus($ok ? 200 : 400)->withHeader('Content-Type', 'text/html; charset=UTF-8');
+};
+$app->get('/baja', $baja_email_handler);
+$app->post('/baja', $baja_email_handler);
 
 // Rutas de páginas legales
 $app->get('/politica-de-privacidad', function ($request, $response, $args) {

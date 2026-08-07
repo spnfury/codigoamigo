@@ -111,7 +111,17 @@ function enviarNewsletterBrevoAPI($to_email, $to_name, $subject, $html_content, 
         $sendSmtpEmail->setHtmlContent($html_content);
         $sendSmtpEmail->setTextContent($text_content);
         $sendSmtpEmail->setReplyTo($replyTo);
-        
+
+        // Baja en un clic (RFC 8058), igual que en la rama SMTP.
+        include_once __DIR__ . '/funciones_baja_email.php';
+        $unsub_url = baja_email_url($to_email);
+        if ($unsub_url !== '') {
+            $sendSmtpEmail->setHeaders([
+                'List-Unsubscribe'      => '<' . $unsub_url . '>, <mailto:baja@codigoamigo.com>',
+                'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click',
+            ]);
+        }
+
         // Añadir tags si se proporcionan
         if (!empty($tags)) {
             $sendSmtpEmail->setTags($tags);
@@ -186,7 +196,16 @@ function enviarNewsletterBrevoSMTP($to_email, $to_name, $subject, $html_content,
         
         // Destinatario
         $mail->addAddress($to_email, $to_name ?: $to_email);
-        
+
+        // Baja en un clic (RFC 8058). Imprescindible en la newsletter: es el
+        // envío de volumen, justo el que Gmail y Yahoo filtran si falta.
+        include_once __DIR__ . '/funciones_baja_email.php';
+        $unsub_url = baja_email_url($to_email);
+        if ($unsub_url !== '') {
+            $mail->addCustomHeader('List-Unsubscribe', '<' . $unsub_url . '>, <mailto:baja@codigoamigo.com>');
+            $mail->addCustomHeader('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click');
+        }
+
         // Contenido
         $mail->isHTML(true);
         $mail->Subject = $subject;

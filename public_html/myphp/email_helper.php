@@ -27,8 +27,8 @@ if (!function_exists('getCollectionEmailLogs')) {
 /**
  * Envía email usando SMTP de Brevo con PHPMailer
  */
-function enviarEmailSMTPBrevo($to_email, $to_name, $subject, $html_content, $text_content = '', $from_email = 'noreply@codigoamigo.com', $from_name = 'Código Amigo') {
-    
+function enviarEmailSMTPBrevo($to_email, $to_name, $subject, $html_content, $text_content = '', $from_email = 'noreply@codigoamigo.com', $from_name = 'Código Amigo', $unsub_url = '') {
+
     $resultado = array(
         'success' => false,
         'error' => ''
@@ -58,6 +58,14 @@ function enviarEmailSMTPBrevo($to_email, $to_name, $subject, $html_content, $tex
         // Configurar destinatario
         $mail->addAddress($to_email, $to_name);
         
+        // Baja en un clic (RFC 8058). Gmail y Yahoo exigen estas dos cabeceras a
+        // quien envía correo de volumen; sin ellas el mensaje se filtra a spam
+        // aunque el contenido sea legítimo.
+        if ($unsub_url !== '') {
+            $mail->addCustomHeader('List-Unsubscribe', '<' . $unsub_url . '>, <mailto:baja@codigoamigo.com>');
+            $mail->addCustomHeader('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click');
+        }
+
         // Configurar contenido
         $mail->isHTML(true);
         $mail->Subject = $subject;
@@ -96,27 +104,40 @@ function enviarEmailConBrevoYRegistrar($to_email, $to_name, $subject, $html_cont
 
     // Añadir footer de desuscripción a emails no transaccionales
     $tipos_transaccionales = ['activacion_usuario', 'recuperacion_password', 'contacto_form', 'codigo_publicado'];
+    $unsub_url = '';
     if (!in_array($tipo, $tipos_transaccionales)) {
+        include_once __DIR__ . '/funciones_baja_email.php';
+
+        // Quien ha pedido la baja no recibe nada más que lo estrictamente
+        // transaccional. Se corta aquí, en el punto por el que pasan todos los
+        // envíos, para no depender de que cada cron se acuerde de comprobarlo.
+        if (email_tiene_baja($to_email)) {
+            log_info("Envío omitido por baja de correo — tipo=$tipo email=$to_email");
+            return ['success' => false, 'error' => 'Destinatario dado de baja', 'omitido_por_baja' => true];
+        }
+
+        $unsub_url = baja_email_url($to_email);
+
         $unsub_footer = '<hr style="border:none;border-top:1px solid #eee;margin:30px 0 15px;">'
             . '<p style="font-size:12px;color:#999;text-align:center;margin:0;">'
             . 'Si no deseas recibir estos correos, puedes '
-            . '<a href="https://www.codigoamigo.com/usuario#preferencias" style="color:#E30613;text-decoration:underline;">configurar tus preferencias de notificación</a>'
-            . ' en tu perfil.</p>';
-        
+            . '<a href="' . htmlspecialchars($unsub_url, ENT_QUOTES, 'UTF-8') . '" style="color:#E30613;text-decoration:underline;">darte de baja en un clic</a>'
+            . ' o <a href="https://www.codigoamigo.com/usuario#preferencias" style="color:#E30613;text-decoration:underline;">ajustar tus preferencias</a>.</p>';
+
         // Insertar antes de </body> si existe, si no al final
         if (stripos($html_content, '</body>') !== false) {
             $html_content = str_ireplace('</body>', $unsub_footer . '</body>', $html_content);
         } else {
             $html_content .= $unsub_footer;
         }
-        
+
         // También añadir al texto plano
-        $unsub_text = "\n\n---\nSi no deseas recibir estos correos, configura tus preferencias en: https://www.codigoamigo.com/usuario";
+        $unsub_text = "\n\n---\nSi no deseas recibir estos correos, date de baja aquí: " . $unsub_url;
         $text_content .= $unsub_text;
     }
-    
+
     // Enviar el email
-    $resultado = enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text_content, $from_email, $from_name);
+    $resultado = enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text_content, $from_email, $from_name, $unsub_url);
     
     // Registrar en el log
     if (!function_exists('registrarEmailLog')) {
@@ -234,7 +255,7 @@ function usuarioAceptaEmail($usuario_id, $tipo_email) {
 /**
  * Envía email usando Brevo SMTP como principal y SendGrid como fallback
  */
-function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text_content = '', $from_email = 'noreply@codigoamigo.com', $from_name = 'Código Amigo') {
+function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text_content = '', $from_email = 'noreply@codigoamigo.com', $from_name = 'Código Amigo', $unsub_url = '') {
 
     // Validar parámetros
     if (empty($to_email) || empty($to_name) || empty($subject) || empty($html_content)) {
@@ -264,7 +285,7 @@ function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text
     
     // Intentar envío con Brevo SMTP primero
     try {
-        $resultado_brevo = enviarEmailSMTPBrevo($to_email, $to_name, $subject, $html_content, $text_content, $from_email, $from_name);
+        $resultado_brevo = enviarEmailSMTPBrevo($to_email, $to_name, $subject, $html_content, $text_content, $from_email, $from_name, $unsub_url);
         
         if ($resultado_brevo['success']) {
             $resultado['success'] = true;
