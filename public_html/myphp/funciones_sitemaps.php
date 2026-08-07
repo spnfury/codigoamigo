@@ -148,12 +148,54 @@ function generarSitemapMarcas() {
         $urlset = $xml->createElement("urlset");
         $urlset = $xml->appendChild($urlset);
         $urlset->setAttribute("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9");
-        
+
+        // Marcas que tienen al menos un código vigente.
+        //
+        // Desde que /de-{slug} devuelve noindex cuando la marca se queda sin
+        // códigos, anunciarlas en el sitemap era contradecirse: el sitemap le
+        // pide a Google que indexe una página que se declara no indexable.
+        // Eran 23 en la auditoría del 2026-08-07. Vuelven solas al sitemap en
+        // cuanto la marca recibe un código.
+        // Mismo criterio que la ficha: no basta con estado 0, hay que descartar
+        // los caducados por fecha_validez (ver cron/daily_sitemap.php).
+        $con_codigos = [];
+        try {
+            $db_cod = createConnection();
+            foreach ($db_cod->selectCollection('codigos')->distinct('marca', [
+                'estado' => 0,
+                '$nor'   => [[
+                    'fecha_validez' => ['$type' => 'string', '$ne' => '', '$lt' => date('Y-m-d')],
+                ]],
+            ]) as $mk) {
+                $con_codigos[(string)$mk] = true;
+            }
+        } catch (\Throwable $e) {
+            // Si falla la consulta se prefiere el sitemap completo de siempre a
+            // publicar uno vacío por accidente.
+            log_error('[sitemap_marcas] no se pudo consultar códigos activos: ' . $e->getMessage());
+            $con_codigos = null;
+        }
+
         $total = 0;
+        $saltadas_sin_codigos = 0;
+        $saltadas_slug_invalido = 0;
+
         foreach ($lista_marcas as $marca) {
             $nombre_clave = is_array($marca) ? ($marca['nombre_clave'] ?? '') : ($marca->nombre_clave ?? '');
             if (empty($nombre_clave)) continue;
-            
+
+            // Hay slugs corruptos en BD ('https://octopusenergyes/',
+            // 'atuladoenergÍa') que generaban URLs que devuelven 301 o 400.
+            if (!preg_match('/^[a-z0-9][a-z0-9._-]*$/', $nombre_clave)) {
+                $saltadas_slug_invalido++;
+                continue;
+            }
+
+            if ($con_codigos !== null && !isset($con_codigos[$nombre_clave])) {
+                $saltadas_sin_codigos++;
+                continue;
+            }
+
             $url_marca = "https://www.codigoamigo.com/" . link_marca($nombre_clave);
             $url = $xml->createElement("url");
             $url = $urlset->appendChild($url);
@@ -170,7 +212,21 @@ function generarSitemapMarcas() {
         
         $sitemap_path = $xml_dir . '/sitemap_marcas.xml';
         $xml->save($sitemap_path);
-        return ['success' => true, 'archivo' => $sitemap_path, 'url' => $base_url . '/myphp/xml/sitemap_marcas.xml', 'total_urls' => $total, 'fecha' => $hoy];
+
+        log_info('[sitemap_marcas] generado', [
+            'urls'            => $total,
+            'sin_codigos'     => $saltadas_sin_codigos,
+            'slug_invalido'   => $saltadas_slug_invalido,
+        ]);
+
+        return [
+            'success'   => true,
+            'archivo'   => $sitemap_path,
+            'url'       => $base_url . '/myphp/xml/sitemap_marcas.xml',
+            'total_urls' => $total,
+            'excluidas' => ['sin_codigos' => $saltadas_sin_codigos, 'slug_invalido' => $saltadas_slug_invalido],
+            'fecha'     => $hoy,
+        ];
     } catch (Throwable $e) {
         log_error("Error al generar sitemap de marcas: " . $e->getMessage());
         return ['success' => false, 'error' => $e->getMessage()];
@@ -423,18 +479,22 @@ function generarSitemapEstaticas() {
     $xml_dir = __DIR__ . '/xml';
     if (!is_dir($xml_dir)) mkdir($xml_dir, 0755, true);
     
+    // Solo páginas que responden 200 y se dejan indexar.
+    //
+    // La lista anterior anunciaba ocho URLs que no cumplían ninguna de las dos
+    // cosas (auditoría del 2026-08-07):
+    //   - /comparar y /sobre_nosotros redirigen a la home con 301.
+    //   - /aviso_legal, /politica_de_privacidad y /politica_de_cookies usaban
+    //     guion bajo; las rutas reales llevan guion, y además son noindex.
+    //   - /registro es noindex.
+    // Pedirle a Google que indexe una redirección o una página noindex gasta
+    // presupuesto de rastreo y resta credibilidad al resto del sitemap.
     $paginas_estaticas = [
         ['url' => $base_url . '/', 'priority' => '1.0', 'changefreq' => 'daily'],
         ['url' => $base_url . '/listado-marcas', 'priority' => '0.9', 'changefreq' => 'daily'],
         ['url' => $base_url . '/listado-categorias', 'priority' => '0.9', 'changefreq' => 'weekly'],
         ['url' => $base_url . '/ultimos-codigos', 'priority' => '0.85', 'changefreq' => 'daily'],
-        ['url' => $base_url . '/comparar', 'priority' => '0.7', 'changefreq' => 'monthly'],
-        ['url' => $base_url . '/registro', 'priority' => '0.7', 'changefreq' => 'monthly'],
-        ['url' => $base_url . '/sobre_nosotros', 'priority' => '0.5', 'changefreq' => 'monthly'],
         ['url' => $base_url . '/contacto', 'priority' => '0.5', 'changefreq' => 'monthly'],
-        ['url' => $base_url . '/aviso_legal', 'priority' => '0.3', 'changefreq' => 'yearly'],
-        ['url' => $base_url . '/politica_de_privacidad', 'priority' => '0.3', 'changefreq' => 'yearly'],
-        ['url' => $base_url . '/politica_de_cookies', 'priority' => '0.2', 'changefreq' => 'yearly'],
     ];
     
     try {
