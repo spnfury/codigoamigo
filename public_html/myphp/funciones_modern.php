@@ -3269,7 +3269,24 @@ function get_category_info($categoria_url) {
         ]
     ];
     
-    return $categorias_info[$categoria_url] ?? [
+    // La ruta /{categoria}-comparte-y-gana busca la clave CON sufijo, pero las
+    // categorías vigentes están dadas de alta SIN él (solo unas pocas antiguas
+    // aparecen en ambas formas). Resultado hasta 2026-08-07: 12 de las 16
+    // páginas de categoría se titulaban "Códigos de descuento Categoría" y
+    // describían "códigos de descuento en Categoría". Una de ellas rankeaba en
+    // posición 4,6 con 101 impresiones y cero clics en 90 días.
+    //
+    // Se prueban las tres formas en vez de normalizar a una sola, porque hay
+    // claves antiguas ('tecnologia-y-electronica-comparte-y-gana') que no
+    // existen sin el sufijo y se perderían.
+    $sin_sufijo = preg_replace('/-comparte-y-gana$/', '', $categoria_url);
+    foreach ([$categoria_url, $sin_sufijo, $sin_sufijo . '-comparte-y-gana'] as $clave) {
+        if (isset($categorias_info[$clave])) return $categorias_info[$clave];
+    }
+
+    log_info('Categoría sin ficha en get_category_info', ['slug' => $categoria_url]);
+
+    return [
         'nombre' => 'Categoría',
         'descripcion' => 'Descubre los mejores códigos de descuento en esta categoría.',
         'icono' => 'fas fa-tag'
