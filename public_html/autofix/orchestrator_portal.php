@@ -112,7 +112,11 @@ if ($rb >= ($cfg['max_rollbacks_dia'] ?? 3)) {
 // ---------- PASO 3: DETECTAR nuevos (no vistos antes) ----------
 $nuevos = [];
 foreach ($frescas as $e) {
-    if (isset($seen[$e['firma']])) continue; // ya conocido (cualquier estado previo)
+    $prev = $seen[$e['firma']] ?? null;
+    // Ya conocido -> no re-avisar. Excepción: firmas marcadas en modo DRY, que
+    // nunca llegaron a repararse; al promover el portal a LIVE deben volver a
+    // entrar en la cola de fixes.
+    if ($prev !== null && !(($prev['estado'] ?? '') === 'dry' && !$DRY)) continue;
     $e['accion'] = autofixp_clasificar($e, $cfg);
     $nuevos[] = $e;
 }
@@ -146,6 +150,10 @@ foreach ($nuevos as $e) {
 
     if ($DRY) {
         palog("[DRY] Se invocaría claude con prompt de " . strlen($prompt) . " chars. No se edita.");
+        // Marcar como vista: en DRY el error sigue en producción y reaparece en
+        // cada vuelta; sin esto el mismo bug avisaba a Telegram cada 30 min.
+        $seen[$firma] = ['estado' => 'dry', 'archivo' => $e['archivo'], 'linea' => $e['linea'],
+                         'tipo' => $e['tipo'], 'ts_ultimo' => date('Y-m-d H:i:s')];
         pnotificar($AUTOFIX_ROOT, $cfg['portal_key'], "🔎 [DRY] Detectado auto-reparable\n{$e['archivo']}:{$e['linea']}\n{$e['tipo']}\n(modo simulación: no se toca nada)");
         $reparados++;
         continue;

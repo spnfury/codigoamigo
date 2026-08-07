@@ -37,6 +37,10 @@ $cfg = [
     // no las toca para no entrar en bucle de reinicios inútiles.
     'no_autorestart' => ['wsaap-king', 'wsaap-comunidad'],
     'ignorar' => ['pm2-logrotate'],          // módulo de sistema, no es app
+    // Cooldown de avisos que NO conllevan acción del vigía (app en
+    // no_autorestart, budget agotado, sigue sin responder). Sin esto una app
+    // parada a propósito genera 288 mensajes/día — el aviso deja de leerse.
+    'cooldown_aviso_h'   => 24,
 ];
 
 @mkdir($STATE, 0775, true);
@@ -74,11 +78,26 @@ foreach ($apps as $p) {
 $msg = [];
 $acciones = 0;
 
+/**
+ * Encola un aviso repetitivo solo si pasó el cooldown desde el último igual.
+ * Los avisos de estado persistente (app parada a propósito, budget agotado)
+ * describen una condición que no cambia: repetirlos cada 5 min es ruido.
+ */
+function aviso_periodico(string $clave, string $texto, array &$st, int $horas, array &$msg): void {
+    $ahora = time();
+    $ult = (int)($st['ultimo_aviso'][$clave] ?? 0);
+    if ($ahora - $ult < $horas * 3600) return;          // aún en cooldown: silencio
+    $st['ultimo_aviso'][$clave] = $ahora;
+    $msg[] = $texto . ($ult > 0 ? " (aviso cada {$horas}h)" : '');
+}
+
 /** Intenta reiniciar una app respetando el budget diario. Devuelve bool. */
 function intentar_restart(string $nombre, string $razon, array &$st, array $cfg, bool $DRY, array &$msg, int &$acciones): bool {
     $d = $st['reinicios'][$nombre] ?? 0;
     if ($d >= $cfg['max_restarts_dia']) {
-        $msg[] = "⛔ {$nombre}: budget agotado ({$d}/{$cfg['max_restarts_dia']}) — {$razon}. Requiere revisión manual.";
+        aviso_periodico("budget:{$nombre}",
+            "⛔ {$nombre}: budget agotado ({$d}/{$cfg['max_restarts_dia']}) — {$razon}. Requiere revisión manual.",
+            $st, (int)$cfg['cooldown_aviso_h'], $msg);
         return false;
     }
     if ($DRY) {
@@ -104,13 +123,17 @@ foreach ($grupos as $nombre => $g) {
 
     // Ráfaga de reinicios (crash-loop) aunque ahora esté online.
     if ($prevRt !== null && ($rt - $prevRt) >= $cfg['alerta_storm']) {
-        $msg[] = "🚨 {$nombre}: +" . ($rt - $prevRt) . " reinicios desde la última vuelta — crash-loop (¿bug de código?)";
+        aviso_periodico("storm:{$nombre}",
+            "🚨 {$nombre}: +" . ($rt - $prevRt) . " reinicios desde la última vuelta — crash-loop (¿bug de código?)",
+            $st, 1, $msg);   // 1h: un crash-loop sigue siendo urgente, pero no cada 5 min
     }
 
     $todoCaido = count(array_filter($g['statuses'], fn($s) => $s !== 'online')) === count($g['statuses']);
     if ($todoCaido) {
         if (in_array($nombre, $cfg['no_autorestart'], true)) {
-            $msg[] = "⛔ {$nombre}: estado '{$g['statuses'][0]}' — en lista no_autorestart, requiere acción manual";
+            aviso_periodico("noauto:{$nombre}",
+                "⛔ {$nombre}: estado '{$g['statuses'][0]}' — en lista no_autorestart, requiere acción manual",
+                $st, (int)$cfg['cooldown_aviso_h'], $msg);
         } else {
             intentar_restart($nombre, 'estado: ' . implode('/', $g['statuses']), $st, $cfg, $DRY, $msg, $acciones);
         }

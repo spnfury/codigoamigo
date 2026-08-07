@@ -28,6 +28,8 @@ $ops_patterns = $cfg['_ops_patterns'];
 $code_pattern = $cfg['_code_patterns'];
 $maxEdad = ($cfg['max_edad_dias'] ?? 7) * 86400;
 $maxLeer = $cfg['max_leer_bytes'] ?? 5242880;
+$opsCooldown = ($cfg['ops_cooldown_h'] ?? 24) * 3600;
+$retFirmas   = ($cfg['retencion_firmas_dias'] ?? 30) * 86400;
 
 /** Deriva el nombre de portal desde la ruta del log. */
 function fleet_portal(string $path): string {
@@ -153,13 +155,32 @@ foreach ($logs as $f => $portal) {
         // de 120 chars antes de llegar al contenido, rompiendo la dedup (dos
         // ocurrencias del MISMO error generaban firmas distintas). Si no hay
         // "PHP message:" (formato ya nativo), se usa la línea desde el inicio.
-        $cuerpo = $linea;
-        $pos = strpos($linea, 'PHP message:');
-        if ($pos !== false) { $cuerpo = substr($linea, $pos); }
-        $norm  = preg_replace('/\d+/', 'N', substr($cuerpo, 0, 120));
-        $firma = substr(md5($portal . '|' . ($es_ops ?: 'code') . '|' . $norm), 0, 16);
-        if (isset($seen[$firma])) { $seen[$firma]['count']++; $seen[$firma]['ts'] = date('Y-m-d H:i:s'); continue; }
-        $seen[$firma] = ['portal' => $portal, 'ts' => date('Y-m-d H:i:s'), 'count' => 1];
+        if ($es_ops) {
+            // Los errores OPS ("quota agotada", "clave inválida") no son bugs
+            // distintos: son UNA condición operativa que escupe mensajes con
+            // texto variable (endpoint, id, timestamps). Firmar por el cuerpo
+            // generaba una firma nueva por mensaje -> decenas de avisos del
+            // mismo problema. Se agrupa por portal+clase y se re-avisa como
+            // mucho una vez cada `ops_cooldown_h`.
+            $firma = substr(md5($portal . '|ops|' . $es_ops), 0, 16);
+        } else {
+            $cuerpo = $linea;
+            $pos = strpos($linea, 'PHP message:');
+            if ($pos !== false) { $cuerpo = substr($linea, $pos); }
+            $norm  = preg_replace('/\d+/', 'N', substr($cuerpo, 0, 120));
+            $firma = substr(md5($portal . '|code|' . $norm), 0, 16);
+        }
+
+        if (isset($seen[$firma])) {
+            $edad = time() - strtotime($seen[$firma]['ts'] ?? 'now');
+            $seen[$firma]['count'] = ($seen[$firma]['count'] ?? 0) + 1;
+            $seen[$firma]['ts'] = date('Y-m-d H:i:s');
+            // Solo los OPS reviven tras el cooldown (la condición puede haber
+            // vuelto). Un bug de código ya avisado no se repite.
+            if (!$es_ops || $edad < $opsCooldown) continue;
+        } else {
+            $seen[$firma] = ['portal' => $portal, 'ts' => date('Y-m-d H:i:s'), 'count' => 1];
+        }
         $total_new++;
 
         if ($es_ops) {
@@ -168,6 +189,13 @@ foreach ($logs as $f => $portal) {
             $digest_code[$portal][] = trim(substr($linea, 0, 140));
         }
     }
+}
+
+// Poda: sin esto fleet_seen.json crece sin techo (se lee y reescribe entero
+// cada 30 min). Una firma sin reaparecer en semanas ya no aporta dedup.
+$corte = time() - $retFirmas;
+foreach ($seen as $f => $r) {
+    if (strtotime($r['ts'] ?? 'now') < $corte) unset($seen[$f]);
 }
 
 if (!$DRY) {

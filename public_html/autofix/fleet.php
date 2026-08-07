@@ -60,6 +60,8 @@ return [
 
     'max_edad_dias'   => 7,          // solo logs tocados en los últimos 7 días
     'max_leer_bytes'  => 5242880,    // no leer más de 5MB de un log por vuelta
+    'ops_cooldown_h'  => 24,         // re-aviso de una clase OPS por portal (quota, clave, DB...)
+    'retencion_firmas_dias' => 30,   // poda de fleet_seen.json (si no, crece sin techo)
 
     // --- clasificación transversal ---
     '_ops_patterns' => [
