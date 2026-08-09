@@ -404,10 +404,28 @@ function selectWeightedRandomCode($marca_nombre_clave, $exclude_id = null) {
         }
     }
     
+    // Si el código es un enlace de referido, la ficha ofrece salir por
+    // /salir.php en vez de enseñar la URL cruda; para rotular ese botón hace
+    // falta el nombre presentable de la marca.
+    $marca_slug = (string)($codigo_sel['marca'] ?? '');
+    $marca_nombre = $marca_slug;
+    if ($marca_slug !== '') {
+        try {
+            $m = createConnection()->selectCollection('marcas')
+                ->findOne(['nombre_clave' => $marca_slug], ['projection' => ['nombre' => 1]]);
+            if (!empty($m['nombre'])) $marca_nombre = (string)$m['nombre'];
+        } catch (\Throwable $e) {
+            // Sin nombre bonito se usa el slug: no merece romper la respuesta.
+        }
+    }
+
     return [
         'success' => true,
         'codigo_id' => (string)$codigo_sel['_id'],
         'codigo' => $codigo_sel['codigo'] ?? '',
+        'marca' => $marca_slug,
+        'marca_nombre' => $marca_nombre,
+        'es_enlace' => (bool)preg_match('#^https?://#i', trim((string)($codigo_sel['codigo'] ?? ''))),
         'descripcion' => $codigo_sel['descripcion'] ?? '',
         'beneficio_texto' => $beneficio_texto,
         'es_destacado' => $es_destacado,

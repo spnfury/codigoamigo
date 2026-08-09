@@ -1207,9 +1207,27 @@ if (!empty($faq_schema_items)) {
             let featuredHTML = data.es_destacado ? '<div style="display:inline-block;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1e3a5f;font-size:0.75rem;font-weight:700;padding:2px 10px;border-radius:20px;margin-bottom:10px"><i class="fas fa-star"></i> Código Destacado</div><br>' : '';
             let descHTML = data.descripcion && data.descripcion.length > 0 ? '<div class="codigo-descripcion">' + esc(data.descripcion.substring(0, 200)) + '</div>' : '';
             let vipBadgeHTML = data.is_vip ? '<span style="display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1e3a5f;font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:6px"><i class="fas fa-crown"></i> VIP</span>' : '';
-            container.innerHTML = featuredHTML + benefitHTML +
-                '<div class="codigo-valor-container"><div class="codigo-valor" id="codigoTexto">' + esc(data.codigo) + '</div>' +
-                '<button class="btn-copiar-codigo" onclick="copiarCodigoRevelado()"><i class="fas fa-copy"></i> Copiar</button></div>' +
+            // Muchos "códigos" son en realidad un enlace de referido. Mostrarlo
+            // como texto con un botón de copiar obligaba a copiar y pegar una URL
+            // larga, y sobre todo hacía que el usuario saliera por su cuenta: sin
+            // pasar por /salir.php no se registra el clic ni se puede reescribir
+            // el enlace con el identificador de afiliado, así que la comisión se
+            // pierde aunque el programa exista.
+            const esEnlace = /^https?:\/\//i.test((data.codigo || '').trim());
+            let valorHTML;
+            if (esEnlace && data.codigo_id) {
+                valorHTML = '<div class="codigo-valor-container" style="flex-direction:column;gap:10px;">' +
+                    '<div style="font-size:0.85rem;color:#6b7280;">Este código es un enlace de invitación: el descuento se aplica al entrar.</div>' +
+                    '<a href="/salir.php?codigo=' + encodeURIComponent(data.codigo_id) + '" target="_blank" rel="nofollow noopener" ' +
+                    'class="cav2-btn cav2-btn-primary cav2-btn-lg" style="text-decoration:none;display:inline-block;">' +
+                    'Ir a ' + esc(data.marca_nombre || 'la web') + ' y activar →</a>' +
+                    '<span id="codigoTexto" style="display:none;">' + esc(data.codigo) + '</span>' +
+                    '</div>';
+            } else {
+                valorHTML = '<div class="codigo-valor-container"><div class="codigo-valor" id="codigoTexto">' + esc(data.codigo) + '</div>' +
+                    '<button class="btn-copiar-codigo" onclick="copiarCodigoRevelado()"><i class="fas fa-copy"></i> Copiar</button></div>';
+            }
+            container.innerHTML = featuredHTML + benefitHTML + valorHTML +
                 '<div class="codigo-publisher"><img src="' + esc(data.usuario_img) + '" alt="' + esc(data.usuario_nombre) + '" class="publisher-avatar" style="' + (data.is_vip ? 'border: 2px solid #f59e0b; box-shadow: 0 0 8px rgba(245,158,11,0.5);' : '') + '" onerror="this.src=\'/img/user-default.png\'">' +
                 '<div class="publisher-info"><div class="publisher-name">' + esc(data.usuario_nombre) + vipBadgeHTML + '</div>' +
                 '<div class="trust-badge ' + esc(data.trust_class) + '"><span class="trust-stars" style="color:' + esc(data.trust_color) + '">' + starsHTML + '</span> ' + esc(data.trust_label) + '</div></div>' +
