@@ -84,10 +84,13 @@ if (!$es_vip_chat && !$es_admin_chat) {
                 <li><i class="fas fa-check-circle"></i> Badge dorado en tu perfil</li>
                 <li><i class="fas fa-check-circle"></i> 10€/mes de saldo de regalo</li>
             </ul>
-            <a href="/public/mis_viewers.php" class="paywall-cta">
-                <i class="fas fa-crown"></i> Hazte VIP — 9,99€/mes
+            <!-- Al pago directamente; el href queda de respaldo si falla el JS.
+                 El precio anunciado era el recurrente, no el de entrada. -->
+            <a href="/public/mis_viewers.php" class="paywall-cta"
+               onclick="return typeof iniciarCheckoutVip === 'function' ? iniciarCheckoutVip('paywall_chat', event) : true;">
+                <i class="fas fa-crown"></i> Hazte VIP — 4,99€ el primer mes
             </a>
-            <p class="paywall-small">Cancela cuando quieras. Sin permanencia.</p>
+            <p class="paywall-small">Luego 9,99€/mes. Cancela cuando quieras, sin permanencia.</p>
         </div>
     </div>
     <style>

@@ -9,6 +9,53 @@ let lastChatMessageId = null;
 // Variables de contexto del código
 let currentChatCodigoContexto = null; // {codigoId, marcaSlug, beneficio, marcaNombre}
 
+/**
+ * Manda al usuario a la pasarela de pago del VIP.
+ *
+ * Los enlaces "hazte VIP" del chat llevaban a /public/mis_viewers.php, que es el
+ * panel de leads: pulsas un enlace que dice "hazte VIP" y acabas en una lista de
+ * métricas donde el alta está más abajo. Desde aquí el usuario ya sabe lo que
+ * quiere —acaba de chocarse con el muro de "para leer respuestas, hazte VIP"—,
+ * así que se le lleva directo a pagar.
+ *
+ * El enlace conserva su href a mis_viewers como respaldo: si el JS falla o la
+ * sesión de pago no se puede crear, sigue habiendo a dónde ir.
+ */
+function iniciarCheckoutVip(source, ev) {
+    if (ev) ev.preventDefault();
+
+    const destinoRespaldo = (ev && ev.currentTarget && ev.currentTarget.getAttribute('href'))
+        || '/public/mis_viewers.php';
+
+    try {
+        if (typeof gtag === 'function') {
+            gtag('event', 'begin_checkout', {
+                currency: 'EUR', value: 4.99, source: source || 'chat',
+                items: [{ item_id: 'vip_subscription', item_name: 'Suscripción VIP', price: 4.99, quantity: 1 }]
+            });
+        }
+    } catch (e) { /* la analítica no debe bloquear el pago */ }
+
+    fetch('/crear_sesion_suscripcion_vip.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: source || 'chat' })
+    })
+        .then(r => r.json())
+        .then(data => {
+            window.location.href = (data && data.success && data.checkout_url)
+                ? data.checkout_url
+                : destinoRespaldo;
+        })
+        .catch(err => {
+            console.error('[Chat] checkout VIP:', err);
+            window.location.href = destinoRespaldo;
+        });
+
+    return false;
+}
+window.iniciarCheckoutVip = iniciarCheckoutVip;
+
 // Inicializar modal de chat
 function initChatModal(userId, userName, userImg, defaultMessage = null, codigoContexto = null) {
     try {
@@ -316,7 +363,7 @@ function loadOrCreateConversation(userId) {
         messagesContainer.innerHTML = '<div class="text-center text-muted p-4" style="margin-top:20px;">' +
             '<div style="background: linear-gradient(135deg,#fff3cd,#ffe69c); width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; color: #b8860b; font-size: 24px;"><i class="fas fa-paper-plane"></i></div>' +
             '<strong>Envía tu mensaje a ' + escapeHtml(currentChatUserName) + '</strong><br>' +
-            '<small style="display:block; margin-top:8px; color:#7a5400;">Tu mensaje se entregará. Para leer respuestas necesitas ser VIP. <a href="/public/mis_viewers.php" style="color:#E30613; font-weight:700;">Hazte VIP</a></small></div>';
+            '<small style="display:block; margin-top:8px; color:#7a5400;">Tu mensaje se entregará. Para leer respuestas necesitas ser VIP. <a href="/public/mis_viewers.php" onclick="return iniciarCheckoutVip(\'chat_previo\', event);" style="color:#E30613; font-weight:700;">Hazte VIP</a></small></div>';
         return;
     }
 
@@ -459,7 +506,7 @@ function sendChatMessage(event) {
                 // No-VIP: tras envío, mostrar disclaimer una sola vez (FOMO + transparencia)
                 if (!isChatUserVip() && !document.getElementById('chatNoVipDisclaimer')) {
                     const disclaimerHTML = '<div id="chatNoVipDisclaimer" style="background: linear-gradient(135deg,#fff3cd,#ffe69c); border-radius: 12px; padding: 12px 16px; margin: 12px 0; text-align: center; font-size: 0.85rem; color: #7a5400;">' +
-                        '<i class="fas fa-info-circle"></i> Mensaje entregado. Para leer respuestas de ' + escapeHtml(currentChatUserName) + ', <a href="/public/mis_viewers.php" style="color:#E30613; font-weight:800;">hazte VIP</a>.' +
+                        '<i class="fas fa-info-circle"></i> Mensaje entregado. Para leer respuestas de ' + escapeHtml(currentChatUserName) + ', <a href="/public/mis_viewers.php" onclick="return iniciarCheckoutVip(\'chat_tras_envio\', event);" style="color:#E30613; font-weight:800;">hazte VIP</a>.' +
                         '</div>';
                     messagesContainer.insertAdjacentHTML('beforeend', disclaimerHTML);
                     scrollChatToBottom();
@@ -477,7 +524,7 @@ function sendChatMessage(event) {
                     const ctaUrl = response.cta_url || '/public/mis_viewers.php';
                     const ctaHTML = '<div style="background: linear-gradient(135deg,#fff3cd,#ffe69c); border-radius: 12px; padding: 14px 16px; margin: 12px 0; text-align: center; font-size: 0.9rem; color: #7a5400;">' +
                         '<i class="fas fa-crown"></i> <strong>' + escapeHtml(response.error || 'Límite alcanzado') + '</strong><br>' +
-                        '<a href="' + ctaUrl + '" style="display:inline-block; margin-top:8px; background:#E30613; color:white; padding:8px 18px; border-radius:24px; text-decoration:none; font-weight:800;">Hazte VIP</a>' +
+                        '<a href="' + ctaUrl + '" onclick="return iniciarCheckoutVip(\'chat_limite\', event);" style="display:inline-block; margin-top:8px; background:#E30613; color:white; padding:8px 18px; border-radius:24px; text-decoration:none; font-weight:800;">Hazte VIP</a>' +
                         '</div>';
                     messagesContainer.insertAdjacentHTML('beforeend', ctaHTML);
                     scrollChatToBottom();

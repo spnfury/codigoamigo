@@ -1025,8 +1025,11 @@ get_header_modern($title, $description, '', '', '', true);
         <h3><i class="fas fa-crown"></i> Saca el máximo partido a tus códigos</h3>
         <?php endif; ?>
         <p>
-            <?php if ($total_potencial > 0): ?>
-            Hasta <strong><?php echo number_format($total_potencial, 0); ?>€</strong> en beneficios potenciales esperándote.
+            <?php if ($total_en_juego > 0): ?>
+            <!-- Se habla de lo que hay en juego en los leads pendientes, no de un
+                 "hasta X€" que suma todos los leads como si fueran a convertir.
+                 Mismo criterio que la tira de arriba. -->
+            Tienes <strong><?php echo fmt_eur($total_en_juego); ?></strong> en juego entre los leads que aún no has cerrado.
             <?php endif; ?>
             <?php if ($total_viewers > 0): ?>
             Hazte VIP para escribir directamente a los usuarios que han visto tus códigos y ayudarles a completar el proceso. Ambos ganáis.
@@ -1176,7 +1179,7 @@ get_header_modern($title, $description, '', '', '', true);
             </div>
             
             <div class="lead-potential">
-                <div class="lead-potential-amount">+<?php echo number_format($viewer['codigo_beneficio'], 0); ?>€</div>
+                <div class="lead-potential-amount">+<?php echo fmt_eur($viewer['codigo_beneficio']); ?></div>
                 <div class="lead-potential-label">beneficio</div>
             </div>
             
