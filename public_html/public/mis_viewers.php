@@ -1343,67 +1343,118 @@ async function sendMassMessage() {
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <!-- Custom VIP Modal Overlay (No dependencies) -->
-<div id="custom-vip-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1050; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
-    <div style="background: #1a1a2e; border-radius: 20px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); width: 90%; max-width: 500px; box-shadow: 0 25px 80px rgba(0,0,0,0.5); animation: vipModalPop 0.3s ease; position: relative;">
+<div id="custom-vip-modal" class="vipm-overlay">
+    <div class="vipm-card">
         <!-- Header -->
-        <div style="background: linear-gradient(135deg, #ffd700 0%, #E30613 100%); padding: 18px 25px; position: relative;">
-            <h5 style="margin: 0; color: white; font-weight: 800; font-size: 1.25rem; display: flex; align-items: center; gap: 10px;">
-                <i class="fas fa-crown"></i> VENTAJAS VIP
-            </h5>
-            <button onclick="document.getElementById('custom-vip-modal').style.display='none'" style="position: absolute; right: 20px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: white; font-size: 28px; cursor: pointer; line-height: 1;">&times;</button>
+        <div class="vipm-head">
+            <h5><i class="fas fa-crown"></i> Contacta con tu lead</h5>
+            <button type="button" class="vipm-close" onclick="document.getElementById('custom-vip-modal').style.display='none'" aria-label="Cerrar">&times;</button>
         </div>
-        <!-- Body -->
-        <div style="padding: 30px; text-align: left;">
-            
-            <div style="background: rgba(255, 215, 0, 0.1); border: 1px solid rgba(255, 215, 0, 0.2); border-radius: 12px; padding: 20px 15px; margin-bottom: 20px; text-align: center;">
-                <p style="margin: 0; font-size: 1.1rem; color: rgba(255,255,255,0.95); line-height: 1.6;">
-                    ¡Estás a un paso de conseguir <strong style="color: #4ade80; font-size: 1.3rem;">+<span id="vip-modal-benefit"></span>€</strong> de beneficio!<br><br>
-                    Contacta con <strong style="color: #fff;" id="vip-modal-username"></strong> para ayudarle con tu código de <strong style="color: #fff;" id="vip-modal-brand"></strong> y asegurar tu referido.<br><br>
-                    <span style="font-size: 0.95rem; color: rgba(255,255,255,0.6);">Hablar directamente con los leads es una función VIP.</span><br>
-                    <strong style="color: #ffd700; font-size: 1.15rem; margin-top: 5px; display: block;">¡Hazte VIP y contacta sin límites!</strong>
-                </p>
-            </div>
-            
-            <div style="background: rgba(255, 69, 58, 0.1); border: 1px solid rgba(255, 69, 58, 0.3); border-radius: 10px; padding: 12px 15px; margin-bottom: 25px; display: flex; align-items: center; gap: 15px;">
-                <div style="font-size: 24px; color: #ff453a; animation: pulseRed 2s infinite;"><i class="fas fa-hourglass-half"></i></div>
-                <div style="font-size: 0.95rem; color: rgba(255,255,255,0.85); line-height: 1.4; text-align: left;">
-                    <strong style="color: #ff453a;">La probabilidad de referido baja cada minuto:</strong> El usuario vio tu código <strong style="color: #fff;" id="vip-modal-time"></strong>. ¡Actúa rápido antes de que busque otra alternativa en internet!
-                </div>
-            </div>
-            
-            <ul style="list-style: none; padding: 0; margin: 0 0 25px 0;">
-                <li style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; color: rgba(255,255,255,0.85); font-size: 0.95rem;">
-                    <i class="fas fa-check-circle" style="color: #ffd700; margin-top: 3px; font-size: 1.1rem;"></i>
-                    <span><strong style="color: #fff;">Chat Ilimitado:</strong> Contacta y ayuda a los usuarios que ven tus códigos para asegurar tus referidos.</span>
-                </li>
-                <li style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; color: rgba(255,255,255,0.85); font-size: 0.95rem;">
-                    <i class="fas fa-check-circle" style="color: #ffd700; margin-top: 3px; font-size: 1.1rem;"></i>
-                    <span><strong style="color: #fff;">Badge VIP Verificado:</strong> Gana confianza y obtén hasta un 40% más de clics en tus códigos.</span>
-                </li>
-                <li style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; color: rgba(255,255,255,0.85); font-size: 0.95rem;">
-                    <i class="fas fa-check-circle" style="color: #ffd700; margin-top: 3px; font-size: 1.1rem;"></i>
-                    <span><strong style="color: #fff;">IA Ilimitada:</strong> Completa todas las descripciones de tus códigos con inteligencia artificial profesional.</span>
-                </li>
-                <li style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 0; color: rgba(255,255,255,0.85); font-size: 0.95rem;">
-                    <i class="fas fa-check-circle" style="color: #ffd700; margin-top: 3px; font-size: 1.1rem;"></i>
-                    <span><strong style="color: #fff;">10€ de Saldo Mensual:</strong> Recibe 10€ cada mes para destacar tus códigos totalmente gratis.</span>
-                </li>
-            </ul>
 
-            <div style="text-align: center;">
-                <button id="btnSubscribeMisLeads" style="display: inline-flex; justify-content: center; align-items: center; gap: 10px; background: linear-gradient(135deg, #ffd700 0%, #E30613 100%); color: white; border: none; padding: 14px 35px; border-radius: 30px; font-weight: bold; font-size: 1.1rem; text-decoration: none; cursor: pointer; box-shadow: 0 4px 15px rgba(227, 6, 19, 0.4); width: 100%; transition: transform 0.2s ease;">
-                    <span class="btn-text">Primer mes 4,99€ <span style="opacity:.75; font-weight:400;">(luego 9,99€/mes)</span></span>
-                    <span class="spinner" style="display: none;"><i class="fas fa-spinner fa-spin"></i></span>
-                </button>
-                <p style="margin-top: 15px; margin-bottom: 0; color: rgba(255,255,255,0.4); font-size: 0.85rem;">
-                    Cancela en cualquier momento con un solo clic.
-                </p>
-            </div>
+        <!-- Cuerpo: es lo único que hace scroll -->
+        <div class="vipm-body">
+            <p class="vipm-hook">
+                Estás a un paso de <strong>+<span id="vip-modal-benefit"></span>€</strong>
+            </p>
+            <p class="vipm-sub">
+                <strong id="vip-modal-username"></strong> vio tu código de
+                <strong id="vip-modal-brand"></strong> <strong id="vip-modal-time"></strong>.
+                Escríbele antes de que busque otra alternativa.
+            </p>
+
+            <ul class="vipm-list">
+                <li><i class="fas fa-check-circle"></i> Chat ilimitado con tus leads</li>
+                <li><i class="fas fa-check-circle"></i> Badge VIP: hasta <strong>+40%</strong> de clics</li>
+                <li><i class="fas fa-check-circle"></i> IA ilimitada en tus descripciones</li>
+                <li><i class="fas fa-check-circle"></i> <strong>10€</strong> de saldo cada mes</li>
+            </ul>
+        </div>
+
+        <!-- Pie fijo: el CTA nunca queda fuera de pantalla -->
+        <div class="vipm-foot">
+            <button id="btnSubscribeMisLeads">
+                <span class="btn-text">Hazte VIP · 4,99€ el primer mes</span>
+                <span class="spinner" style="display: none;"><i class="fas fa-spinner fa-spin"></i></span>
+            </button>
+            <p class="vipm-legal">Luego 9,99€/mes. Cancelas cuando quieras.</p>
         </div>
     </div>
 </div>
 
 <style>
+/* Modal VIP.
+   Antes el cuerpo medía ~1.500px en móvil y el botón de alta caía por debajo
+   del borde de la pantalla: había que adivinar que aún quedaba contenido y
+   seguir haciendo scroll para verlo. Ahora la tarjeta es una columna con altura
+   máxima; solo el cuerpo hace scroll y el CTA vive en un pie fijo, así que
+   siempre se ve. Los textos se recortaron a una línea por ventaja. */
+.vipm-overlay, .vipm-overlay * { box-sizing: border-box; }
+.vipm-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85);
+    z-index: 1050; justify-content: center; align-items: center;
+    backdrop-filter: blur(5px); padding: 16px;
+}
+.vipm-card {
+    display: flex; flex-direction: column;
+    background: #1a1a2e; border-radius: 20px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,.1);
+    width: 100%; max-width: 440px; max-height: 88vh;
+    box-shadow: 0 25px 80px rgba(0,0,0,.5); animation: vipModalPop .3s ease;
+}
+.vipm-head {
+    flex: 0 0 auto; position: relative;
+    background: linear-gradient(135deg, #ffd700 0%, #E30613 100%);
+    padding: 15px 50px 15px 20px;
+}
+.vipm-head h5 {
+    margin: 0; color: #fff; font-weight: 800; font-size: 1.1rem;
+    display: flex; align-items: center; gap: 9px;
+}
+.vipm-close {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    background: transparent; border: none; color: #fff; font-size: 28px;
+    cursor: pointer; line-height: 1; padding: 0 6px;
+}
+.vipm-body { flex: 1 1 auto; overflow-y: auto; padding: 22px 22px 6px; text-align: left; }
+.vipm-hook {
+    margin: 0 0 6px; text-align: center; font-size: 1.05rem;
+    color: rgba(255,255,255,.9);
+}
+.vipm-hook strong { color: #4ade80; font-size: 1.6rem; display: block; margin-top: 2px; }
+.vipm-sub {
+    margin: 0 0 18px; text-align: center; font-size: .92rem; line-height: 1.5;
+    color: rgba(255,255,255,.65);
+}
+.vipm-sub strong { color: #fff; }
+.vipm-list { list-style: none; padding: 0; margin: 0; }
+.vipm-list li {
+    display: flex; align-items: center; gap: 10px; padding: 7px 0;
+    color: rgba(255,255,255,.85); font-size: .94rem;
+}
+.vipm-list i { color: #ffd700; font-size: 1rem; flex: 0 0 auto; }
+.vipm-list strong { color: #fff; }
+.vipm-foot {
+    flex: 0 0 auto; padding: 16px 22px 20px;
+    border-top: 1px solid rgba(255,255,255,.08); background: #1a1a2e;
+}
+#btnSubscribeMisLeads {
+    display: flex; justify-content: center; align-items: center; gap: 10px;
+    width: 100%; padding: 15px 20px; border: none; border-radius: 30px;
+    background: linear-gradient(135deg, #ffd700 0%, #E30613 100%);
+    color: #fff; font-weight: 700; font-size: 1.05rem; cursor: pointer;
+    box-shadow: 0 4px 15px rgba(227,6,19,.4); transition: transform .2s ease;
+}
+#btnSubscribeMisLeads:hover { transform: translateY(-1px); }
+.vipm-legal {
+    margin: 10px 0 0; text-align: center;
+    color: rgba(255,255,255,.4); font-size: .8rem;
+}
+@media (max-width: 480px) {
+    .vipm-card { max-height: 92vh; }
+    .vipm-body { padding: 18px 18px 4px; }
+    .vipm-hook strong { font-size: 1.45rem; }
+}
+
 @keyframes vipModalPop {
     0% { opacity: 0; transform: scale(0.95); }
     100% { opacity: 1; transform: scale(1); }
