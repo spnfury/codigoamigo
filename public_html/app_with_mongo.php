@@ -410,9 +410,20 @@ $app->get('/', function ($request, $response) {
                     <p style="color: rgba(255,255,255,0.8); margin: 0; font-size: 0.85rem; line-height: 1.4;">Badge dorado • Chat con viewers • 10€ de saldo gratis cada mes</p>
                 </div>
             </div>
-            <a href="/public/mis_viewers.php" style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #ffd700, #E30613); color: white; padding: 12px 24px; border-radius: 25px; font-weight: 700; text-decoration: none; font-size: 0.9rem; white-space: nowrap; transition: transform 0.2s ease, box-shadow 0.2s ease;" onmouseover="this.style.transform='scale(1.03)'; this.style.boxShadow='0 8px 25px rgba(255,215,0,0.3)'" onmouseout="this.style.transform=''; this.style.boxShadow=''">
-                <i class="fas fa-crown"></i> Solo 9,99€/mes →
-            </a>
+            <!-- El botón lleva directo a la pasarela, no al panel de leads.
+                 Antes enlazaba a /public/mis_viewers.php: quien pulsaba un CTA
+                 con un precio escrito aterrizaba en un cuadro de mando con sus
+                 métricas ("55 leads totales", "2.827€ potencial") y sin nada que
+                 pagar a la vista. El precio también estaba mal: anunciaba
+                 9,99€/mes cuando la entrada real son 4,99€ el primer mes, que
+                 además es mejor gancho. -->
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                <button type="button" id="btnVipHomeBanner" style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #ffd700, #E30613); color: white; padding: 12px 24px; border: none; border-radius: 25px; font-weight: 700; font-size: 0.9rem; white-space: nowrap; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease;" onmouseover="this.style.transform='scale(1.03)'; this.style.boxShadow='0 8px 25px rgba(255,215,0,0.3)'" onmouseout="this.style.transform=''; this.style.boxShadow=''">
+                    <span class="vip-banner-text"><i class="fas fa-crown"></i> Empieza por 4,99€ →</span>
+                    <span class="vip-banner-spinner" style="display: none;"><i class="fas fa-spinner fa-spin"></i></span>
+                </button>
+                <small style="color: rgba(255,255,255,0.45); font-size: 0.72rem;">Luego 9,99€/mes. Cancelas cuando quieras.</small>
+            </div>
         </div>
     </div>
     <script>
@@ -422,6 +433,52 @@ $app->get('/', function ($request, $response) {
         if (!dismissed || (Date.now() - parseInt(dismissed)) > 7 * 24 * 60 * 60 * 1000) {
             document.getElementById('vip-home-banner').style.display = 'block';
         }
+
+        // Del banner a la pasarela en un clic, sin pantallas intermedias.
+        var btn = document.getElementById('btnVipHomeBanner');
+        if (!btn) return;
+
+        btn.addEventListener('click', async function() {
+            var texto = btn.querySelector('.vip-banner-text');
+            var spinner = btn.querySelector('.vip-banner-spinner');
+            btn.disabled = true;
+            btn.style.opacity = '0.8';
+            if (texto) texto.style.display = 'none';
+            if (spinner) spinner.style.display = 'inline-block';
+
+            function restaurar() {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                if (texto) texto.style.display = 'inline-flex';
+                if (spinner) spinner.style.display = 'none';
+            }
+
+            try {
+                if (typeof gtag === 'function') {
+                    gtag('event', 'begin_checkout', {
+                        currency: 'EUR', value: 4.99, source: 'banner_home',
+                        items: [{ item_id: 'vip_subscription', item_name: 'Suscripción VIP', price: 4.99, quantity: 1 }]
+                    });
+                }
+                var res = await fetch('/crear_sesion_suscripcion_vip.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source: 'banner_home' })
+                });
+                var data = await res.json();
+                if (data.success && data.checkout_url) {
+                    window.location.href = data.checkout_url;
+                    return;
+                }
+                // Si la pasarela falla, al menos que no se quede en nada: al
+                // embudo VIP, donde puede reintentar el alta.
+                window.location.href = '/public/mis_viewers.php';
+            } catch (e) {
+                console.error('VIP banner checkout:', e);
+                restaurar();
+                window.location.href = '/public/mis_viewers.php';
+            }
+        });
     })();
     </script>
     <?php endif; ?>
