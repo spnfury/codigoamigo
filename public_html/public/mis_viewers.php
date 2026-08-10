@@ -120,15 +120,29 @@ $total_codigos_vistos = count($codigos_vistos_ids);
 $count_conseguidos = 0;
 $count_activos = 0;
 $count_no_contactados = 0;
+// Beneficio realmente cobrado, separado del que aún está por cerrar.
+// Antes la cabecera solo enseñaba $total_potencial (la suma de TODOS los leads
+// como si fueran a convertir). En todo el sitio hay 1 lead completado sobre
+// 4.238, así que esa cifra prometía cientos de euros a quien había ganado 5.
+$total_ganado = 0;
+$total_en_juego = 0;
 foreach ($viewers as $v) {
+    $beneficio = (float)($v['codigo_beneficio'] ?? 0);
     if (!empty($v['completado'])) {
         $count_conseguidos++;
+        $total_ganado += $beneficio;
     } else {
         $count_activos++;
+        $total_en_juego += $beneficio;
         if (empty($v['contacted'])) {
             $count_no_contactados++;
         }
     }
+}
+
+/** Formato español: 2.827€, no 2,827€ (number_format por defecto usa el inglés). */
+function fmt_eur($n) {
+    return number_format((float)$n, 0, ',', '.') . '€';
 }
 
 // Encontrar código top
@@ -160,19 +174,22 @@ get_header_modern($title, $description, '', '', '', true);
     position: relative;
 }
 
-/* --- Header --- */
+/* --- Header ---
+   Ocupaba 71px con un título de 2rem y un subtítulo que explica lo evidente a
+   partir de la segunda visita. Se reduce para que la lista de leads —que es lo
+   que se viene a ver— entre antes en pantalla. */
 .leads-header {
-    margin-bottom: 35px;
+    margin-bottom: 16px;
 }
 
 .leads-title {
-    font-size: 2rem;
+    font-size: 1.55rem;
     font-weight: 800;
     color: #fff;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 12px;
     flex-wrap: wrap;
 }
 
@@ -184,90 +201,75 @@ get_header_modern($title, $description, '', '', '', true);
 }
 
 .leads-subtitle {
-    color: rgba(255,255,255,0.5);
-    font-size: 1rem;
+    color: rgba(255,255,255,0.45);
+    font-size: 0.85rem;
+    margin: 0;
 }
 
-/* --- Stats Grid --- */
-.leads-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-bottom: 35px;
-}
-
-@media (max-width: 768px) {
-    .leads-stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (max-width: 420px) {
-    .leads-stats-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-.lead-stat-card {
+/* --- Resumen compacto --- */
+.leads-resumen {
+    display: flex;
+    align-items: stretch;
     background: rgba(255,255,255,0.04);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 16px;
-    padding: 22px 18px;
-    text-align: center;
-    transition: all 0.3s ease;
-    position: relative;
+    border-radius: 14px;
     overflow: hidden;
+    margin-bottom: 24px;
 }
-
-.lead-stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    border-radius: 16px 16px 0 0;
+.lead-res-item {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 14px 8px;
+    text-align: center;
+    background: transparent;
+    border: none;
+    border-right: 1px solid rgba(255,255,255,0.07);
+    font-family: inherit;
+    min-width: 0;
 }
-
-.lead-stat-card:nth-child(1)::before { background: linear-gradient(90deg, #667eea, #764ba2); }
-.lead-stat-card:nth-child(2)::before { background: linear-gradient(90deg, #f093fb, #f5576c); }
-.lead-stat-card:nth-child(3)::before { background: linear-gradient(90deg, #4facfe, #00f2fe); }
-.lead-stat-card:nth-child(4)::before { background: linear-gradient(90deg, #ffd700, #E30613); }
-
-.lead-stat-card:hover {
-    border-color: rgba(255,255,255,0.15);
-    transform: translateY(-3px);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-}
-
-.lead-stat-icon {
-    font-size: 1.4rem;
-    margin-bottom: 10px;
-    opacity: 0.7;
-}
-
-.lead-stat-card:nth-child(1) .lead-stat-icon { color: #667eea; }
-.lead-stat-card:nth-child(2) .lead-stat-icon { color: #f093fb; }
-.lead-stat-card:nth-child(3) .lead-stat-icon { color: #4facfe; }
-.lead-stat-card:nth-child(4) .lead-stat-icon { color: #ffd700; }
-
-.lead-stat-value {
-    font-size: 2rem;
+.lead-res-item:last-child { border-right: none; }
+.lead-res-value {
+    font-size: 1.5rem;
     font-weight: 800;
     color: #fff;
     line-height: 1.1;
-    margin-bottom: 6px;
+    white-space: nowrap;
 }
-
-.lead-stat-label {
-    font-size: 0.8rem;
+.lead-res-label {
+    font-size: 0.72rem;
     color: rgba(255,255,255,0.45);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.4px;
     font-weight: 600;
+    line-height: 1.3;
 }
+.lead-res-label em {
+    display: block;
+    font-style: normal;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+    font-size: 0.68rem;
+    color: rgba(255,255,255,0.3);
+    margin-top: 2px;
+}
+/* El único color de la tira es el de lo que pide acción, y es el único
+   elemento pulsable: al tocarlo filtra la lista. */
+.lead-res-accion { cursor: pointer; }
+.lead-res-accion .lead-res-value { color: #ffd700; }
+.lead-res-accion .lead-res-label { color: rgba(255,215,0,0.7); }
+.lead-res-accion:hover { background: rgba(255,215,0,0.07); }
+.lead-res-accion:active { background: rgba(255,215,0,0.12); }
+
+@media (max-width: 380px) {
+    .lead-res-value { font-size: 1.3rem; }
+    .lead-res-item { padding: 12px 6px; }
+}
+
 
 /* --- Section Title --- */
 .leads-section-header {
@@ -939,27 +941,42 @@ get_header_modern($title, $description, '', '', '', true);
         </p>
     </div>
     
-    <!-- Stats Grid -->
-    <div class="leads-stats-grid">
-        <div class="lead-stat-card">
-            <div class="lead-stat-icon"><i class="fas fa-crosshairs"></i></div>
-            <div class="lead-stat-value"><?php echo $total_viewers; ?></div>
-            <div class="lead-stat-label">Leads totales</div>
+    <!-- Resumen.
+         Antes eran cuatro tarjetas en rejilla que ocupaban 292px de alto en
+         móvil (el 67% de la primera pantalla junto con el título) para enseñar
+         cuatro números que no llevaban a ninguna acción: leads totales, códigos
+         vistos, potencial y código top. Encima tenían :hover con elevación y
+         sombra, así que parecían pulsables sin serlo.
+         Ahora es una tira de ~72px con lo que sí cambia lo que haces: cuántos
+         quedan sin contactar (que además filtra la lista al tocarlo) y cuánto
+         se ha cobrado de verdad. -->
+    <div class="leads-resumen">
+        <div class="lead-res-item">
+            <span class="lead-res-value"><?php echo (int)$total_viewers; ?></span>
+            <span class="lead-res-label">Leads</span>
         </div>
-        <div class="lead-stat-card">
-            <div class="lead-stat-icon"><i class="fas fa-tags"></i></div>
-            <div class="lead-stat-value"><?php echo $total_codigos_vistos; ?></div>
-            <div class="lead-stat-label">Códigos vistos</div>
+
+        <?php if ($count_no_contactados > 0): ?>
+        <button type="button" class="lead-res-item lead-res-accion" onclick="filterLeads('no_contactados')"
+                title="Ver solo los leads que aún no has contactado">
+            <span class="lead-res-value"><?php echo (int)$count_no_contactados; ?></span>
+            <span class="lead-res-label">Sin contactar</span>
+        </button>
+        <?php else: ?>
+        <div class="lead-res-item">
+            <span class="lead-res-value"><?php echo (int)$count_activos; ?></span>
+            <span class="lead-res-label">Activos</span>
         </div>
-        <div class="lead-stat-card">
-            <div class="lead-stat-icon"><i class="fas fa-coins"></i></div>
-            <div class="lead-stat-value"><?php echo number_format($total_potencial, 0); ?>€</div>
-            <div class="lead-stat-label">Potencial</div>
-        </div>
-        <div class="lead-stat-card">
-            <div class="lead-stat-icon"><i class="fas fa-trophy"></i></div>
-            <div class="lead-stat-value" style="font-size: <?php echo strlen($codigo_top_marca) > 10 ? '1.1rem' : '1.5rem'; ?>"><?php echo htmlspecialchars($codigo_top_marca); ?></div>
-            <div class="lead-stat-label">Código top<?php if ($codigo_top_count > 0) echo " ($codigo_top_count leads)"; ?></div>
+        <?php endif; ?>
+
+        <div class="lead-res-item">
+            <span class="lead-res-value"><?php echo fmt_eur($total_ganado); ?></span>
+            <span class="lead-res-label">
+                Ganado
+                <?php if ($total_en_juego > 0): ?>
+                    <em><?php echo fmt_eur($total_en_juego); ?> en juego</em>
+                <?php endif; ?>
+            </span>
         </div>
     </div>
 
