@@ -484,8 +484,8 @@
                     Hazte <strong>VIP</strong> y contacta directamente con los usuarios que ven tus códigos. 
                     Badge dorado + chat ilimitado + <strong>10€ de saldo gratis</strong> cada mes.
                 </p>
-                <a href="/public/suscripcion_vip.php" style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #ffd700 0%, #E30613 100%); color: white; padding: 10px 25px; border-radius: 25px; font-weight: 700; text-decoration: none; font-size: 0.95rem; transition: all 0.3s ease;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(227,6,19,0.3)'" onmouseout="this.style.transform=''; this.style.boxShadow=''">
-                    <i class="fas fa-crown"></i> Hazte VIP — 9,99€/mes
+                <a href="/public/mis_viewers.php" style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #ffd700 0%, #E30613 100%); color: white; padding: 10px 25px; border-radius: 25px; font-weight: 700; text-decoration: none; font-size: 0.95rem; transition: all 0.3s ease;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(227,6,19,0.3)'" onmouseout="this.style.transform=''; this.style.boxShadow=''">
+                    <i class="fas fa-crown"></i> Hazte VIP — 4,99€ el primer mes
                 </a>
             </div>
         `;

@@ -831,7 +831,7 @@ function add_mobile_header_compact() {
                 <?php else: ?>
                 <a href="/public/mis_viewers.php" class="profile-menu-item" style="background: linear-gradient(135deg, rgba(255,215,0,0.1) 0%, rgba(227,6,19,0.1) 100%); color: #E30613; margin: 5px 15px; border-radius: 8px; padding: 12px;">
                     <i class="fas fa-crown" style="color: #ffd700;"></i>
-                    <span style="font-weight: 700;">Hazte VIP — 9,99€/mes</span>
+                    <span style="font-weight: 700;">Hazte VIP — 4,99€ el primer mes</span>
                 </a>
                 <?php endif; ?>
 

@@ -1743,9 +1743,9 @@ window.filterByVisibility = function(visibility) {
         
         <div class="footer-links" style="display: flex; justify-content: center; gap: 30px; margin-bottom: 20px; flex-wrap: wrap;">
             <a href="/" style="color: #cccccc; text-decoration: none; font-size: 1rem; transition: color 0.3s ease;">Inicio</a>
-            <a href="/todos-los-codigos" style="color: #cccccc; text-decoration: none; font-size: 1rem; transition: color 0.3s ease;">Todos los Códigos</a>
-            <a href="/marcas" style="color: #cccccc; text-decoration: none; font-size: 1rem; transition: color 0.3s ease;">Marcas</a>
-            <a href="/categorias" style="color: #cccccc; text-decoration: none; font-size: 1rem; transition: color 0.3s ease;">Categorías</a>
+            <a href="/ultimos-codigos" style="color: #cccccc; text-decoration: none; font-size: 1rem; transition: color 0.3s ease;">Todos los Códigos</a>
+            <a href="/listado-marcas" style="color: #cccccc; text-decoration: none; font-size: 1rem; transition: color 0.3s ease;">Marcas</a>
+            <a href="/listado-categorias" style="color: #cccccc; text-decoration: none; font-size: 1rem; transition: color 0.3s ease;">Categorías</a>
         </div>
         
         <div class="footer-bottom" style="border-top: 1px solid #404040; padding-top: 20px; color: #888888; font-size: 0.9rem;">

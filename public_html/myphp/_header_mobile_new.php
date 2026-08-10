@@ -78,10 +78,10 @@
                 <i class="fas fa-plus-circle"></i> Publicar Código
             </a>
             <?php } ?>
-            <a href="/marcas" class="slide-nav-item">
+            <a href="/listado-marcas" class="slide-nav-item">
                 <i class="fas fa-tags"></i> Marcas
             </a>
-            <a href="/categorias" class="slide-nav-item">
+            <a href="/listado-categorias" class="slide-nav-item">
                 <i class="fas fa-list"></i> Categorías
             </a>
             <?php
