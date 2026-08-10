@@ -1229,10 +1229,22 @@ get_header_modern($title, $description, '', '', '', true);
         </div>
     </div>
 </div>
+<?php endif; // fin del modal de mensaje masivo (solo VIP con más de un lead) ?>
 
+<!-- Este script va FUERA del condicional de VIP a propósito.
+     Estaba dentro de `if ($is_vip && $total_viewers > 1)`, así que a un usuario
+     no VIP no se le definía filterLeads() y los filtros de leads ("Sin
+     contactar", "Conseguidos", "Todos") no hacían nada: el onclick lanzaba un
+     ReferenceError y la lista se quedaba igual. Justo los usuarios a los que
+     hay que convencer para que se hagan VIP.
+     Mismo fallo que tuvo el botón Cancelar con SweetAlert el 2026-07-30.
+     Las funciones de envío masivo se quedan aquí pero solo se invocan desde
+     botones que no existen sin VIP, y toleran que falten sus elementos. -->
 <script>
 function toggleSelectAll() {
-    const isChecked = document.getElementById('selectAll').checked;
+    const selAll = document.getElementById('selectAll');
+    if (!selAll) return;
+    const isChecked = selAll.checked;
     // Only select visible ones
     const checkboxes = document.querySelectorAll('.lead-card:not(.filtered-out) .viewer-checkbox');
     checkboxes.forEach(cb => cb.checked = isChecked);
@@ -1333,7 +1345,6 @@ async function sendMassMessage() {
     }
 }
 </script>
-<?php endif; ?>
 
 <!-- SweetAlert2: lo usan los botones de gestión VIP (cancelar, reactivar,
      retención) y el upsell de cualquier usuario — debe cargarse siempre.
