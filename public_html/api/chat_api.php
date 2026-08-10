@@ -66,7 +66,7 @@ if (!$es_vip_actual && in_array($action, $acciones_solo_vip, true)) {
         'success' => false,
         'error' => 'Mensajería directa exclusiva para usuarios VIP. Hazte VIP para leer y responder mensajes.',
         'requiere_vip' => true,
-        'cta_url' => '/suscripciones_y_creditos'
+        'cta_url' => '/public/mis_viewers.php'
     ]);
     exit;
 }
@@ -448,7 +448,7 @@ try {
                             'success' => false,
                             'error' => "Has alcanzado el límite de {$cap_no_vip} mensajes diarios. Hazte VIP para enviar mensajes sin límite y leer respuestas.",
                             'requiere_vip' => true,
-                            'cta_url' => '/suscripciones_y_creditos'
+                            'cta_url' => '/public/mis_viewers.php'
                         ]);
                         exit;
                     }

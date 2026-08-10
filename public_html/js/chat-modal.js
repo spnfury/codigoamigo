@@ -316,7 +316,7 @@ function loadOrCreateConversation(userId) {
         messagesContainer.innerHTML = '<div class="text-center text-muted p-4" style="margin-top:20px;">' +
             '<div style="background: linear-gradient(135deg,#fff3cd,#ffe69c); width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; color: #b8860b; font-size: 24px;"><i class="fas fa-paper-plane"></i></div>' +
             '<strong>Envía tu mensaje a ' + escapeHtml(currentChatUserName) + '</strong><br>' +
-            '<small style="display:block; margin-top:8px; color:#7a5400;">Tu mensaje se entregará. Para leer respuestas necesitas ser VIP. <a href="/suscripciones_y_creditos" style="color:#E30613; font-weight:700;">Hazte VIP</a></small></div>';
+            '<small style="display:block; margin-top:8px; color:#7a5400;">Tu mensaje se entregará. Para leer respuestas necesitas ser VIP. <a href="/public/mis_viewers.php" style="color:#E30613; font-weight:700;">Hazte VIP</a></small></div>';
         return;
     }
 
@@ -459,7 +459,7 @@ function sendChatMessage(event) {
                 // No-VIP: tras envío, mostrar disclaimer una sola vez (FOMO + transparencia)
                 if (!isChatUserVip() && !document.getElementById('chatNoVipDisclaimer')) {
                     const disclaimerHTML = '<div id="chatNoVipDisclaimer" style="background: linear-gradient(135deg,#fff3cd,#ffe69c); border-radius: 12px; padding: 12px 16px; margin: 12px 0; text-align: center; font-size: 0.85rem; color: #7a5400;">' +
-                        '<i class="fas fa-info-circle"></i> Mensaje entregado. Para leer respuestas de ' + escapeHtml(currentChatUserName) + ', <a href="/suscripciones_y_creditos" style="color:#E30613; font-weight:800;">hazte VIP</a>.' +
+                        '<i class="fas fa-info-circle"></i> Mensaje entregado. Para leer respuestas de ' + escapeHtml(currentChatUserName) + ', <a href="/public/mis_viewers.php" style="color:#E30613; font-weight:800;">hazte VIP</a>.' +
                         '</div>';
                     messagesContainer.insertAdjacentHTML('beforeend', disclaimerHTML);
                     scrollChatToBottom();
@@ -474,7 +474,7 @@ function sendChatMessage(event) {
 
                 // Cap diario alcanzado u otra restricción VIP: mostrar CTA inline
                 if (response.requiere_vip) {
-                    const ctaUrl = response.cta_url || '/suscripciones_y_creditos';
+                    const ctaUrl = response.cta_url || '/public/mis_viewers.php';
                     const ctaHTML = '<div style="background: linear-gradient(135deg,#fff3cd,#ffe69c); border-radius: 12px; padding: 14px 16px; margin: 12px 0; text-align: center; font-size: 0.9rem; color: #7a5400;">' +
                         '<i class="fas fa-crown"></i> <strong>' + escapeHtml(response.error || 'Límite alcanzado') + '</strong><br>' +
                         '<a href="' + ctaUrl + '" style="display:inline-block; margin-top:8px; background:#E30613; color:white; padding:8px 18px; border-radius:24px; text-decoration:none; font-weight:800;">Hazte VIP</a>' +

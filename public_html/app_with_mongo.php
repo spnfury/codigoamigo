@@ -2987,6 +2987,15 @@ $baja_email_handler = function ($request, $response, $args) {
 $app->get('/baja', $baja_email_handler);
 $app->post('/baja', $baja_email_handler);
 
+// URL antigua del embudo VIP. No existía como ruta, así que caía en el catch-all
+// y terminaba en la home: quien pulsaba "hazte VIP" desde el chat o desde la
+// ficha de marca acababa en la portada sin entender qué había pasado. Los
+// enlaces del código ya apuntan a /public/mis_viewers.php; esto cubre los que
+// puedan seguir vivos en correos enviados o enlaces externos.
+$app->get('/suscripciones_y_creditos', function ($request, $response, $args) {
+    return $response->withRedirect('/public/mis_viewers.php', 301);
+});
+
 // Rutas de páginas legales
 $app->get('/politica-de-privacidad', function ($request, $response, $args) {
     global $noindex;

@@ -628,7 +628,7 @@ if (function_exists('obtenerFlashPromosPorMarca')) {
                 <?php if ($visibility_status === 'hidden' || $visibility_status === 'warning' || !$user_has_premium): ?>
                 <div class="pos-actions">
                     <?php if (!$user_code['is_vip']): ?>
-                        <a href="/suscripciones_y_creditos" class="btn btn-sm pos-btn-vip"><i class="fas fa-crown"></i> Hazte VIP</a>
+                        <a href="/public/mis_viewers.php" class="btn btn-sm pos-btn-vip"><i class="fas fa-crown"></i> Hazte VIP</a>
                     <?php endif; ?>
                     <a href="/destacar_codigo?codigo=<?= urlencode($codigo_id) ?>" class="btn btn-sm pos-btn-destacar"><i class="fas fa-star"></i> Destacar Código</a>
                 </div>

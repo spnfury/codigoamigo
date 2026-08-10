@@ -84,7 +84,7 @@ if (!$es_vip_chat && !$es_admin_chat) {
                 <li><i class="fas fa-check-circle"></i> Badge dorado en tu perfil</li>
                 <li><i class="fas fa-check-circle"></i> 10€/mes de saldo de regalo</li>
             </ul>
-            <a href="/suscripciones_y_creditos" class="paywall-cta">
+            <a href="/public/mis_viewers.php" class="paywall-cta">
                 <i class="fas fa-crown"></i> Hazte VIP — 9,99€/mes
             </a>
             <p class="paywall-small">Cancela cuando quieras. Sin permanencia.</p>

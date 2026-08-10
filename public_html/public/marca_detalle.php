@@ -671,7 +671,7 @@ if (!empty($faq_schema_items)) {
           <a href="/public/mis_viewers.php?marca=<?= urlencode($marca) ?>" class="cav2-btn cav2-btn-ghost" style="padding:8px 16px;font-size:0.85rem;">📈 Ver estadísticas completas</a>
           <?php if ($visibility_status === 'hidden' || $visibility_status === 'warning' || !$user_has_premium): ?>
             <?php if (empty($user_code['is_vip'])): ?>
-              <a href="/suscripciones_y_creditos" class="cav2-btn cav2-btn-primary" style="padding:8px 16px;font-size:0.85rem;">👑 Hazte VIP</a>
+              <a href="/public/mis_viewers.php" class="cav2-btn cav2-btn-primary" style="padding:8px 16px;font-size:0.85rem;">👑 Hazte VIP</a>
             <?php endif; ?>
             <a href="/destacar_codigo?codigo=<?= urlencode($codigo_id) ?>" class="cav2-btn cav2-btn-primary" style="padding:8px 16px;font-size:0.85rem;background:var(--c-warning);">⭐ Destacar código</a>
           <?php endif; ?>
