@@ -699,7 +699,7 @@ function add_mobile_header_compact() {
                 <img src="' . htmlspecialchars($foto_perfil ?: '/img/po.png') . '" alt="Perfil" class="slide-user-avatar">
                 <div class="slide-user-details">
                     <span class="slide-user-name">' . htmlspecialchars($nombre_usuario ?: 'Usuario') . '</span>
-                    <a href="/mi-perfil" class="slide-user-link">Ver perfil →</a>
+                    <a href="/usuario" class="slide-user-link">Ver perfil →</a>
                 </div>
             </div>
             '; } else { echo '

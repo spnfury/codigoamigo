@@ -58,7 +58,7 @@
                     <img src="<?php echo $data_usuario["img"] ?? '/img/po.png'; ?>" alt="Perfil" class="slide-user-avatar">
                     <div class="slide-user-details">
                         <span class="slide-user-name"><?php echo $data_usuario["username"] ?? 'Usuario'; ?></span>
-                        <a href="/mi-perfil" class="slide-user-link">Ver perfil →</a>
+                        <a href="/usuario" class="slide-user-link">Ver perfil →</a>
                     </div>
                 </div>
             <?php } else { ?>

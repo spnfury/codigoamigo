@@ -831,7 +831,14 @@
                                 <select id="categoria" class="form-control">
                                     <option value="select">Selecciona una categoría para tu marca</option>
                                     <?php
-                                    $listacategorias = getCategorias();
+                                    // getCategorias() vive en inc/conexion.php y la carga la ruta
+                                    // /nuevo_codigo. Al abrir este fichero por su URL directa no
+                                    // había nada cargado y la página moría con "Call to undefined
+                                    // function getCategorias()" a media respuesta.
+                                    if (!function_exists('getCategorias')) {
+                                        include_once __DIR__ . '/../inc/conexion.php';
+                                    }
+                                    $listacategorias = function_exists('getCategorias') ? getCategorias() : [];
                                     foreach ($listacategorias as $cat) { ?>
                                         <option value="<?php echo $cat['nombre_clave']?>"><?php echo $cat['nombre']?></option>
                                     <?php } ?>

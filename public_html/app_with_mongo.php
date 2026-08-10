@@ -4524,6 +4524,21 @@ $app->get('/bienvenida-login', function ($request, $response, $args) {
         return $response->withRedirect('/', 302);
     }
 
+    // La plantilla llama a get_header_modern() y esta ruta no cargaba nada, así
+    // que la página reventaba con "Call to undefined function get_header_modern()"
+    // y devolvía un 500 con la traza de Slim a la vista. Es la pantalla que se
+    // enseña justo después de iniciar sesión.
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/funciones_modern.php';
+    include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true;
+
+    if (!isset($detect)) {
+        $detect = new Mobile_Detect();
+    }
+    $GLOBALS['detect'] = $detect;
+
     $title = '¡Bienvenido a Código Amigo!';
     $description = 'Descubre las mejores oportunidades para compartir y ahorrar en nuestra comunidad - ' . $author_web;
 

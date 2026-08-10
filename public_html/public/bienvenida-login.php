@@ -37,7 +37,7 @@ get_header_modern($title, $description);
             <p>Nos alegra verte de nuevo. Tu comunidad de códigos descuento sigue creciendo y hay novedades listas para ti.</p>
             <div class="welcome-actions">
                 <a class="primary" href="/mis-anuncios">Ver mis códigos</a>
-                <a class="secondary" href="/publicar">Publicar nuevo código</a>
+                <a class="secondary" href="/nuevo_codigo">Publicar nuevo código</a>
             </div>
             <div class="welcome-info">
                 <span>Te redirigiremos en <strong id="welcome-countdown">5</strong> segundos</span>
@@ -63,12 +63,12 @@ get_header_modern($title, $description);
         <div class="grid-item">
             <h4>Explora novedades</h4>
             <p>Descubre los códigos destacados de la semana y las marcas que más están premiando a nuestra comunidad.</p>
-            <a href="/destacados">Ir a destacados</a>
+            <a href="/ultimos-codigos">Ver últimos códigos</a>
         </div>
         <div class="grid-item">
             <h4>Comparte fácil</h4>
             <p>Sube tus códigos en menos de un minuto y deja que otros usuarios se beneficien de tus recomendaciones.</p>
-            <a href="/publicar">Compartir código</a>
+            <a href="/nuevo_codigo">Compartir código</a>
         </div>
         <div class="grid-item">
             <h4>Gana recompensas</h4>

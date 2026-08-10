@@ -86,7 +86,6 @@ function get_footer_modern() {
                             <div class="column-title">Contacto</div>
                             <ul class="footer-links">
                                 <li><a href="/contacto" class="footer-link">Contacto</a></li>
-                                <li><a href="/sobre-nosotros" class="footer-link">Sobre nosotros</a></li>
                                 <li><a href="/preguntas-frecuentes" class="footer-link">FAQ</a></li>
                                 <li><a href="https://t.me/spnfury" class="footer-link" target="_blank">Soporte técnico</a></li>
                             </ul>
@@ -100,8 +99,8 @@ function get_footer_modern() {
                             <ul class="footer-links">
                                 <li><a href="/amazon" class="footer-link" style="color: #FF9900; font-weight: bold;">Amazon Gratis <i class="fas fa-star"></i></a></li>
                                 <li><a href="/nuevo_codigo" class="footer-link">Publicar código</a></li>
-                                <li><a href="/listado_marcas" class="footer-link">Todas las marcas</a></li>
-                                <li><a href="/destacados" class="footer-link">Códigos destacados</a></li>
+                                <li><a href="/listado-marcas" class="footer-link">Todas las marcas</a></li>
+                                <li><a href="/ultimos-codigos" class="footer-link">Últimos códigos</a></li>
                                 <li><a href="/blog" class="footer-link">Blog</a></li>
                             </ul>
                         </div>
