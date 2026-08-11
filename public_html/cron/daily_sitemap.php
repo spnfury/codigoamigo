@@ -9,6 +9,7 @@ set_time_limit(120);
 
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../myphp/funciones.php';
+require_once __DIR__ . '/../myphp/funciones_sitemaps.php';
 
 $db = createConnection();
 $today = date('Y-m-d');
@@ -96,6 +97,22 @@ if (file_exists($cat_path)) {
         $log("Sitemap categorias refrescado: " . count($cat_m[1]) . " URLs");
     }
 }
+
+// ─── 1c. Regenerar sitemap_estaticas.xml y sitemap_guias.xml ───
+// Hasta hoy no los tocaba nadie: estáticas llevaba desde el 7-ago y guías desde
+// el 9-jun con la misma fecha dentro, mientras el índice de abajo les ponía la
+// de hoy. Google se encuentra un sitemap que prometía cambios y no los tiene.
+// Se llama a las funciones de myphp/funciones_sitemaps.php, que son las que
+// mandan sobre qué URLs entran (las estáticas están auditadas: 200 e indexables).
+$res_est = generarSitemapEstaticas();
+$log($res_est['success']
+    ? "Sitemap estaticas regenerado: {$res_est['total_urls']} URLs"
+    : "Error al regenerar sitemap estaticas: " . ($res_est['error'] ?? 'desconocido'));
+
+$res_guias = generarSitemapGuias();
+$log($res_guias['success']
+    ? "Sitemap guias regenerado: {$res_guias['total_urls']} URLs"
+    : "Error al regenerar sitemap guias: " . ($res_guias['error'] ?? 'desconocido'));
 
 // ─── 2. Actualizar sitemap index ───
 $index_xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
