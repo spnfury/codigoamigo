@@ -9,7 +9,6 @@
 define('ADSENSE_ACTIVO', true);
 
 if (!defined('ADSENSE_PUBLISHER_ID'))      define('ADSENSE_PUBLISHER_ID',     'ca-pub-2091026230098067');
-if (!defined('ADSENSE_PUBLISHER_ID_ALT'))  define('ADSENSE_PUBLISHER_ID_ALT', 'ca-pub-8991940088210256');
 if (!defined('ADSENSE_SLOT_TOP_MARCAS'))   define('ADSENSE_SLOT_TOP_MARCAS',   '2215822301');
 if (!defined('ADSENSE_SLOT_TOP'))          define('ADSENSE_SLOT_TOP',          '9558662809');
 if (!defined('ADSENSE_SLOT_DETALLE_LATERAL')) define('ADSENSE_SLOT_DETALLE_LATERAL', '2861865272');
@@ -72,11 +71,6 @@ function get_adsense_entremedio() {
          data-ad-format="rectangle"
          data-full-width-responsive="true"></ins>
     <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>';
-}
-
-function get_adsense_page_level() {
-    if (!ADSENSE_ACTIVO) return '';
-    return '<script>(adsbygoogle = window.adsbygoogle || []).push({ google_ad_client: "' . ADSENSE_PUBLISHER_ID_ALT . '", enable_page_level_ads: true });</script>';
 }
 
 function echo_adsense_top()           { echo get_adsense_top(); }

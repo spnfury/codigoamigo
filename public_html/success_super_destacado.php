@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/inc/logger.php';
 session_start();
 require_once __DIR__ . '/inc/conexion.php';
 require_once __DIR__ . '/myphp/funciones.php';
@@ -73,7 +74,7 @@ try {
     }
     
 } catch (Exception $e) {
-    error_log("Error verifying Super Destacado payment: " . $e->getMessage());
+    log_error("Error verifying Super Destacado payment: " . $e->getMessage());
     $_SESSION['msg_error'] = "Error al verificar el pago: " . $e->getMessage();
 }
 

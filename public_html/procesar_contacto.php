@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/inc/logger.php';
 /**
  * Procesador de formulario de contacto con reCAPTCHA v3
  */
@@ -87,7 +88,7 @@ function enviarEmailContacto($nombre, $email, $telefono, $mensaje, $form_type = 
     // return mail($para, $asunto, $contenido, $headers);
 
     // Por ahora, solo simulamos que se envió correctamente
-    error_log("EMAIL SIMULADO - [$form_type] De: $nombre <$email> - Mensaje: " . substr($mensaje, 0, 100) . "...");
+    log_info("EMAIL SIMULADO - [$form_type] De: $nombre <$email> - Mensaje: " . substr($mensaje, 0, 100) . "...");
     return true;
 }
 ?>

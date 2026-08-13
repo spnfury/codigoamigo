@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 /**
  * Funciones para generar contenido de marcas usando IA
@@ -53,30 +54,19 @@ function generarDescripcionMarcaIA($nombre_marca, $categoria = '') {
         'temperature' => defined('AI_TEMPERATURE') ? AI_TEMPERATURE : 0.7
     ];
 
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, defined('GROQ_API_URL') ? GROQ_API_URL : 'https://api.groq.com/openai/v1/chat/completions');
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . $api_key,
-        'Content-Type: application/json'
-    ]);
-    curl_setopt($ch, CURLOPT_TIMEOUT, defined('AI_TIMEOUT') ? AI_TIMEOUT : 30);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-
-    $response = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    curl_close($ch);
+    // Groq con rotación de claves + fallback de modelo (ver groq_request en ai_config)
+    $__g = groq_request($data);
+    $response  = $__g['body'];
+    $http_code = $__g['http'];
+    $error = '';
 
     if ($error) {
-        error_log("Error cURL Groq (contenido marca): " . $error);
+        log_error("Error cURL Groq (contenido marca): " . $error);
         return ['success' => false, 'error' => 'Error de conexión: ' . $error];
     }
 
     if ($http_code !== 200) {
-        error_log("Error HTTP Groq (contenido marca): " . $http_code . " - " . $response);
+        log_error("Error HTTP Groq (contenido marca): " . $http_code . " - " . $response);
         return ['success' => false, 'error' => 'Error de API: ' . $http_code];
     }
 
@@ -156,30 +146,19 @@ function generarDescripcionLargaMarcaIA($nombre_marca, $categoria = '') {
         'temperature' => defined('AI_TEMPERATURE') ? AI_TEMPERATURE : 0.7
     ];
 
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, defined('GROQ_API_URL') ? GROQ_API_URL : 'https://api.groq.com/openai/v1/chat/completions');
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . $api_key,
-        'Content-Type: application/json'
-    ]);
-    curl_setopt($ch, CURLOPT_TIMEOUT, defined('AI_TIMEOUT') ? AI_TIMEOUT : 60); // Más tiempo para descripción larga
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-
-    $response = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    curl_close($ch);
+    // Groq con rotación de claves + fallback de modelo (timeout ampliado: desc larga)
+    $__g = groq_request($data, 60);
+    $response  = $__g['body'];
+    $http_code = $__g['http'];
+    $error = '';
 
     if ($error) {
-        error_log("Error cURL Groq (descripción larga marca): " . $error);
+        log_error("Error cURL Groq (descripción larga marca): " . $error);
         return ['success' => false, 'error' => 'Error de conexión: ' . $error];
     }
 
     if ($http_code !== 200) {
-        error_log("Error HTTP Groq (descripción larga marca): " . $http_code . " - " . $response);
+        log_error("Error HTTP Groq (descripción larga marca): " . $http_code . " - " . $response);
         return ['success' => false, 'error' => 'Error de API: ' . $http_code];
     }
 
@@ -231,30 +210,19 @@ function generarVentajaMarcaIA($nombre_marca, $categoria = '', $numero_ventaja =
         'temperature' => defined('AI_TEMPERATURE') ? AI_TEMPERATURE : 0.7
     ];
 
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, defined('GROQ_API_URL') ? GROQ_API_URL : 'https://api.groq.com/openai/v1/chat/completions');
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . $api_key,
-        'Content-Type: application/json'
-    ]);
-    curl_setopt($ch, CURLOPT_TIMEOUT, defined('AI_TIMEOUT') ? AI_TIMEOUT : 30);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-
-    $response = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    curl_close($ch);
+    // Groq con rotación de claves + fallback de modelo (ver groq_request en ai_config)
+    $__g = groq_request($data);
+    $response  = $__g['body'];
+    $http_code = $__g['http'];
+    $error = '';
 
     if ($error) {
-        error_log("Error cURL Groq (ventaja marca): " . $error);
+        log_error("Error cURL Groq (ventaja marca): " . $error);
         return ['success' => false, 'error' => 'Error de conexión: ' . $error];
     }
 
     if ($http_code !== 200) {
-        error_log("Error HTTP Groq (ventaja marca): " . $http_code . " - " . $response);
+        log_error("Error HTTP Groq (ventaja marca): " . $http_code . " - " . $response);
         return ['success' => false, 'error' => 'Error de API: ' . $http_code];
     }
 
@@ -314,12 +282,12 @@ function buscarImagenesMarca($nombre_marca, $limite = 10) {
     curl_close($ch);
 
     if ($error) {
-        error_log("Error cURL Google Images: " . $error);
+        log_error("Error cURL Google Images: " . $error);
         return ['success' => false, 'error' => 'Error de conexión: ' . $error];
     }
 
     if ($http_code !== 200) {
-        error_log("Error HTTP Google Images: " . $http_code . " - " . $response);
+        log_error("Error HTTP Google Images: " . $http_code . " - " . $response);
         return ['success' => false, 'error' => 'Error de API: ' . $http_code];
     }
 

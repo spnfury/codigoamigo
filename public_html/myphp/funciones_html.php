@@ -1912,7 +1912,7 @@ filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#262626', end
 				<tr>
     				<td>Fecha Código Abierto</td>
     				<td>Usuario</td>
-    				<td>Zumbido (disponibles <?php echo $_SESSION["zumbido_saldo"]; ?>)</td>
+    				<td>Acción</td>
 				</tr>
 			</thead>
         <tbody>
@@ -1929,12 +1929,8 @@ filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#262626', end
             	<td><?php if($datos["usuario"]["username"]){?><img width="50px" src="<?php echo $datos["usuario"]["img"]; ?>"><?php echo $datos["usuario"]["username"]; ?><?php }else{ echo "usuario anónimo"; } ?></td>
             	<td><?php
 
-            	/* CHECK BUZZ */
-            	//check_buzz($datos["visita"]["fecha_vista"],$c,$datos["usuario"]["_id"]);
-
             	if($datos["usuario"]["username"]){?>
-                    <a class="btn btn-custom envia_buzz" data-codigo-id-user="<?php echo $datos["usuario"]["_id"]; ?>" data-codigo-id="<?php echo $obj_id_codigo; ?>"><i class="far fa-bell"></i> Enviar Zumbido</a>
-                    <a class="btn btn-primary envia_chat" onclick="if(window.parent && typeof window.parent.openChatModal === 'function') { window.parent.openChatModal('<?php echo (string)$datos["usuario"]["_id"]; ?>', '<?php echo $datos["usuario"]["username"]; ?>', '<?php echo $datos["usuario"]["img"]; ?>'); } else { window.parent.location.href='/chat?usuario=<?php echo (string)$datos["usuario"]["_id"]; ?>'; }" style="background: #28a745; border-color: #28a745; margin-left: 5px; color: white;"><i class="fas fa-comments"></i> Chatear</a>
+                    <a class="btn btn-primary envia_chat" onclick="if(window.parent && typeof window.parent.openChatModal === 'function') { window.parent.openChatModal('<?php echo (string)$datos["usuario"]["_id"]; ?>', '<?php echo $datos["usuario"]["username"]; ?>', '<?php echo $datos["usuario"]["img"]; ?>'); } else { window.parent.location.href='/chat?usuario=<?php echo (string)$datos["usuario"]["_id"]; ?>'; }" style="background: #28a745; border-color: #28a745; color: white;"><i class="fas fa-comments"></i> Chatear</a>
                 <?php } ?></td>
             </tr>
 

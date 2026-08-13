@@ -91,6 +91,7 @@ if (!isset($panel)) {
         <link rel="stylesheet" href="/css/modern-design.css?v=<?php echo time(); ?>">
         <link rel="stylesheet" href="/css/mobile-header-new.css?v=<?php echo time(); ?>">
         <link rel="stylesheet" href="/css/mobile-new-design.css?v=<?php echo time(); ?>">
+        <link rel="stylesheet" href="/css/site-v2.css?v=<?php echo file_exists($_SERVER['DOCUMENT_ROOT'] . '/css/site-v2.css') ? filemtime($_SERVER['DOCUMENT_ROOT'] . '/css/site-v2.css') : time(); ?>">
         
         <?php if($force_css==1){ ?>
             <!-- CSS adicional solo si es necesario -->
@@ -475,11 +476,14 @@ if (!isset($panel)) {
         $chat_script_version = file_exists($chat_script_path) ? filemtime($chat_script_path) : time();
         $current_user_id_value = isset($_SESSION['user_id']) ? (string)$_SESSION['user_id'] : '';
         $chat_logged_in = isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
+        if (!function_exists('es_usuario_vip')) { @include_once __DIR__ . '/../funciones_usuario.php'; }
+        $chat_user_is_vip = $chat_logged_in && function_exists('es_usuario_vip') ? es_usuario_vip($current_user_id_value) : false;
         ?>
         <script>
             window.currentUserId = <?php echo json_encode($current_user_id_value); ?>;
             window.currentUserIdVar = window.currentUserId;
             window.codigoAmigoChatLoggedIn = <?php echo $chat_logged_in ? 'true' : 'false'; ?>;
+            window.codigoAmigoChatVip = <?php echo $chat_user_is_vip ? 'true' : 'false'; ?>;
         </script>
         <script src="/js/chat-modal.js?v=<?php echo $chat_script_version; ?>" defer></script>
         
@@ -720,7 +724,7 @@ if (!isset($panel)) {
                         </div>
 
                         <div class="user-profile" id="user-profile">
-                            <img src="" alt="Avatar" class="user-avatar-small" id="user-avatar">
+                            <img src="/img/user-default.png" alt="Avatar" class="user-avatar-small" id="user-avatar">
                             <span class="user-name-small" id="user-name">Usuario</span>
                             <i class="fas fa-chevron-down"></i>
                         </div>
@@ -930,7 +934,7 @@ if (!isset($panel)) {
                         'mail' => $_SESSION['mail'] ?? '',
                         'img' => $usuario_completo['img'] ?? $_SESSION['img'] ?? '',
                         'avatar' => $usuario_completo['img'] ?? $_SESSION['img'] ?? '',
-                        'zumbido_saldo' => $_SESSION['zumbido_saldo'] ?? 0
+                        'zumbido_saldo' => $usuario_completo['zumbido_saldo'] ?? 0
                     ];
 
                     echo json_encode($userData);

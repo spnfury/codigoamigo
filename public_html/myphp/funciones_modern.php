@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 // Función para detectar URLs y extraer códigos de descuento
 function detect_url_and_extract_code($codigo_text) {
     // Patrones para detectar URLs
@@ -549,7 +550,7 @@ function get_brand_info($marca_clave) {
         }
     } catch (Exception $e) {
         // Si hay error, continuar con el fallback
-        error_log("Error obteniendo información de marca: " . $e->getMessage());
+        log_error("Error obteniendo información de marca: " . $e->getMessage());
     }
     
     // Fallback si no se encuentra la marca - usar imágenes específicas para marcas conocidas
@@ -698,7 +699,7 @@ function add_mobile_header_compact() {
                 <img src="' . htmlspecialchars($foto_perfil ?: '/img/po.png') . '" alt="Perfil" class="slide-user-avatar">
                 <div class="slide-user-details">
                     <span class="slide-user-name">' . htmlspecialchars($nombre_usuario ?: 'Usuario') . '</span>
-                    <a href="/mi-perfil" class="slide-user-link">Ver perfil →</a>
+                    <a href="/usuario" class="slide-user-link">Ver perfil →</a>
                 </div>
             </div>
             '; } else { echo '
@@ -764,7 +765,7 @@ function add_mobile_header_compact() {
         <a href="#" class="bottom-nav-item" id="profile-toggle">
             <div class="profile-container">
                 <i class="fas fa-user" id="profile-icon"></i>
-                <img src="" alt="Perfil" id="profile-image" style="display: none; width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">
+                <img src="/img/user-default.png" alt="Perfil" id="profile-image" style="display: none; width: 24px; height: 24px; border-radius: 50%; object-fit: cover;">
                 <span id="profile-text">Iniciar sesión</span>
             </div>
         </a>
@@ -775,7 +776,7 @@ function add_mobile_header_compact() {
         <div class="profile-menu-content">
             <div class="profile-menu-header">
                 <div class="profile-info">
-                    <img src="" alt="Perfil" id="profile-menu-image" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                    <img src="/img/user-default.png" alt="Perfil" id="profile-menu-image" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
                     <div class="profile-details">
                         <div id="profile-menu-name" class="profile-name">Usuario</div>
                         <span id="profile-menu-email">usuario@email.com</span>
@@ -830,7 +831,7 @@ function add_mobile_header_compact() {
                 <?php else: ?>
                 <a href="/public/mis_viewers.php" class="profile-menu-item" style="background: linear-gradient(135deg, rgba(255,215,0,0.1) 0%, rgba(227,6,19,0.1) 100%); color: #E30613; margin: 5px 15px; border-radius: 8px; padding: 12px;">
                     <i class="fas fa-crown" style="color: #ffd700;"></i>
-                    <span style="font-weight: 700;">Hazte VIP — 9,99€/mes</span>
+                    <span style="font-weight: 700;">Hazte VIP — 4,99€ el primer mes</span>
                 </a>
                 <?php endif; ?>
 
@@ -1559,6 +1560,31 @@ function generate_publisher_latent_cta() {
     return $html;
 }
 
+/**
+ * Banner de invitar amigos en el home. Solo usuarios logueados (el programa de
+ * referidos exige cuenta): el sistema existe desde hace tiempo pero nadie lo
+ * descubre porque solo vivía enterrado en un dropdown de perfil. Reusa las
+ * clases .publisher-cta-band ya estilizadas para no duplicar CSS.
+ */
+function generate_referral_home_banner() {
+    if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
+        return '';
+    }
+
+    $html  = '<div class="publisher-cta-band">';
+    $html .= '<div class="publisher-cta-content">';
+    $html .= '<div class="publisher-cta-eyebrow"><i class="fas fa-gift"></i> Invita y gana</div>';
+    $html .= '<h3 class="publisher-cta-title">Invita a un amigo y gana 5€</h3>';
+    $html .= '<p class="publisher-cta-desc">Tu amigo recibe 5€ al registrarse. Tú ganas otros 5€ cuando publique su primer código.</p>';
+    $html .= '</div>';
+    $html .= '<a href="/invitar-amigos" class="publisher-cta-btn">';
+    $html .= 'Invitar amigos <i class="fas fa-arrow-right"></i>';
+    $html .= '</a>';
+    $html .= '</div>';
+
+    return $html;
+}
+
 // Función para generar la sección de marcas populares en la home
 /**
  * Sección de guías destacadas para la home.
@@ -1624,6 +1650,93 @@ function generate_guias_section($limit = 4) {
     </style>';
 
     return $html;
+}
+
+/**
+ * Bloque de enlace interno "Marcas en tendencia": enlaza desde el home (alta
+ * autoridad) las marcas que rankean cerca de página 1 (franja GSC, cacheada por
+ * cron/generar_marcas_oportunidad.php) con anchor text descriptivo, para
+ * concentrar link equity en las que más opción tienen de subir. Devuelve ''
+ * si no hay cache.
+ */
+function render_marcas_oportunidad() {
+    $path = __DIR__ . '/data/marcas_oportunidad.json';
+    if (!is_file($path)) return '';
+    $data = json_decode((string)file_get_contents($path), true);
+    $marcas = $data['marcas'] ?? [];
+    if (empty($marcas)) return '';
+
+    $html  = '<section class="marcas-tendencia-section"><div class="container">';
+    $html .= '<div class="section-title h2-style">Marcas en tendencia</div>';
+    $html .= '<p class="section-subtitle">Las marcas más buscadas ahora mismo. Encuentra sus códigos de descuento verificados.</p>';
+    $html .= '<div class="marcas-tendencia-grid">';
+    foreach ($marcas as $m) {
+        $slug   = $m['slug'] ?? '';
+        if ($slug === '') continue;
+        $nombre = mb_convert_case(mb_strtolower($m['nombre'] ?? $slug, 'UTF-8'), MB_CASE_TITLE, 'UTF-8');
+        $html .= '<a class="marca-tendencia-chip" href="/de-' . htmlspecialchars($slug, ENT_QUOTES, 'UTF-8')
+              . '" title="Códigos descuento ' . htmlspecialchars($nombre, ENT_QUOTES, 'UTF-8') . '">'
+              . 'Códigos descuento <strong>' . htmlspecialchars($nombre, ENT_QUOTES, 'UTF-8') . '</strong></a>';
+    }
+    $html .= '</div></div></section>';
+    $html .= '<style>
+    .marcas-tendencia-section{padding:32px 0;}
+    .marcas-tendencia-grid{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:18px;}
+    .marca-tendencia-chip{display:inline-flex;align-items:center;gap:4px;padding:9px 16px;border-radius:24px;
+        background:#fff;border:1px solid #eee;color:#444;text-decoration:none;font-size:.85rem;
+        box-shadow:0 1px 3px rgba(0,0,0,.05);transition:all .15s ease;}
+    .marca-tendencia-chip strong{color:#E30613;font-weight:700;}
+    .marca-tendencia-chip:hover{border-color:#E30613;transform:translateY(-1px);box-shadow:0 3px 8px rgba(227,6,19,.12);}
+    </style>';
+    return $html;
+}
+
+/**
+ * Contenido SEO de página de categoría: intro rico + FAQs + schema FAQPage.
+ * Lee categorias.seo_html / seo_faqs (generado por cron/generar_categorias_seo.php).
+ * Convierte las páginas de categoría (thin content) en páginas con cuerpo real
+ * para competir por términos de cabecera. Devuelve '' si no hay contenido.
+ */
+function render_categoria_seo($nombre_clave) {
+    try {
+        $db = createConnection();
+        $cat = $db->categorias->findOne(
+            ['nombre_clave' => $nombre_clave, 'estado' => 1],
+            ['projection' => ['seo_html' => 1, 'seo_faqs' => 1]]
+        );
+    } catch (\Throwable $e) {
+        return '';
+    }
+    if (!$cat) return '';
+
+    $intro = trim($cat['seo_html'] ?? '');
+    $faqs  = isset($cat['seo_faqs']) ? (array) $cat['seo_faqs'] : [];
+    if ($intro === '' && empty($faqs)) return '';
+
+    $out = '<section class="cat-seo-section"><div class="container">';
+    if ($intro !== '') {
+        $out .= '<div class="cat-seo-intro">' . $intro . '</div>';
+    }
+    if (!empty($faqs)) {
+        $items = [];
+        $out .= '<div class="cat-seo-faq"><h2 class="h2-style">Preguntas frecuentes</h2>';
+        foreach ($faqs as $f) {
+            $q = trim($f['q'] ?? '');
+            $a = trim($f['a'] ?? '');
+            if ($q === '' || $a === '') continue;
+            $out .= '<details class="cat-faq-item"><summary>' . htmlspecialchars($q, ENT_QUOTES, 'UTF-8')
+                  . '</summary><div><p>' . htmlspecialchars($a, ENT_QUOTES, 'UTF-8') . '</p></div></details>';
+            $items[] = ['@type' => 'Question', 'name' => $q, 'acceptedAnswer' => ['@type' => 'Answer', 'text' => $a]];
+        }
+        $out .= '</div>';
+        if (!empty($items)) {
+            $schema = ['@context' => 'https://schema.org', '@type' => 'FAQPage', 'mainEntity' => $items];
+            $out .= '<script type="application/ld+json">' . json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>';
+        }
+    }
+    $out .= '</div></section>';
+    $out .= '<style>.cat-seo-section{padding:28px 0;}.cat-seo-intro{max-width:860px;margin:0 auto 22px;line-height:1.7;color:#444;}.cat-seo-intro p{margin:0 0 12px;}.cat-seo-faq{max-width:860px;margin:0 auto;}.cat-seo-faq h2{font-size:1.3rem;margin:0 0 14px;}.cat-faq-item{border:1px solid #eee;border-radius:10px;padding:12px 16px;margin-bottom:10px;background:#fff;}.cat-faq-item summary{font-weight:600;cursor:pointer;color:#222;}.cat-faq-item div{margin-top:8px;color:#555;}</style>';
+    return $out;
 }
 
 function generate_popular_brands_section($limit = 9) {
@@ -2459,10 +2572,10 @@ function get_modern_additional_css() {
         --accent-glow: 0 0 15px rgba(227, 6, 19, 0.2);
     }
 
-    /* Base Body Refinement */
+    /* Base Body Refinement — light theme V4 */
     body {
-        background-color: var(--deep-dark) !important;
-        color: #e0e0e0 !important;
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
     }
 
     /* Glassmorphism Class */
@@ -2687,7 +2800,8 @@ function get_modern_additional_css() {
     .featured-section {
         margin: 3rem 0;
         padding: 2rem 0;
-        background: linear-gradient(135deg, var(--dark-gray) 0%, #1A1A1A 100%);
+        background: linear-gradient(135deg, #ffffff 0%, #f7f8fa 100%);
+        border: 1px solid #e8e8ea;
         border-radius: 20px;
     }
 
@@ -3155,7 +3269,24 @@ function get_category_info($categoria_url) {
         ]
     ];
     
-    return $categorias_info[$categoria_url] ?? [
+    // La ruta /{categoria}-comparte-y-gana busca la clave CON sufijo, pero las
+    // categorías vigentes están dadas de alta SIN él (solo unas pocas antiguas
+    // aparecen en ambas formas). Resultado hasta 2026-08-07: 12 de las 16
+    // páginas de categoría se titulaban "Códigos de descuento Categoría" y
+    // describían "códigos de descuento en Categoría". Una de ellas rankeaba en
+    // posición 4,6 con 101 impresiones y cero clics en 90 días.
+    //
+    // Se prueban las tres formas en vez de normalizar a una sola, porque hay
+    // claves antiguas ('tecnologia-y-electronica-comparte-y-gana') que no
+    // existen sin el sufijo y se perderían.
+    $sin_sufijo = preg_replace('/-comparte-y-gana$/', '', $categoria_url);
+    foreach ([$categoria_url, $sin_sufijo, $sin_sufijo . '-comparte-y-gana'] as $clave) {
+        if (isset($categorias_info[$clave])) return $categorias_info[$clave];
+    }
+
+    log_info('Categoría sin ficha en get_category_info', ['slug' => $categoria_url]);
+
+    return [
         'nombre' => 'Categoría',
         'descripcion' => 'Descubre los mejores códigos de descuento en esta categoría.',
         'icono' => 'fas fa-tag'
@@ -3673,7 +3804,7 @@ function generate_featured_brands_slider($limit = 6) {
     
     // Debug temporal - remover después
     if (isset($_GET['debug'])) {
-        error_log("DEBUG generate_featured_brands_slider: " . count($marcas) . " marcas encontradas");
+        log_info("DEBUG generate_featured_brands_slider: " . count($marcas) . " marcas encontradas");
     }
     
     if(empty($marcas)) {
@@ -4040,7 +4171,7 @@ function get_featured_brands_for_home($limit = 6) {
             ];
         }
     } catch (Exception $e) {
-        error_log("Error obteniendo marcas destacadas: " . $e->getMessage());
+        log_error("Error obteniendo marcas destacadas: " . $e->getMessage());
     }
     
     return $marcas_destacadas;
@@ -4200,7 +4331,7 @@ function get_usuarios_activos_footer($limit = 12) {
         return $resultado;
 
     } catch (Exception $e) {
-        error_log('get_usuarios_activos_footer error: ' . $e->getMessage());
+        log_error('get_usuarios_activos_footer error: ' . $e->getMessage());
         return [];
     }
 }

@@ -150,7 +150,7 @@ try {
     echo "[".date('Y-m-d H:i:s')."] PROCESO FINALIZADO. {$procesados} analizados, {$emails_enviados} correos enviados.\n";
     
 } catch (Throwable $e) {
-    error_log("Error crítico en cron recuperar_carritos_vip: " . $e->getMessage());
+    log_error("Error crítico en cron recuperar_carritos_vip: " . $e->getMessage());
     echo "ERROR: " . $e->getMessage() . "\n";
 }
 ?>

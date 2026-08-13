@@ -2,6 +2,57 @@
 // Incluir funciones de PDF
 include_once __DIR__ . '/funciones_pdf.php';
 
+/**
+ * Formatea la descripción de un código añadiendo saltos de línea
+ * en patrones habituales (emojis numéricos, viñetas, etc.) cuando el
+ * usuario ha pegado todo en un solo párrafo. Devuelve HTML seguro.
+ */
+function formatear_descripcion_codigo($texto) {
+    if (!is_string($texto) || $texto === '') {
+        return '<p>Descripción no disponible</p>';
+    }
+
+    $texto = trim($texto);
+
+    // Si ya tiene saltos de línea propios, respetar pero también separar bloques largos
+    $tiene_saltos = (strpos($texto, "\n") !== false);
+
+    // Escape HTML primero
+    $safe = htmlspecialchars($texto, ENT_QUOTES, 'UTF-8');
+
+    // Insertar saltos antes de keycaps numéricos 1️⃣ .. 9️⃣ (precedidos por algo)
+    $safe = preg_replace('/(?<!^)(?<!\n)\s*([1-9]\x{FE0F}?\x{20E3})/u', "\n\n$1 ", $safe);
+
+    // Saltos antes de marcadores comunes
+    $marcadores = ['⚠️', '✅', '👉', '🔗', '📌', '🎁', '💰', '🚀', '📲', '💸', '🛒', '🤝', '🙌', '🌱'];
+    foreach ($marcadores as $m) {
+        $safe = str_replace($m, "\n" . $m, $safe);
+    }
+
+    // Convertir URLs en enlaces (después del escape: ya están como texto plano)
+    $safe = preg_replace_callback(
+        '#(https?://[^\s<]+)#',
+        function ($m) {
+            $url = $m[1];
+            return '<a href="' . $url . '" target="_blank" rel="noopener noreferrer">' . $url . '</a>';
+        },
+        $safe
+    );
+
+    // Colapsar saltos múltiples
+    $safe = preg_replace("/\n{3,}/", "\n\n", $safe);
+
+    // Dividir en párrafos por dobles saltos, líneas por simples
+    $parrafos = preg_split("/\n{2,}/", trim($safe));
+    $html = '';
+    foreach ($parrafos as $p) {
+        $p = trim($p);
+        if ($p === '') continue;
+        $html .= '<p>' . nl2br($p) . '</p>';
+    }
+    return $html !== '' ? $html : '<p>' . nl2br($safe) . '</p>';
+}
+
 // Función para generar la página de detalle del código con diseño increíble
 function generate_code_detail_page($codigo) {
     // Asegurar que la sesión esté iniciada
@@ -138,9 +189,12 @@ function generate_code_detail_page($codigo) {
     $html .= '<div class="header-text">';
     $html .= '<h1>Código de Descuento ' . $marca_nombre . '</h1>';
     $html .= '<p class="header-subtitle">Código verificado y actualizado</p>';
+    $html .= '<div class="header-badges">';
+    $html .= '<span class="verified-badge"><i class="fas fa-check-circle"></i> Verificado</span>';
     if($destacado) {
         $html .= '<span class="featured-badge"><i class="fas fa-star"></i> Destacado</span>';
     }
+    $html .= '</div>';
     $html .= '</div>';
     $html .= '</div>';
     $html .= '<div class="header-actions">';
@@ -186,24 +240,27 @@ function generate_code_detail_page($codigo) {
             // Código oculto para mostrar después del reveal
             $html .= '<div class="code-url-section code-revealed-section" style="display: none;" data-codigo="' . htmlspecialchars($code_info['url'] ?? '', ENT_QUOTES, 'UTF-8') . '">';
             $html .= '<div class="url-label"><i class="fas fa-link"></i> Enlace directo:</div>';
-            $html .= '<a href="' . htmlspecialchars($code_info['url'] ?? '') . '" target="_blank" class="code-url-link">';
+            // Clic saliente vía /salir.php: registra el clickout por marca (datos para
+            // afiliación) y redirige a la URL original (o afiliada si hay programa)
+            $html .= '<a href="/salir.php?codigo=' . htmlspecialchars($code_id, ENT_QUOTES, 'UTF-8') . '" rel="nofollow noopener" target="_blank" class="code-url-link">';
             $html .= '<i class="fas fa-external-link-alt"></i>';
             $html .= '<span>' . htmlspecialchars($code_info['url'] ?? '') . '</span>';
             $html .= '</a>';
             $html .= '</div>';
             $html .= '<div class="code-text" id="codeText" style="display: none;">' . htmlspecialchars($code_info['url'] ?? '') . '</div>';
         } else {
-            // Propietarios ven el enlace directamente
+            // Propietarios ven el enlace directamente (clic saliente vía /salir.php
+            // para registrar el clickout; el texto visible sigue siendo la URL real)
             $html .= '<div class="code-url-section">';
             $html .= '<div class="url-label"><i class="fas fa-link"></i> Enlace directo:</div>';
-            $html .= '<a href="' . htmlspecialchars($code_info['url'] ?? '') . '" target="_blank" class="code-url-link">';
+            $html .= '<a href="/salir.php?codigo=' . htmlspecialchars($code_id, ENT_QUOTES, 'UTF-8') . '" rel="nofollow noopener" target="_blank" class="code-url-link">';
             $html .= '<i class="fas fa-external-link-alt"></i>';
             $html .= '<span>' . htmlspecialchars($code_info['url'] ?? '') . '</span>';
             $html .= '</a>';
             $html .= '</div>';
             $urlTrimmed = trim((string)($code_info['url'] ?? ''));
             $html .= '<div class="code-text" id="codeText" style="display: none;">' . htmlspecialchars($urlTrimmed) . '</div>';
-            $html .= '<button class="btn-copy-code" onclick="window.open(\'' . htmlspecialchars($urlTrimmed, ENT_QUOTES, 'UTF-8') . '\', \'_blank\')">';
+            $html .= '<button class="btn-copy-code" onclick="window.open(\'/salir.php?codigo=' . htmlspecialchars($code_id, ENT_QUOTES, 'UTF-8') . '\', \'_blank\')">';
             $html .= '<i class="fas fa-external-link-alt"></i> Ir a la web';
             $html .= '</button>';
         }
@@ -293,7 +350,7 @@ function generate_code_detail_page($codigo) {
     // Descripción
     $html .= '<div class="code-description-card">';
     $html .= '<h3><i class="fas fa-info-circle"></i> Descripción de la oferta</h3>';
-    $html .= '<p>' . htmlspecialchars($description) . '</p>';
+    $html .= '<div class="description-body">' . formatear_descripcion_codigo($description) . '</div>';
     $html .= '</div>';
     
     // Cómo usar
@@ -449,27 +506,6 @@ function generate_code_detail_page($codigo) {
     
     $html .= '</div>'; // closes user-info-card
 
-    // VIP Awareness Banner (solo para usuarios logueados que no son VIP)
-    $current_user_is_vip = ($usuario_logueado && function_exists('es_usuario_vip')) ? es_usuario_vip($_SESSION['user_id']) : false;
-    if ($usuario_logueado && !$current_user_is_vip) {
-        $html .= '<div class="vip-awareness-banner" style="background: linear-gradient(135deg, #ffd700 0%, #E30613 100%); padding: 20px; border-radius: 15px; margin-bottom: 20px;">';
-        $html .= '<div class="vip-awareness-content" style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">';
-        $html .= '<div style="width: 50px; height: 50px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">';
-        $html .= '<i class="fas fa-crown" style="color: white; font-size: 24px;"></i>';
-        $html .= '</div>';
-        $html .= '<div>';
-        $html .= '<h4 style="color: white; font-weight: 700; margin: 0 0 5px 0; font-size: 1rem;">¿Publicas códigos de referido?</h4>';
-        $html .= '<p style="color: rgba(255,255,255,0.9); margin: 0; font-size: 0.85rem; line-height: 1.4;">Hazte VIP y contacta directamente con usuarios que ven tus códigos. Badge dorado + 10€/mes de saldo.</p>';
-        $html .= '</div>';
-        $html .= '</div>';
-        $html .= '<a href="/public/mis_viewers.php" class="btn-vip-cta" style="display: inline-flex; align-items: center; gap: 8px; background: white; color: #E30613; border: none; padding: 10px 20px; border-radius: 25px; font-weight: 700; cursor: pointer; text-decoration: none; font-size: 0.9rem; width: 100%; justify-content: center;">';
-        $html .= '<i class="fas fa-crown"></i> Hazte VIP — 9,99€/mes';
-        $html .= '</a>';
-        $html .= '</div>';
-    }
-
-
-
     // Si el usuario actual es el propietario, mostrar menú de edición
     if ($es_propietario) {
         $html .= '<div class="owner-actions-card">';
@@ -575,33 +611,6 @@ function generate_code_detail_page($codigo) {
         </style>';
     }
 
-    // Botón de estadísticas visible para todos (el gráfico es público; el dueño verá además los usuarios)
-    $html .= '<div class="stats-card">';
-    $html .= '<h4><i class="fas fa-chart-bar"></i> Estadísticas</h4>';
-    $html .= '<button class="btn-stats" data-codigo-id="' . htmlspecialchars((string)$code_id, ENT_QUOTES, 'UTF-8') . '" onclick="viewStatsModal(\'' . htmlspecialchars((string)$code_id, ENT_QUOTES, 'UTF-8') . '\'); return false;">';
-    $html .= '<i class="fas fa-chart-line"></i> Ver estadísticas';
-    $html .= '</button>';
-    $html .= '</div>';
-
-
-    // Información adicional
-    $html .= '<div class="code-info-card">';
-    $html .= '<h4><i class="fas fa-shield-alt"></i> Información del código</h4>';
-    $html .= '<div class="info-item">';
-    $html .= '<span class="info-label">Estado:</span>';
-    $html .= '<span class="info-value verified"><i class="fas fa-check-circle"></i> Verificado</span>';
-    $html .= '</div>';
-    $html .= '<div class="info-item">';
-    $html .= '<span class="info-label">Beneficio:</span>';
-    $html .= '<span class="info-value">' . $benefit . '€</span>';
-    $html .= '</div>';
-
-    $html .= '</div>';
-    
-    // Botones de acción
-    $html .= '<div class="action-buttons-card">';
-    
-    // Botón de favoritos (solo si el usuario está logueado)
     // Asegurar que la sesión esté disponible
     if (session_status() === PHP_SESSION_NONE) {
         session_start();
@@ -609,7 +618,7 @@ function generate_code_detail_page($codigo) {
     if (!isset($_SESSION)) {
         session_start();
     }
-    
+
     // Verificar sesión de múltiples formas: $_SESSION, $usuario_actual_id, y $GLOBALS
     $user_id_para_favorito = '';
     if (!empty($usuario_actual_id)) {
@@ -619,7 +628,38 @@ function generate_code_detail_page($codigo) {
     } elseif (isset($GLOBALS['current_user_id']) && !empty($GLOBALS['current_user_id'])) {
         $user_id_para_favorito = trim($GLOBALS['current_user_id']);
     }
-    
+
+    // Calcular stats inline
+    $total_clicks = isset($codigo['totalclicks']) ? (int)$codigo['totalclicks'] : 0;
+    $dias_activo = 0;
+    try {
+        if ($date instanceof MongoDB\BSON\UTCDateTime) {
+            $dias_activo = (int)((time() - $date->toDateTime()->getTimestamp()) / 86400);
+        } elseif ($date instanceof DateTime) {
+            $dias_activo = (int)((time() - $date->getTimestamp()) / 86400);
+        } elseif (is_string($date) && !empty($date)) {
+            $ts = strtotime($date);
+            if ($ts) { $dias_activo = (int)((time() - $ts) / 86400); }
+        }
+    } catch (Exception $e) {}
+    if ($dias_activo < 0) { $dias_activo = 0; }
+
+    // Tarjeta combinada: estadísticas + compartir + favoritos
+    $code_id_attr = htmlspecialchars((string)$code_id, ENT_QUOTES, 'UTF-8');
+    $html .= '<div class="stats-card">';
+    $html .= '<h4><i class="fas fa-chart-bar"></i> Estadísticas</h4>';
+    $html .= '<div class="stats-grid">';
+    $html .= '<div class="stat-item"><div class="stat-lbl"><i class="fas fa-eye"></i> Vistas</div><div class="stat-num">' . number_format($total_clicks, 0, ',', '.') . '</div></div>';
+    $html .= '<div class="stat-item"><div class="stat-lbl"><i class="fas fa-clock"></i> Días activo</div><div class="stat-num">' . $dias_activo . '</div></div>';
+    $html .= '<div class="stat-item stat-highlight"><div class="stat-lbl"><i class="fas fa-coins"></i> Beneficio</div><div class="stat-num">' . htmlspecialchars((string)$benefit, ENT_QUOTES, 'UTF-8') . '€</div></div>';
+    $html .= '</div>';
+    $html .= '<button class="btn-stats" data-codigo-id="' . $code_id_attr . '" onclick="viewStatsModal(\'' . $code_id_attr . '\'); return false;">';
+    $html .= '<i class="fas fa-chart-line"></i> Ver estadísticas detalladas';
+    $html .= '</button>';
+    $html .= '<button class="btn-share-stats" onclick="shareCode()">';
+    $html .= '<i class="fas fa-share-alt"></i> Compartir código';
+    $html .= '</button>';
+
     if (!empty($user_id_para_favorito)) {
         include_once __DIR__ . '/funciones_favoritos.php';
         if (function_exists('es_favorito')) {
@@ -630,1114 +670,789 @@ function generate_code_detail_page($codigo) {
                 $html .= '<i class="fas fa-heart"></i> ' . ($is_favorito ? 'En favoritos' : 'Añadir a favoritos');
                 $html .= '</button>';
             } catch (Exception $e) {
-                // Si hay error, mostrar el botón de todas formas
                 $html .= '<button class="favorite-btn" data-codigo-id="' . htmlspecialchars($code_id) . '" title="Añadir a favoritos">';
                 $html .= '<i class="fas fa-heart"></i> Añadir a favoritos';
                 $html .= '</button>';
             }
         } else {
-            // Si la función no existe, mostrar el botón de todas formas
             $html .= '<button class="favorite-btn" data-codigo-id="' . htmlspecialchars($code_id) . '" title="Añadir a favoritos">';
             $html .= '<i class="fas fa-heart"></i> Añadir a favoritos';
             $html .= '</button>';
         }
     }
-    
-    if (isset($code_info['is_url']) && $code_info['is_url']) {
-        if ($mostrar_reveal) {
-            $html .= '<button class="btn-primary btn-auto-reveal-url" onclick="if(document.querySelector(\'.btn-reveal-code\')){document.querySelector(\'.btn-reveal-code\').click();}">';
-            $html .= '<i class="fas fa-external-link-alt"></i> Ir a la web';
-            $html .= '</button>';
-        } else {
-            $urlTrimmed = trim((string)($code_info['url'] ?? ''));
-            $html .= '<button class="btn-primary" onclick="window.open(\'' . htmlspecialchars($urlTrimmed, ENT_QUOTES, 'UTF-8') . '\', \'_blank\')">';
-            $html .= '<i class="fas fa-external-link-alt"></i> Ir a la web';
-            $html .= '</button>';
-        }
-    } else {
-        $html .= '<button class="btn-primary" onclick="copyCode()">';
-        $html .= '<i class="fas fa-copy"></i> Copiar código';
-        $html .= '</button>';
-    }
-    $html .= '<button class="btn-secondary" onclick="shareCode()">';
-    $html .= '<i class="fas fa-share"></i> Compartir';
-    $html .= '</button>';
     $html .= '</div>';
-    
+
+
     $html .= '</div>'; // col-md-4
     $html .= '</div>'; // row
     $html .= '</div>'; // container
     $html .= '</div>'; // container-fluid
     
-    // Agregar estilos CSS increíbles para el nuevo diseño
+    // Estilos rediseñados — alineados con sistema de tokens v2 (rojo CodigoAmigo)
     $html .= '<style>
-    /* Hero Section */
+    /* ===== Tokens locales (scoped al detalle) ===== */
+    .main_entremedio {
+        --cad-bg: #f5f7fa;
+        --cad-surface: #ffffff;
+        --cad-surface-2: #f8fafc;
+        --cad-border: #e5e7eb;
+        --cad-text: #0f172a;
+        --cad-text-2: #334155;
+        --cad-text-3: #64748b;
+        --cad-brand: #E30613;
+        --cad-brand-2: #b3000f;
+        --cad-brand-soft: #fef2f3;
+        --cad-success: #16a34a;
+        --cad-warning: #f59e0b;
+        --cad-shadow-sm: 0 2px 8px rgba(15,23,42,0.06);
+        --cad-shadow: 0 6px 20px rgba(15,23,42,0.08);
+        --cad-r-md: 12px;
+        --cad-r-lg: 16px;
+        background: var(--cad-bg);
+        color: var(--cad-text);
+        padding-bottom: 32px;
+    }
+
+    /* ===== Hero ===== */
     .code-detail-hero {
-        background: linear-gradient(135deg, #ff8a3d 0%, #ff4f0f 100%);
-        padding: 20px 0;
-        margin-bottom: 30px;
+        background: var(--cad-surface);
+        border-bottom: 1px solid var(--cad-border);
+        padding: 18px 0 22px;
+        margin-bottom: 24px;
     }
-    
-    .breadcrumb-nav {
-        margin-bottom: 15px;
-    }
-    
+
+    .breadcrumb-nav { margin-bottom: 12px; font-size: 13px; }
     .breadcrumb-link {
-        color: rgba(255, 255, 255, 0.8);
+        color: var(--cad-text-3);
         text-decoration: none;
-        font-size: 13px;
-        transition: color 0.3s ease;
+        transition: color .2s ease;
     }
-    
-    .breadcrumb-link:hover {
-        color: white;
-        text-decoration: none;
-    }
-    
-    .breadcrumb-separator {
-        color: rgba(255, 255, 255, 0.6);
-        margin: 0 8px;
-        font-size: 12px;
-    }
-    
-    .breadcrumb-current {
-        color: white;
-        font-weight: 600;
-        font-size: 13px;
-    }
-    
+    .breadcrumb-link:hover { color: var(--cad-brand); text-decoration: none; }
+    .breadcrumb-separator { color: var(--cad-text-3); margin: 0 6px; }
+    .breadcrumb-current { color: var(--cad-text-2); font-weight: 600; }
+
     .code-detail-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
         flex-wrap: wrap;
-        gap: 15px;
+        gap: 14px;
     }
-    
-    .header-left {
-        display: flex;
-        align-items: center;
-        gap: 15px;
-    }
-    
+    .header-left { display: flex; align-items: center; gap: 14px; }
     .brand-logo {
-        width: 50px;
-        height: 50px;
+        width: 56px; height: 56px;
         object-fit: contain;
-        background: white;
-        border-radius: 12px;
-        padding: 8px;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        background: var(--cad-surface);
+        border: 1px solid var(--cad-border);
+        border-radius: var(--cad-r-md);
+        padding: 6px;
     }
-    
     .header-text h1 {
-        color: white;
-        font-size: 1.8rem;
-        font-weight: 700;
-        margin: 0 0 5px 0;
-        text-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        color: var(--cad-text);
+        font-size: 1.5rem;
+        font-weight: 800;
+        margin: 0 0 4px 0;
+        line-height: 1.2;
     }
-    
     .header-subtitle {
-        color: rgba(255, 255, 255, 0.9);
-        font-size: 1rem;
+        color: var(--cad-text-3);
+        font-size: 0.95rem;
         margin: 0 0 8px 0;
     }
-    
-    .featured-badge {
-        background: #E30613;
-        color: white;
-        padding: 4px 12px;
-        border-radius: 15px;
-        font-size: 12px;
-        font-weight: 600;
+    .header-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+    .featured-badge, .verified-badge {
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        box-shadow: 0 4px 10px rgba(227, 6, 19, 0.3);
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
     }
-    
-    .header-actions {
-        display: flex;
-        gap: 10px;
-    }
-    
+    .featured-badge { background: var(--cad-brand); color: #fff; }
+    .verified-badge { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    .verified-badge i { color: var(--cad-success); }
+
     .btn-back, .btn-share {
-        background: rgba(255, 255, 255, 0.2);
-        color: white;
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        padding: 8px 16px;
-        border-radius: 20px;
+        background: var(--cad-surface);
+        color: var(--cad-text-2);
+        border: 1px solid var(--cad-border);
+        padding: 8px 14px;
+        border-radius: 999px;
         font-weight: 600;
-        font-size: 0.9rem;
-        transition: all 0.3s ease;
+        font-size: 0.85rem;
         cursor: pointer;
-        backdrop-filter: blur(10px);
+        transition: all .2s ease;
     }
-    
     .btn-back:hover, .btn-share:hover {
-        background: white;
-        color: #ff4f0f;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        border-color: var(--cad-brand);
+        color: var(--cad-brand);
+        background: var(--cad-brand-soft);
     }
-    
-    /* Main Content */
-    .code-main-card {
-        background: white;
-        border-radius: 20px;
-        padding: 40px;
-        margin-bottom: 30px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
-        border: 1px solid #f0f0f0;
+
+    /* ===== Cards comunes ===== */
+    .code-main-card,
+    .code-description-card,
+    .how-to-use-card,
+    .pdf-carousel-card,
+    .user-info-card,
+    .owner-actions-card,
+    .stats-card,
+    .action-buttons-card {
+        background: var(--cad-surface);
+        border: 1px solid var(--cad-border);
+        border-radius: var(--cad-r-lg);
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: var(--cad-shadow-sm);
     }
-    
-    .code-benefit-display {
-        text-align: center;
-        margin-bottom: 40px;
-        padding: 30px;
-        background: linear-gradient(135deg, #ff7a18, #ff4f0f);
-        border-radius: 20px;
-        color: white;
-    }
-    
-    .benefit-amount {
-        font-size: 4rem;
-        font-weight: 800;
-        line-height: 1;
-        margin-bottom: 10px;
-        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-    }
-    
-    .benefit-label {
-        font-size: 1.2rem;
-        font-weight: 600;
-        opacity: 0.9;
-    }
-    
-    .code-display-container h3 {
-        color: #333;
-        font-size: 1.5rem;
+
+    .code-main-card h3,
+    .code-description-card h3,
+    .how-to-use-card h3,
+    .pdf-carousel-card h3,
+    .user-info-card h4,
+    .owner-actions-card h4,
+    .stats-card h4 {
+        color: var(--cad-text);
+        font-size: 1.1rem;
         font-weight: 700;
-        margin-bottom: 25px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    
-    .code-text {
-        font-family: "Courier New", monospace;
-        font-size: 2.5rem;
-        font-weight: 800;
-        letter-spacing: 4px;
-        text-align: center;
-        padding: 40px;
-        background: linear-gradient(135deg, #2b1f36, #3b2740);
-        color: white;
-        border-radius: 20px;
-        box-shadow: 0 15px 40px rgba(44, 62, 80, 0.3);
-        border: 3px solid #ff7a18;
-        margin-bottom: 30px;
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .code-text::before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-        animation: shine 3s infinite;
-    }
-    
-    @keyframes shine {
-        0% { left: -100%; }
-        100% { left: 100%; }
-    }
-    
-    .code-url-section {
-        background: #f8f9fa;
-        border-radius: 15px;
-        padding: 25px;
-        margin-bottom: 30px;
-        border: 2px solid #e9ecef;
-    }
-
-    /* Cuando es una URL, ocultar elementos innecesarios */
-    .code-display-container.code-is-url .code-text {
-        display: none !important;
-    }
-
-    .code-display-container.code-is-url > .btn-copy-code {
-        display: none !important;
-    }
-    
-    .url-label {
-        color: #666;
-        font-weight: 600;
-        margin-bottom: 15px;
+        margin: 0 0 18px 0;
         display: flex;
         align-items: center;
         gap: 8px;
     }
-    
+    .code-main-card h3 i,
+    .code-description-card h3 i,
+    .how-to-use-card h3 i,
+    .pdf-carousel-card h3 i,
+    .user-info-card h4 i,
+    .owner-actions-card h4 i,
+    .stats-card h4 i { color: var(--cad-brand); }
+
+    /* ===== Beneficio destacado ===== */
+    .code-benefit-display {
+        text-align: center;
+        margin-bottom: 24px;
+        padding: 22px;
+        background: linear-gradient(135deg, var(--cad-brand), var(--cad-brand-2));
+        border-radius: var(--cad-r-lg);
+        color: #fff;
+    }
+    .benefit-amount {
+        font-size: 3rem;
+        font-weight: 900;
+        line-height: 1;
+        margin-bottom: 6px;
+    }
+    .benefit-label {
+        font-size: 0.95rem;
+        font-weight: 600;
+        opacity: 0.95;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* ===== Código ===== */
+    .code-text {
+        font-family: "SF Mono", "Courier New", monospace;
+        font-size: 1.8rem;
+        font-weight: 800;
+        letter-spacing: 3px;
+        text-align: center;
+        padding: 26px 18px;
+        background: var(--cad-surface-2);
+        color: var(--cad-text);
+        border: 2px dashed var(--cad-brand);
+        border-radius: var(--cad-r-md);
+        margin-bottom: 18px;
+        word-break: break-all;
+    }
+
+    .code-url-section {
+        background: var(--cad-surface-2);
+        border: 1px solid var(--cad-border);
+        border-radius: var(--cad-r-md);
+        padding: 18px;
+        margin-bottom: 18px;
+    }
+    .code-display-container.code-is-url .code-text { display: none !important; }
+    .code-display-container.code-is-url > .btn-copy-code { display: none !important; }
+
+    .url-label {
+        color: var(--cad-text-2);
+        font-weight: 600;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.9rem;
+    }
     .code-url-link {
         display: flex;
         align-items: center;
         gap: 10px;
-        color: #E30613;
+        color: var(--cad-brand);
         text-decoration: none;
-        padding: 15px 20px;
-        background: white;
-        border: 2px solid #E30613;
-        border-radius: 12px;
+        padding: 12px 16px;
+        background: var(--cad-surface);
+        border: 1px solid var(--cad-brand);
+        border-radius: var(--cad-r-md);
         font-weight: 600;
-        transition: all 0.3s ease;
+        transition: all .2s ease;
         word-break: break-all;
     }
-    
     .code-url-link:hover {
-        background: #E30613;
-        color: white;
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(227, 6, 19, 0.3);
+        background: var(--cad-brand);
+        color: #fff;
+        text-decoration: none;
     }
-    
+
     .btn-copy-code {
-        background: linear-gradient(135deg, #28a745, #20c997);
-        color: white;
+        background: var(--cad-brand);
+        color: #fff;
         border: none;
-        padding: 20px 40px;
-        border-radius: 15px;
-        font-size: 1.2rem;
+        padding: 14px 24px;
+        border-radius: var(--cad-r-md);
+        font-size: 1rem;
         font-weight: 700;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: all .2s ease;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 10px;
+        gap: 8px;
         width: 100%;
-        box-shadow: 0 10px 30px rgba(40, 167, 69, 0.3);
     }
-    
-    .btn-copy-code:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 15px 40px rgba(40, 167, 69, 0.4);
+    .btn-copy-code:hover { background: var(--cad-brand-2); transform: translateY(-1px); }
+
+    /* ===== Reveal ===== */
+    .code-reveal-wrapper { position: relative; margin-bottom: 18px; }
+    .code-blurred {
+        padding: 26px 18px;
+        background: var(--cad-surface-2);
+        border: 2px dashed var(--cad-border);
+        border-radius: var(--cad-r-md);
+        text-align: center;
+        filter: blur(6px);
+        user-select: none;
     }
-    
-    /* Cards */
-    .code-description-card, .how-to-use-card {
-        background: white;
-        border-radius: 20px;
-        padding: 40px;
-        margin-bottom: 30px;
-        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08);
-        border: 1px solid #f0f0f0;
+    .code-text-blurred, .code-url-blurred {
+        font-family: "SF Mono", "Courier New", monospace;
+        font-size: 1.8rem;
+        font-weight: 800;
+        letter-spacing: 3px;
+        color: var(--cad-text);
     }
-    
-    .code-description-card h3, .how-to-use-card h3 {
-        color: #333;
-        font-size: 1.5rem;
+    .btn-reveal-code {
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        background: var(--cad-brand);
+        color: #fff;
+        border: none;
+        padding: 12px 26px;
+        border-radius: 999px;
         font-weight: 700;
-        margin-bottom: 25px;
+        cursor: pointer;
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
+        box-shadow: 0 8px 22px rgba(227,6,19,0.35);
+        transition: all .2s ease;
     }
-    
+    .btn-reveal-code:hover { background: var(--cad-brand-2); transform: translate(-50%, -50%) scale(1.04); }
+
+    /* ===== Descripción ===== */
     .code-description-card p {
-        color: #666;
-        font-size: 1.1rem;
-        line-height: 1.8;
+        color: var(--cad-text-2);
+        font-size: 1rem;
+        line-height: 1.7;
         margin: 0;
     }
-    
-    .steps-container {
-        display: flex;
-        flex-direction: column;
-        gap: 25px;
-    }
-    
-    .step-item {
-        display: flex;
-        align-items: flex-start;
-        gap: 20px;
-    }
-    
+
+    /* ===== Pasos ===== */
+    .steps-container { display: flex; flex-direction: column; gap: 16px; }
+    .step-item { display: flex; align-items: flex-start; gap: 14px; }
     .step-number {
-        background: linear-gradient(135deg, #E30613, #FF4D4D);
-        color: white;
-        width: 50px;
-        height: 50px;
+        background: var(--cad-brand-soft);
+        color: var(--cad-brand);
+        width: 36px; height: 36px;
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
         font-weight: 800;
-        font-size: 1.2rem;
+        font-size: 1rem;
         flex-shrink: 0;
-        box-shadow: 0 8px 20px rgba(227, 6, 19, 0.3);
+        border: 2px solid var(--cad-brand);
     }
-    
     .step-content h4 {
-        color: #333;
-        font-size: 1.2rem;
+        color: var(--cad-text);
+        font-size: 1rem;
         font-weight: 700;
-        margin: 0 0 8px 0;
+        margin: 0 0 4px 0;
     }
-    
     .step-content p {
-        color: #666;
+        color: var(--cad-text-3);
         margin: 0;
-        line-height: 1.6;
-    }
-    
-    /* Sidebar */
-    .user-info-card, .code-info-card, .action-buttons-card, .owner-actions-card, .stats-card {
-        background: white;
-        border-radius: 20px;
-        padding: 30px;
-        margin-bottom: 25px;
-        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08);
-        border: 1px solid #f0f0f0;
+        line-height: 1.5;
+        font-size: 0.92rem;
     }
 
-    .owner-actions-card h4, .stats-card h4 {
-        color: #333;
-        font-size: 1.3rem;
-        font-weight: 700;
-        margin-bottom: 20px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-
-    .owner-buttons {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    .btn-edit, .btn-delete, .btn-stats, .btn-highlight {
-        padding: 12px 20px;
-        border-radius: 10px;
-        font-weight: 600;
-        font-size: 0.9rem;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        border: none;
-        text-align: left;
-    }
-
-    .btn-edit {
-        background: linear-gradient(135deg, #007bff, #0056b3);
-        color: white;
-    }
-
-    .btn-edit:hover {
-        background: linear-gradient(135deg, #0056b3, #004085);
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(0, 123, 255, 0.3);
-    }
-
-    .btn-delete {
-        background: linear-gradient(135deg, #dc3545, #c82333);
-        color: white;
-    }
-
-    .btn-delete:hover {
-        background: linear-gradient(135deg, #c82333, #a71e2a);
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(220, 53, 69, 0.3);
-    }
-
-    .btn-stats {
-        background: linear-gradient(135deg, #28a745, #20c997);
-        color: white;
-        width: 100%;
-    }
-    
-    .stats-card .btn-stats {
-        width: 100%;
-        justify-content: center;
-    }
-    .btn-highlight {
-        background: linear-gradient(135deg, #ff9800, #f57c00);
-        color: white;
-        text-decoration: none;
-        justify-content: flex-start;
-        font-size: 1rem;
-        padding: 14px 22px;
-        box-shadow: 0 10px 25px rgba(255,152,0,0.25);
-    }
-
-    .btn-highlight:hover {
-        background: linear-gradient(135deg, #F57C00, #E65100);
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(255, 152, 0, 0.3);
-        color: white;
-        text-decoration: none;
-    }
-
-    .btn-promocion {
-        background: linear-gradient(135deg, #E30613, #C40510) !important;
-        color: white !important;
-        text-decoration: none;
-        justify-content: flex-start;
-        font-size: 1rem;
-        padding: 14px 22px;
-        box-shadow: 0 10px 25px rgba(227, 6, 19, 0.3);
-        border: none;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        text-align: left;
-        font-weight: 600;
-    }
-
-    .btn-promocion:hover {
-        background: linear-gradient(135deg, #C40510, #D4491A) !important;
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(227, 6, 19, 0.4);
-        color: white !important;
-        text-decoration: none;
-    }
-
-    .btn-promocion i {
-        color: white !important;
-    }
-
-    .btn-stats:hover {
-        background: linear-gradient(135deg, #20c997, #1dd1a1);
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(40, 167, 69, 0.3);
-    }
-    
-    .user-info-card h4, .code-info-card h4 {
-        color: #333;
-        font-size: 1.3rem;
-        font-weight: 700;
-        margin-bottom: 20px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    
+    /* ===== Usuario ===== */
     .user-profile {
         display: flex;
         align-items: center;
-        gap: 15px;
-        margin-bottom: 20px;
+        gap: 12px;
+        margin-bottom: 12px;
     }
-    
-    .btn-chat-user {
-        width: 100%;
-        margin-top: 15px; /* Separación añadida */
-        background: linear-gradient(135deg, #0d6efd, #0b5ed7);
-        color: white;
-        border: none;
-        padding: 12px 20px;
-        border-radius: 12px;
-        font-weight: 600;
-        font-size: 0.95rem;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        box-shadow: 0 4px 15px rgba(13, 110, 253, 0.2);
-    }
-    
-    .btn-chat-user:hover {
-        background: linear-gradient(135deg, #0b5ed7, #0a58ca);
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(13, 110, 253, 0.3);
-    }
-    
-    .btn-chat-user i {
-        font-size: 1rem;
-    }
-    
     .user-avatar {
-        width: 60px;
-        height: 60px;
+        width: 52px; height: 52px;
         border-radius: 50%;
         overflow: hidden;
         flex-shrink: 0;
-        background: #f8f9fa;
+        background: var(--cad-surface-2);
+        border: 2px solid var(--cad-border);
         display: flex;
         align-items: center;
         justify-content: center;
-        border: 2px solid #e9ecef;
     }
-    
-    .user-avatar img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-    
+    .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
     .user-avatar-placeholder {
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(135deg, #E30613, #FF4D4D);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 1.5rem;
-        font-weight: 700;
+        width: 100%; height: 100%;
+        background: var(--cad-brand);
+        display: flex; align-items: center; justify-content: center;
+        color: #fff; font-size: 1.2rem; font-weight: 700;
     }
-    
+    .user-details { min-width: 0; }
+    .user-profile a,
+    .user-profile a:hover,
+    .user-profile a:visited { color: var(--cad-text) !important; text-decoration: none !important; }
     .user-name {
-        color: #ffffff !important;
+        color: var(--cad-text) !important;
         background: transparent !important;
         font-weight: 700;
-        font-size: 1.1rem;
-        margin-bottom: 4px;
+        font-size: 1rem;
+        margin-bottom: 2px;
         line-height: 1.2;
     }
-    
-    .user-date {
-        color: #6c757d;
-        font-size: 0.9rem;
-        font-size: 0.9rem;
+    .user-date { color: var(--cad-text-3) !important; font-size: 0.85rem; }
+    .description-body p { color: var(--cad-text-2); font-size: 1rem; line-height: 1.7; margin: 0 0 12px 0; }
+    .description-body p:last-child { margin-bottom: 0; }
+    .description-body a { color: var(--cad-brand); text-decoration: underline; word-break: break-all; }
+
+    /* ===== Promo chat integrada ===== */
+    .integrated-promo-box {
+        margin-top: 14px;
+        padding: 14px;
+        background: var(--cad-brand-soft);
+        border-radius: var(--cad-r-md);
+        border-left: 3px solid var(--cad-brand);
     }
-    
-    .info-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px 0;
-        border-bottom: 1px solid #f0f0f0;
-    }
-    
-    .info-item:last-child {
-        border-bottom: none;
-    }
-    
-    .info-label {
-        color: #666;
-        font-weight: 600;
-    }
-    
-    .info-value {
-        color: #333;
+    .integrated-promo-box .promo-header {
         font-weight: 700;
-    }
-    
-    .info-value.verified {
-        color: #28a745;
+        color: var(--cad-brand);
+        font-size: 0.98rem;
+        margin-bottom: 6px;
         display: flex;
         align-items: center;
-        gap: 5px;
+        gap: 6px;
     }
-    
-    .btn-primary, .btn-secondary, .favorite-btn {
+    .integrated-promo-box .promo-desc {
+        font-size: 0.88rem;
+        color: var(--cad-text-2);
+        line-height: 1.45;
+        margin: 0;
+    }
+    .integrated-promo-box .promo-desc strong { color: var(--cad-text); }
+
+    .chat-incentive-wrapper { width: 100%; }
+    .btn-chat-user {
         width: 100%;
-        padding: 15px 25px;
-        border-radius: 12px;
+        background: var(--cad-brand);
+        color: #fff;
+        border: none;
+        padding: 11px 18px;
+        border-radius: var(--cad-r-md);
         font-weight: 700;
-        font-size: 1rem;
+        font-size: 0.95rem;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: all .2s ease;
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 8px;
-        margin-bottom: 15px;
-        border: none;
     }
-    
-    .favorite-btn {
-        background: #f8f9fa !important;
-        border: 2px solid #ddd !important;
-        color: #666 !important;
-        /* Forzar estilo de botón pill (anular estilo circular de JS) */
-        width: 100% !important;
-        height: auto !important;
-        border-radius: 12px !important;
-        display: flex !important;
-        justify-content: center !important;
-        padding: 15px 25px !important;
-        margin-bottom: 25px !important;
+    .btn-chat-user:hover { background: var(--cad-brand-2); transform: translateY(-1px); }
+    .pulse-chat { animation: cad-pulse 2.4s infinite; }
+    @keyframes cad-pulse {
+        0% { box-shadow: 0 0 0 0 rgba(227,6,19,0.45); }
+        70% { box-shadow: 0 0 0 12px rgba(227,6,19,0); }
+        100% { box-shadow: 0 0 0 0 rgba(227,6,19,0); }
     }
-    
-    .favorite-btn i {
-        font-size: 16px !important;
-        color: inherit !important;
-        font-weight: 900 !important;
-        margin-right: 8px !important; /* Añadir espacio entre icono y texto */
-    }
-    
-    .favorite-btn:hover {
-        border-color: #E30613 !important;
-        color: #E30613 !important;
-        background: rgba(227, 6, 19, 0.1) !important;
-        transform: translateY(-2px) !important;
-    }
-    
-    .favorite-btn.active {
-        background: linear-gradient(135deg, #E30613, #FF4D4D) !important;
-        border-color: #E30613 !important;
-        color: white !important;
-        box-shadow: 0 8px 25px rgba(227, 6, 19, 0.3) !important;
-    }
-    
-    .favorite-btn.active i {
-        color: white !important;
-    }
-    
-    .favorite-btn.active:hover {
-        background: linear-gradient(135deg, #C40510, #E30613) !important;
-        border-color: #C40510 !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 12px 35px rgba(227, 6, 19, 0.4) !important;
-    }
-    
-    .btn-primary {
-        background: linear-gradient(135deg, #E30613, #FF4D4D);
-        color: white;
-        box-shadow: 0 8px 25px rgba(227, 6, 19, 0.3);
-    }
-    
-    .btn-primary:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 12px 35px rgba(227, 6, 19, 0.4);
-    }
-    
-    .btn-secondary {
-        background: #f8f9fa;
-        color: #333;
-        border: 2px solid #e9ecef;
-    }
-    
-    .btn-secondary:hover {
-        background: #e9ecef;
-        transform: translateY(-2px);
-    }
-    
-    /* PDF Carousel Styles */
-    .pdf-carousel-card {
-        background: white;
-        border-radius: 20px;
-        padding: 40px;
-        margin-bottom: 30px;
-        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08);
-        border: 1px solid #f0f0f0;
-    }
-    
-    .pdf-carousel-card h3 {
-        color: #333;
-        font-size: 1.5rem;
-        font-weight: 700;
-        margin-bottom: 25px;
+
+    /* ===== Acciones owner ===== */
+    .owner-buttons { display: flex; flex-direction: column; gap: 10px; }
+    .btn-edit, .btn-stats, .btn-highlight, .btn-promocion, .btn-delete {
+        padding: 11px 16px;
+        border-radius: var(--cad-r-md);
+        font-weight: 600;
+        font-size: 0.92rem;
+        cursor: pointer;
+        transition: all .2s ease;
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
+        border: 1px solid transparent;
+        text-decoration: none;
+        text-align: left;
     }
-    
-    .pdf-carousel-container {
-        position: relative;
+    .btn-highlight {
+        background: var(--cad-warning);
+        color: #fff;
+        justify-content: flex-start;
+    }
+    .btn-highlight:hover { background: #d97706; color: #fff; text-decoration: none; transform: translateY(-1px); }
+
+    .btn-promocion {
+        background: var(--cad-brand) !important;
+        color: #fff !important;
+        justify-content: flex-start;
+    }
+    .btn-promocion:hover { background: var(--cad-brand-2) !important; color: #fff !important; text-decoration: none; transform: translateY(-1px); }
+
+    .btn-edit {
+        background: var(--cad-surface);
+        color: var(--cad-text-2);
+        border-color: var(--cad-border);
+        justify-content: flex-start;
+    }
+    .btn-edit:hover { background: var(--cad-surface-2); color: var(--cad-text); text-decoration: none; border-color: var(--cad-text-3); }
+
+    .btn-delete {
+        background: var(--cad-surface);
+        color: #dc2626;
+        border-color: #fecaca;
+        justify-content: flex-start;
+    }
+    .btn-delete:hover { background: #fef2f2; color: #b91c1c; border-color: #dc2626; }
+
+    /* ===== Stats ===== */
+    .stats-card { padding: 20px !important; }
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 14px;
+    }
+    .stat-item {
+        background: var(--cad-surface-2);
+        border-radius: var(--cad-r-md);
+        padding: 12px 6px;
+        text-align: center;
+        border: 1px solid var(--cad-border);
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-width: 0;
+    }
+    .stat-item .stat-lbl {
+        font-size: 0.65rem;
+        color: var(--cad-text-3);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.2px;
+        margin-bottom: 6px;
         width: 100%;
-        max-width: 100%;
-        margin: 0 auto;
+        text-align: center;
     }
-    
+    .stat-item .stat-lbl i { margin-right: 3px; }
+    .stat-item .stat-num {
+        font-size: clamp(1.1rem, 2.4vw, 1.5rem);
+        font-weight: 800;
+        color: var(--cad-text);
+        line-height: 1.05;
+        width: 100%;
+        text-align: center;
+        word-break: break-word;
+    }
+    .stat-item.stat-highlight {
+        background: var(--cad-brand-soft);
+        border-color: var(--cad-brand);
+    }
+    .stat-item.stat-highlight .stat-num,
+    .stat-item.stat-highlight .stat-lbl,
+    .stat-item.stat-highlight .stat-lbl i { color: var(--cad-brand); }
+
+    .btn-stats {
+        background: var(--cad-text);
+        color: #fff;
+        width: 100%;
+        justify-content: center;
+        border: none;
+    }
+    .btn-stats:hover { background: #1e293b; transform: translateY(-1px); }
+
+    .btn-share-stats {
+        width: 100%;
+        margin-top: 10px;
+        padding: 11px 16px;
+        border-radius: var(--cad-r-md);
+        border: 1px solid var(--cad-brand);
+        background: var(--cad-surface);
+        color: var(--cad-brand);
+        font-weight: 700;
+        font-size: 0.92rem;
+        cursor: pointer;
+        transition: all .2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+    .btn-share-stats:hover { background: var(--cad-brand); color: #fff; }
+
+    /* ===== Favorito ===== */
+    .favorite-btn {
+        width: 100% !important;
+        height: auto !important;
+        margin-top: 10px !important;
+        margin-bottom: 0 !important;
+        padding: 11px 16px !important;
+        border-radius: var(--cad-r-md) !important;
+        background: var(--cad-surface) !important;
+        border: 1px solid var(--cad-border) !important;
+        color: var(--cad-text-2) !important;
+        font-weight: 600 !important;
+        font-size: 0.92rem !important;
+        cursor: pointer;
+        transition: all .2s ease;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 8px;
+    }
+    .favorite-btn i { font-size: 14px !important; color: inherit !important; margin-right: 6px !important; }
+    .favorite-btn:hover {
+        border-color: var(--cad-brand) !important;
+        color: var(--cad-brand) !important;
+        background: var(--cad-brand-soft) !important;
+    }
+    .favorite-btn.active {
+        background: var(--cad-brand) !important;
+        border-color: var(--cad-brand) !important;
+        color: #fff !important;
+    }
+    .favorite-btn.active i { color: #fff !important; }
+    .favorite-btn.active:hover { background: var(--cad-brand-2) !important; border-color: var(--cad-brand-2) !important; }
+
+    /* ===== Botones principales ===== */
+    .action-buttons-card { padding: 16px; }
+    .btn-primary {
+        width: 100%;
+        padding: 13px 22px;
+        border-radius: var(--cad-r-md);
+        font-weight: 700;
+        font-size: 0.98rem;
+        cursor: pointer;
+        transition: all .2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border: none;
+        background: var(--cad-brand);
+        color: #fff;
+    }
+    .btn-primary:hover { background: var(--cad-brand-2); transform: translateY(-1px); }
+
+    .btn-secondary {
+        width: 100%;
+        padding: 13px 22px;
+        border-radius: var(--cad-r-md);
+        font-weight: 700;
+        background: var(--cad-surface-2);
+        color: var(--cad-text-2);
+        border: 1px solid var(--cad-border);
+    }
+    .btn-secondary:hover { background: var(--cad-border); }
+
+    /* ===== PDF Carousel ===== */
+    .pdf-carousel-container { position: relative; }
     .pdf-carousel-wrapper {
         position: relative;
         display: flex;
         align-items: center;
         justify-content: center;
         overflow: hidden;
-        background: #f8f9fa;
-        border-radius: 15px;
-        padding: 20px;
-        min-height: 500px;
+        background: var(--cad-surface-2);
+        border-radius: var(--cad-r-md);
+        padding: 16px;
+        min-height: 400px;
     }
-    
-    .pdf-pages-container {
-        position: relative;
-        width: 100%;
-        max-width: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-    }
-    
-    .pdf-page-item {
-        display: none;
-        width: 100%;
-        text-align: center;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-    }
-    
-    .pdf-page-item.active {
-        display: block;
-        opacity: 1;
-    }
-    
+    .pdf-pages-container { width: 100%; display: flex; align-items: center; justify-content: center; }
+    .pdf-page-item { display: none; width: 100%; text-align: center; opacity: 0; transition: opacity .25s ease; }
+    .pdf-page-item.active { display: block; opacity: 1; }
     .pdf-page-image {
-        max-width: 100%;
-        height: auto;
-        border-radius: 10px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-        margin: 0 auto;
-        display: block;
-        max-height: 600px;
-        object-fit: contain;
+        max-width: 100%; height: auto;
+        border-radius: var(--cad-r-md);
+        box-shadow: var(--cad-shadow);
+        margin: 0 auto; display: block;
+        max-height: 560px; object-fit: contain;
     }
-    
-    .pdf-page-number {
-        margin-top: 15px;
-        color: #666;
-        font-size: 0.9rem;
-        font-weight: 600;
-    }
-    
+    .pdf-page-number { margin-top: 12px; color: var(--cad-text-3); font-size: 0.85rem; font-weight: 600; }
     .pdf-carousel-btn {
         position: absolute;
         top: 50%;
         transform: translateY(-50%);
-        background: white;
-        color: #666;
-        border: 1px solid #ddd;
-        width: 60px;
-        height: 60px;
+        background: var(--cad-surface);
+        color: var(--cad-text-2);
+        border: 1px solid var(--cad-border);
+        width: 44px; height: 44px;
         border-radius: 50%;
         cursor: pointer;
-        font-size: 1.5rem;
+        font-size: 1.1rem;
         display: flex;
         align-items: center;
         justify-content: center;
-        z-index: 100;
-        transition: all 0.3s ease;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-        opacity: 0.9;
+        z-index: 5;
+        transition: all .2s ease;
     }
-    
-    .pdf-carousel-btn:hover {
-        background: #f3f2ef;
-        color: #0a66c2;
-        border-color: #0a66c2;
-        transform: translateY(-50%) scale(1.05);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        opacity: 1;
-    }
-    
-    .pdf-carousel-btn:active {
-        transform: translateY(-50%) scale(0.95);
-    }
-    
-    .pdf-carousel-prev {
-        left: 15px;
-    }
-    
-    .pdf-carousel-next {
-        right: 15px;
-    }
-    
-    .pdf-carousel-wrapper:hover .pdf-carousel-btn {
-        opacity: 1;
-    }
-    
+    .pdf-carousel-btn:hover { background: var(--cad-brand); color: #fff; border-color: var(--cad-brand); }
+    .pdf-carousel-prev { left: 12px; }
+    .pdf-carousel-next { right: 12px; }
+
     .pdf-carousel-indicators {
         display: flex;
         justify-content: center;
-        gap: 8px;
-        margin-top: 25px;
-        padding: 15px;
-        background: #f8f9fa;
-        border-radius: 10px;
+        gap: 6px;
+        margin-top: 18px;
         flex-wrap: wrap;
     }
-    
     .pdf-indicator {
-        width: 8px;
-        height: 8px;
+        width: 8px; height: 8px;
         border-radius: 50%;
-        background: #c4c4c4;
+        background: var(--cad-border);
         cursor: pointer;
-        transition: all 0.3s ease;
-        border: 2px solid transparent;
+        transition: all .2s ease;
     }
-    
-    .pdf-indicator:hover {
-        background: #0a66c2;
-        transform: scale(1.3);
-        border-color: rgba(10, 102, 194, 0.3);
-    }
-    
-    .pdf-indicator.active {
-        background: #0a66c2;
-        width: 24px;
-        border-radius: 4px;
-        border-color: transparent;
-    }
-    
-    /* Contador de páginas estilo LinkedIn */
+    .pdf-indicator:hover { background: var(--cad-brand); transform: scale(1.2); }
+    .pdf-indicator.active { background: var(--cad-brand); width: 22px; border-radius: 4px; }
+
     .pdf-page-counter {
         position: absolute;
-        bottom: 20px;
-        right: 20px;
-        background: rgba(0, 0, 0, 0.7);
-        color: white;
-        padding: 8px 16px;
-        border-radius: 20px;
-        font-size: 0.9rem;
+        bottom: 14px; right: 14px;
+        background: rgba(15,23,42,0.78);
+        color: #fff;
+        padding: 5px 12px;
+        border-radius: 999px;
+        font-size: 0.8rem;
         font-weight: 600;
-        z-index: 50;
-        backdrop-filter: blur(10px);
+        backdrop-filter: blur(6px);
     }
-    
-    /* Responsive */
-    @media (max-width: 768px) {
-        .breadcrumb-nav {
-            display: none;
-        }
 
-        .code-detail-header {
-            flex-direction: column;
-            text-align: center;
-        }
-        
-        .header-left {
-            flex-direction: column;
-            text-align: center;
-        }
-        
-        .header-text h1 {
-            font-size: 2rem;
-        }
-        
-        .code-benefit-display {
-            padding: 20px;
-            margin-bottom: 25px;
-        }
-        
-        .benefit-amount {
-            font-size: 3rem;
-        }
-        
-        .code-text {
-            font-size: 1.8rem;
-            padding: 30px 20px;
-            letter-spacing: 2px;
-        }
-        
-        .code-main-card, .code-description-card, .how-to-use-card {
-            padding: 25px;
-        }
-        
-        .user-info-card, .code-info-card, .action-buttons-card {
-            padding: 20px;
-        }
-    }
-    
-    @media (max-width: 480px) {
-        .code-detail-hero {
-            padding: 20px 0;
-        }
-        
-        .code-main-card, .code-description-card, .how-to-use-card {
-            padding: 15px;
-        }
-        
-        .header-text h1 {
-            font-size: 1.5rem;
-        }
-        
-        .code-benefit-display {
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-        
-        .benefit-amount {
-            font-size: 2rem;
-            margin-bottom: 5px;
-        }
-        
-        .benefit-label {
-            font-size: 1rem;
-        }
-        
-        .code-text {
-            font-size: 1.5rem;
-            padding: 25px 15px;
-            letter-spacing: 1px;
-        }
-        
-        .step-item {
-            flex-direction: column;
-            text-align: center;
-        }
-        
-        .pdf-carousel-card {
-            padding: 20px;
-        }
-        
-        .pdf-carousel-wrapper {
-            min-height: 400px;
-            padding: 10px;
-        }
-        
-        .pdf-page-image {
-            max-height: 400px;
-        }
-        
-        .pdf-carousel-btn {
-            width: 48px;
-            height: 48px;
-            font-size: 1.2rem;
-        }
-        
-        .pdf-carousel-prev {
-            left: 10px;
-        }
-        
-        .pdf-carousel-next {
-            right: 10px;
-        }
-        
-        .pdf-page-counter {
-            bottom: 10px;
-            right: 10px;
-            font-size: 0.8rem;
-            padding: 6px 12px;
-        }
-    }
-    /* Help Awareness Card */
+    /* ===== Help awareness (legacy, mantenido) ===== */
     .help-awareness-card {
-        background: #fff;
-        border-radius: 20px;
-        padding: 25px;
-        margin-bottom: 25px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-        border: 1px solid #f0f0f0;
-        border-left: 5px solid #ff7a18;
+        background: var(--cad-surface);
+        border-radius: var(--cad-r-lg);
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid var(--cad-border);
+        border-left: 4px solid var(--cad-brand);
     }
-    
     .help-awareness-card h4 {
-        color: #333;
-        font-size: 1.2rem;
-        font-weight: 700;
-        margin-bottom: 15px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    
-    .help-awareness-card p {
-        font-size: 0.95rem;
-        color: #666 !important;
-        line-height: 1.5;
-        margin-bottom: 15px;
-        background: transparent !important;
-    }
-    
-    .help-status-logged {
-        background: #e8f5e9;
-        color: #2e7d32;
-        padding: 12px;
-        border-radius: 12px;
-        font-size: 0.9rem;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    
-    .help-promo-box {
-        background: #fff8f1;
-        border: 1px dashed #ffb74d;
-        padding: 15px;
-        border-radius: 15px;
-        text-align: center;
-    }
-    
-    .help-promo-box p {
-        margin-bottom: 10px !important;
-        color: #e65100 !important;
-    }
-    
-    .btn-help-login {
-        background: #ff7a18;
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 12px;
-        font-weight: 600;
-        width: 100%;
-        transition: all 0.3s ease;
-        margin-top: 5px;
-        cursor: pointer;
-    }
-    
-    .btn-help-login:hover {
-        background: #ff4f0f;
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(255, 122, 24, 0.3);
-    }
-    /* Estilos nuevos para la caja de promoción integrada */
-    .integrated-promo-box {
-        margin-top: 20px;
-        padding: 15px;
-        background: rgba(255, 122, 24, 0.05); /* Muy sutil fondo naranja */
-        border-radius: 12px;
-        border-left: 4px solid #E30613; /* Borde izquierdo destacado */
-    }
-
-    .integrated-promo-box .promo-header {
-        font-weight: 700;
-        color: #E30613;
+        color: var(--cad-text);
         font-size: 1.05rem;
-        margin-bottom: 8px;
+        font-weight: 700;
+        margin-bottom: 12px;
         display: flex;
         align-items: center;
         gap: 8px;
     }
-
-    .integrated-promo-box .promo-desc {
-        font-size: 0.9rem;
-        color: #555;
-        line-height: 1.4;
-        margin: 0;
+    .help-awareness-card p {
+        font-size: 0.92rem;
+        color: var(--cad-text-2) !important;
+        line-height: 1.5;
+        margin-bottom: 12px;
+        background: transparent !important;
     }
-    
-    .integrated-promo-box .promo-desc strong {
-        color: #333;
+    .help-status-logged {
+        background: #f0fdf4;
+        color: #166534;
+        padding: 10px 12px;
+        border-radius: var(--cad-r-md);
+        font-size: 0.88rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
-
-    /* Incentivos de Chat Styles */
-    .chat-incentive-wrapper {
-        position: relative;
+    .help-promo-box {
+        background: var(--cad-brand-soft);
+        border: 1px dashed var(--cad-brand);
+        padding: 14px;
+        border-radius: var(--cad-r-md);
+        text-align: center;
+    }
+    .help-promo-box p { margin-bottom: 8px !important; color: var(--cad-brand-2) !important; }
+    .btn-help-login {
+        background: var(--cad-brand);
+        color: #fff;
+        border: none;
+        padding: 10px 18px;
+        border-radius: var(--cad-r-md);
+        font-weight: 700;
         width: 100%;
+        cursor: pointer;
+        transition: all .2s ease;
+    }
+    .btn-help-login:hover { background: var(--cad-brand-2); }
+
+    /* ===== VIP badge ===== */
+    .vip-badge-gold {
+        background: linear-gradient(135deg, #fbbf24, #f59e0b);
+        color: #1e3a5f;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-weight: 700;
     }
 
-    .pulse-chat {
-        animation: pulse-blue 2s infinite;
-        background: #007bff !important;
-        font-weight: 700 !important;
-        letter-spacing: 0.5px;
-        box-shadow: 0 8px 20px rgba(0, 123, 255, 0.3) !important;
+    /* ===== Responsive ===== */
+    @media (max-width: 768px) {
+        .breadcrumb-nav { display: none; }
+        .code-detail-header { flex-direction: column; text-align: center; }
+        .header-left { flex-direction: column; text-align: center; }
+        .header-text h1 { font-size: 1.3rem; }
+        .benefit-amount { font-size: 2.4rem; }
+        .code-text, .code-text-blurred, .code-url-blurred {
+            font-size: 1.4rem;
+            letter-spacing: 2px;
+        }
+        .code-main-card, .code-description-card, .how-to-use-card, .pdf-carousel-card,
+        .user-info-card, .owner-actions-card, .stats-card, .action-buttons-card {
+            padding: 18px;
+        }
     }
-
-    @keyframes pulse-blue {
-        0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7); }
-        70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(0, 123, 255, 0); }
-        100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 123, 255, 0); }
+    @media (max-width: 480px) {
+        .code-detail-hero { padding: 14px 0 18px; }
+        .header-text h1 { font-size: 1.2rem; }
+        .benefit-amount { font-size: 2rem; }
+        .code-text, .code-text-blurred, .code-url-blurred {
+            font-size: 1.2rem;
+            letter-spacing: 1.5px;
+        }
+        .step-item { flex-direction: column; text-align: center; align-items: center; }
+        .stats-grid { gap: 6px; }
+        .stat-item { padding: 10px 4px; }
+        .stat-item .stat-num { font-size: 1.1rem; }
+        .stat-item .stat-lbl { font-size: 0.6rem; margin-bottom: 4px; }
+        .pdf-carousel-wrapper { min-height: 320px; padding: 10px; }
+        .pdf-page-image { max-height: 360px; }
+        .pdf-carousel-btn { width: 38px; height: 38px; font-size: 0.95rem; }
     }
     </style>';
     
@@ -1765,10 +1480,10 @@ function generate_code_detail_page($codigo) {
             }
             
             if (userLoggedIn) {
-                var actionButtonsCard = document.querySelector(".action-buttons-card");
-                if (actionButtonsCard) {
+                var statsCard = document.querySelector(".stats-card");
+                if (statsCard) {
                     // Verificar si el botón ya existe
-                    var existingFavoriteBtn = actionButtonsCard.querySelector(".favorite-btn");
+                    var existingFavoriteBtn = statsCard.querySelector(".favorite-btn");
                     if (!existingFavoriteBtn) {
                         var codeId = "' . htmlspecialchars($code_id, ENT_QUOTES, 'UTF-8') . '";
                         var favoriteBtn = document.createElement("button");
@@ -1776,14 +1491,9 @@ function generate_code_detail_page($codigo) {
                         favoriteBtn.setAttribute("data-codigo-id", codeId);
                         favoriteBtn.setAttribute("title", "Añadir a favoritos");
                         favoriteBtn.innerHTML = \'<i class="fas fa-heart"></i> Añadir a favoritos\';
-                        
-                        // Insertar antes del primer botón
-                        var firstButton = actionButtonsCard.querySelector("button");
-                        if (firstButton) {
-                            actionButtonsCard.insertBefore(favoriteBtn, firstButton);
-                        } else {
-                            actionButtonsCard.appendChild(favoriteBtn);
-                        }
+
+                        // Añadir al final de la tarjeta (después de "Ver estadísticas")
+                        statsCard.appendChild(favoriteBtn);
                         
                         // Inicializar el handler de favoritos después de un pequeño delay
                         // El script favoritos.js ya añade los handlers automáticamente

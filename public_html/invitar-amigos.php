@@ -30,9 +30,9 @@ $estadisticas = obtenerEstadisticasReferidos($_SESSION["user_id"]);
 
 // Configurar variables para el header
 $title = "Invita a tus amigos y gana dinero - Código Amigo";
-$description = "Invita a tus amigos a Código Amigo y gana 5€ por cada amigo que se registre y verifique su perfil. ¡Comparte tu código de referido!";
+$description = "Invita a tus amigos a Código Amigo. Tu amigo recibe 5€ al registrarse y tú ganas otros 5€ cuando publique su primer código. ¡Comparte tu código de referido!";
 $title_social = "Invita a tus amigos y gana dinero";
-$description_social = "Gana 5€ por cada amigo que se registre en Código Amigo usando tu código de referido.";
+$description_social = "Tu amigo gana 5€ al registrarse y tú ganas 5€ cuando publique su primer código.";
 
 // Incluir header
 get_header_modern($title, $description, $title_social, $description_social);
@@ -50,7 +50,7 @@ get_header_modern($title, $description, $title_social, $description_social);
                 </div>
                 <h1 class="referral-hero-title">Invita a tus amigos</h1>
                 <p class="referral-hero-subtitle">
-                    ¡Gana dinero compartiendo! Recibiréis <strong>5€ cada uno</strong> cuando tu amigo verifique su perfil.
+                    ¡Gana dinero compartiendo! Tu amigo recibe <strong>5€ al registrarse</strong> y tú ganas <strong>otros 5€</strong> cuando publique su primer código.
                 </p>
             </div>
         </div>
@@ -160,7 +160,7 @@ get_header_modern($title, $description, $title_social, $description_social);
                     <div class="referral-step-number" style="--step-color: #ffd700;">3</div>
                     <div class="referral-step-content">
                         <h4 class="referral-step-title">¡Ganáis 5€ cada uno!</h4>
-                        <p class="referral-step-desc">Cuando verifique su email, se os añadirán 5€ automáticos a cada uno</p>
+                        <p class="referral-step-desc">Tu amigo recibe 5€ al verificar su email. Tú ganas otros 5€ cuando publique su primer código.</p>
                     </div>
                 </div>
             </div>

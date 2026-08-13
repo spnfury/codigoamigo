@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 /**
  * Funciones para gestionar favoritos de códigos
  */
@@ -101,7 +102,7 @@ function añadir_favorito($usuario_id, $codigo_id, $tipo = 'codigo') {
                 );
             } catch (Exception $e) {
                 // Silencioso: no fallar la acción principal si falla el incremento
-                error_log("Error incrementando temperatura al añadir favorito: " . $e->getMessage());
+                log_error("Error incrementando temperatura al añadir favorito: " . $e->getMessage());
             }
         }
 

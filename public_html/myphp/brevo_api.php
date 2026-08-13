@@ -60,18 +60,18 @@ function enviarNewsletterBrevoAPI($to_email, $to_name, $subject, $html_content, 
     if (empty(BREVO_API_KEY) || BREVO_API_KEY === 'xkeysib-YOUR_API_KEY_HERE') {
         // Intentar usar SMTP como fallback si está configurado
         if (defined('BREVO_SMTP_USERNAME') && !empty(BREVO_SMTP_USERNAME)) {
-            error_log("Brevo API key no configurada, usando SMTP como fallback");
+            log_warning("Brevo API key no configurada, usando SMTP como fallback");
             return enviarNewsletterBrevoSMTP($to_email, $to_name, $subject, $html_content, $text_content, $from_email, $from_name, $tags);
         }
         $resultado['error'] = 'BREVO_API_KEY no configurada y SMTP no disponible';
-        error_log("Error Brevo API: API key no configurada y SMTP no disponible");
+        log_error("Error Brevo API: API key no configurada y SMTP no disponible");
         return $resultado;
     }
     
     // Validar parámetros
     if (empty($to_email) || empty($subject) || empty($html_content)) {
         $resultado['error'] = 'Parámetros inválidos';
-        error_log("Error Brevo API: Parámetros inválidos - to_email: $to_email");
+        log_error("Error Brevo API: Parámetros inválidos - to_email: $to_email");
         return $resultado;
     }
     
@@ -111,7 +111,17 @@ function enviarNewsletterBrevoAPI($to_email, $to_name, $subject, $html_content, 
         $sendSmtpEmail->setHtmlContent($html_content);
         $sendSmtpEmail->setTextContent($text_content);
         $sendSmtpEmail->setReplyTo($replyTo);
-        
+
+        // Baja en un clic (RFC 8058), igual que en la rama SMTP.
+        include_once __DIR__ . '/funciones_baja_email.php';
+        $unsub_url = baja_email_url($to_email);
+        if ($unsub_url !== '') {
+            $sendSmtpEmail->setHeaders([
+                'List-Unsubscribe'      => '<' . $unsub_url . '>, <mailto:baja@codigoamigo.com>',
+                'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click',
+            ]);
+        }
+
         // Añadir tags si se proporcionan
         if (!empty($tags)) {
             $sendSmtpEmail->setTags($tags);
@@ -128,7 +138,7 @@ function enviarNewsletterBrevoAPI($to_email, $to_name, $subject, $html_content, 
     } catch (\Exception $e) {
         // Error
         $resultado['error'] = "Error Brevo API: " . $e->getMessage();
-        error_log("Error Brevo API: " . $e->getMessage());
+        log_error("Error Brevo API: " . $e->getMessage());
     }
     
     return $resultado;
@@ -186,7 +196,16 @@ function enviarNewsletterBrevoSMTP($to_email, $to_name, $subject, $html_content,
         
         // Destinatario
         $mail->addAddress($to_email, $to_name ?: $to_email);
-        
+
+        // Baja en un clic (RFC 8058). Imprescindible en la newsletter: es el
+        // envío de volumen, justo el que Gmail y Yahoo filtran si falta.
+        include_once __DIR__ . '/funciones_baja_email.php';
+        $unsub_url = baja_email_url($to_email);
+        if ($unsub_url !== '') {
+            $mail->addCustomHeader('List-Unsubscribe', '<' . $unsub_url . '>, <mailto:baja@codigoamigo.com>');
+            $mail->addCustomHeader('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click');
+        }
+
         // Contenido
         $mail->isHTML(true);
         $mail->Subject = $subject;
@@ -204,7 +223,7 @@ function enviarNewsletterBrevoSMTP($to_email, $to_name, $subject, $html_content,
         
     } catch (Exception $e) {
         $resultado['error'] = "Error Brevo SMTP: " . $mail->ErrorInfo;
-        error_log("Error Brevo SMTP: " . $mail->ErrorInfo);
+        log_error("Error Brevo SMTP: " . $mail->ErrorInfo);
     }
     
     return $resultado;
@@ -277,7 +296,7 @@ function verificarLimitesBrevo() {
         
     } catch (\Exception $e) {
         $resultado['error'] = "Error al verificar cuenta: " . $e->getMessage();
-        error_log("Error al verificar límites Brevo: " . $e->getMessage());
+        log_error("Error al verificar límites Brevo: " . $e->getMessage());
     }
     
     return $resultado;

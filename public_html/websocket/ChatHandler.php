@@ -4,6 +4,7 @@ namespace CodigoAmigo\WebSocket;
 use Ratchet\MessageComponentInterface;
 use Ratchet\ConnectionInterface;
 use MongoDB\Client;
+include_once __DIR__ . '/../inc/logger.php';
 
 class ChatHandler implements MessageComponentInterface {
     protected $clients;
@@ -30,7 +31,7 @@ class ChatHandler implements MessageComponentInterface {
         $token = $params['token'] ?? null;
         
         // Validar autenticación
-        if (!$this->validateAuth($user_id, $token)) {
+        if (!$this->validateAuth($user_id, $token, $conn)) {
             $conn->send(json_encode([
                 'type' => 'error',
                 'message' => 'Autenticación fallida'
@@ -117,32 +118,48 @@ class ChatHandler implements MessageComponentInterface {
      * Cuando hay un error
      */
     public function onError(ConnectionInterface $conn, \Exception $e) {
-        error_log("WebSocket Error: " . $e->getMessage());
+        log_error("WebSocket Error: " . $e->getMessage());
         $conn->close();
     }
     
     /**
      * Valida la autenticación del usuario
      */
-    protected function validateAuth($user_id, $token) {
+    protected function validateAuth($user_id, $token, $conn = null) {
         if (!$user_id || !$token) {
             return false;
         }
-        
+
         // Validar formato de user_id (ObjectId de MongoDB)
         if (!preg_match('/^[a-f\d]{24}$/i', $user_id)) {
             return false;
         }
-        
+
         // Validar token contra sesión PHP
         try {
-            // Obtener el ID de sesión de la cookie si existe
+            // Obtener el ID de sesión de la cookie si existe. $conn no se pasaba
+            // antes (bug: variable inexistente en este scope) -> session_start()
+            // arrancaba siempre una sesión vacía nueva y ws_tokens nunca se
+            // encontraba, fallando la autenticación de TODA conexión websocket.
+            // Nota: httpRequest es un GuzzleHttp\Psr7\Request (petición cliente,
+            // no ServerRequest), que NO tiene getCookieParams() -> hay que
+            // parsear la cabecera Cookie a mano.
             $session_id = null;
-            if (isset($conn->httpRequest->getCookieParams()['PHPSESSID'])) {
-                $session_id = $conn->httpRequest->getCookieParams()['PHPSESSID'];
+            if ($conn && isset($conn->httpRequest)) {
+                $cookie_header = $conn->httpRequest->getHeaderLine('Cookie');
+                if ($cookie_header && preg_match('/PHPSESSID=([^;]+)/', $cookie_header, $m)) {
+                    $session_id = $m[1];
+                }
             }
-            
+
             if ($session_id) {
+                // El pool FPM de codigoamigo.com usa session.save_path=/home/admin/tmp
+                // (override, ver /etc/php/8.3/fpm/pool.d/codigoamigo.com.conf). Este
+                // proceso CLI usa por defecto /var/lib/php/sessions -> sin esto,
+                // session_start() nunca encuentra el fichero de sesión real.
+                if (session_status() === PHP_SESSION_NONE) {
+                    session_save_path('/home/admin/tmp');
+                }
                 session_id($session_id);
             }
 
@@ -156,7 +173,16 @@ class ChatHandler implements MessageComponentInterface {
             require_once __DIR__ . '/../myphp/funciones_usuario.php';
             
             $validated_user_id = validarTokenWebSocket($token);
-            
+
+            // Cerrar la sesión inmediatamente: este proceso es de larga duración
+            // y atiende conexiones de MUCHOS usuarios distintos. Sin cerrarla,
+            // la sesión del primer usuario que conecta queda abierta para
+            // siempre y session_id() no puede cambiar en las siguientes
+            // conexiones (falla el auth de todos los usuarios excepto el primero).
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_write_close();
+            }
+
             if ($validated_user_id && $validated_user_id === $user_id) {
                 // Verificar que el usuario existe
                 $usuario = get_object_user('_id', new \MongoDB\BSON\ObjectId($user_id));
@@ -165,7 +191,10 @@ class ChatHandler implements MessageComponentInterface {
             
             return false;
         } catch (\Exception $e) {
-            error_log("Error validando auth: " . $e->getMessage());
+            log_error("Error validando auth: " . $e->getMessage());
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_write_close();
+            }
             return false;
         }
     }
@@ -319,7 +348,7 @@ class ChatHandler implements MessageComponentInterface {
                 ]);
             }
         } catch (\Exception $e) {
-            error_log("Error broadcasting user status: " . $e->getMessage());
+            log_error("Error broadcasting user status: " . $e->getMessage());
         }
     }
     

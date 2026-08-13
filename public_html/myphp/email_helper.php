@@ -27,8 +27,8 @@ if (!function_exists('getCollectionEmailLogs')) {
 /**
  * Envía email usando SMTP de Brevo con PHPMailer
  */
-function enviarEmailSMTPBrevo($to_email, $to_name, $subject, $html_content, $text_content = '', $from_email = 'noreply@codigoamigo.com', $from_name = 'Código Amigo') {
-    
+function enviarEmailSMTPBrevo($to_email, $to_name, $subject, $html_content, $text_content = '', $from_email = 'noreply@codigoamigo.com', $from_name = 'Código Amigo', $unsub_url = '') {
+
     $resultado = array(
         'success' => false,
         'error' => ''
@@ -58,6 +58,14 @@ function enviarEmailSMTPBrevo($to_email, $to_name, $subject, $html_content, $tex
         // Configurar destinatario
         $mail->addAddress($to_email, $to_name);
         
+        // Baja en un clic (RFC 8058). Gmail y Yahoo exigen estas dos cabeceras a
+        // quien envía correo de volumen; sin ellas el mensaje se filtra a spam
+        // aunque el contenido sea legítimo.
+        if ($unsub_url !== '') {
+            $mail->addCustomHeader('List-Unsubscribe', '<' . $unsub_url . '>, <mailto:baja@codigoamigo.com>');
+            $mail->addCustomHeader('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click');
+        }
+
         // Configurar contenido
         $mail->isHTML(true);
         $mail->Subject = $subject;
@@ -77,7 +85,7 @@ function enviarEmailSMTPBrevo($to_email, $to_name, $subject, $html_content, $tex
         
     } catch (Exception $e) {
         $resultado['error'] = "Error PHPMailer: " . $e->getMessage();
-        error_log("Error enviando email via Brevo SMTP: " . $e->getMessage());
+        log_error("Error enviando email via Brevo SMTP: " . $e->getMessage());
     }
     
     return $resultado;
@@ -85,30 +93,51 @@ function enviarEmailSMTPBrevo($to_email, $to_name, $subject, $html_content, $tex
 
 // Función wrapper que registra en el log después del envío
 function enviarEmailConBrevoYRegistrar($to_email, $to_name, $subject, $html_content, $tipo, $usuario_id = null, $detalles = [], $text_content = '', $from_email = 'noreply@codigoamigo.com', $from_name = 'Código Amigo') {
-    
+
+    // Validar email antes de cualquier procesamiento — evita excepciones de Brevo SMTP
+    $to_email_trim = is_string($to_email) ? strtolower(trim($to_email)) : '';
+    if (!filter_var($to_email_trim, FILTER_VALIDATE_EMAIL)) {
+        log_error("enviarEmailConBrevoYRegistrar: email destinatario inválido — tipo=$tipo usuario=$usuario_id email='" . (string)$to_email . "'");
+        return ['success' => false, 'error' => 'Email destinatario inválido: ' . (string)$to_email];
+    }
+    $to_email = $to_email_trim;
+
     // Añadir footer de desuscripción a emails no transaccionales
     $tipos_transaccionales = ['activacion_usuario', 'recuperacion_password', 'contacto_form', 'codigo_publicado'];
+    $unsub_url = '';
     if (!in_array($tipo, $tipos_transaccionales)) {
+        include_once __DIR__ . '/funciones_baja_email.php';
+
+        // Quien ha pedido la baja no recibe nada más que lo estrictamente
+        // transaccional. Se corta aquí, en el punto por el que pasan todos los
+        // envíos, para no depender de que cada cron se acuerde de comprobarlo.
+        if (email_tiene_baja($to_email)) {
+            log_info("Envío omitido por baja de correo — tipo=$tipo email=$to_email");
+            return ['success' => false, 'error' => 'Destinatario dado de baja', 'omitido_por_baja' => true];
+        }
+
+        $unsub_url = baja_email_url($to_email);
+
         $unsub_footer = '<hr style="border:none;border-top:1px solid #eee;margin:30px 0 15px;">'
             . '<p style="font-size:12px;color:#999;text-align:center;margin:0;">'
             . 'Si no deseas recibir estos correos, puedes '
-            . '<a href="https://www.codigoamigo.com/usuario#preferencias" style="color:#E30613;text-decoration:underline;">configurar tus preferencias de notificación</a>'
-            . ' en tu perfil.</p>';
-        
+            . '<a href="' . htmlspecialchars($unsub_url, ENT_QUOTES, 'UTF-8') . '" style="color:#E30613;text-decoration:underline;">darte de baja en un clic</a>'
+            . ' o <a href="https://www.codigoamigo.com/usuario#preferencias" style="color:#E30613;text-decoration:underline;">ajustar tus preferencias</a>.</p>';
+
         // Insertar antes de </body> si existe, si no al final
         if (stripos($html_content, '</body>') !== false) {
             $html_content = str_ireplace('</body>', $unsub_footer . '</body>', $html_content);
         } else {
             $html_content .= $unsub_footer;
         }
-        
+
         // También añadir al texto plano
-        $unsub_text = "\n\n---\nSi no deseas recibir estos correos, configura tus preferencias en: https://www.codigoamigo.com/usuario";
+        $unsub_text = "\n\n---\nSi no deseas recibir estos correos, date de baja aquí: " . $unsub_url;
         $text_content .= $unsub_text;
     }
-    
+
     // Enviar el email
-    $resultado = enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text_content, $from_email, $from_name);
+    $resultado = enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text_content, $from_email, $from_name, $unsub_url);
     
     // Registrar en el log
     if (!function_exists('registrarEmailLog')) {
@@ -166,36 +195,59 @@ function usuarioAceptaEmail($usuario_id, $tipo_email) {
         'destacado_expirado' => 'email_destacados',
         'destacado_auto_renovado' => 'email_destacados',
         'destacado_saldo_insuficiente' => 'email_destacados',
+        // Reenganche / win-back (marketing): debe ser opt-out-able
+        'reengagement_publicar' => 'email_reengagement',
+        'reengagement_vip_publicador' => 'email_reengagement',
+        'winback_vip_caducado' => 'email_reengagement',
+        'power_publisher_vip' => 'email_reengagement',
+        'cross_sell_destacar_vip' => 'email_reengagement',
+        'followup_ia_modal_vip' => 'email_reengagement',
+        'promo_referidos_publicador' => 'email_reengagement',
     ];
-    
+
     $campo = $mapa_preferencias[$tipo_email] ?? null;
-    
-    // Si el tipo no está mapeado, enviar por defecto
-    if (!$campo) {
-        return true;
-    }
-    
-    // Buscar preferencia del usuario
+
+    // Buscar usuario (siempre, para comprobar estado de baja además de la preferencia)
     try {
         $collection_usuarios = getCollectionUsuarios();
+        $projection = ['estado' => 1, 'email_marketing' => 1];
+        if ($campo) {
+            $projection[$campo] = 1;
+        }
         $usuario = $collection_usuarios->findOne(
             ['_id' => new \MongoDB\BSON\ObjectId($usuario_id)],
-            ['projection' => [$campo => 1]]
+            ['projection' => $projection]
         );
-        
+
         if (!$usuario) {
             return true; // usuario no encontrado, enviar por defecto
         }
-        
+
+        // GUARD BAJA/ELIMINADO: nunca enviar marketing a cuentas con estado negativo
+        // (estado=-3 baja por usuario, otros estados negativos = suspendida/eliminada).
+        if (isset($usuario['estado']) && (int)$usuario['estado'] < 0) {
+            return false;
+        }
+
+        // Opt-out global de marketing (si el usuario lo ha desactivado, respetar).
+        if (isset($usuario['email_marketing']) && (int)$usuario['email_marketing'] === 0) {
+            return false;
+        }
+
+        // Si el tipo no está mapeado a un campo específico, enviar por defecto
+        if (!$campo) {
+            return true;
+        }
+
         // Si el campo no existe en el documento, default = 1 (activo)
         if (!isset($usuario[$campo])) {
             return true;
         }
-        
+
         return (int)$usuario[$campo] === 1;
-        
+
     } catch (\Exception $e) {
-        error_log("Error comprobando preferencia email ($tipo_email) para usuario $usuario_id: " . $e->getMessage());
+        log_error("Error comprobando preferencia email ($tipo_email) para usuario $usuario_id: " . $e->getMessage());
         return true; // En caso de error, enviar por defecto
     }
 }
@@ -203,15 +255,25 @@ function usuarioAceptaEmail($usuario_id, $tipo_email) {
 /**
  * Envía email usando Brevo SMTP como principal y SendGrid como fallback
  */
-function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text_content = '', $from_email = 'noreply@codigoamigo.com', $from_name = 'Código Amigo') {
-    
+function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text_content = '', $from_email = 'noreply@codigoamigo.com', $from_name = 'Código Amigo', $unsub_url = '') {
+
     // Validar parámetros
     if (empty($to_email) || empty($to_name) || empty($subject) || empty($html_content)) {
-        error_log("Error enviarEmailConBrevo: Parámetros inválidos - to_email: $to_email, to_name: $to_name");
+        log_error("Error enviarEmailConBrevo: Parámetros inválidos - to_email: $to_email, to_name: $to_name");
         return [
             'success' => false,
             'method' => '',
             'error' => 'Parámetros inválidos'
+        ];
+    }
+
+    // Validar formato email destinatario — evita excepciones SMTP
+    if (!filter_var(trim((string)$to_email), FILTER_VALIDATE_EMAIL)) {
+        log_error("Error enviarEmailConBrevo: email destinatario malformado: '" . (string)$to_email . "'");
+        return [
+            'success' => false,
+            'method' => '',
+            'error' => 'Email destinatario inválido: ' . (string)$to_email
         ];
     }
     
@@ -223,7 +285,7 @@ function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text
     
     // Intentar envío con Brevo SMTP primero
     try {
-        $resultado_brevo = enviarEmailSMTPBrevo($to_email, $to_name, $subject, $html_content, $text_content, $from_email, $from_name);
+        $resultado_brevo = enviarEmailSMTPBrevo($to_email, $to_name, $subject, $html_content, $text_content, $from_email, $from_name, $unsub_url);
         
         if ($resultado_brevo['success']) {
             $resultado['success'] = true;
@@ -235,7 +297,7 @@ function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text
         }
         
     } catch (Exception $e) {
-        error_log("Error enviando email via Brevo SMTP: " . $e->getMessage());
+        log_error("Error enviando email via Brevo SMTP: " . $e->getMessage());
         $resultado['error'] = "Brevo SMTP: " . $e->getMessage();
     }
     
@@ -267,7 +329,7 @@ function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text
         }
         
     } catch (Exception $e) {
-        error_log("Error enviando email via SendGrid (fallback): " . $e->getMessage());
+        log_error("Error enviando email via SendGrid (fallback): " . $e->getMessage());
         $resultado['error'] .= " | SendGrid: " . $e->getMessage();
     }
     
@@ -298,7 +360,7 @@ function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text
         }
         
     } catch (Exception $e) {
-        error_log("Error enviando email via Elastic Email (último recurso): " . $e->getMessage());
+        log_error("Error enviando email via Elastic Email (último recurso): " . $e->getMessage());
         $resultado['error'] .= " | Elastic Email: " . $e->getMessage();
     }
     
@@ -322,7 +384,7 @@ function enviarEmailConBrevo($to_email, $to_name, $subject, $html_content, $text
     }
 
     // Si todos los métodos fallan
-    error_log("Error: No se pudo enviar email a " . $to_email . " con ningún método. Errores: " . $resultado['error']);
+    log_error("Error: No se pudo enviar email a " . $to_email . " con ningún método. Errores: " . $resultado['error']);
     mandaBot("Error crítico: No se pudo enviar email a " . $to_email . " con ningún método. Errores: " . $resultado['error']);
 
     return $resultado;

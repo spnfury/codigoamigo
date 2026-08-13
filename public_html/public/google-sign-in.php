@@ -101,7 +101,7 @@ try {
 
     $buffer = ob_get_clean();
     if ($buffer !== '') {
-        error_log('[google-sign-in] Se detectó salida previa antes de la respuesta JSON: ' . substr(trim($buffer), 0, 400));
+        log_warning('[google-sign-in] Se detectó salida previa antes de la respuesta JSON: ' . substr(trim($buffer), 0, 400));
     }
 
     echo json_encode($response);
@@ -112,11 +112,11 @@ try {
     }
     http_response_code($statusCode);
 
-    error_log('[google-sign-in] ' . $e->getMessage());
+    log_error('[google-sign-in] ' . $e->getMessage());
 
     $buffer = ob_get_clean();
     if ($buffer !== '') {
-        error_log('[google-sign-in] Se detectó salida previa (error): ' . substr(trim($buffer), 0, 400));
+        log_warning('[google-sign-in] Se detectó salida previa (error): ' . substr(trim($buffer), 0, 400));
     }
 
     echo json_encode([

@@ -1,0 +1,11 @@
+{
+    "2af718e0f3a30a2e": {
+        "estado": "rollback",
+        "archivo": "/home/admin/web/codigoamigo.com/public_html/autofix/demo/demo_bug.php",
+        "linea": 11,
+        "tipo": "Uncaught Exception (0): Unsupported operand types: string - int",
+        "backup": "/home/admin/web/codigoamigo.com/public_html/autofix/demo/state/backups/2af718e0f3a30a2e_20260701060138_demo_bug.php.bak",
+        "ts_fix": "2026-07-01 06:01:53",
+        "ts_ultimo": "2026-07-01 06:15:21"
+    }
+}

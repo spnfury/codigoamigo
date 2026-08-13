@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 /**
  * Funciones para generar y gestionar sitemaps de CodigoAmigo
  */
@@ -17,7 +18,7 @@ function getCollectionSitemapLogs() {
     try {
         return $db->selectCollection('sitemap_logs');
     } catch (Throwable $e) {
-        error_log("Error al obtener colección de logs de sitemaps: " . $e->getMessage());
+        log_error("Error al obtener colección de logs de sitemaps: " . $e->getMessage());
         return null;
     }
 }
@@ -36,7 +37,7 @@ function registrarGeneracionSitemap($tipo, $resultado) {
         $collection->insertOne($log);
         return true;
     } catch (Throwable $e) {
-        error_log("Error al registrar log de sitemap: " . $e->getMessage());
+        log_error("Error al registrar log de sitemap: " . $e->getMessage());
         return false;
     }
 }
@@ -59,7 +60,7 @@ function obtenerHistorialSitemaps($limite = 50) {
         }
         return $historial;
     } catch (Throwable $e) {
-        error_log("Error al obtener historial de sitemaps: " . $e->getMessage());
+        log_error("Error al obtener historial de sitemaps: " . $e->getMessage());
         return [];
     }
 }
@@ -92,14 +93,11 @@ function generarSitemapPrincipal($incluir_codigos = false) {
     $lastmod = $xml->createElement("lastmod", $hoy);
     $sitemap->appendChild($lastmod);
     
-    // Sitemap de comparativas
-    $sitemap = $xml->createElement("sitemap");
-    $sitemap = $sitemapindex->appendChild($sitemap);
-    $loc = $xml->createElement("loc", $base_url . "/myphp/xml/sitemap_comparativas.xml");
-    $sitemap->appendChild($loc);
-    $lastmod = $xml->createElement("lastmod", $hoy);
-    $sitemap->appendChild($lastmod);
-    
+    // Sitemap de comparativas DESACTIVADO: ~5000 páginas programáticas con ~2 clics/90d.
+    // Quemaban crawl budget y diluían calidad del dominio. Ahora noindex (ver ruta
+    // /comparar/ en app_with_mongo.php). No se listan en el índice para que Google
+    // reenfoque el crawl en las páginas de marca.
+
     // Sitemap de guías
     $sitemap = $xml->createElement("sitemap");
     $sitemap = $sitemapindex->appendChild($sitemap);
@@ -150,12 +148,54 @@ function generarSitemapMarcas() {
         $urlset = $xml->createElement("urlset");
         $urlset = $xml->appendChild($urlset);
         $urlset->setAttribute("xmlns", "http://www.sitemaps.org/schemas/sitemap/0.9");
-        
+
+        // Marcas que tienen al menos un código vigente.
+        //
+        // Desde que /de-{slug} devuelve noindex cuando la marca se queda sin
+        // códigos, anunciarlas en el sitemap era contradecirse: el sitemap le
+        // pide a Google que indexe una página que se declara no indexable.
+        // Eran 23 en la auditoría del 2026-08-07. Vuelven solas al sitemap en
+        // cuanto la marca recibe un código.
+        // Mismo criterio que la ficha: no basta con estado 0, hay que descartar
+        // los caducados por fecha_validez (ver cron/daily_sitemap.php).
+        $con_codigos = [];
+        try {
+            $db_cod = createConnection();
+            foreach ($db_cod->selectCollection('codigos')->distinct('marca', [
+                'estado' => 0,
+                '$nor'   => [[
+                    'fecha_validez' => ['$type' => 'string', '$ne' => '', '$lt' => date('Y-m-d')],
+                ]],
+            ]) as $mk) {
+                $con_codigos[(string)$mk] = true;
+            }
+        } catch (\Throwable $e) {
+            // Si falla la consulta se prefiere el sitemap completo de siempre a
+            // publicar uno vacío por accidente.
+            log_error('[sitemap_marcas] no se pudo consultar códigos activos: ' . $e->getMessage());
+            $con_codigos = null;
+        }
+
         $total = 0;
+        $saltadas_sin_codigos = 0;
+        $saltadas_slug_invalido = 0;
+
         foreach ($lista_marcas as $marca) {
             $nombre_clave = is_array($marca) ? ($marca['nombre_clave'] ?? '') : ($marca->nombre_clave ?? '');
             if (empty($nombre_clave)) continue;
-            
+
+            // Hay slugs corruptos en BD ('https://octopusenergyes/',
+            // 'atuladoenergÍa') que generaban URLs que devuelven 301 o 400.
+            if (!preg_match('/^[a-z0-9][a-z0-9._-]*$/', $nombre_clave)) {
+                $saltadas_slug_invalido++;
+                continue;
+            }
+
+            if ($con_codigos !== null && !isset($con_codigos[$nombre_clave])) {
+                $saltadas_sin_codigos++;
+                continue;
+            }
+
             $url_marca = "https://www.codigoamigo.com/" . link_marca($nombre_clave);
             $url = $xml->createElement("url");
             $url = $urlset->appendChild($url);
@@ -172,9 +212,23 @@ function generarSitemapMarcas() {
         
         $sitemap_path = $xml_dir . '/sitemap_marcas.xml';
         $xml->save($sitemap_path);
-        return ['success' => true, 'archivo' => $sitemap_path, 'url' => $base_url . '/myphp/xml/sitemap_marcas.xml', 'total_urls' => $total, 'fecha' => $hoy];
+
+        log_info('[sitemap_marcas] generado', [
+            'urls'            => $total,
+            'sin_codigos'     => $saltadas_sin_codigos,
+            'slug_invalido'   => $saltadas_slug_invalido,
+        ]);
+
+        return [
+            'success'   => true,
+            'archivo'   => $sitemap_path,
+            'url'       => $base_url . '/myphp/xml/sitemap_marcas.xml',
+            'total_urls' => $total,
+            'excluidas' => ['sin_codigos' => $saltadas_sin_codigos, 'slug_invalido' => $saltadas_slug_invalido],
+            'fecha'     => $hoy,
+        ];
     } catch (Throwable $e) {
-        error_log("Error al generar sitemap de marcas: " . $e->getMessage());
+        log_error("Error al generar sitemap de marcas: " . $e->getMessage());
         return ['success' => false, 'error' => $e->getMessage()];
     }
 }
@@ -216,7 +270,7 @@ function generarSitemapCategorias() {
         $xml->save($sitemap_path);
         return ['success' => true, 'archivo' => $sitemap_path, 'url' => $base_url . '/myphp/xml/sitemap_categorias.xml', 'total_urls' => $total, 'fecha' => $hoy];
     } catch (Throwable $e) {
-        error_log("Error al generar sitemap de categorías: " . $e->getMessage());
+        log_error("Error al generar sitemap de categorías: " . $e->getMessage());
         return ['success' => false, 'error' => $e->getMessage()];
     }
 }
@@ -262,7 +316,7 @@ function generarSitemapCodigos($limite = 10000) {
         $xml->save($sitemap_path);
         return ['success' => true, 'archivo' => $sitemap_path, 'url' => $base_url . '/myphp/xml/sitemap_codigos.xml', 'total_urls' => $total, 'fecha' => $hoy];
     } catch (Throwable $e) {
-        error_log("Error al generar sitemap de códigos: " . $e->getMessage());
+        log_error("Error al generar sitemap de códigos: " . $e->getMessage());
         return ['success' => false, 'error' => $e->getMessage()];
     }
 }
@@ -282,12 +336,15 @@ function generarSitemapComparativas($limite = 5000) {
     if (!$db) return ['success' => false, 'error' => 'Error de conexión'];
     
     try {
-        // Obtener marcas activas (estado=1) que tienen categoria_clave
+        // Obtener marcas activas (estado=1) que tienen categoria_clave.
+        // Excluir marcas marcadas como inactivas por SEO (sin actividad en >12 meses)
+        // para no diluir relevancia con páginas de códigos antiguos.
         $col_marcas = $db->selectCollection('marcas');
         $cursor = $col_marcas->find(
             [
                 'estado'         => 1,
-                'categoria_clave'=> ['$exists' => true, '$ne' => '']
+                'categoria_clave'=> ['$exists' => true, '$ne' => ''],
+                'inactiva_seo'   => ['$ne' => true],
             ],
             ['projection' => ['nombre_clave' => 1, 'categoria_clave' => 1]]
         );
@@ -337,7 +394,7 @@ function generarSitemapComparativas($limite = 5000) {
         $xml->save($sitemap_path);
         return ['success' => true, 'archivo' => $sitemap_path, 'url' => $base_url . '/myphp/xml/sitemap_comparativas.xml', 'total_urls' => $total, 'fecha' => $hoy];
     } catch (Throwable $e) {
-        error_log("Error al generar sitemap de comparativas: " . $e->getMessage());
+        log_error("Error al generar sitemap de comparativas: " . $e->getMessage());
         return ['success' => false, 'error' => $e->getMessage()];
     }
 }
@@ -422,18 +479,22 @@ function generarSitemapEstaticas() {
     $xml_dir = __DIR__ . '/xml';
     if (!is_dir($xml_dir)) mkdir($xml_dir, 0755, true);
     
+    // Solo páginas que responden 200 y se dejan indexar.
+    //
+    // La lista anterior anunciaba ocho URLs que no cumplían ninguna de las dos
+    // cosas (auditoría del 2026-08-07):
+    //   - /comparar y /sobre_nosotros redirigen a la home con 301.
+    //   - /aviso_legal, /politica_de_privacidad y /politica_de_cookies usaban
+    //     guion bajo; las rutas reales llevan guion, y además son noindex.
+    //   - /registro es noindex.
+    // Pedirle a Google que indexe una redirección o una página noindex gasta
+    // presupuesto de rastreo y resta credibilidad al resto del sitemap.
     $paginas_estaticas = [
         ['url' => $base_url . '/', 'priority' => '1.0', 'changefreq' => 'daily'],
         ['url' => $base_url . '/listado-marcas', 'priority' => '0.9', 'changefreq' => 'daily'],
         ['url' => $base_url . '/listado-categorias', 'priority' => '0.9', 'changefreq' => 'weekly'],
         ['url' => $base_url . '/ultimos-codigos', 'priority' => '0.85', 'changefreq' => 'daily'],
-        ['url' => $base_url . '/comparar', 'priority' => '0.7', 'changefreq' => 'monthly'],
-        ['url' => $base_url . '/registro', 'priority' => '0.7', 'changefreq' => 'monthly'],
-        ['url' => $base_url . '/sobre_nosotros', 'priority' => '0.5', 'changefreq' => 'monthly'],
         ['url' => $base_url . '/contacto', 'priority' => '0.5', 'changefreq' => 'monthly'],
-        ['url' => $base_url . '/aviso_legal', 'priority' => '0.3', 'changefreq' => 'yearly'],
-        ['url' => $base_url . '/politica_de_privacidad', 'priority' => '0.3', 'changefreq' => 'yearly'],
-        ['url' => $base_url . '/politica_de_cookies', 'priority' => '0.2', 'changefreq' => 'yearly'],
     ];
     
     try {
@@ -460,7 +521,7 @@ function generarSitemapEstaticas() {
         $xml->save($sitemap_path);
         return ['success' => true, 'archivo' => $sitemap_path, 'url' => $base_url . '/myphp/xml/sitemap_estaticas.xml', 'total_urls' => count($paginas_estaticas), 'fecha' => $hoy];
     } catch (Throwable $e) {
-        error_log("Error al generar sitemap de páginas estáticas: " . $e->getMessage());
+        log_error("Error al generar sitemap de páginas estáticas: " . $e->getMessage());
         return ['success' => false, 'error' => $e->getMessage()];
     }
 }
@@ -481,10 +542,10 @@ function generarTodosLosSitemaps($opciones = []) {
     $resultado_categorias = generarSitemapCategorias();
     $resultados['sitemaps']['categorias'] = $resultado_categorias;
     
-    // Comparativas: pares de marcas de la misma categoría
-    $resultado_comparativas = generarSitemapComparativas($limite_comparativas);
-    $resultados['sitemaps']['comparativas'] = $resultado_comparativas;
-    
+    // Comparativas DESACTIVADAS: noindex + fuera del índice de sitemap (ver ruta /comparar/).
+    // ~5000 páginas programáticas con ~2 clics/90d quemaban crawl budget.
+    // $resultado_comparativas = generarSitemapComparativas($limite_comparativas);
+
     // Guías / Super Landings
     $resultado_guias = generarSitemapGuias();
     $resultados['sitemaps']['guias'] = $resultado_guias;

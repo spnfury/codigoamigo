@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 /**
  * Funciones para YouTube y extracción de productos
@@ -36,7 +37,7 @@ function callYoutubeAPIWithRotation($endpoint, $params) {
             $data = json_decode($response, true);
             // Si hay error de cuota, probar con la siguiente llave
             if (isset($data['error']['errors'][0]['reason']) && $data['error']['errors'][0]['reason'] === 'quotaExceeded') {
-                error_log("YouTube Quota exceeded for key: " . substr($key, 0, 8) . "...");
+                log_warning("YouTube Quota exceeded for key: " . substr($key, 0, 8) . "...");
                 continue;
             }
             
@@ -177,20 +178,10 @@ function extractProductNameGroq($title, $description = '') {
         'temperature' => 0.1 // Muy baja temperatura para ser preciso
     ];
 
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, defined('GROQ_API_URL') ? GROQ_API_URL : 'https://api.groq.com/openai/v1/chat/completions');
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . $api_key,
-        'Content-Type: application/json'
-    ]);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-
-    $response = curl_exec($ch);
-    $error = curl_error($ch);
-    curl_close($ch);
+    // Groq con rotación de claves + fallback de modelo (ver groq_request en ai_config)
+    $__g = groq_request($data, 10);
+    $response = $__g['body'];
+    $error = '';
 
     if (!$error) {
         $result = json_decode($response, true);

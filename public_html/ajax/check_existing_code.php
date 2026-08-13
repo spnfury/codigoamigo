@@ -55,7 +55,7 @@ try {
     }
 
 } catch (Exception $e) {
-    error_log("Error check_existing_code: " . $e->getMessage());
+    log_error("Error check_existing_code: " . $e->getMessage());
     echo json_encode(['success' => false, 'error' => 'Error, intente de nuevo']);
 }
 ?>

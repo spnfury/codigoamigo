@@ -81,12 +81,11 @@ function get_footer_modern() {
             <div class="container">
                 <div class="row">
                     <!-- Contacto -->
-                    <div class="col-md-4 col-sm-6">
+                    <div class="col-md-3 col-sm-6">
                         <div class="footer-column">
                             <div class="column-title">Contacto</div>
                             <ul class="footer-links">
                                 <li><a href="/contacto" class="footer-link">Contacto</a></li>
-                                <li><a href="/sobre-nosotros" class="footer-link">Sobre nosotros</a></li>
                                 <li><a href="/preguntas-frecuentes" class="footer-link">FAQ</a></li>
                                 <li><a href="https://t.me/spnfury" class="footer-link" target="_blank">Soporte técnico</a></li>
                             </ul>
@@ -94,21 +93,46 @@ function get_footer_modern() {
                     </div>
 
                     <!-- Recursos -->
-                    <div class="col-md-4 col-sm-6">
+                    <div class="col-md-3 col-sm-6">
                         <div class="footer-column">
                             <div class="column-title">Recursos</div>
                             <ul class="footer-links">
                                 <li><a href="/amazon" class="footer-link" style="color: #FF9900; font-weight: bold;">Amazon Gratis <i class="fas fa-star"></i></a></li>
                                 <li><a href="/nuevo_codigo" class="footer-link">Publicar código</a></li>
-                                <li><a href="/listado_marcas" class="footer-link">Todas las marcas</a></li>
-                                <li><a href="/destacados" class="footer-link">Códigos destacados</a></li>
+                                <li><a href="/listado-marcas" class="footer-link">Todas las marcas</a></li>
+                                <li><a href="/ultimos-codigos" class="footer-link">Últimos códigos</a></li>
                                 <li><a href="/blog" class="footer-link">Blog</a></li>
                             </ul>
                         </div>
                     </div>
 
+                    <!-- Guías -->
+                    <div class="col-md-3 col-sm-6">
+                        <div class="footer-column">
+                            <div class="column-title"><a href="/guias" class="footer-link" style="font-weight:inherit;color:inherit;">Guías</a></div>
+                            <ul class="footer-links">
+                                <?php
+                                if (!function_exists('get_active_super_landings')) {
+                                    $sl_fn = __DIR__ . '/_super_landing_functions.php';
+                                    if (file_exists($sl_fn)) { include_once $sl_fn; }
+                                }
+                                $footer_guias = function_exists('get_active_super_landings') ? get_active_super_landings(5) : [];
+                                if (!empty($footer_guias)) {
+                                    foreach ($footer_guias as $fg) {
+                                        $fg_slug = htmlspecialchars($fg['slug'] ?? '');
+                                        if ($fg_slug === '') continue;
+                                        $fg_title = htmlspecialchars($fg['title'] ?? ($fg['meta_title'] ?? 'Guía'));
+                                        echo '<li><a href="/guias/' . $fg_slug . '" class="footer-link">' . $fg_title . '</a></li>';
+                                    }
+                                }
+                                echo '<li><a href="/guias" class="footer-link" style="font-weight:600;">Ver todas las guías →</a></li>';
+                                ?>
+                            </ul>
+                        </div>
+                    </div>
+
                     <!-- Comunidad -->
-                    <div class="col-md-4 col-sm-12">
+                    <div class="col-md-3 col-sm-12">
                         <div class="footer-column">
                             <div class="column-title">Comunidad</div>
                             <p style="color: #cccccc; font-size: 0.9rem; margin-bottom: 15px;">

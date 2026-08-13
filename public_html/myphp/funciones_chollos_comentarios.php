@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 /**
  * Funciones para el sistema de comentarios de chollos
@@ -29,7 +30,7 @@ function getCollectionCholloComentarios() {
     try {
         return $db->selectCollection('chollo_comentarios');
     } catch (Throwable $e) {
-        error_log("Error al obtener colección de comentarios: " . $e->getMessage());
+        log_error("Error al obtener colección de comentarios: " . $e->getMessage());
         return null;
     }
 }
@@ -46,7 +47,7 @@ function getCollectionComentarioVotos() {
     try {
         return $db->selectCollection('comentario_votos');
     } catch (Throwable $e) {
-        error_log("Error al obtener colección de votos de comentarios: " . $e->getMessage());
+        log_error("Error al obtener colección de votos de comentarios: " . $e->getMessage());
         return null;
     }
 }
@@ -162,7 +163,7 @@ function crearComentario($datos) {
                         }
                     }
                 } catch (Throwable $e) {
-                    error_log("Error creando notificación: " . $e->getMessage());
+                    log_error("Error creando notificación: " . $e->getMessage());
                 }
             }
             
@@ -174,7 +175,7 @@ function crearComentario($datos) {
             return ['success' => false, 'error' => 'Error al crear comentario'];
         }
     } catch (Throwable $e) {
-        error_log("Error al crear comentario: " . $e->getMessage());
+        log_error("Error al crear comentario: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno'];
     }
 }
@@ -241,7 +242,7 @@ function obtenerComentarios($chollo_id, $orden = 'antiguos') {
         
         return $comentarios;
     } catch (Throwable $e) {
-        error_log("Error al obtener comentarios: " . $e->getMessage());
+        log_error("Error al obtener comentarios: " . $e->getMessage());
         return [];
     }
 }
@@ -347,7 +348,7 @@ function votarComentario($comentario_id, $usuario_id, $tipo) {
             ]
         ];
     } catch (Throwable $e) {
-        error_log("Error al votar comentario: " . $e->getMessage());
+        log_error("Error al votar comentario: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno'];
     }
 }
@@ -392,7 +393,7 @@ function editarComentario($comentario_id, $usuario_id, $texto) {
         
         return ['success' => $resultado->getModifiedCount() > 0];
     } catch (Throwable $e) {
-        error_log("Error al editar comentario: " . $e->getMessage());
+        log_error("Error al editar comentario: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno'];
     }
 }
@@ -444,7 +445,7 @@ function eliminarComentario($comentario_id, $usuario_id) {
             return ['success' => false, 'error' => 'No se pudo eliminar el comentario'];
         }
     } catch (Throwable $e) {
-        error_log("Error al eliminar comentario: " . $e->getMessage());
+        log_error("Error al eliminar comentario: " . $e->getMessage());
         return ['success' => false, 'error' => 'Error interno'];
     }
 }
@@ -524,7 +525,7 @@ function obtenerUltimosComentariosGlobales($limite = 5) {
         
         return $comentarios;
     } catch (Throwable $e) {
-        error_log("Error obteniendo últimos comentarios globales: " . $e->getMessage());
+        log_error("Error obteniendo últimos comentarios globales: " . $e->getMessage());
         return [];
     }
 }

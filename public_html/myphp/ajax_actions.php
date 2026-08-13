@@ -81,6 +81,10 @@ if ($_REQUEST) {
             editar_perfil($datos);
             break;
 
+        case "eliminar_cuenta":
+            eliminar_cuenta($datos);
+            break;
+
         case "desbanear_usuario":
             desbanear_usuario($datos);
             break;
@@ -276,15 +280,15 @@ if ($_REQUEST) {
                     // Score mínimo de 0.5 (recomendación oficial de Google para v3)
                     if ($recaptchaScore >= 0.5) {
                         $recaptchaValidado = true;
-                        error_log("reCAPTCHA OK: score $recaptchaScore (IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida') . ")");
+                        log_info("reCAPTCHA OK: score $recaptchaScore (IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida') . ")");
                     } else {
                         // Score bajo = posible spam
                         $motivoRechazo = "Score bajo: $recaptchaScore";
-                        error_log("reCAPTCHA score bajo: " . $recaptchaScore . " (IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida') . "). Usuario: " . ($datos['nombre'] ?? 'anon'));
+                        log_warning("reCAPTCHA score bajo: " . $recaptchaScore . " (IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida') . "). Usuario: " . ($datos['nombre'] ?? 'anon'));
                     }
                 } else {
                     $motivoRechazo = "Error validación: " . ($resultado['error'] ?? 'desconocido');
-                    error_log("reCAPTCHA validación fallida técnica: " . $motivoRechazo . " (IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida') . ")");
+                    log_warning("reCAPTCHA validación fallida técnica: " . $motivoRechazo . " (IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida') . ")");
                 }
             }
             
@@ -293,7 +297,7 @@ if ($_REQUEST) {
             // Si es un error técnico (invalid keys, timeout), también intentamos permitirlo si la IP es limpia.
             if (!$recaptchaValidado) {
                 if (permiteContactoSinRecaptcha()) {
-                    error_log("reCAPTCHA FALLBACK ACTIVADO (Motivo: $motivoRechazo). Permitiendo envío para IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'unk'));
+                    log_warning("reCAPTCHA FALLBACK ACTIVADO (Motivo: $motivoRechazo). Permitiendo envío para IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'unk'));
                     $recaptchaValidado = true; 
                     $datos['_sistema_nota'] = "Verificado mediante fallback de seguridad. Motivo: $motivoRechazo. IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'desconocida');
                 } else {
@@ -341,7 +345,12 @@ if ($_REQUEST) {
                     echo json_encode(['success' => false, 'message' => 'No autorizado']);
                     exit;
                 }
-                $nuevo_valor = !(isset($codigo['auto_renovar_destacado']) && $codigo['auto_renovar_destacado'] === true);
+                // Comparación laxa a propósito: el campo se guarda unas veces
+                // como booleano true y otras como entero 1 (p. ej. desde
+                // admin_dashboard.php). Con `=== true` un valor 1 se leía como
+                // "desactivado", así que el toggle lo volvía a poner en true y
+                // el usuario no podía desactivar la renovación nunca.
+                $nuevo_valor = empty($codigo['auto_renovar_destacado']);
                 $collection_codigos->updateOne(
                     ['_id' => new MongoDB\BSON\ObjectId($codigo_id)],
                     ['$set' => ['auto_renovar_destacado' => $nuevo_valor]]
@@ -384,10 +393,70 @@ function update_marca($datos)
 
 }
 
+function eliminar_cuenta($datos)
+{
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    if (!isset($_SESSION['user_id'])) {
+        echo json_encode(['success' => false, 'message' => 'No autorizado. Inicia sesión de nuevo.']);
+        return;
+    }
+    $password = $datos['password'] ?? '';
+    if ($password === '') {
+        echo json_encode(['success' => false, 'message' => 'Introduce tu contraseña para confirmar.']);
+        return;
+    }
+    try {
+        $col_usuarios = getCollectionUsuarios();
+        $col_codigos  = getCollectionCodigos();
+        $userId = new \MongoDB\BSON\ObjectId((string)$_SESSION['user_id']);
+        $usuario = $col_usuarios->findOne(['_id' => $userId]);
+        if (!$usuario) {
+            echo json_encode(['success' => false, 'message' => 'Usuario no encontrado.']);
+            return;
+        }
+        // Verificar contraseña (comparación en claro, igual que login)
+        if (($usuario['pass'] ?? '') !== $password) {
+            echo json_encode(['success' => false, 'message' => 'Contraseña incorrecta.']);
+            return;
+        }
+        // Anonimizar: borrar PII + estado=-3 (baja por usuario). Misma lógica que el API.
+        $col_usuarios->updateOne(
+            ['_id' => $userId],
+            ['$set' => [
+                'estado'   => -3,
+                'mail'     => '',
+                'username' => 'deleted_user_' . substr((string)$userId, -6),
+                'pass'     => '',
+                'img'      => '',
+                'desc'     => '',
+                'telefono' => '',
+                'deleted_at' => new \MongoDB\BSON\UTCDateTime(),
+                'baja_solicitada_via' => 'web_self_service',
+            ]]
+        );
+        // Desvincular códigos (el contenido público permanece sin PII)
+        $col_codigos->updateMany(
+            ['id_usuario' => $userId],
+            ['$set' => ['id_usuario' => null, 'owner_deleted_at' => new \MongoDB\BSON\UTCDateTime()]]
+        );
+        // Cerrar sesión
+        $_SESSION = [];
+        if (ini_get('session.use_cookies')) {
+            $p = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000, $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+        }
+        session_destroy();
+        echo json_encode(['success' => true, 'message' => 'Tu cuenta ha sido eliminada. Gracias por haber usado CódigoAmigo.']);
+    } catch (\Exception $e) {
+        log_error('eliminar_cuenta Error: ' . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'No se pudo eliminar la cuenta. Inténtalo más tarde.']);
+    }
+}
+
 function editar_perfil($datos)
 {
     try {
-        error_log("editar_perfil START with datos: " . json_encode($datos));
+        log_info("editar_perfil START with datos: " . json_encode($datos));
         $collection_usuarios = getCollectionUsuarios();
         
         // Preparar datos para actualizar
@@ -397,6 +466,7 @@ function editar_perfil($datos)
             'email_competencia' => isset($datos['email_competencia']) ? (int)$datos['email_competencia'] : 1,
             'email_aperturas' => isset($datos['email_aperturas']) ? (int)$datos['email_aperturas'] : 1,
             'email_destacados' => isset($datos['email_destacados']) ? (int)$datos['email_destacados'] : 1,
+            'email_reengagement' => isset($datos['email_reengagement']) ? (int)$datos['email_reengagement'] : 1,
         ];
         
         // Solo actualizar contraseña si se proporciona y no está vacía
@@ -413,13 +483,13 @@ function editar_perfil($datos)
             $updateData['whatsapp'] = $datos['whatsapp'];
         }
         
-        error_log("editar_perfil updateData: " . json_encode($updateData));
+        log_info("editar_perfil updateData: " . json_encode($updateData));
         $updateResult = $collection_usuarios->updateOne(
             ['mail' => $datos["correo"]],
             ['$set' => $updateData]
         );
         
-        error_log("editar_perfil Result - Matched: " . $updateResult->getMatchedCount() . ", Modified: " . $updateResult->getModifiedCount());
+        log_info("editar_perfil Result - Matched: " . $updateResult->getMatchedCount() . ", Modified: " . $updateResult->getModifiedCount());
         
         if ($updateResult->getModifiedCount() > 0 || $updateResult->getMatchedCount() > 0) {
             echo json_encode(['success' => true, 'message' => 'Usuario modificado correctamente']);
@@ -427,7 +497,7 @@ function editar_perfil($datos)
             echo json_encode(['success' => false, 'message' => 'No se realizaron cambios']);
         }
     } catch (Exception $e) {
-        error_log("editar_perfil Error: " . $e->getMessage());
+        log_error("editar_perfil Error: " . $e->getMessage());
         echo json_encode(['success' => false, 'message' => 'Error al modificar datos: ' . $e->getMessage()]);
     }
 }
@@ -578,7 +648,7 @@ function check_session() {
         }
     } catch (Exception $e) {
         // Error al obtener el usuario - sesión inválida
-        error_log("Error en check_session: " . $e->getMessage());
+        log_error("Error en check_session: " . $e->getMessage());
         clearCurrentSession();
         $response = [
             'success' => false,

@@ -1,6 +1,11 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 include_once __DIR__ . '/email_helper.php';
+// Plantilla visual moderna (_templateBaseDestacadoEmail) para las conversiones
+// que buscan patrocinados/VIP: los emails de este fichero usaban HTML suelto
+// con colores inconsistentes, en vez de la plantilla de marca ya existente.
+include_once __DIR__ . '/funciones_destacados_email.php';
 
 use SendGrid\Mail\To;
 use SendGrid\Mail\Cc;
@@ -44,7 +49,7 @@ use SendGrid\Mail\ReplyTo;
         if ($resultado['success']) {
             return "success";
         } else {
-            error_log("Error enviando email de contacto: " . $resultado['error']);
+            log_error("Error enviando email de contacto: " . $resultado['error']);
             return "error";
         }
 
@@ -92,7 +97,7 @@ use SendGrid\Mail\ReplyTo;
         // Comprobar preferencia del usuario destinatario
         $id_usuario_codigo = $codigo_to_show['id_usuario'] ?? null;
         if ($id_usuario_codigo && !usuarioAceptaEmail((string)$id_usuario_codigo, 'apertura_codigo')) {
-            error_log("Email apertura_codigo NO enviado a $correo: usuario ha desactivado esta notificación");
+            log_info("Email apertura_codigo NO enviado a $correo: usuario ha desactivado esta notificación");
             return;
         }
 
@@ -140,186 +145,44 @@ use SendGrid\Mail\ReplyTo;
     }
 
 
-    function enviar_buzz_codigo($data) {
-
-        global $url_logo_web;
-        session_start();
-
-        
-
-        /* INSERTO ZUMBIDO EN LA TABLA DE REGISTROS */
-        try {
-            $collection_zumbidos = getCollectionZumbidos();
-
-            $data = [
-                "id_codigo" => new \MongoDB\BSON\ObjectId($codigo["_id"]),
-                "id_user_a_enviar_zumbido" => $data["id_user"],
-                "user_id" => $_SESSION["user_id"],
-                "fecha_visita" => date('d-m-Y  H:i:s'),
-            ];
-
-            $collection_zumbidos->insertOne($data);
-
-        } catch(MongoDB\Driver\Exception\WriteException $e) {
-            $writeResult = $e->getWriteResult();
-            echo "Errores en MongoDB\n";
-        }
-        /* ZUMBIDOS */
-
-
-        /* ACTUALIZO SALDO ZUMBIDOS DEL USUARIo*/
-        try {
-
-            $collection_usuarios = getCollectionUsuarios();
-
-            $updateResult = $collection_usuarios->updateOne(
-                ['_id' => new \MongoDB\BSON\ObjectId($_SESSION["user_id"])],
-                ['$set' => ['zumbido_saldo' => $_SESSION["zumbido_saldo"]-1]]
-                );
-
-
-        } catch(MongoDB\Driver\Exception\WriteException $e) {
-            $writeResult = $e->getWriteResult();
-            echo "Errores en MongoDB\n";
-        }
-
-        $_SESSION["zumbido_saldo"]-=1;
-
-
-        echo $_SESSION["zumbido_saldo"];
-
-        $pre_codigo = $data['data_codigo_id'];
-
-        $obj_id_codigo = new \MongoDB\BSON\ObjectId($pre_codigo);
-        $codigo_to_show = getCodeByID($obj_id_codigo);
-
-        //echo "*".$data["id_user"]."*";
-        $obj_id_codigo_user = new \MongoDB\BSON\ObjectId($data["id_user_a_enviar_zumbido"]);
-        $u = getObjectUser('_id', $obj_id_codigo_user);
-
-        $correo = $u['mail'];
-        $nombre = $u['username'];
-        
-        /* END ACTUALIZO SALDO ZUMBIDOS */
-
-        $marca = get_object_marca("nombre_clave", $codigo_to_show['marca']);
-
-
-
-        $url_codigo = $data['url_codigo'];
-        $nombre_marca = $codigo_to_show['marca'];
-
-        $img_marca = $marca['imagen'];
-
-        $usuario_original = $data['usuario_original'];
-
-        $nombre_quien_ha_abierto = $_SESSION["username"];
-
-        $url = "https://www.codigoamigo.com/de-".$marca["nombre_clave"]."?codigo=".$pre_codigo;
-
-        $to = $correo;
-        
-        
-        
-
-        //$asunto = $nombre.", ".$nombre_quien_ha_abierto." te está esperando";
-        $asunto = $nombre.", ¡¿qué pasa con tu código de ".$nombre_marca."?!";
-
-//         $body = $nombre.", ".$nombre_quien_ha_abierto." es un CazaCódigos profesional.
-//                 Como ha visto que abriste su código de ".$nombre_marca."
-//                 Se muere de ganas porque lo apliques.
-//                 ¡Activa tu código, obtén tu promoción y haz feliz a ".$nombre_quien_ha_abierto."!
-//                 Ambos ganáis, ¿a qué esperas?";
-
-
-
-        $body = "Hola ".$nombre.",<br>
-        ¿Recuerdas que visitaste el código de ".$nombre_marca." en ".$url."?<br><br>
-        <img src='".$img_marca."' width='200px'>
-        <br>
-        <h1>¿No quieres ganar tu recompensa?</h1>
-
-        ¡".$nombre_quien_ha_abierto." está deseando que lo actives!
-
-
-        <br>Sabemos que algunos códigos, como el de ".$nombre_marca.", requieren un proceso de verificación para ganar tu recompensa.<br>
-        <br>
-        ¡Ya casi lo tienes! Finaliza el proceso y, ¡disfruta de tu premio!";
-
-//         $body = "<img src='".$url_logo_web."' alt='logo codigo amigo' /><br><br>";
-
-//         $body .= "<h1>Hola, ".$nombre."</h1>";
-
-//         $body .="<p>El usuario <b>".$usuario_original["username"]."</b> te acaba de quitar tu posición con tu código amigo de <b>".$nombre_marca."</b>
-
-//             <br>
-
-//             No dejes que esto pase, ¡el trono debe ser tuyo!
-
-//             <br>
-
-//             <a href='https://www.codigoamigo.com/destaca?codigo=".$codigo_to_show["_id"]."'>Haz click en este enlace</a>
-
-//             <br>¡Vamos!</p>";
-
-
-        
-
-        $email = new \SendGrid\Mail\Mail();
-        $email->setFrom("info@codigoamigo.com", "Código Amigo");
-        $email->setSubject($asunto);
-        $email->addTo($to, $nombre);
-        $email->addContent("text/plain", "and easy to do anywhere, even with PHP");
-        $email->addContent(
-            "text/html", $body
-            );
-
-        $sendgrid = new \SendGrid('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');
-        
-        try {
-            $response = $sendgrid->send($email);
-
-        } catch (Exception $e) {
-            echo 'Caught exception: '. $e->getMessage() ."\n";
-        }
-        
-        
-
-        /*
-         * AÑADO EN TABLA DE ZUMBIDOS
-         */
-
-
-    }
 
     function enviar_mail_codigo_no_destacado($codigo_to_show, $correo, $nombre, $url_codigo, $nombre_marca, $img_marca, $usuario_original) {
-
-        global $url_logo_web;
 
         // Comprobar preferencia del usuario destinatario
         $id_usuario_codigo = $codigo_to_show['id_usuario'] ?? null;
         if ($id_usuario_codigo && !usuarioAceptaEmail((string)$id_usuario_codigo, 'competencia')) {
-            error_log("Email competencia NO enviado a $correo: usuario ha desactivado esta notificación");
+            log_info("Email competencia NO enviado a $correo: usuario ha desactivado esta notificación");
             return false;
         }
 
         $to_email = $correo;
         $to_name = $nombre;
         $asunto = "Pst, tienes competencia en " . $nombre_marca;
+        $url_destacar = "https://www.codigoamigo.com/destacar_codigo?codigo=" . $codigo_to_show["_id"];
 
-        $html_content = "<img src='" . $url_logo_web . "' alt='logo codigo amigo' /><br><br>";
-        $html_content .= "<h1>Hola, " . $nombre . "</h1>";
-        $html_content .= "<p>El usuario <b>" . $usuario_original["username"] . "</b> te acaba de quitar tu posición con tu código amigo de <b>" . $nombre_marca . "</b></p>";
-        $html_content .= "<p>No dejes que esto pase, ¡el trono debe ser tuyo!</p>";
-        $html_content .= "<p><a href='https://www.codigoamigo.com/destacar_codigo?codigo=" . $codigo_to_show["_id"] . "' style='background: #E30613; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block;'>Haz click en este enlace</a></p>";
-        $html_content .= "<p><a href='https://www.codigoamigo.com/mis-anuncios' style='background: #6c757d; color: white; padding: 10px 18px; text-decoration: none; border-radius: 6px; display: inline-block;'>Ver mis códigos</a></p>";
-        $html_content .= "<p>¡Vamos!</p>";
+        // Plantilla de marca (antes HTML suelto sin mención a VIP, la vía de
+        // conversión recurrente que más interesa frente al destacar puntual)
+        $contenido = '
+            <p style="margin-top:0;">Hola <strong>' . htmlspecialchars($nombre) . '</strong>,</p>
+            <p>El usuario <strong>' . htmlspecialchars($usuario_original["username"]) . '</strong> te acaba de quitar tu posición con tu código amigo de <strong>' . htmlspecialchars($nombre_marca) . '</strong>.</p>
+            <div style="background-color:#fdf3f4;border:1px solid #f8d7da;border-radius:8px;padding:16px;margin:25px 0;">
+                <p style="margin:0;color:#c7254e;font-weight:600;">No dejes que esto pase, ¡el trono debe ser tuyo!</p>
+            </div>
+            <div style="background-color:#f4f7fa;padding:20px;border-radius:8px;border-left:4px solid #E30613;margin-top:20px;">
+                <p style="margin:0 0 8px 0;color:#222;font-weight:bold;font-size:15px;">&#11088; ¿Te pasa esto a menudo?</p>
+                <p style="margin:0;color:#555;font-size:14px;line-height:1.5;">Con <a href="https://www.codigoamigo.com/public/suscripcion_vip.php" style="color:#E30613;font-weight:bold;text-decoration:none;">VIP (9,99€/mes)</a> recibes 10€ de saldo cada mes para recuperar tu posición sin pensarlo, primer mes a mitad de precio.</p>
+            </div>
+            <div style="text-align:center;margin-top:25px;">
+                <a href="https://www.codigoamigo.com/mis-anuncios" style="color:#555555;text-decoration:none;font-weight:600;">Ver mis códigos</a>
+            </div>';
+
+        $html_content = _templateBaseDestacadoEmail('Nueva competencia en ' . htmlspecialchars($nombre_marca), $contenido, 'Recuperar mi posición', $url_destacar);
 
         $text_content = "Hola, " . $nombre . "\n\n" .
                        "El usuario " . $usuario_original["username"] . " te acaba de quitar tu posición con tu código amigo de " . $nombre_marca . "\n\n" .
                        "No dejes que esto pase, ¡el trono debe ser tuyo!\n\n" .
-                       "Haz click en este enlace para destacar tu código:\n" .
-                       "https://www.codigoamigo.com/destacar_codigo?codigo=" . $codigo_to_show["_id"] . "\n\n" .
+                       "Recuperar mi posición: " . $url_destacar . "\n\n" .
+                       "¿Te pasa a menudo? Hazte VIP por 9,99€/mes (primer mes a mitad de precio) y recibe 10€ de saldo cada mes: https://www.codigoamigo.com/public/suscripcion_vip.php\n\n" .
                        "Ver mis códigos: https://www.codigoamigo.com/mis-anuncios\n\n" .
                        "¡Vamos!";
 
@@ -338,9 +201,9 @@ use SendGrid\Mail\ReplyTo;
         );
 
         if (!$resultado['success']) {
-            error_log("Error enviando email de competencia a " . $to_email . ": " . $resultado['error']);
+            log_error("Error enviando email de competencia a " . $to_email . ": " . $resultado['error']);
         } else {
-            error_log("Email de competencia enviado correctamente a " . $to_email . " via " . $resultado['method']);
+            log_info("Email de competencia enviado correctamente a " . $to_email . " via " . $resultado['method']);
         }
 
         return $resultado['success'];
@@ -351,34 +214,39 @@ use SendGrid\Mail\ReplyTo;
 
     function enviar_mail_codigo_no_destacado_home($codigo_to_show, $correo, $nombre, $url_codigo, $nombre_marca, $img_marca, $usuario_original) {
 
-        global $url_logo_web;
-
         // Comprobar preferencia del usuario destinatario
         $id_usuario_codigo = $codigo_to_show['id_usuario'] ?? null;
         if ($id_usuario_codigo && !usuarioAceptaEmail((string)$id_usuario_codigo, 'competencia_home')) {
-            error_log("Email competencia_home NO enviado a $correo: usuario ha desactivado esta notificación");
+            log_info("Email competencia_home NO enviado a $correo: usuario ha desactivado esta notificación");
             return false;
         }
 
         $to_email = $correo;
         $to_name = $nombre;
         $asunto = "Pst, tienes competencia en " . $nombre_marca;
+        $url_destacar = "https://www.codigoamigo.com/destacar_codigo?codigo=" . $codigo_to_show["_id"];
 
-        $html_content = "<img src='" . $url_logo_web . "' alt='logo codigo amigo' /><br><br>";
-        $html_content .= "<h1>Hola, " . $nombre . "</h1>";
-        $html_content .= "<p>El usuario <b>" . $usuario_original["username"] . "</b> te acaba de quitar tu posición con tu código amigo de <b>" . $nombre_marca . "</b></p>";
-        $html_content .= "<p>No dejes que esto pase, ¡el trono debe ser tuyo!</p>";
-        $html_content .= "<p>Vuélvete a posicionar el primero en la portada!</p>";
-        $html_content .= "<p><a href='https://www.codigoamigo.com/destacar_codigo?codigo=" . $codigo_to_show["_id"] . "' style='background: #E30613; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block;'>Haz click en este enlace</a></p>";
-        $html_content .= "<p><a href='https://www.codigoamigo.com/mis-anuncios' style='background: #6c757d; color: white; padding: 10px 18px; text-decoration: none; border-radius: 6px; display: inline-block;'>Ver mis códigos</a></p>";
-        $html_content .= "<p>¡Vamos!</p>";
+        $contenido = '
+            <p style="margin-top:0;">Hola <strong>' . htmlspecialchars($nombre) . '</strong>,</p>
+            <p>El usuario <strong>' . htmlspecialchars($usuario_original["username"]) . '</strong> te acaba de quitar tu posición con tu código amigo de <strong>' . htmlspecialchars($nombre_marca) . '</strong>.</p>
+            <div style="background-color:#fdf3f4;border:1px solid #f8d7da;border-radius:8px;padding:16px;margin:25px 0;">
+                <p style="margin:0;color:#c7254e;font-weight:600;">No dejes que esto pase, ¡vuelve a ser el primero en la portada!</p>
+            </div>
+            <div style="background-color:#f4f7fa;padding:20px;border-radius:8px;border-left:4px solid #E30613;margin-top:20px;">
+                <p style="margin:0 0 8px 0;color:#222;font-weight:bold;font-size:15px;">&#11088; ¿Te pasa esto a menudo?</p>
+                <p style="margin:0;color:#555;font-size:14px;line-height:1.5;">Con <a href="https://www.codigoamigo.com/public/suscripcion_vip.php" style="color:#E30613;font-weight:bold;text-decoration:none;">VIP (9,99€/mes)</a> recibes 10€ de saldo cada mes para recuperar tu posición sin pensarlo, primer mes a mitad de precio.</p>
+            </div>
+            <div style="text-align:center;margin-top:25px;">
+                <a href="https://www.codigoamigo.com/mis-anuncios" style="color:#555555;text-decoration:none;font-weight:600;">Ver mis códigos</a>
+            </div>';
+
+        $html_content = _templateBaseDestacadoEmail('Nueva competencia en el home', $contenido, 'Recuperar mi posición', $url_destacar);
 
         $text_content = "Hola, " . $nombre . "\n\n" .
                        "El usuario " . $usuario_original["username"] . " te acaba de quitar tu posición con tu código amigo de " . $nombre_marca . "\n\n" .
-                       "No dejes que esto pase, ¡el trono debe ser tuyo!\n\n" .
-                       "Vuélvete a posicionar el primero en la portada!\n\n" .
-                       "Haz click en este enlace para destacar tu código:\n" .
-                       "https://www.codigoamigo.com/destacar_codigo?codigo=" . $codigo_to_show["_id"] . "\n\n" .
+                       "No dejes que esto pase, ¡vuelve a ser el primero en la portada!\n\n" .
+                       "Recuperar mi posición: " . $url_destacar . "\n\n" .
+                       "¿Te pasa a menudo? Hazte VIP por 9,99€/mes (primer mes a mitad de precio) y recibe 10€ de saldo cada mes: https://www.codigoamigo.com/public/suscripcion_vip.php\n\n" .
                        "Ver mis códigos: https://www.codigoamigo.com/mis-anuncios\n\n" .
                        "¡Vamos!";
 
@@ -397,9 +265,9 @@ use SendGrid\Mail\ReplyTo;
         );
 
         if (!$resultado['success']) {
-            error_log("Error enviando email de competencia home a " . $to_email . ": " . $resultado['error']);
+            log_error("Error enviando email de competencia home a " . $to_email . ": " . $resultado['error']);
         } else {
-            error_log("Email de competencia home enviado correctamente a " . $to_email . " via " . $resultado['method']);
+            log_info("Email de competencia home enviado correctamente a " . $to_email . " via " . $resultado['method']);
         }
 
         return $resultado['success'];
@@ -421,7 +289,7 @@ use SendGrid\Mail\ReplyTo;
             if (!$codigo_nuevo_info) {
                 $codigo_nuevo = getCodeByID(new \MongoDB\BSON\ObjectId($codigo_id_nuevo));
                 if (!$codigo_nuevo) {
-                    error_log("Error: No se pudo obtener información del código $codigo_id_nuevo");
+                    log_error("Error: No se pudo obtener información del código $codigo_id_nuevo");
                     return 0;
                 }
             } else {
@@ -431,7 +299,7 @@ use SendGrid\Mail\ReplyTo;
             // Obtener información del usuario que destacó
             $usuario_nuevo = getObjectUser('_id', new \MongoDB\BSON\ObjectId($usuario_id_nuevo));
             if (!$usuario_nuevo) {
-                error_log("Error: No se pudo obtener información del usuario $usuario_id_nuevo");
+                log_error("Error: No se pudo obtener información del usuario $usuario_id_nuevo");
                 return 0;
             }
             $datos_usuario_nuevo = get_array_de_usuario($usuario_nuevo);
@@ -440,14 +308,28 @@ use SendGrid\Mail\ReplyTo;
             $marca_nuevo = getObjectMarca('nombre_clave', $codigo_nuevo['marca']);
             $marca_nombre = $marca_nuevo['nombre'] ?? $codigo_nuevo['marca'];
 
-            // Obtener todos los códigos con destacado_social > 0 (los que están en el home)
+            // Códigos que están en el home (destacado_social > 0).
+            //
+            // Antes se avisaba a TODOS (299 usuarios por cada destacado nuevo):
+            // 1.026 emails en 30 días para 2 pagos = 513 emails por venta y
+            // 0,0049€ de ingreso por email (medido 2026-07-28). Ese volumen sin
+            // interacción degrada la reputación del dominio en Gmail y arrastra
+            // al resto de envíos (reengagement, verificaciones) hacia spam.
+            //
+            // Ahora solo se avisa a quien tiene algo concreto que perder: los
+            // que están al final de la cola del home, que son los que el nuevo
+            // destacado desplaza. Mensaje más urgente y ~90% menos volumen.
             $collection_codigos = getCollectionCodigos();
             $filtro_home = [
                 'estado' => 0,
                 'destacado_social' => ['$gt' => 0]
             ];
 
-            $codigos_home = $collection_codigos->find($filtro_home)->toArray();
+            $tope_destinatarios = 30;
+            $codigos_home = $collection_codigos->find($filtro_home, [
+                'sort'  => ['destacado_social' => 1, '_id' => 1], // los más débiles primero
+                'limit' => $tope_destinatarios + 5,               // margen por exclusiones
+            ])->toArray();
 
             // Obtener usuarios únicos que tienen códigos en el home
             $usuarios_home = [];
@@ -477,15 +359,25 @@ use SendGrid\Mail\ReplyTo;
                 $datos_usuario_home = get_array_de_usuario($usuario_home);
                 $email_usuario = strtolower(trim($datos_usuario_home['mail'] ?? ''));
 
-                // Evitar duplicados y emails vacíos
+                // Evitar duplicados, emails vacíos y emails malformados
                 if (empty($email_usuario) || isset($emails_enviados[$email_usuario])) {
+                    continue;
+                }
+                if (!filter_var($email_usuario, FILTER_VALIDATE_EMAIL)) {
+                    log_warning("Email competencia_home_super inválido, saltado: $email_usuario (usuario $usuario_id_home)");
+                    $emails_enviados[$email_usuario] = true;
                     continue;
                 }
 
                 // Comprobar preferencia del usuario destinatario
                 if (!usuarioAceptaEmail($usuario_id_home, 'competencia_home_super')) {
-                    error_log("Email competencia_home_super NO enviado a $email_usuario: usuario ha desactivado esta notificación");
+                    log_info("Email competencia_home_super NO enviado a $email_usuario: usuario ha desactivado esta notificación");
                     continue;
+                }
+
+                // Tope duro de destinatarios por disparo (ver nota arriba)
+                if ($emails_enviados_count >= $tope_destinatarios) {
+                    break;
                 }
 
                 // Marcar email como enviado
@@ -543,24 +435,22 @@ use SendGrid\Mail\ReplyTo;
 
                 if ($resultado['success']) {
                     $emails_enviados_count++;
-                    error_log("Email de competencia home (super) enviado a " . $to_email);
+                    log_info("Email de competencia home (super) enviado a " . $to_email);
                 } else {
-                    error_log("Error enviando email de competencia home (super) a " . $to_email . ": " . $resultado['error']);
+                    log_error("Error enviando email de competencia home (super) a " . $to_email . ": " . $resultado['error']);
                 }
             }
 
-            error_log("Total de emails de competencia home enviados: $emails_enviados_count");
+            log_info("Total de emails de competencia home enviados: $emails_enviados_count");
             return $emails_enviados_count;
 
         } catch (Exception $e) {
-            error_log("Error en notificar_competencia_home_destacado_super: " . $e->getMessage());
+            log_error("Error en notificar_competencia_home_destacado_super: " . $e->getMessage());
             return 0;
         }
     }
 
     function enviar_mail_codigo_publicado($codigo_data, $user_data) {
-        global $url_logo_web;
-
         $to_email = $user_data["mail"];
         $to_name = $user_data["username"];
         $asunto = "¡Tu código de " . $codigo_data["marca"] . " ha sido publicado!";
@@ -574,32 +464,43 @@ use SendGrid\Mail\ReplyTo;
         $url_editar = "https://www.codigoamigo.com/modificar_codigo/" . $codigo_data["_id"];
         $url_destacar = "https://www.codigoamigo.com/destaca?codigo=" . $codigo_data["_id"];
 
-        $html_content = "<img src='" . $url_logo_web . "' alt='logo codigo amigo' /><br><br>";
-        $html_content .= "<h1>¡Enhorabuena " . $user_data["username"] . "!</h1>";
-        $html_content .= "<p>Tu código de <b>" . $codigo_data["marca"] . "</b> ya está publicado y listo para generar beneficios.</p>";
+        // Contenido con la plantilla de marca (_templateBaseDestacadoEmail), no HTML
+        // suelto: antes este email (el de mayor volumen, se manda en cada publicación)
+        // usaba botones verde/azul sin relación con la marca y nunca mencionaba VIP,
+        // que es la vía de conversión recurrente que más interesa al negocio.
+        $contenido = '
+            <p style="margin-top:0;">¡Enhorabuena <strong>' . htmlspecialchars($user_data["username"]) . '</strong>!</p>
+            <p>Tu código de <strong>' . htmlspecialchars($codigo_data["marca"]) . '</strong> ya está publicado y listo para generar beneficios.</p>
 
-        // Botones de acción
-        $html_content .= "<div style='margin: 20px 0;'>";
-        $html_content .= "<a href='" . $url_codigo . "' style='background: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; margin-right: 10px;'>Ver Código</a>";
-        $html_content .= "<a href='" . $url_editar . "' style='background: #2196F3; color: white; padding: 10px 20px; text-decoration: none;'>Editar Código</a>";
-        $html_content .= "</div>";
+            <div style="text-align:center;margin:20px 0;">
+                <a href="' . htmlspecialchars($url_codigo) . '" style="color:#E30613;text-decoration:none;font-weight:600;margin-right:20px;">Ver código</a>
+                <a href="' . htmlspecialchars($url_editar) . '" style="color:#555555;text-decoration:none;font-weight:600;">Editar código</a>
+            </div>
 
-        // Sección destacada
-        $html_content .= "<div style='background: #FFF3CD; border: 2px solid #FFE69C; padding: 20px; margin: 30px 0; border-radius: 5px;'>";
-        $html_content .= "<h2 style='color: #856404; margin-top: 0;'>🚀 ¡Multiplica tus ingresos por 100!</h2>";
-        $html_content .= "<p>¿Sabías que puedes multiplicar tus ganancias destacando tu código? Los códigos destacados reciben hasta 100 veces más visitas.</p>";
-        $html_content .= "<a href='" . $url_destacar . "' style='background: #FFC107; color: #000; padding: 15px 30px; text-decoration: none; display: inline-block; margin-top: 10px; font-weight: bold;'>¡Destacar mi código ahora!</a>";
-        $html_content .= "</div>";
+            <div style="background-color:#fdf3f4;border:1px solid #f8d7da;border-radius:8px;padding:16px;margin:25px 0;">
+                <p style="margin:0;color:#c7254e;font-weight:700;font-size:15px;">&#128640; Multiplica tus visitas destacando tu código</p>
+                <p style="margin:8px 0 0 0;color:#a94442;font-size:14px;">Los códigos destacados reciben hasta 100 veces más visitas que uno normal. Por solo 0,99€ tu código sube de posición.</p>
+                <div style="text-align:center;margin-top:15px;">
+                    <a href="' . htmlspecialchars($url_destacar) . '" style="background:#E30613;color:white;padding:12px 28px;text-decoration:none;border-radius:8px;font-weight:bold;font-size:15px;display:inline-block;">¡Destacar mi código ahora!</a>
+                </div>
+            </div>
 
-        $html_content .= "<p>Recuerda que si tienes cualquier duda, pregunta o sugerencia, puedes hacernosla llegar a <b>info@codigoamigo.com</b></p>";
+            <div style="background-color:#f4f7fa;padding:20px;border-radius:8px;border-left:4px solid #E30613;margin-top:20px;">
+                <p style="margin:0 0 8px 0;color:#222;font-weight:bold;font-size:15px;">&#11088; ¿Publicas códigos a menudo?</p>
+                <p style="margin:0;color:#555;font-size:14px;line-height:1.5;">Hazte <a href="https://www.codigoamigo.com/public/suscripcion_vip.php" style="color:#E30613;font-weight:bold;text-decoration:none;">Usuario VIP por 9,99€/mes</a> y recibe 10€ de saldo gratis cada mes para destacar tus códigos sin pagar de tu bolsillo, badge verificado y chat ilimitado con quien te contacte. El primer mes, a mitad de precio.</p>
+            </div>
+
+            <p style="margin-top:25px;">Si tienes cualquier duda, pregunta o sugerencia, escríbenos a <strong>info@codigoamigo.com</strong></p>';
+
+        $html_content = _templateBaseDestacadoEmail('¡Código publicado!', $contenido);
 
         $text_content = "¡Enhorabuena " . $user_data["username"] . "!\n\n" .
                        "Tu código de " . $codigo_data["marca"] . " ya está publicado y listo para generar beneficios.\n\n" .
                        "Enlaces de acceso:\n" .
                        "Ver código: " . $url_codigo . "\n" .
                        "Editar código: " . $url_editar . "\n\n" .
-                       "¿Sabías que puedes multiplicar tus ganancias destacando tu código? Los códigos destacados reciben hasta 100 veces más visitas.\n\n" .
-                       "Destacar código: " . $url_destacar . "\n\n" .
+                       "Los códigos destacados reciben hasta 100 veces más visitas. Destacar código (0,99€): " . $url_destacar . "\n\n" .
+                       "¿Publicas a menudo? Hazte VIP por 9,99€/mes (primer mes a mitad de precio) y recibe 10€ de saldo gratis cada mes, badge verificado y chat ilimitado: https://www.codigoamigo.com/public/suscripcion_vip.php\n\n" .
                        "Recuerda que si tienes cualquier duda, pregunta o sugerencia, puedes hacernosla llegar a info@codigoamigo.com";
 
         // Usar el sistema de envío con registro en logs
@@ -617,9 +518,9 @@ use SendGrid\Mail\ReplyTo;
         );
 
         if (!$resultado['success']) {
-            error_log("Error enviando email de código publicado a " . $to_email . ": " . $resultado['error']);
+            log_error("Error enviando email de código publicado a " . $to_email . ": " . $resultado['error']);
         } else {
-            error_log("Email de código publicado enviado correctamente a " . $to_email . " via " . $resultado['method']);
+            log_info("Email de código publicado enviado correctamente a " . $to_email . " via " . $resultado['method']);
         }
 
         return $resultado['success'];

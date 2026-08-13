@@ -120,15 +120,29 @@ $total_codigos_vistos = count($codigos_vistos_ids);
 $count_conseguidos = 0;
 $count_activos = 0;
 $count_no_contactados = 0;
+// Beneficio realmente cobrado, separado del que aún está por cerrar.
+// Antes la cabecera solo enseñaba $total_potencial (la suma de TODOS los leads
+// como si fueran a convertir). En todo el sitio hay 1 lead completado sobre
+// 4.238, así que esa cifra prometía cientos de euros a quien había ganado 5.
+$total_ganado = 0;
+$total_en_juego = 0;
 foreach ($viewers as $v) {
+    $beneficio = (float)($v['codigo_beneficio'] ?? 0);
     if (!empty($v['completado'])) {
         $count_conseguidos++;
+        $total_ganado += $beneficio;
     } else {
         $count_activos++;
+        $total_en_juego += $beneficio;
         if (empty($v['contacted'])) {
             $count_no_contactados++;
         }
     }
+}
+
+/** Formato español: 2.827€, no 2,827€ (number_format por defecto usa el inglés). */
+function fmt_eur($n) {
+    return number_format((float)$n, 0, ',', '.') . '€';
 }
 
 // Encontrar código top
@@ -160,19 +174,22 @@ get_header_modern($title, $description, '', '', '', true);
     position: relative;
 }
 
-/* --- Header --- */
+/* --- Header ---
+   Ocupaba 71px con un título de 2rem y un subtítulo que explica lo evidente a
+   partir de la segunda visita. Se reduce para que la lista de leads —que es lo
+   que se viene a ver— entre antes en pantalla. */
 .leads-header {
-    margin-bottom: 35px;
+    margin-bottom: 16px;
 }
 
 .leads-title {
-    font-size: 2rem;
+    font-size: 1.55rem;
     font-weight: 800;
     color: #fff;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 12px;
     flex-wrap: wrap;
 }
 
@@ -184,90 +201,75 @@ get_header_modern($title, $description, '', '', '', true);
 }
 
 .leads-subtitle {
-    color: rgba(255,255,255,0.5);
-    font-size: 1rem;
+    color: rgba(255,255,255,0.45);
+    font-size: 0.85rem;
+    margin: 0;
 }
 
-/* --- Stats Grid --- */
-.leads-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-bottom: 35px;
-}
-
-@media (max-width: 768px) {
-    .leads-stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (max-width: 420px) {
-    .leads-stats-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-.lead-stat-card {
+/* --- Resumen compacto --- */
+.leads-resumen {
+    display: flex;
+    align-items: stretch;
     background: rgba(255,255,255,0.04);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 16px;
-    padding: 22px 18px;
-    text-align: center;
-    transition: all 0.3s ease;
-    position: relative;
+    border-radius: 14px;
     overflow: hidden;
+    margin-bottom: 24px;
 }
-
-.lead-stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    border-radius: 16px 16px 0 0;
+.lead-res-item {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 14px 8px;
+    text-align: center;
+    background: transparent;
+    border: none;
+    border-right: 1px solid rgba(255,255,255,0.07);
+    font-family: inherit;
+    min-width: 0;
 }
-
-.lead-stat-card:nth-child(1)::before { background: linear-gradient(90deg, #667eea, #764ba2); }
-.lead-stat-card:nth-child(2)::before { background: linear-gradient(90deg, #f093fb, #f5576c); }
-.lead-stat-card:nth-child(3)::before { background: linear-gradient(90deg, #4facfe, #00f2fe); }
-.lead-stat-card:nth-child(4)::before { background: linear-gradient(90deg, #ffd700, #E30613); }
-
-.lead-stat-card:hover {
-    border-color: rgba(255,255,255,0.15);
-    transform: translateY(-3px);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-}
-
-.lead-stat-icon {
-    font-size: 1.4rem;
-    margin-bottom: 10px;
-    opacity: 0.7;
-}
-
-.lead-stat-card:nth-child(1) .lead-stat-icon { color: #667eea; }
-.lead-stat-card:nth-child(2) .lead-stat-icon { color: #f093fb; }
-.lead-stat-card:nth-child(3) .lead-stat-icon { color: #4facfe; }
-.lead-stat-card:nth-child(4) .lead-stat-icon { color: #ffd700; }
-
-.lead-stat-value {
-    font-size: 2rem;
+.lead-res-item:last-child { border-right: none; }
+.lead-res-value {
+    font-size: 1.5rem;
     font-weight: 800;
     color: #fff;
     line-height: 1.1;
-    margin-bottom: 6px;
+    white-space: nowrap;
 }
-
-.lead-stat-label {
-    font-size: 0.8rem;
+.lead-res-label {
+    font-size: 0.72rem;
     color: rgba(255,255,255,0.45);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.4px;
     font-weight: 600;
+    line-height: 1.3;
 }
+.lead-res-label em {
+    display: block;
+    font-style: normal;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+    font-size: 0.68rem;
+    color: rgba(255,255,255,0.3);
+    margin-top: 2px;
+}
+/* El único color de la tira es el de lo que pide acción, y es el único
+   elemento pulsable: al tocarlo filtra la lista. */
+.lead-res-accion { cursor: pointer; }
+.lead-res-accion .lead-res-value { color: #ffd700; }
+.lead-res-accion .lead-res-label { color: rgba(255,215,0,0.7); }
+.lead-res-accion:hover { background: rgba(255,215,0,0.07); }
+.lead-res-accion:active { background: rgba(255,215,0,0.12); }
+
+@media (max-width: 380px) {
+    .lead-res-value { font-size: 1.3rem; }
+    .lead-res-item { padding: 12px 6px; }
+}
+
 
 /* --- Section Title --- */
 .leads-section-header {
@@ -939,27 +941,42 @@ get_header_modern($title, $description, '', '', '', true);
         </p>
     </div>
     
-    <!-- Stats Grid -->
-    <div class="leads-stats-grid">
-        <div class="lead-stat-card">
-            <div class="lead-stat-icon"><i class="fas fa-crosshairs"></i></div>
-            <div class="lead-stat-value"><?php echo $total_viewers; ?></div>
-            <div class="lead-stat-label">Leads totales</div>
+    <!-- Resumen.
+         Antes eran cuatro tarjetas en rejilla que ocupaban 292px de alto en
+         móvil (el 67% de la primera pantalla junto con el título) para enseñar
+         cuatro números que no llevaban a ninguna acción: leads totales, códigos
+         vistos, potencial y código top. Encima tenían :hover con elevación y
+         sombra, así que parecían pulsables sin serlo.
+         Ahora es una tira de ~72px con lo que sí cambia lo que haces: cuántos
+         quedan sin contactar (que además filtra la lista al tocarlo) y cuánto
+         se ha cobrado de verdad. -->
+    <div class="leads-resumen">
+        <div class="lead-res-item">
+            <span class="lead-res-value"><?php echo (int)$total_viewers; ?></span>
+            <span class="lead-res-label">Leads</span>
         </div>
-        <div class="lead-stat-card">
-            <div class="lead-stat-icon"><i class="fas fa-tags"></i></div>
-            <div class="lead-stat-value"><?php echo $total_codigos_vistos; ?></div>
-            <div class="lead-stat-label">Códigos vistos</div>
+
+        <?php if ($count_no_contactados > 0): ?>
+        <button type="button" class="lead-res-item lead-res-accion" onclick="filterLeads('no_contactados')"
+                title="Ver solo los leads que aún no has contactado">
+            <span class="lead-res-value"><?php echo (int)$count_no_contactados; ?></span>
+            <span class="lead-res-label">Sin contactar</span>
+        </button>
+        <?php else: ?>
+        <div class="lead-res-item">
+            <span class="lead-res-value"><?php echo (int)$count_activos; ?></span>
+            <span class="lead-res-label">Activos</span>
         </div>
-        <div class="lead-stat-card">
-            <div class="lead-stat-icon"><i class="fas fa-coins"></i></div>
-            <div class="lead-stat-value"><?php echo number_format($total_potencial, 0); ?>€</div>
-            <div class="lead-stat-label">Potencial</div>
-        </div>
-        <div class="lead-stat-card">
-            <div class="lead-stat-icon"><i class="fas fa-trophy"></i></div>
-            <div class="lead-stat-value" style="font-size: <?php echo strlen($codigo_top_marca) > 10 ? '1.1rem' : '1.5rem'; ?>"><?php echo htmlspecialchars($codigo_top_marca); ?></div>
-            <div class="lead-stat-label">Código top<?php if ($codigo_top_count > 0) echo " ($codigo_top_count leads)"; ?></div>
+        <?php endif; ?>
+
+        <div class="lead-res-item">
+            <span class="lead-res-value"><?php echo fmt_eur($total_ganado); ?></span>
+            <span class="lead-res-label">
+                Ganado
+                <?php if ($total_en_juego > 0): ?>
+                    <em><?php echo fmt_eur($total_en_juego); ?> en juego</em>
+                <?php endif; ?>
+            </span>
         </div>
     </div>
 
@@ -997,16 +1014,28 @@ get_header_modern($title, $description, '', '', '', true);
     </div>
     <?php endif; ?>
 
-    <?php if (!$is_vip && $total_viewers > 0): ?>
-    <!-- VIP Upsell -->
+    <?php if (!$is_vip): ?>
+    <!-- VIP Upsell (visible también sin leads: antes exigía $total_viewers > 0
+         y un usuario sin leads no tenía ninguna vía para suscribirse) -->
     <div class="leads-vip-upsell">
         <?php $leads_urgencia = $count_no_contactados > 0 ? $count_no_contactados : $total_viewers; ?>
+        <?php if ($total_viewers > 0): ?>
         <h3><i class="fas fa-crown"></i> Tienes <?php echo $leads_urgencia; ?> <?php echo $count_no_contactados > 0 ? 'leads sin contactar' : 'leads esperando'; ?></h3>
+        <?php else: ?>
+        <h3><i class="fas fa-crown"></i> Saca el máximo partido a tus códigos</h3>
+        <?php endif; ?>
         <p>
-            <?php if ($total_potencial > 0): ?>
-            Hasta <strong><?php echo number_format($total_potencial, 0); ?>€</strong> en beneficios potenciales esperándote.
+            <?php if ($total_en_juego > 0): ?>
+            <!-- Se habla de lo que hay en juego en los leads pendientes, no de un
+                 "hasta X€" que suma todos los leads como si fueran a convertir.
+                 Mismo criterio que la tira de arriba. -->
+            Tienes <strong><?php echo fmt_eur($total_en_juego); ?></strong> en juego entre los leads que aún no has cerrado.
             <?php endif; ?>
+            <?php if ($total_viewers > 0): ?>
             Hazte VIP para escribir directamente a los usuarios que han visto tus códigos y ayudarles a completar el proceso. Ambos ganáis.
+            <?php else: ?>
+            Hazte VIP y podrás escribir directamente a los usuarios que vean tus códigos para ayudarles a completar el proceso. Ambos ganáis.
+            <?php endif; ?>
         </p>
         <button class="btn-upgrade-vip" id="btnSubscribeVip">
             <i class="fas fa-bolt"></i>
@@ -1150,7 +1179,7 @@ get_header_modern($title, $description, '', '', '', true);
             </div>
             
             <div class="lead-potential">
-                <div class="lead-potential-amount">+<?php echo number_format($viewer['codigo_beneficio'], 0); ?>€</div>
+                <div class="lead-potential-amount">+<?php echo fmt_eur($viewer['codigo_beneficio']); ?></div>
                 <div class="lead-potential-label">beneficio</div>
             </div>
             
@@ -1220,11 +1249,22 @@ get_header_modern($title, $description, '', '', '', true);
         </div>
     </div>
 </div>
+<?php endif; // fin del modal de mensaje masivo (solo VIP con más de un lead) ?>
 
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<!-- Este script va FUERA del condicional de VIP a propósito.
+     Estaba dentro de `if ($is_vip && $total_viewers > 1)`, así que a un usuario
+     no VIP no se le definía filterLeads() y los filtros de leads ("Sin
+     contactar", "Conseguidos", "Todos") no hacían nada: el onclick lanzaba un
+     ReferenceError y la lista se quedaba igual. Justo los usuarios a los que
+     hay que convencer para que se hagan VIP.
+     Mismo fallo que tuvo el botón Cancelar con SweetAlert el 2026-07-30.
+     Las funciones de envío masivo se quedan aquí pero solo se invocan desde
+     botones que no existen sin VIP, y toleran que falten sus elementos. -->
 <script>
 function toggleSelectAll() {
-    const isChecked = document.getElementById('selectAll').checked;
+    const selAll = document.getElementById('selectAll');
+    if (!selAll) return;
+    const isChecked = selAll.checked;
     // Only select visible ones
     const checkboxes = document.querySelectorAll('.lead-card:not(.filtered-out) .viewer-checkbox');
     checkboxes.forEach(cb => cb.checked = isChecked);
@@ -1325,70 +1365,127 @@ async function sendMassMessage() {
     }
 }
 </script>
-<?php endif; ?>
+
+<!-- SweetAlert2: lo usan los botones de gestión VIP (cancelar, reactivar,
+     retención) y el upsell de cualquier usuario — debe cargarse siempre.
+     Antes solo se cargaba dentro del bloque de mensaje masivo
+     ($is_vip && $total_viewers > 1) y el botón Cancelar no hacía nada
+     para VIPs con 0-1 leads (bug reportado 2026-07-30). -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <!-- Custom VIP Modal Overlay (No dependencies) -->
-<div id="custom-vip-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1050; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
-    <div style="background: #1a1a2e; border-radius: 20px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); width: 90%; max-width: 500px; box-shadow: 0 25px 80px rgba(0,0,0,0.5); animation: vipModalPop 0.3s ease; position: relative;">
+<div id="custom-vip-modal" class="vipm-overlay">
+    <div class="vipm-card">
         <!-- Header -->
-        <div style="background: linear-gradient(135deg, #ffd700 0%, #E30613 100%); padding: 18px 25px; position: relative;">
-            <h5 style="margin: 0; color: white; font-weight: 800; font-size: 1.25rem; display: flex; align-items: center; gap: 10px;">
-                <i class="fas fa-crown"></i> VENTAJAS VIP
-            </h5>
-            <button onclick="document.getElementById('custom-vip-modal').style.display='none'" style="position: absolute; right: 20px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: white; font-size: 28px; cursor: pointer; line-height: 1;">&times;</button>
+        <div class="vipm-head">
+            <h5><i class="fas fa-crown"></i> Contacta con tu lead</h5>
+            <button type="button" class="vipm-close" onclick="document.getElementById('custom-vip-modal').style.display='none'" aria-label="Cerrar">&times;</button>
         </div>
-        <!-- Body -->
-        <div style="padding: 30px; text-align: left;">
-            
-            <div style="background: rgba(255, 215, 0, 0.1); border: 1px solid rgba(255, 215, 0, 0.2); border-radius: 12px; padding: 20px 15px; margin-bottom: 20px; text-align: center;">
-                <p style="margin: 0; font-size: 1.1rem; color: rgba(255,255,255,0.95); line-height: 1.6;">
-                    ¡Estás a un paso de conseguir <strong style="color: #4ade80; font-size: 1.3rem;">+<span id="vip-modal-benefit"></span>€</strong> de beneficio!<br><br>
-                    Contacta con <strong style="color: #fff;" id="vip-modal-username"></strong> para ayudarle con tu código de <strong style="color: #fff;" id="vip-modal-brand"></strong> y asegurar tu referido.<br><br>
-                    <span style="font-size: 0.95rem; color: rgba(255,255,255,0.6);">Hablar directamente con los leads es una función VIP.</span><br>
-                    <strong style="color: #ffd700; font-size: 1.15rem; margin-top: 5px; display: block;">¡Hazte VIP y contacta sin límites!</strong>
-                </p>
-            </div>
-            
-            <div style="background: rgba(255, 69, 58, 0.1); border: 1px solid rgba(255, 69, 58, 0.3); border-radius: 10px; padding: 12px 15px; margin-bottom: 25px; display: flex; align-items: center; gap: 15px;">
-                <div style="font-size: 24px; color: #ff453a; animation: pulseRed 2s infinite;"><i class="fas fa-hourglass-half"></i></div>
-                <div style="font-size: 0.95rem; color: rgba(255,255,255,0.85); line-height: 1.4; text-align: left;">
-                    <strong style="color: #ff453a;">La probabilidad de referido baja cada minuto:</strong> El usuario vio tu código <strong style="color: #fff;" id="vip-modal-time"></strong>. ¡Actúa rápido antes de que busque otra alternativa en internet!
-                </div>
-            </div>
-            
-            <ul style="list-style: none; padding: 0; margin: 0 0 25px 0;">
-                <li style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; color: rgba(255,255,255,0.85); font-size: 0.95rem;">
-                    <i class="fas fa-check-circle" style="color: #ffd700; margin-top: 3px; font-size: 1.1rem;"></i>
-                    <span><strong style="color: #fff;">Chat Ilimitado:</strong> Contacta y ayuda a los usuarios que ven tus códigos para asegurar tus referidos.</span>
-                </li>
-                <li style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; color: rgba(255,255,255,0.85); font-size: 0.95rem;">
-                    <i class="fas fa-check-circle" style="color: #ffd700; margin-top: 3px; font-size: 1.1rem;"></i>
-                    <span><strong style="color: #fff;">Badge VIP Verificado:</strong> Gana confianza y obtén hasta un 40% más de clics en tus códigos.</span>
-                </li>
-                <li style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; color: rgba(255,255,255,0.85); font-size: 0.95rem;">
-                    <i class="fas fa-check-circle" style="color: #ffd700; margin-top: 3px; font-size: 1.1rem;"></i>
-                    <span><strong style="color: #fff;">IA Ilimitada:</strong> Completa todas las descripciones de tus códigos con inteligencia artificial profesional.</span>
-                </li>
-                <li style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 0; color: rgba(255,255,255,0.85); font-size: 0.95rem;">
-                    <i class="fas fa-check-circle" style="color: #ffd700; margin-top: 3px; font-size: 1.1rem;"></i>
-                    <span><strong style="color: #fff;">10€ de Saldo Mensual:</strong> Recibe 10€ cada mes para destacar tus códigos totalmente gratis.</span>
-                </li>
-            </ul>
 
-            <div style="text-align: center;">
-                <button id="btnSubscribeMisLeads" style="display: inline-flex; justify-content: center; align-items: center; gap: 10px; background: linear-gradient(135deg, #ffd700 0%, #E30613 100%); color: white; border: none; padding: 14px 35px; border-radius: 30px; font-weight: bold; font-size: 1.1rem; text-decoration: none; cursor: pointer; box-shadow: 0 4px 15px rgba(227, 6, 19, 0.4); width: 100%; transition: transform 0.2s ease;">
-                    <span class="btn-text">QUIERO SER VIP POR 9,99€</span>
-                    <span class="spinner" style="display: none;"><i class="fas fa-spinner fa-spin"></i></span>
-                </button>
-                <p style="margin-top: 15px; margin-bottom: 0; color: rgba(255,255,255,0.4); font-size: 0.85rem;">
-                    Cancela en cualquier momento con un solo clic.
-                </p>
-            </div>
+        <!-- Cuerpo: es lo único que hace scroll -->
+        <div class="vipm-body">
+            <p class="vipm-hook">
+                Estás a un paso de <strong>+<span id="vip-modal-benefit"></span>€</strong>
+            </p>
+            <p class="vipm-sub">
+                <strong id="vip-modal-username"></strong> vio tu código de
+                <strong id="vip-modal-brand"></strong> <strong id="vip-modal-time"></strong>.
+                Escríbele antes de que busque otra alternativa.
+            </p>
+
+            <ul class="vipm-list">
+                <li><i class="fas fa-check-circle"></i> Chat ilimitado con tus leads</li>
+                <li><i class="fas fa-check-circle"></i> Badge VIP: hasta <strong>+40%</strong> de clics</li>
+                <li><i class="fas fa-check-circle"></i> IA ilimitada en tus descripciones</li>
+                <li><i class="fas fa-check-circle"></i> <strong>10€</strong> de saldo cada mes</li>
+            </ul>
+        </div>
+
+        <!-- Pie fijo: el CTA nunca queda fuera de pantalla -->
+        <div class="vipm-foot">
+            <button id="btnSubscribeMisLeads">
+                <span class="btn-text">Hazte VIP · 4,99€ el primer mes</span>
+                <span class="spinner" style="display: none;"><i class="fas fa-spinner fa-spin"></i></span>
+            </button>
+            <p class="vipm-legal">Luego 9,99€/mes. Cancelas cuando quieras.</p>
         </div>
     </div>
 </div>
 
 <style>
+/* Modal VIP.
+   Antes el cuerpo medía ~1.500px en móvil y el botón de alta caía por debajo
+   del borde de la pantalla: había que adivinar que aún quedaba contenido y
+   seguir haciendo scroll para verlo. Ahora la tarjeta es una columna con altura
+   máxima; solo el cuerpo hace scroll y el CTA vive en un pie fijo, así que
+   siempre se ve. Los textos se recortaron a una línea por ventaja. */
+.vipm-overlay, .vipm-overlay * { box-sizing: border-box; }
+.vipm-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85);
+    z-index: 1050; justify-content: center; align-items: center;
+    backdrop-filter: blur(5px); padding: 16px;
+}
+.vipm-card {
+    display: flex; flex-direction: column;
+    background: #1a1a2e; border-radius: 20px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,.1);
+    width: 100%; max-width: 440px; max-height: 88vh;
+    box-shadow: 0 25px 80px rgba(0,0,0,.5); animation: vipModalPop .3s ease;
+}
+.vipm-head {
+    flex: 0 0 auto; position: relative;
+    background: linear-gradient(135deg, #ffd700 0%, #E30613 100%);
+    padding: 15px 50px 15px 20px;
+}
+.vipm-head h5 {
+    margin: 0; color: #fff; font-weight: 800; font-size: 1.1rem;
+    display: flex; align-items: center; gap: 9px;
+}
+.vipm-close {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    background: transparent; border: none; color: #fff; font-size: 28px;
+    cursor: pointer; line-height: 1; padding: 0 6px;
+}
+.vipm-body { flex: 1 1 auto; overflow-y: auto; padding: 22px 22px 6px; text-align: left; }
+.vipm-hook {
+    margin: 0 0 6px; text-align: center; font-size: 1.05rem;
+    color: rgba(255,255,255,.9);
+}
+.vipm-hook strong { color: #4ade80; font-size: 1.6rem; display: block; margin-top: 2px; }
+.vipm-sub {
+    margin: 0 0 18px; text-align: center; font-size: .92rem; line-height: 1.5;
+    color: rgba(255,255,255,.65);
+}
+.vipm-sub strong { color: #fff; }
+.vipm-list { list-style: none; padding: 0; margin: 0; }
+.vipm-list li {
+    display: flex; align-items: center; gap: 10px; padding: 7px 0;
+    color: rgba(255,255,255,.85); font-size: .94rem;
+}
+.vipm-list i { color: #ffd700; font-size: 1rem; flex: 0 0 auto; }
+.vipm-list strong { color: #fff; }
+.vipm-foot {
+    flex: 0 0 auto; padding: 16px 22px 20px;
+    border-top: 1px solid rgba(255,255,255,.08); background: #1a1a2e;
+}
+#btnSubscribeMisLeads {
+    display: flex; justify-content: center; align-items: center; gap: 10px;
+    width: 100%; padding: 15px 20px; border: none; border-radius: 30px;
+    background: linear-gradient(135deg, #ffd700 0%, #E30613 100%);
+    color: #fff; font-weight: 700; font-size: 1.05rem; cursor: pointer;
+    box-shadow: 0 4px 15px rgba(227,6,19,.4); transition: transform .2s ease;
+}
+#btnSubscribeMisLeads:hover { transform: translateY(-1px); }
+.vipm-legal {
+    margin: 10px 0 0; text-align: center;
+    color: rgba(255,255,255,.4); font-size: .8rem;
+}
+@media (max-width: 480px) {
+    .vipm-card { max-height: 92vh; }
+    .vipm-body { padding: 18px 18px 4px; }
+    .vipm-hook strong { font-size: 1.45rem; }
+}
+
 @keyframes vipModalPop {
     0% { opacity: 0; transform: scale(0.95); }
     100% { opacity: 1; transform: scale(1); }
@@ -1436,7 +1533,7 @@ document.getElementById('btnSubscribeMisLeads')?.addEventListener('click', async
     
     try {
         if (typeof gtag === 'function') {
-            gtag('event', 'begin_checkout', { currency: 'EUR', value: 9.99, source: 'modal_mis_leads', items: [{ item_id: 'vip_subscription', item_name: 'Suscripción VIP', price: 9.99, quantity: 1 }] });
+            gtag('event', 'begin_checkout', { currency: 'EUR', value: 4.99, source: 'modal_mis_leads', items: [{ item_id: 'vip_subscription', item_name: 'Suscripción VIP', price: 4.99, quantity: 1 }] });
         }
         const response = await fetch('/crear_sesion_suscripcion_vip.php', {
             method: 'POST',
@@ -1478,7 +1575,7 @@ document.getElementById('btnSubscribeVip')?.addEventListener('click', async func
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
     try {
         if (typeof gtag === 'function') {
-            gtag('event', 'begin_checkout', { currency: 'EUR', value: 9.99, source: 'upsell_no_vip', items: [{ item_id: 'vip_subscription', item_name: 'Suscripción VIP', price: 9.99, quantity: 1 }] });
+            gtag('event', 'begin_checkout', { currency: 'EUR', value: 4.99, source: 'upsell_no_vip', items: [{ item_id: 'vip_subscription', item_name: 'Suscripción VIP', price: 4.99, quantity: 1 }] });
         }
         const response = await fetch('/crear_sesion_suscripcion_vip.php', { method: 'POST', headers: {'Content-Type':'application/json'} });
         const data = await response.json();
@@ -1495,99 +1592,132 @@ document.getElementById('btnSubscribeVip')?.addEventListener('click', async func
 });
 <?php endif; ?>
 
-// ═══ Gestión VIP: cancelar / reactivar / retención ═══
-<?php if ($is_vip && !$vip_cancel_pending): ?>
-document.getElementById('btnCancelVip')?.addEventListener('click', function() {
-    Swal.fire({
-        title: '¿Cancelar VIP?',
-        html: `
-            <div style="text-align:left; margin: 15px 0;">
-                <p style="color:#666; margin-bottom:15px;">Perderás estos beneficios al final del período:</p>
-                <div style="display:flex; align-items:center; gap:10px; padding:6px 0; color:#dc3545;"><i class="fas fa-times-circle"></i> Badge VIP Verificado</div>
-                <div style="display:flex; align-items:center; gap:10px; padding:6px 0; color:#dc3545;"><i class="fas fa-times-circle"></i> Chat ilimitado con viewers</div>
-                <div style="display:flex; align-items:center; gap:10px; padding:6px 0; color:#dc3545;"><i class="fas fa-times-circle"></i> Mensajes masivos</div>
-                <div style="display:flex; align-items:center; gap:10px; padding:6px 0; color:#dc3545;"><i class="fas fa-times-circle"></i> 10€ de saldo mensual</div>
-                <p style="color:#888; font-size:0.85rem; margin-top:15px;"><i class="fas fa-info-circle"></i> Tu saldo actual se mantiene disponible.</p>
-            </div>`,
-        icon: 'warning', showCancelButton: true,
-        confirmButtonColor: '#dc3545', cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Sí, cancelar', cancelButtonText: 'Volver', reverseButtons: true
-    }).then((r) => {
-        if (!r.isConfirmed) return;
-        <?php if (!$vip_retention_used): ?>
-        Swal.fire({
-            title: '¡Espera! Tenemos algo para ti',
-            html: `
-                <div style="text-align:center;">
-                    <div style="font-size:3rem; margin:10px 0;">🎁</div>
-                    <p style="color:#333; font-size:1.1rem; font-weight:600; margin-bottom:5px;">¿Y si te quedas por solo 4,99€?</p>
-                    <p style="color:#666; font-size:0.95rem; margin-bottom:20px;">Mismos beneficios, mitad de precio el próximo mes.</p>
-                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:15px; padding:20px; color:white;">
-                        <div style="font-size:2.5rem; font-weight:800;">4,99€</div>
-                        <div style="font-size:0.9rem; opacity:0.9;">en vez de 9,99€/mes</div>
-                    </div>
-                </div>`,
-            showCancelButton: true, showDenyButton: true,
-            confirmButtonText: '¡Acepto 4,99€!', denyButtonText: 'No, cancelar igualmente', cancelButtonText: 'Volver',
-            confirmButtonColor: '#667eea', denyButtonColor: '#dc3545'
-        }).then((rr) => {
-            if (rr.isConfirmed) applyRetentionOffer();
-            else if (rr.isDenied) cancelVipSubscription();
-        });
-        <?php else: ?>
-        cancelVipSubscription();
-        <?php endif; ?>
-    });
-});
-async function cancelVipSubscription() {
-    Swal.fire({ title: 'Cancelando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-    try {
-        const r = await fetch('/ajax/cancelar_suscripcion_vip.php', { method: 'POST' });
-        const d = await r.json();
-        if (d.success) {
-            Swal.fire({ icon: 'info', title: 'Suscripción cancelada', html: `<p>Mantendrás tus beneficios hasta el <strong>${d.expires_at}</strong>.</p>`, confirmButtonColor: '#6c757d' }).then(() => location.reload());
-        } else Swal.fire({ icon: 'error', title: 'Error', text: d.error || 'No se pudo cancelar' });
-    } catch(e) { Swal.fire({ icon: 'error', title: 'Error', text: 'Error de conexión' }); }
-}
-async function applyRetentionOffer() {
-    Swal.fire({ title: 'Aplicando oferta...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-    try {
-        const r = await fetch('/ajax/oferta_retencion_vip.php', { method: 'POST' });
-        const d = await r.json();
-        if (d.success) {
-            Swal.fire({ icon: 'success', title: '¡Genial!', html: `<p>Tu próxima renovación será de <strong>${d.next_amount}</strong>.</p>`, confirmButtonColor: '#667eea' }).then(() => location.reload());
-        } else Swal.fire({ icon: 'error', title: 'Error', text: d.error || 'No se pudo aplicar la oferta' });
-    } catch(e) { Swal.fire({ icon: 'error', title: 'Error', text: 'Error de conexión' }); }
-}
-<?php endif; ?>
+</script>
 
-<?php if ($is_vip && $vip_cancel_pending): ?>
-document.getElementById('btnReactivate')?.addEventListener('click', async function() {
-    const r = await Swal.fire({
-        title: '¿Reactivar VIP?', text: 'Tu suscripción continuará renovándose automáticamente.',
-        icon: 'question', showCancelButton: true,
-        confirmButtonColor: '#ffd700', cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Sí, reactivar', cancelButtonText: 'Volver'
+<!-- ═══ Gestión VIP: cancelar / reactivar / retención ═══
+     Script propio con sintaxis ES5 y fallback nativo (confirm/alert):
+     antes estaba en el script principal (que usa optional chaining `?.`)
+     y dependía de SweetAlert2 vía CDN. Si el CDN era bloqueado (adblock)
+     o el navegador no soportaba `?.`, el listener nunca se registraba
+     y el botón Cancelar "no hacía nada" (bug reportado 2026-07-31). -->
+<script>
+(function() {
+    function hasSwal() { return typeof window.Swal !== 'undefined'; }
+    function stripTags(html) { return String(html || '').replace(/<[^>]+>/g, ''); }
+    function notify(icon, title, msg, reload) {
+        if (hasSwal()) {
+            Swal.fire({ icon: icon, title: title, html: msg }).then(function() { if (reload) location.reload(); });
+        } else {
+            alert(title + (msg ? '\n\n' + stripTags(msg) : ''));
+            if (reload) location.reload();
+        }
+    }
+    function postVip(url, loadingTitle, okTitle, okMsgFn) {
+        if (hasSwal()) {
+            Swal.fire({ title: loadingTitle, allowOutsideClick: false, didOpen: function() { Swal.showLoading(); } });
+        }
+        fetch(url, { method: 'POST' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d && d.success) {
+                    notify('success', okTitle, okMsgFn ? okMsgFn(d) : (d.message || ''), true);
+                } else {
+                    notify('error', 'Error', (d && d.error) || 'No se pudo completar la acción', false);
+                }
+            })
+            .catch(function() { notify('error', 'Error', 'Error de conexión', false); });
+    }
+    function cancelVipSubscription() {
+        postVip('/ajax/cancelar_suscripcion_vip.php', 'Cancelando...', 'Suscripción cancelada',
+            function(d) { return '<p>Mantendrás tus beneficios hasta el <strong>' + d.expires_at + '</strong>.</p>'; });
+    }
+    function applyRetentionOffer() {
+        postVip('/ajax/oferta_retencion_vip.php', 'Aplicando oferta...', '¡Genial!',
+            function(d) { return '<p>Tu próxima renovación será de <strong>' + d.next_amount + '</strong>.</p>'; });
+    }
+
+    <?php if ($is_vip && !$vip_cancel_pending): ?>
+    var btnCancel = document.getElementById('btnCancelVip');
+    if (btnCancel) btnCancel.addEventListener('click', function() {
+        if (!hasSwal()) {
+            // Fallback sin SweetAlert (CDN bloqueado, p.ej. adblock)
+            if (!confirm('¿Cancelar VIP?\n\nPerderás estos beneficios al final del período ya pagado:\n- Badge VIP Verificado\n- Chat ilimitado con viewers\n- Mensajes masivos\n- 10€ de saldo mensual\n\nTu saldo actual se mantiene disponible.')) return;
+            <?php if (!$vip_retention_used): ?>
+            if (confirm('¡Espera! Tenemos algo para ti\n\n¿Quieres quedarte por solo 4,99€ el próximo mes (en vez de 9,99€)? Mismos beneficios, mitad de precio.\n\nAceptar = Quedarme por 4,99€\nCancelar = Cancelar VIP igualmente')) {
+                applyRetentionOffer();
+            } else {
+                cancelVipSubscription();
+            }
+            <?php else: ?>
+            cancelVipSubscription();
+            <?php endif; ?>
+            return;
+        }
+        Swal.fire({
+            title: '¿Cancelar VIP?',
+            html: '<div style="text-align:left; margin: 15px 0;">'
+                + '<p style="color:#666; margin-bottom:15px;">Perderás estos beneficios al final del período:</p>'
+                + '<div style="display:flex; align-items:center; gap:10px; padding:6px 0; color:#dc3545;"><i class="fas fa-times-circle"></i> Badge VIP Verificado</div>'
+                + '<div style="display:flex; align-items:center; gap:10px; padding:6px 0; color:#dc3545;"><i class="fas fa-times-circle"></i> Chat ilimitado con viewers</div>'
+                + '<div style="display:flex; align-items:center; gap:10px; padding:6px 0; color:#dc3545;"><i class="fas fa-times-circle"></i> Mensajes masivos</div>'
+                + '<div style="display:flex; align-items:center; gap:10px; padding:6px 0; color:#dc3545;"><i class="fas fa-times-circle"></i> 10€ de saldo mensual</div>'
+                + '<p style="color:#888; font-size:0.85rem; margin-top:15px;"><i class="fas fa-info-circle"></i> Tu saldo actual se mantiene disponible.</p>'
+                + '</div>',
+            icon: 'warning', showCancelButton: true,
+            confirmButtonColor: '#dc3545', cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Sí, cancelar', cancelButtonText: 'Volver', reverseButtons: true
+        }).then(function(r) {
+            if (!r.isConfirmed) return;
+            <?php if (!$vip_retention_used): ?>
+            Swal.fire({
+                title: '¡Espera! Tenemos algo para ti',
+                html: '<div style="text-align:center;">'
+                    + '<div style="font-size:3rem; margin:10px 0;">🎁</div>'
+                    + '<p style="color:#333; font-size:1.1rem; font-weight:600; margin-bottom:5px;">¿Y si te quedas por solo 4,99€?</p>'
+                    + '<p style="color:#666; font-size:0.95rem; margin-bottom:20px;">Mismos beneficios, mitad de precio el próximo mes.</p>'
+                    + '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:15px; padding:20px; color:white;">'
+                    + '<div style="font-size:2.5rem; font-weight:800;">4,99€</div>'
+                    + '<div style="font-size:0.9rem; opacity:0.9;">en vez de 9,99€/mes</div>'
+                    + '</div></div>',
+                showCancelButton: true, showDenyButton: true,
+                confirmButtonText: '¡Acepto 4,99€!', denyButtonText: 'No, cancelar igualmente', cancelButtonText: 'Volver',
+                confirmButtonColor: '#667eea', denyButtonColor: '#dc3545'
+            }).then(function(rr) {
+                if (rr.isConfirmed) applyRetentionOffer();
+                else if (rr.isDenied) cancelVipSubscription();
+            });
+            <?php else: ?>
+            cancelVipSubscription();
+            <?php endif; ?>
+        });
     });
-    if (!r.isConfirmed) return;
-    Swal.fire({ title: 'Reactivando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-    try {
-        const res = await fetch('/ajax/reactivar_suscripcion_vip.php', { method: 'POST' });
-        const d = await res.json();
-        if (d.success) Swal.fire({ icon: 'success', title: '¡Reactivada!', text: d.message, confirmButtonColor: '#ffd700' }).then(() => location.reload());
-        else Swal.fire({ icon: 'error', title: 'Error', text: d.error });
-    } catch(e) { Swal.fire({ icon: 'error', title: 'Error', text: 'Error de conexión' }); }
-});
-document.getElementById('btnRetention')?.addEventListener('click', async function() {
-    Swal.fire({ title: 'Aplicando oferta...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-    try {
-        const r = await fetch('/ajax/oferta_retencion_vip.php', { method: 'POST' });
-        const d = await r.json();
-        if (d.success) Swal.fire({ icon: 'success', title: '¡Genial!', html: `<p>Tu próxima renovación será de <strong>${d.next_amount}</strong>.</p>`, confirmButtonColor: '#667eea' }).then(() => location.reload());
-        else Swal.fire({ icon: 'error', title: 'Error', text: d.error || 'No se pudo aplicar la oferta' });
-    } catch(e) { Swal.fire({ icon: 'error', title: 'Error', text: 'Error de conexión' }); }
-});
-<?php endif; ?>
+    <?php endif; ?>
+
+    <?php if ($is_vip && $vip_cancel_pending): ?>
+    var btnReact = document.getElementById('btnReactivate');
+    if (btnReact) btnReact.addEventListener('click', function() {
+        function doReactivate() {
+            postVip('/ajax/reactivar_suscripcion_vip.php', 'Reactivando...', '¡Reactivada!',
+                function(d) { return d.message || ''; });
+        }
+        if (!hasSwal()) {
+            if (confirm('¿Reactivar VIP?\n\nTu suscripción continuará renovándose automáticamente.')) doReactivate();
+            return;
+        }
+        Swal.fire({
+            title: '¿Reactivar VIP?', text: 'Tu suscripción continuará renovándose automáticamente.',
+            icon: 'question', showCancelButton: true,
+            confirmButtonColor: '#ffd700', cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Sí, reactivar', cancelButtonText: 'Volver'
+        }).then(function(r) { if (r.isConfirmed) doReactivate(); });
+    });
+    var btnRet = document.getElementById('btnRetention');
+    if (btnRet) btnRet.addEventListener('click', function() {
+        if (!hasSwal() && !confirm('¿Quedarte por 4,99€ el próximo mes (en vez de 9,99€)?')) return;
+        applyRetentionOffer();
+    });
+    <?php endif; ?>
+})();
 </script>
 
 <?php

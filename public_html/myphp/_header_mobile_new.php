@@ -58,7 +58,7 @@
                     <img src="<?php echo $data_usuario["img"] ?? '/img/po.png'; ?>" alt="Perfil" class="slide-user-avatar">
                     <div class="slide-user-details">
                         <span class="slide-user-name"><?php echo $data_usuario["username"] ?? 'Usuario'; ?></span>
-                        <a href="/mi-perfil" class="slide-user-link">Ver perfil →</a>
+                        <a href="/usuario" class="slide-user-link">Ver perfil →</a>
                     </div>
                 </div>
             <?php } else { ?>
@@ -78,10 +78,10 @@
                 <i class="fas fa-plus-circle"></i> Publicar Código
             </a>
             <?php } ?>
-            <a href="/marcas" class="slide-nav-item">
+            <a href="/listado-marcas" class="slide-nav-item">
                 <i class="fas fa-tags"></i> Marcas
             </a>
-            <a href="/categorias" class="slide-nav-item">
+            <a href="/listado-categorias" class="slide-nav-item">
                 <i class="fas fa-list"></i> Categorías
             </a>
             <?php

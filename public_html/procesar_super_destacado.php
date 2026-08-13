@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/inc/logger.php';
 session_start();
 require_once __DIR__ . '/inc/conexion.php';
 require_once __DIR__ . '/myphp/funciones.php';
@@ -57,7 +58,7 @@ require_once __DIR__ . '/vendor/autoload.php';
 // Get user email for Stripe key logic
 $collection_usuarios = $db->selectCollection('usuarios');
 $usuario = $collection_usuarios->findOne(['_id' => new MongoDB\BSON\ObjectId($user_id)]);
-$email_usuario = $usuario['email'] ?? '';
+$email_usuario = $usuario['mail'] ?? '';
 
 require_once __DIR__ . '/config/stripe.php';
 $stripe_key = get_stripe_secret_key($email_usuario, $user_id);
@@ -88,6 +89,12 @@ try {
             'codigo_id' => (string)$codigo_id,
             'user_id' => $user_id,
             'tipo' => 'super_destacado'
+        ],
+        // Mensaje de beneficios justo antes del botón de pago, para mejorar conversión
+        'custom_text' => [
+            'submit' => [
+                'message' => 'Tu código sube a la posición #1 de la Guía Oficial durante 30 días: máxima visibilidad frente al resto de códigos.'
+            ]
         ]
     ]);
 
@@ -96,7 +103,7 @@ try {
     exit;
 
 } catch (Exception $e) {
-    error_log("Error creating Stripe session for Super destacado: " . $e->getMessage());
+    log_error("Error creating Stripe session for Super destacado: " . $e->getMessage());
     $_SESSION['msg_error'] = "Error al procesar el pago: " . $e->getMessage();
     header('Location: /destacar_super.php?codigo_id=' . $codigo_id);
     exit;

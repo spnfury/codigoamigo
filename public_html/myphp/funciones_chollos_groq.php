@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 /**
  * Funciones para reescribir textos de chollos usando Groq API
@@ -66,30 +67,19 @@ function reescribirTextoGroq($texto_original, $tipo = 'general') {
         'temperature' => defined('AI_TEMPERATURE') ? AI_TEMPERATURE : 0.7
     ];
 
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, defined('GROQ_API_URL') ? GROQ_API_URL : 'https://api.groq.com/openai/v1/chat/completions');
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . $api_key,
-        'Content-Type: application/json'
-    ]);
-    curl_setopt($ch, CURLOPT_TIMEOUT, defined('AI_TIMEOUT') ? AI_TIMEOUT : 30);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-
-    $response = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    curl_close($ch);
+    // Groq con rotación de claves + fallback de modelo (ver groq_request en ai_config)
+    $__g = groq_request($data);
+    $response  = $__g['body'];
+    $http_code = $__g['http'];
+    $error = '';
 
     if ($error) {
-        error_log("Error cURL Groq: " . $error);
+        log_error("Error cURL Groq: " . $error);
         return ['success' => false, 'error' => 'Error de conexión: ' . $error];
     }
 
     if ($http_code !== 200) {
-        error_log("Error HTTP Groq: " . $http_code . " - " . $response);
+        log_error("Error HTTP Groq: " . $http_code . " - " . $response);
         return ['success' => false, 'error' => 'Error de API: ' . $http_code];
     }
 
@@ -207,61 +197,22 @@ Texto del chollo:
         'response_format' => ['type' => 'json_object'] // Forzar respuesta JSON
     ];
 
-    // Reintentar hasta 3 veces en caso de error
-    $max_intentos = 3;
-    $intento = 0;
-    $response = null;
-    $http_code = 0;
-    $error = null;
-    
-    while ($intento < $max_intentos) {
-        $intento++;
-        
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, defined('GROQ_API_URL') ? GROQ_API_URL : 'https://api.groq.com/openai/v1/chat/completions');
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Authorization: Bearer ' . $api_key,
-            'Content-Type: application/json'
-        ]);
-        curl_setopt($ch, CURLOPT_TIMEOUT, defined('AI_TIMEOUT') ? AI_TIMEOUT : 30);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-
-        $response = curl_exec($ch);
-        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-        
-        // Si fue exitoso, salir del bucle
-        if (!$error && $http_code === 200) {
-            break;
-        }
-        
-        // Si es rate limiting (429), esperar más tiempo con un poco de aleatoriedad (jitter)
-        if ($http_code === 429 && $intento < $max_intentos) {
-            $espera = (2 * $intento) + rand(1, 3); // Esperar 3-5, 5-7, 7-9 segundos
-            error_log("Rate limit alcanzado en Groq, esperando {$espera}s antes de reintentar (intento {$intento}/{$max_intentos})");
-            sleep($espera); 
-            continue;
-        }
-        
-        // Si es otro error y quedan intentos, esperar un poco
-        if ($intento < $max_intentos) {
-            error_log("Error en Groq, reintentando (intento {$intento}/{$max_intentos}): " . ($error ?: "HTTP {$http_code}"));
-            sleep(1);
-        }
-    }
+    // Groq con rotación de claves + fallback de modelo (ver groq_request en ai_config).
+    // Sustituye el antiguo bucle de reintentos single-key: el helper rota las claves
+    // del pool y cae a 70b-versatile si todas dan 429.
+    $__g = groq_request($data);
+    $response  = $__g['body'];
+    $http_code = $__g['http'];
+    $error = '';
 
     if ($error) {
-        error_log("Error cURL Groq después de {$intento} intentos: " . $error);
+        log_error("Error cURL Groq después de {$intento} intentos: " . $error);
         $resultado['error'] = 'Error de conexión: ' . $error;
         return $resultado;
     }
 
     if ($http_code !== 200) {
-        error_log("Error HTTP Groq después de {$intento} intentos: " . $http_code . " - " . $response);
+        log_error("Error HTTP Groq después de {$intento} intentos: " . $http_code . " - " . $response);
         $resultado['error'] = 'Error de API: ' . $http_code;
         return $resultado;
     }
@@ -335,7 +286,7 @@ Texto del chollo:
                 $resultado['success'] = true;
             } else {
                 $resultado['error'] = 'No se pudo parsear la respuesta de Groq';
-                error_log("Respuesta Groq no parseable: " . $content);
+                log_error("Respuesta Groq no parseable: " . $content);
             }
         }
     } else {
@@ -428,14 +379,14 @@ Chollos a procesar:
         // Si es rate limiting (429), esperar más tiempo con un poco de aleatoriedad (jitter)
         if ($http_code === 429 && $intento < $max_intentos) {
             $espera = (3 * $intento) + rand(2, 5); // Esperar 5-8, 8-11, 11-14 segundos
-            error_log("Rate limit alcanzado en procesarPaqueteChollosConGroq, esperando {$espera}s antes de reintentar (intento {$intento}/{$max_intentos})");
+            log_warning("Rate limit alcanzado en procesarPaqueteChollosConGroq, esperando {$espera}s antes de reintentar (intento {$intento}/{$max_intentos})");
             sleep($espera); 
             continue;
         }
         
         // Si es otro error y quedan intentos, esperar un poco
         if ($intento < $max_intentos) {
-            error_log("Error en procesarPaqueteChollosConGroq, reintentando (intento {$intento}/{$max_intentos}): " . ($error ?: "HTTP {$http_code}"));
+            log_warning("Error en procesarPaqueteChollosConGroq, reintentando (intento {$intento}/{$max_intentos}): " . ($error ?: "HTTP {$http_code}"));
             sleep(2);
         }
     }
@@ -457,7 +408,7 @@ Chollos a procesar:
         }
     }
 
-    error_log("Error en procesarPaqueteChollosConGroq: HTTP {$http_code} - " . $response);
+    log_error("Error en procesarPaqueteChollosConGroq: HTTP {$http_code} - " . $response);
     return [];
 }
 

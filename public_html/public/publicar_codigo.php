@@ -831,7 +831,14 @@
                                 <select id="categoria" class="form-control">
                                     <option value="select">Selecciona una categoría para tu marca</option>
                                     <?php
-                                    $listacategorias = getCategorias();
+                                    // getCategorias() vive en inc/conexion.php y la carga la ruta
+                                    // /nuevo_codigo. Al abrir este fichero por su URL directa no
+                                    // había nada cargado y la página moría con "Call to undefined
+                                    // function getCategorias()" a media respuesta.
+                                    if (!function_exists('getCategorias')) {
+                                        include_once __DIR__ . '/../inc/conexion.php';
+                                    }
+                                    $listacategorias = function_exists('getCategorias') ? getCategorias() : [];
                                     foreach ($listacategorias as $cat) { ?>
                                         <option value="<?php echo $cat['nombre_clave']?>"><?php echo $cat['nombre']?></option>
                                     <?php } ?>
@@ -993,32 +1000,38 @@
             <h4 class="modal-title"><i class="fas fa-crown"></i> VENTAJAS VIP</h4>
           </div>
           <div class="modal-body" style="padding: 30px; text-align: center;">
-            <p style="font-size: 18px; margin-bottom: 25px;">La función de <strong>Completar con IA</strong> es exclusiva para usuarios VIP. <br><strong>¡Hazte VIP y disfruta de todas estas ventajas!</strong></p>
-            
+            <!-- Textos a una línea por ventaja: la versión larga obligaba a hacer
+                 scroll dentro del modal en móvil y empujaba el botón fuera de la
+                 pantalla. Mismo recorte que el modal de mis_viewers.php. -->
+            <p style="font-size: 17px; margin-bottom: 20px;"><strong>Completar con IA</strong> es una función VIP.</p>
+
             <ul class="vip-feature-list">
                 <li class="vip-feature-item">
                     <i class="fas fa-check-circle"></i>
-                    <span><strong>IA Ilimitada:</strong> Completa todas las descripciones de tus códigos con inteligencia artificial profesional.</span>
+                    <span>IA ilimitada en tus descripciones</span>
                 </li>
                 <li class="vip-feature-item">
                     <i class="fas fa-check-circle"></i>
-                    <span><strong>Badge VIP Verificado:</strong> Gana confianza y obtén hasta un 40% más de clics en tus códigos.</span>
+                    <span>Badge VIP: hasta <strong>+40%</strong> de clics</span>
                 </li>
                 <li class="vip-feature-item">
                     <i class="fas fa-check-circle"></i>
-                    <span><strong>Chat Ilimitado:</strong> Contacta directamente con los usuarios que ven tus códigos.</span>
+                    <span>Chat ilimitado con tus leads</span>
                 </li>
                 <li class="vip-feature-item">
                     <i class="fas fa-check-circle"></i>
-                    <span><strong>10€ de Saldo Mensual:</strong> Recibe 10€ cada mes para destacar tus códigos totalmente gratis.</span>
+                    <span><strong>10€</strong> de saldo cada mes</span>
                 </li>
             </ul>
 
-            <a href="/public/mis_viewers.php" class="btn-upgrade-now">
-                QUIERO SER VIP POR 9,99€
-            </a>
-            
-            <p style="margin-top: 20px; color: #888; font-size: 13px;">Cancela en cualquier momento con un solo clic.</p>
+            <button type="button" id="btn-vip-checkout" class="btn-upgrade-now" style="border: none; cursor: pointer; width: 100%; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+                <span class="btn-vip-text" style="display: inline-flex; align-items: center; gap: 6px;">
+                    Hazte VIP · 4,99€ el primer mes
+                </span>
+                <span class="btn-vip-spinner" style="display: none;"><i class="fas fa-spinner fa-spin"></i></span>
+            </button>
+
+            <p style="margin-top: 14px; color: #888; font-size: 13px;">Luego 9,99€/mes. Cancelas cuando quieras.</p>
           </div>
         </div>
       </div>
@@ -1409,6 +1422,7 @@
             
             // Si NO es VIP, mostrar modal de ventajas VIP directamente
             if (!window.isVipUser) {
+                $.post('/ajax/track_evento_vip.php', { tipo: 'modal_ia_bloqueada' });
                 $('#modal-vip-upgrade').modal('show');
                 return;
             }
@@ -1456,6 +1470,57 @@
                 },
                 error: function() {
                     btn.removeClass('loading').html('<i class="fas fa-magic"></i> Completar con IA <span class="vip-badge-mini">VIP</span>');
+                    alert('Error de conexión. Inténtalo de nuevo.');
+                }
+            });
+        });
+
+        // Checkout directo desde modal VIP (bloqueo de IA)
+        $('#btn-vip-checkout').on('click', function() {
+            var btn = $(this);
+            var spinner = btn.find('.btn-vip-spinner');
+            var text = btn.find('.btn-vip-text');
+            
+            if (btn.hasClass('loading')) return;
+            
+            btn.addClass('loading');
+            text.hide();
+            spinner.show();
+            
+            $.ajax({
+                url: '/crear_sesion_suscripcion_vip.php',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ source: 'modal_ia_bloqueada' }),
+                dataType: 'json',
+                success: function(response) {
+                    btn.removeClass('loading');
+                    text.show();
+                    spinner.hide();
+                    
+                    if (response.success && response.checkout_url) {
+                        if (typeof gtag === 'function') {
+                            gtag('event', 'begin_checkout', {
+                                currency: 'EUR',
+                                value: 4.99,
+                                source: 'modal_ia_bloqueada',
+                                items: [{
+                                    item_id: 'vip_subscription',
+                                    item_name: 'Suscripción VIP',
+                                    price: 4.99,
+                                    quantity: 1
+                                }]
+                            });
+                        }
+                        window.location.href = response.checkout_url;
+                    } else {
+                        alert(response.error || 'No se pudo crear la sesión de pago. Inténtalo de nuevo.');
+                    }
+                },
+                error: function() {
+                    btn.removeClass('loading');
+                    text.show();
+                    spinner.hide();
                     alert('Error de conexión. Inténtalo de nuevo.');
                 }
             });

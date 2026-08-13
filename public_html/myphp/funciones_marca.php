@@ -157,7 +157,9 @@ function sube_imagen_marca($datos){
 //         error_reporting(E_ALL);
 //         ini_set("display_errors", "on");
 
-        $folder = "/var/www/vhosts/codigoamigo.com/httpdocs/img/panel_marcas/new/";
+        // Ruta del servidor actual (la anterior era del Plesk viejo y no existía:
+        // desde abr-2025 las imágenes no se guardaban en local)
+        $folder = $_SERVER['DOCUMENT_ROOT'] ? $_SERVER['DOCUMENT_ROOT'] . "/img/panel_marcas/new/" : "/home/admin/web/codigoamigo.com/public_html/img/panel_marcas/new/";
         $folder_ext = "https://www.codigoamigo.com/img/panel_marcas/new/";
 
 
@@ -194,23 +196,22 @@ function sube_imagen_marca($datos){
         $im->writeImages($folder.$imageName, true);
         //echo "si estoy";
 
-        /*$SYSTEM_CONF["AMAZON_KEY"] = 'AKIAIBGD6UYYDE7LWM3A';
-        $SYSTEM_CONF["AMAZON_SECRET"] = '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';
+        // Credenciales Contabo S3 desde env / private/api_secrets.php (fuera de git).
+        // Antes estaban hardcodeadas aquí (y las de AWS viejas comentadas, también en git).
+        $secrets_path = dirname(__DIR__, 3) . '/private/api_secrets.php';
+        if (is_readable($secrets_path)) {
+            require_once $secrets_path;
+        }
+        $s3_env = function ($key, $default = '') {
+            if (!empty($_ENV[$key])) return $_ENV[$key];
+            $v = getenv($key);
+            return ($v !== false && $v !== '') ? $v : $default;
+        };
 
-        $SYSTEM_CONF["AMAZON_BUCKET"] = "cdn-codigoamigo";*/
+        $SYSTEM_CONF["AMAZON_KEY"] = $s3_env('CONTABO_S3_KEY');
+        $SYSTEM_CONF["AMAZON_SECRET"] = $s3_env('CONTABO_S3_SECRET');
+        $SYSTEM_CONF["AMAZON_BUCKET"] = $s3_env('CONTABO_S3_BUCKET', 'codigoamigo-bucket');
 
-        /*$SYSTEM_CONF["AMAZON_KEY"] = 'AKIASARKPDPLQVRVKCFK';
-        $SYSTEM_CONF["AMAZON_SECRET"] = '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';*/
-        
-        $SYSTEM_CONF["AMAZON_KEY"] = 'd5092bd5c6f9b8f617a683dcb24d63df';
-        $SYSTEM_CONF["AMAZON_SECRET"] = 'aecdd53e2e31d664a5a602df52a41e1e';
-        
-        
-
-        $SYSTEM_CONF["AMAZON_BUCKET"] = "codigoamigo-bucket";
-
-
-        
         $s3 = S3Client::factory(array(
             'credentials' => array(
                 'key'    =>  $SYSTEM_CONF["AMAZON_KEY"],
@@ -218,7 +219,7 @@ function sube_imagen_marca($datos){
             ),
             'region' => 'eu2',
             'version' => 'latest',
-            'endpoint' => 'https://eu2.contabostorage.com/',
+            'endpoint' => $s3_env('CONTABO_S3_ENDPOINT', 'https://eu2.contabostorage.com/'),
             'use_path_style_endpoint' => true
         ));
         
@@ -235,11 +236,11 @@ function sube_imagen_marca($datos){
                 'Body' => ($data)
             ));
 
-            //$ruta_imagen = "https://cdn-codigoamigo.s3-eu-west-1.amazonaws.com//panel_marcas/new/".$imageName;
-            //$ruta_imagen = "https://d3hcf0nbuqjt3g.cloudfront.net/panel_marcas/new/".$imageName;
-            $ruta_imagen = "https://cdn.codigoamigo.com/panel_marcas/new/".$imageName;
-            
-            
+            // Guardar SIEMPRE la URL local en DB: cdn.codigoamigo.com devuelve 401
+            // (servicio caído). El putObject a Contabo queda como copia de respaldo.
+            $ruta_imagen = $folder_ext.$imageName;
+
+
         } catch (Exception $e) {
             echo 'Ha habido una excepción: ' . $e->getMessage() . "<br>";
 
@@ -804,7 +805,12 @@ function getMarcas($limit = null, $categoria = null, $excluye = null) {
                 if (strpos($imagen_procesada, 'https://d3hcf0nbuqjt3g.cloudfront.net/') !== false) {
                     $imagen_procesada = str_replace("https://d3hcf0nbuqjt3g.cloudfront.net/", "https://www.codigoamigo.com/img/", $imagen_procesada);
                 }
-                
+                // cdn.codigoamigo.com devuelve 401 (servicio caído) — servir desde
+                // el propio dominio, donde los ficheros existen en /img/
+                if (strpos($imagen_procesada, 'https://cdn.codigoamigo.com/') !== false) {
+                    $imagen_procesada = str_replace("https://cdn.codigoamigo.com/", "https://www.codigoamigo.com/img/", $imagen_procesada);
+                }
+
                 if (strpos($imagen_procesada, 'http') !== 0) {
                     $imagen_procesada = 'https://www.codigoamigo.com' . (strpos($imagen_procesada, '/') === 0 ? '' : '/') . $imagen_procesada;
                 }
@@ -831,6 +837,70 @@ function getMarcas($limit = null, $categoria = null, $excluye = null) {
 
     SimpleCache::set($cacheKey, $array_final_marcas);
     return $array_final_marcas;
+}
+
+
+// ============================================================================
+// PROMOCIONES POR TIEMPO LIMITADO (referido boost de marcas tipo N26, Revolut…)
+// ============================================================================
+
+/**
+ * Devuelve los datos de promoción activa de una marca, o null si no hay.
+ * Una promoción está activa cuando:
+ *   - promo_activa == true
+ *   - promo_fecha_fin >= hoy (formato YYYY-MM-DD)
+ */
+function getPromocionMarca($marca_doc_o_clave) {
+    if (is_string($marca_doc_o_clave)) {
+        $marca = getObjectMarca('nombre_clave', $marca_doc_o_clave);
+    } else {
+        $marca = $marca_doc_o_clave;
+    }
+    if (!$marca || empty($marca['promo_activa'])) {
+        return null;
+    }
+    $fin = $marca['promo_fecha_fin'] ?? '';
+    $hoy = date('Y-m-d');
+    if (!$fin || $fin < $hoy) {
+        return null;
+    }
+    $dias_restantes = max(0, (int)floor((strtotime($fin) - strtotime($hoy)) / 86400));
+    return [
+        'titulo'         => $marca['promo_titulo']   ?? '',
+        'bono'           => $marca['promo_bono']     ?? '',
+        'fecha_fin'      => $fin,
+        'url'            => $marca['promo_url']      ?? '',
+        'dias_restantes' => $dias_restantes,
+        'nombre'         => $marca['nombre']         ?? '',
+        'nombre_clave'   => $marca['nombre_clave']   ?? '',
+        'logo'           => $marca['logo']           ?? '',
+    ];
+}
+
+/**
+ * Devuelve array de marcas con promoción vigente, ordenadas por fecha_fin asc
+ * (urgencia primero).
+ */
+function getMarcasConPromocionActiva() {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+
+    $hoy = date('Y-m-d');
+    $col = getCollectionMarcas();
+    $cursor = $col->find(
+        [
+            'promo_activa' => true,
+            'promo_fecha_fin' => ['$gte' => $hoy],
+        ],
+        ['sort' => ['promo_fecha_fin' => 1]]
+    );
+    $out = [];
+    foreach ($cursor as $m) {
+        $promo = getPromocionMarca($m);
+        if ($promo) $out[] = $promo;
+    }
+    $cache = $out;
+    return $out;
 }
 
 ?>

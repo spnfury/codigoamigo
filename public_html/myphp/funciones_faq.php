@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 
 // Incluir funciones de conexión a MongoDB
 if (!function_exists('createConnection')) {
@@ -218,7 +219,7 @@ function generarFAQsConIA($marca_clave, $marca_nombre, $api_provider = 'perplexi
     try {
         // Fallback automático si no hay API key de Perplexity
         if ($api_provider === 'perplexity' && (!defined('PERPLEXITY_API_KEY') || strpos(PERPLEXITY_API_KEY, 'your-api-key') !== false)) {
-            error_log("Aviso: PERPLEXITY_API_KEY no configurada. Usando Groq como fallback.");
+            log_warning("Aviso: PERPLEXITY_API_KEY no configurada. Usando Groq como fallback.");
             $api_provider = 'groq';
         }
 
@@ -229,7 +230,7 @@ function generarFAQsConIA($marca_clave, $marca_nombre, $api_provider = 'perplexi
         }
         
         if (empty($faqs_generadas)) {
-             error_log("Error: No se generaron FAQs para la marca $marca_nombre con el proveedor $api_provider");
+             log_error("Error: No se generaron FAQs para la marca $marca_nombre con el proveedor $api_provider");
              return false;
         }
 
@@ -256,7 +257,7 @@ function generarFAQsConIA($marca_clave, $marca_nombre, $api_provider = 'perplexi
         return $faqs_guardadas;
         
     } catch (Exception $e) {
-        error_log("Error crítico generando FAQs con IA: " . $e->getMessage());
+        log_error("Error crítico generando FAQs con IA: " . $e->getMessage());
         return false;
     }
 }
@@ -273,7 +274,7 @@ function generarFAQsPerplexity($marca_clave, $marca_nombre) {
     $api_key = defined('PERPLEXITY_API_KEY') ? PERPLEXITY_API_KEY : '';
     
     if (empty($api_key) || strpos($api_key, 'your-api-key') !== false) {
-        error_log("Error: PERPLEXITY_API_KEY no configurada correctamente.");
+        log_error("Error: PERPLEXITY_API_KEY no configurada correctamente.");
         return [];
     }
     
@@ -310,12 +311,12 @@ function generarFAQsPerplexity($marca_clave, $marca_nombre) {
     curl_close($ch);
     
     if ($error) {
-        error_log("Error cURL Perplexity: " . $error);
+        log_error("Error cURL Perplexity: " . $error);
         return [];
     }
     
     if ($http_code !== 200) {
-        error_log("Error HTTP Perplexity: " . $http_code . " - " . $response);
+        log_error("Error HTTP Perplexity: " . $http_code . " - " . $response);
         return [];
     }
     
@@ -345,7 +346,7 @@ function generarFAQsGroq($marca_clave, $marca_nombre) {
     $api_key = defined('GROQ_API_KEY') ? GROQ_API_KEY : '';
     
     if (empty($api_key) || strpos($api_key, 'your-api-key') !== false) {
-        error_log("Error: GROQ_API_KEY no configurada correctamente.");
+        log_error("Error: GROQ_API_KEY no configurada correctamente.");
         return [];
     }
     
@@ -364,30 +365,19 @@ function generarFAQsGroq($marca_clave, $marca_nombre) {
         'temperature' => defined('AI_TEMPERATURE') ? AI_TEMPERATURE : 0.7
     ];
     
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, defined('GROQ_API_URL') ? GROQ_API_URL : 'https://api.groq.com/openai/v1/chat/completions');
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Authorization: Bearer ' . $api_key,
-        'Content-Type: application/json'
-    ]);
-    curl_setopt($ch, CURLOPT_TIMEOUT, defined('AI_TIMEOUT') ? AI_TIMEOUT : 30);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-    
-    $response = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    curl_close($ch);
+    // Groq con rotación de claves + fallback de modelo (ver groq_request en ai_config)
+    $__g = groq_request($data);
+    $response  = $__g['body'];
+    $http_code = $__g['http'];
+    $error = '';
     
     if ($error) {
-        error_log("Error cURL Groq: " . $error);
+        log_error("Error cURL Groq: " . $error);
         return [];
     }
     
     if ($http_code !== 200) {
-        error_log("Error HTTP Groq: " . $http_code . " - " . $response);
+        log_error("Error HTTP Groq: " . $http_code . " - " . $response);
         return [];
     }
     

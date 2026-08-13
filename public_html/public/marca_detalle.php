@@ -248,24 +248,29 @@ if (function_exists('obtenerFlashPromosPorMarca')) {
     ];
     echo '<script type="application/ld+json">' . json_encode($offer_schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . '</script>';
 
-    // Schema BreadcrumbList (Nueva implementación)
+    // Schema BreadcrumbList — Inicio → Categoría → Marca (silo de categoría para
+    // enlace interno). Calculamos aquí una sola vez la categoría (clave/label/url)
+    // y la reutilizamos en el breadcrumb VISIBLE de abajo para que coincidan
+    // (requisito de Google: structured data debe reflejar migas visibles).
+    $bc_cat_clave = $marca_info['categoria_clave'] ?? '';
+    $bc_cat_label = $bc_cat_clave ? ucfirst(str_replace('-', ' ', $bc_cat_clave)) : '';
+    $bc_cat_url   = $bc_cat_clave
+        ? (function_exists('link_categoria') ? link_categoria($bc_cat_clave) : 'https://www.codigoamigo.com/' . $bc_cat_clave . '-comparte-y-gana')
+        : '';
+
+    $bc_items = [
+        ['@type' => 'ListItem', 'position' => 1, 'name' => 'Inicio', 'item' => 'https://www.codigoamigo.com'],
+    ];
+    $bc_pos = 2;
+    if ($bc_cat_clave) {
+        $bc_items[] = ['@type' => 'ListItem', 'position' => $bc_pos++, 'name' => $bc_cat_label, 'item' => $bc_cat_url];
+    }
+    $bc_items[] = ['@type' => 'ListItem', 'position' => $bc_pos, 'name' => $nombre_marca, 'item' => 'https://www.codigoamigo.com/de-' . (isset($marca) ? $marca : '')];
+
     $schema_breadcrumb = [
         '@context' => 'https://schema.org',
         '@type' => 'BreadcrumbList',
-        'itemListElement' => [
-            [
-                '@type' => 'ListItem',
-                'position' => 1,
-                'name' => 'Inicio',
-                'item' => 'https://www.codigoamigo.com'
-            ],
-            [
-                '@type' => 'ListItem',
-                'position' => 2,
-                'name' => $nombre_marca,
-                'item' => 'https://www.codigoamigo.com/de-' . (isset($marca) ? $marca : '')
-            ]
-        ]
+        'itemListElement' => $bc_items,
     ];
     echo '<script type="application/ld+json">' . json_encode($schema_breadcrumb, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . '</script>';
 
@@ -440,11 +445,12 @@ $cat_clave = $marca_info['categoria_clave'] ?? '';
 if (!empty($cat_clave) && function_exists('getMarcas')) {
     $similares_raw = @getMarcas(8, $cat_clave, [$marca]);
     foreach ($similares_raw as $ms) {
-        if (empty($ms['imagen'])) continue;
+        // Antes se saltaban las marcas sin logo (perdían enlace interno horizontal).
+        // Ahora se incluyen; el render usa placeholder de iniciales si falta imagen.
         $marcas_similares[] = [
             'nombre' => $ms['nombre'],
             'slug'   => $ms['nombre_clave'],
-            'imagen' => $ms['imagen'],
+            'imagen' => $ms['imagen'] ?? '',
             'num'    => $ms['numero_codigos'] ?? 0,
         ];
     }
@@ -478,6 +484,28 @@ $faq_lines_to_display[] = [
     'q' => '¿Qué son los niveles de confianza?',
     'a' => 'Cada código tiene 1-5 estrellas según calidad del código y actividad del usuario publicador.'
 ];
+
+// Schema FAQPage: estructura las mismas FAQs que se muestran abajo (línea ~872)
+// para que Google entienda el contenido. Pendiente histórico (ver :272).
+$faq_schema_items = [];
+foreach ($faq_lines_to_display as $faq) {
+    $fq = trim($faq['q'] ?? '');
+    $fa = trim(strip_tags($faq['a'] ?? ''));
+    if ($fq === '' || $fa === '') continue;
+    $faq_schema_items[] = [
+        '@type' => 'Question',
+        'name' => $fq,
+        'acceptedAnswer' => ['@type' => 'Answer', 'text' => $fa],
+    ];
+}
+if (!empty($faq_schema_items)) {
+    $schema_faqpage = [
+        '@context' => 'https://schema.org',
+        '@type' => 'FAQPage',
+        'mainEntity' => $faq_schema_items,
+    ];
+    echo '<script type="application/ld+json">' . json_encode($schema_faqpage, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>';
+}
 ?>
 
 <div class="cav2">
@@ -523,6 +551,15 @@ $faq_lines_to_display[] = [
 
   <!-- MAIN -->
   <main class="cav2-main">
+
+    <!-- BREADCRUMB visible (alineado con el schema BreadcrumbList de arriba) -->
+    <nav class="cav2-breadcrumb" aria-label="Ruta de navegación" style="font-size:.85rem;color:#6b7280;margin-bottom:14px;">
+      <a href="/" style="color:inherit;text-decoration:none;">Inicio</a>
+      <?php if (!empty($bc_cat_clave)): ?>
+        <span aria-hidden="true"> › </span><a href="<?php echo htmlspecialchars($bc_cat_url); ?>" style="color:inherit;text-decoration:none;"><?php echo htmlspecialchars($bc_cat_label); ?></a>
+      <?php endif; ?>
+      <span aria-hidden="true"> › </span><span style="color:#111;"><?php echo htmlspecialchars($nombre_marca); ?></span>
+    </nav>
 
     <!-- POSICIONAMIENTO / ESTADÍSTICAS DEL CÓDIGO DEL USUARIO -->
     <?php
@@ -634,7 +671,7 @@ $faq_lines_to_display[] = [
           <a href="/public/mis_viewers.php?marca=<?= urlencode($marca) ?>" class="cav2-btn cav2-btn-ghost" style="padding:8px 16px;font-size:0.85rem;">📈 Ver estadísticas completas</a>
           <?php if ($visibility_status === 'hidden' || $visibility_status === 'warning' || !$user_has_premium): ?>
             <?php if (empty($user_code['is_vip'])): ?>
-              <a href="/suscripciones_y_creditos" class="cav2-btn cav2-btn-primary" style="padding:8px 16px;font-size:0.85rem;">👑 Hazte VIP</a>
+              <a href="/public/mis_viewers.php" class="cav2-btn cav2-btn-primary" style="padding:8px 16px;font-size:0.85rem;">👑 Hazte VIP</a>
             <?php endif; ?>
             <a href="/destacar_codigo?codigo=<?= urlencode($codigo_id) ?>" class="cav2-btn cav2-btn-primary" style="padding:8px 16px;font-size:0.85rem;background:var(--c-warning);">⭐ Destacar código</a>
           <?php endif; ?>
@@ -859,8 +896,29 @@ $faq_lines_to_display[] = [
           <div><?php echo nl2br($seo_que_es); ?></div>
         <?php elseif (!empty($brand_intro_html)): ?>
           <?php echo $brand_intro_html; ?>
+        <?php elseif (!empty(trim($descripcion_larga))): /* descripción rica en DB (HTML), no se mostraba */ ?>
+          <div><?php echo $descripcion_larga; ?></div>
+        <?php elseif (!empty(trim($descripcion_marca))): ?>
+          <p><?php echo nl2br(htmlspecialchars($descripcion_marca, ENT_QUOTES, 'UTF-8')); ?></p>
         <?php else: ?>
           <p><?php echo htmlspecialchars($nombre_marca); ?> es una de las marcas líderes en su sector. Aprovecha los códigos promocionales compartidos por nuestra comunidad para conseguir descuentos exclusivos en tu próxima compra.</p>
+        <?php endif; ?>
+        <?php
+        // Enlace interno contextual (in-body) a marcas de misma categoría: reparte
+        // autoridad horizontal entre fichas y construye silo de categoría. Pesa más
+        // que el grid de logos al pie porque va dentro del cuerpo de texto.
+        if (!empty($marcas_similares)):
+            $incat = array_slice($marcas_similares, 0, 3);
+            $enlaces_incat = [];
+            foreach ($incat as $ic) {
+                $enlaces_incat[] = '<a href="/de-' . htmlspecialchars($ic['slug']) . '">códigos de ' . htmlspecialchars($ic['nombre']) . '</a>';
+            }
+            $n_incat = count($enlaces_incat);
+            $lista_incat = $n_incat === 1
+                ? $enlaces_incat[0]
+                : implode(', ', array_slice($enlaces_incat, 0, $n_incat - 1)) . ' y ' . $enlaces_incat[$n_incat - 1];
+        ?>
+        <p style="margin-top:14px;">¿Buscas más formas de ahorrar<?php echo ($bc_cat_label ? ' en ' . htmlspecialchars($bc_cat_label) : ''); ?>? Descubre también <?php echo $lista_incat; ?>.</p>
         <?php endif; ?>
       </div>
     </section>
@@ -886,7 +944,11 @@ $faq_lines_to_display[] = [
         <?php foreach ($marcas_similares as $ms): ?>
         <a href="/de-<?php echo htmlspecialchars($ms['slug']); ?>" class="cav2-similar-card">
           <div class="cav2-similar-logo">
+            <?php if (!empty($ms['imagen'])): ?>
             <img src="<?php echo htmlspecialchars($ms['imagen']); ?>" alt="<?php echo htmlspecialchars($ms['nombre']); ?>" loading="lazy">
+            <?php else: ?>
+            <span style="font-size:1.4rem;font-weight:800;color:var(--c-brand);"><?php echo strtoupper(substr($ms['nombre'], 0, 2)); ?></span>
+            <?php endif; ?>
           </div>
           <div class="cav2-similar-name"><?php echo htmlspecialchars($ms['nombre']); ?></div>
           <div class="cav2-similar-meta"><?php echo (int)$ms['num']; ?> código<?php echo $ms['num'] == 1 ? '' : 's'; ?></div>
@@ -1145,9 +1207,27 @@ $faq_lines_to_display[] = [
             let featuredHTML = data.es_destacado ? '<div style="display:inline-block;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1e3a5f;font-size:0.75rem;font-weight:700;padding:2px 10px;border-radius:20px;margin-bottom:10px"><i class="fas fa-star"></i> Código Destacado</div><br>' : '';
             let descHTML = data.descripcion && data.descripcion.length > 0 ? '<div class="codigo-descripcion">' + esc(data.descripcion.substring(0, 200)) + '</div>' : '';
             let vipBadgeHTML = data.is_vip ? '<span style="display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1e3a5f;font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:6px"><i class="fas fa-crown"></i> VIP</span>' : '';
-            container.innerHTML = featuredHTML + benefitHTML +
-                '<div class="codigo-valor-container"><div class="codigo-valor" id="codigoTexto">' + esc(data.codigo) + '</div>' +
-                '<button class="btn-copiar-codigo" onclick="copiarCodigoRevelado()"><i class="fas fa-copy"></i> Copiar</button></div>' +
+            // Muchos "códigos" son en realidad un enlace de referido. Mostrarlo
+            // como texto con un botón de copiar obligaba a copiar y pegar una URL
+            // larga, y sobre todo hacía que el usuario saliera por su cuenta: sin
+            // pasar por /salir.php no se registra el clic ni se puede reescribir
+            // el enlace con el identificador de afiliado, así que la comisión se
+            // pierde aunque el programa exista.
+            const esEnlace = /^https?:\/\//i.test((data.codigo || '').trim());
+            let valorHTML;
+            if (esEnlace && data.codigo_id) {
+                valorHTML = '<div class="codigo-valor-container" style="flex-direction:column;gap:10px;">' +
+                    '<div style="font-size:0.85rem;color:#6b7280;">Este código es un enlace de invitación: el descuento se aplica al entrar.</div>' +
+                    '<a href="/salir.php?codigo=' + encodeURIComponent(data.codigo_id) + '" target="_blank" rel="nofollow noopener" ' +
+                    'class="cav2-btn cav2-btn-primary cav2-btn-lg" style="text-decoration:none;display:inline-block;">' +
+                    'Ir a ' + esc(data.marca_nombre || 'la web') + ' y activar →</a>' +
+                    '<span id="codigoTexto" style="display:none;">' + esc(data.codigo) + '</span>' +
+                    '</div>';
+            } else {
+                valorHTML = '<div class="codigo-valor-container"><div class="codigo-valor" id="codigoTexto">' + esc(data.codigo) + '</div>' +
+                    '<button class="btn-copiar-codigo" onclick="copiarCodigoRevelado()"><i class="fas fa-copy"></i> Copiar</button></div>';
+            }
+            container.innerHTML = featuredHTML + benefitHTML + valorHTML +
                 '<div class="codigo-publisher"><img src="' + esc(data.usuario_img) + '" alt="' + esc(data.usuario_nombre) + '" class="publisher-avatar" style="' + (data.is_vip ? 'border: 2px solid #f59e0b; box-shadow: 0 0 8px rgba(245,158,11,0.5);' : '') + '" onerror="this.src=\'/img/user-default.png\'">' +
                 '<div class="publisher-info"><div class="publisher-name">' + esc(data.usuario_nombre) + vipBadgeHTML + '</div>' +
                 '<div class="trust-badge ' + esc(data.trust_class) + '"><span class="trust-stars" style="color:' + esc(data.trust_color) + '">' + starsHTML + '</span> ' + esc(data.trust_label) + '</div></div>' +

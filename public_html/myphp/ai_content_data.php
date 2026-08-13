@@ -167,5 +167,12 @@ function get_ai_brand_content($brand_slug) {
         ]
     ];
     
+    // La ficha de Booking está dada de alta como 'bookingcom', así que el
+    // bloque escrito para 'booking' no se llegaba a mostrar nunca: la página
+    // con más impresiones sin un solo clic del sitio (2.746 en 90 días) se
+    // quedaba con la descripción genérica de tres líneas.
+    $alias = ['bookingcom' => 'booking'];
+    if (isset($alias[$brand_slug])) $brand_slug = $alias[$brand_slug];
+
     return isset($data[$brand_slug]) ? $data[$brand_slug] : null;
 }

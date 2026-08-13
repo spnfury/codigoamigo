@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 // Funciones de búsqueda simplificadas para CodigoAmigo.com
 
 function procesar_termino_busqueda($termino) {
@@ -74,7 +75,7 @@ function record_search_term($termino) {
         return true;
     } catch (Exception $e) {
         // Log del error si es necesario
-        error_log("Error registrando búsqueda: " . $e->getMessage());
+        log_error("Error registrando búsqueda: " . $e->getMessage());
         return false;
     }
 }
@@ -149,7 +150,7 @@ function get_search_statistics() {
         );
         
     } catch (Exception $e) {
-        error_log("Error obteniendo estadísticas de búsqueda: " . $e->getMessage());
+        log_error("Error obteniendo estadísticas de búsqueda: " . $e->getMessage());
         return array(
             'daily' => array(),
             'weekly' => array(),
@@ -237,14 +238,14 @@ function get_related_searches($current_term, $limit = 8) {
                     }
                 }
             } catch (Exception $e) {
-                error_log("Error obteniendo marcas relacionadas: " . $e->getMessage());
+                log_error("Error obteniendo marcas relacionadas: " . $e->getMessage());
             }
         }
         
         return $related_searches;
         
     } catch (Exception $e) {
-        error_log("Error obteniendo búsquedas relacionadas: " . $e->getMessage());
+        log_error("Error obteniendo búsquedas relacionadas: " . $e->getMessage());
         return array();
     }
 }
@@ -300,7 +301,7 @@ function get_popular_searches_by_period($period = 'today', $limit = 8) {
         return $results;
         
     } catch (Exception $e) {
-        error_log("Error obteniendo búsquedas populares por período: " . $e->getMessage());
+        log_error("Error obteniendo búsquedas populares por período: " . $e->getMessage());
         return array();
     }
 }

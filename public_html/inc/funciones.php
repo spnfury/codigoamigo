@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/logger.php';
 
 
 
@@ -103,8 +104,8 @@
         }
         
         // Validar tipo de archivo
-        if (!($file["uploadedfile"]['type'] =="image/jpeg" OR $file["uploadedfile"]['type'] =="image/gif" OR $file["uploadedfile"]['type'] =="image/png")) {
-            $msg = "Solo es posible subir archivos que sean imágenes.";
+        if (!($file["uploadedfile"]['type'] =="image/jpeg" OR $file["uploadedfile"]['type'] =="image/gif" OR $file["uploadedfile"]['type'] =="image/png" OR $file["uploadedfile"]['type'] =="image/webp")) {
+            $msg = "Solo es posible subir archivos que sean imágenes (JPG, PNG, GIF o WebP).";
             $uploadedfileload = "false";
         }
         
@@ -259,11 +260,11 @@
         );
         
         if (!$resultado['success']) {
-            error_log("Error enviando email de activación: " . $resultado['error']);
+            log_error("Error enviando email de activación: " . $resultado['error']);
             mandaBot("Error crítico enviando email de activación: " . $resultado['error']);
             return false;
         } else {
-            error_log("Email de activación enviado correctamente via " . $resultado['method'] . " a: " . $email);
+            log_info("Email de activación enviado correctamente via " . $resultado['method'] . " a: " . $email);
             return true;
         }
     }
@@ -276,10 +277,10 @@
         $resultado = enviarEmailRecuperacionPassword($datos);
         
         if (!$resultado['success']) {
-            error_log("Error crítico enviando email de recuperación: " . $resultado['error']);
+            log_error("Error crítico enviando email de recuperación: " . $resultado['error']);
             mandaBot("Error crítico enviando email de recuperación: " . $resultado['error']);
         } else {
-            error_log("Email de recuperación enviado correctamente via " . $resultado['method'] . " a: " . $datos['mail']);
+            log_info("Email de recuperación enviado correctamente via " . $resultado['method'] . " a: " . $datos['mail']);
         }
     }
 

@@ -1,0 +1,25 @@
+{
+    "142cc5cdd11d7e03": {
+        "estado": "healed",
+        "archivo": "/home/admin/web/codigoamigo.com/public_html/myphp/funciones.php",
+        "linea": 1708,
+        "tipo": "Uncaught Exception (0): Unsupported operand types: string - int",
+        "backup": "/home/admin/web/codigoamigo.com/public_html/autofix/state/backups/142cc5cdd11d7e03_20260701061748_funciones.php.bak",
+        "ts_fix": "2026-07-01 06:19:18",
+        "ts_ultimo": "2026-07-01 07:00:01"
+    },
+    "de594f6cbbaa019a": {
+        "estado": "manual",
+        "archivo": "/home/admin/web/codigoamigo.com/public_html/public/destaca.php",
+        "linea": 6,
+        "tipo": "Uncaught Exception (0): Error parsing ObjectId string: removed",
+        "ts_ultimo": "2026-07-21 03:30:01"
+    },
+    "7ea152504041e10f": {
+        "estado": "manual",
+        "archivo": "/home/admin/web/codigoamigo.com/public_html/php/remove_photo_user.php",
+        "linea": 4,
+        "tipo": "Uncaught Exception (0): Call to undefined function getCollectionUsuarios()",
+        "ts_ultimo": "2026-07-29 06:30:01"
+    }
+}

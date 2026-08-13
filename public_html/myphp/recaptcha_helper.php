@@ -1,10 +1,25 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 /**
  * Helper para validación de Google reCAPTCHA
  */
 
-// Clave secreta de reCAPTCHA
-define('RECAPTCHA_SECRET_KEY', '6LfyTegrAAAAAOnDI2_LSnJWf-knMy92ntWngpTQ');
+// Clave secreta de reCAPTCHA: leída de /private/api_secrets.php (fuera del
+// webroot, chmod 600), no hardcodeada. Rotar allí tras la exposición pública.
+if (!defined('RECAPTCHA_SECRET_KEY')) {
+    if (empty($_ENV['RECAPTCHA_SECRET_KEY'])) {
+        $_priv = dirname(__DIR__, 2) . '/private/api_secrets.php';
+        if (is_file($_priv)) {
+            require_once $_priv;
+        }
+    }
+    $_secret = $_ENV['RECAPTCHA_SECRET_KEY'] ?? '';
+    if ($_secret === '') {
+        $_g = getenv('RECAPTCHA_SECRET_KEY');
+        $_secret = ($_g !== false) ? $_g : '';
+    }
+    define('RECAPTCHA_SECRET_KEY', $_secret);
+}
 
 /**
  * Valida el token de reCAPTCHA con Google
@@ -82,9 +97,9 @@ function validarRecaptcha($recaptcha_response, $remote_ip = null) {
         if (isset($response_data['error-codes']) && is_array($response_data['error-codes'])) {
             $error_codes = implode(', ', $response_data['error-codes']);
             $resultado['error'] .= ' - Códigos de error: ' . $error_codes;
-            error_log("Google reCAPTCHA error codes: " . $error_codes . " (IP: " . ($remote_ip ?? 'N/A') . ")");
+            log_error("Google reCAPTCHA error codes: " . $error_codes . " (IP: " . ($remote_ip ?? 'N/A') . ")");
         } else {
-            error_log("Google reCAPTCHA failed without error codes. Response: " . $response);
+            log_error("Google reCAPTCHA failed without error codes. Response: " . $response);
         }
     }
 
@@ -104,7 +119,7 @@ function verificarRecaptcha($recaptcha_response) {
     $resultado = validarRecaptcha($recaptcha_response, $remote_ip);
     
     if (!$resultado['success']) {
-        error_log("reCAPTCHA validation failed: " . $resultado['error']);
+        log_error("reCAPTCHA validation failed: " . $resultado['error']);
     }
     
     return $resultado['success'];

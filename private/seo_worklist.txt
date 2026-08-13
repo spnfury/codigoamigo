@@ -1,0 +1,53 @@
+# CODIGOAMIGO — Worklist SEO demand-proven (GSC 90d)
+
+## TIER A — Ganables YA (pos 8-14, un empujón → top5, CTR ×3-5)
+marca                    clicks    impr   pos  ctr%
+honestgreenrestaurant        53    1918  12.0   2.8
+yego                         45    1383  13.0   3.3
+pagostore                    19     878  10.4   2.2
+plenitude                    10     758  11.5   1.3
+cleverea                     33     605  10.1   5.5
+bunqbanco                     7     597  10.7   1.2
+elevenfit                    17     463   9.3   3.7
+weward                        2     380  11.4   0.5
+meru                         18     365   9.9   4.9
+fintonic                      4     341   9.8   1.2
+amovens                      15     318  12.2   4.7
+promosapp                    21     298  10.8   7.0
+sotysolar                     6     228   8.9   2.6
+xceed                        38     221  11.9  17.2
+wesmartpark                  16     205  13.6   7.8
+bird                          4     197   9.9   2.0
+momoven                       2     168  12.5   1.2
+
+## TIER B — Enterradas alto-volumen (pos 15-40, imp>=400, upside grande, +difícil)
+marca                    clicks    impr   pos  ctr%
+iqos                          2    1345  29.0   0.1
+cooltra                       0    1269  39.6   0.0
+cheerz                        1    1172  31.7   0.1
+rakuten                       4    1014  38.9   0.4
+acciona                      11    1013  34.4   1.1
+veepee                        3    1009  35.7   0.3
+bancosabadell                12     936  36.2   1.3
+zumub                         1     919  37.7   0.1
+bolt                         14     917  34.9   1.5
+betfury                       7     917  29.6   0.8
+skyscanner                    0     880  33.8   0.0
+finetwork                     0     866  30.1   0.0
+parclick                      0     787  33.1   0.0
+oferplan                     68     783  23.8   8.7
+packlink                     11     665  20.5   1.7
+grover                        2     645  35.3   0.3
+joom                          0     645  21.2   0.0
+etoro                         0     635  23.9   0.0
+octopusenergy                 3     611  31.1   0.5
+suop                          2     518  27.6   0.4
+ionos                         0     498  17.8   0.0
+360imprimir                   0     496  18.4   0.0
+myinvestor                    8     489  27.9   1.6
+certideal                     0     471  30.0   0.0
+foodspring                    0     458  22.4   0.0
+didi                          6     450  26.1   1.3
+bulevip                       0     421  27.7   0.0
+taxdown                       3     413  28.6   0.7
+banggood                      0     413  37.6   0.0

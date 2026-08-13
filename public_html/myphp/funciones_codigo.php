@@ -11,14 +11,6 @@
     }
 
 
-    function getCollectionZumbidos () {
-
-        $db = createConnection();
-        $collection_codigos = $db->selectCollection('registro_zumbidos');
-        return $collection_codigos;
-
-    }
-
     /******************************************************
      *  LISTADO DE CÓDIGOS
      * ***************************************************/

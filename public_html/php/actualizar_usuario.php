@@ -1,4 +1,5 @@
 <?php 
+include_once __DIR__ . '/../inc/logger.php';
 
     // Validar que las variables estén definidas
     if (!isset($new_password) || !isset($new_confirm_password) || !isset($mail)) {
@@ -75,10 +76,10 @@
         }
         
     } catch(MongoCursorException $e) {
-        error_log("Error MongoDB en actualizar_usuario: " . $e->getMessage());
+        log_error("Error MongoDB en actualizar_usuario: " . $e->getMessage());
         echo "<script>alert('Error de base de datos: " . addslashes($e->getMessage()) . "'); window.location='/cambiar_password?msg_error=database_error';</script>";
     } catch(Exception $e) {
-        error_log("Error general en actualizar_usuario: " . $e->getMessage());
+        log_error("Error general en actualizar_usuario: " . $e->getMessage());
         echo "<script>alert('Error del sistema: " . addslashes($e->getMessage()) . "'); window.location='/cambiar_password?msg_error=system_error';</script>";
     }
 ?>

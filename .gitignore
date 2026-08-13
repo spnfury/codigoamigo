@@ -5,8 +5,15 @@ inc/conexion.php
 
 # Credenciales y notas de sesión fuera del webroot
 private/stripe_secrets.php
+private/api_secrets.php
+private/google_credentials.json
+private/*.json
 private/*.env
 private/*.md
+private/backups/
+
+# Defensa profundidad: nada dentro de public_html/private/
+public_html/private/
 
 # Logs y archivos de debug
 *.log
@@ -29,6 +36,11 @@ cached-*.html
 # Archivos de uploads (mantener estructura pero no contenido)
 uploads/*
 !uploads/.gitkeep
+
+# Contenido generado dentro del webroot
+public_html/images/chollos/*
+public_html/uploads/*
+!public_html/uploads/.gitkeep
 
 # Archivos de vendor (se instalan con composer)
 vendor/
@@ -55,3 +67,4 @@ documentacion_rediseno/
 
 # Repositorios Git anidados
 public_html/v2/startbootstrap-sb-admin-2/
+.gstack/

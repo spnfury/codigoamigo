@@ -123,14 +123,23 @@
     }
 
     function getCollectionFavoritos() {
-        
+
         $db = createConnection();
         $collection_favoritos = $db->selectCollection('favoritos');
-        
+
         return $collection_favoritos;
-        
+
     }
-    
+
+    function getCollectionEventosVipBloqueo() {
+
+        $db = createConnection();
+        $collection_eventos_vip_bloqueo = $db->selectCollection('eventos_vip_bloqueo');
+
+        return $collection_eventos_vip_bloqueo;
+
+    }
+
     function getCollectionMensajes() {
         
         $db = createConnection();
@@ -288,6 +297,30 @@
             
     
         if(empty($usuario_array["username"])) {
+
+            // El match mail+pass falló. Averiguamos POR QUÉ para dar un error útil
+            // (estos casos generaban tickets de soporte con el genérico "no aparece
+            // en la base de datos"). Solo se ejecuta en la rama de fallo.
+            try {
+                $por_mail = $collection_usuarios->findOne(['mail' => $mail]);
+                if ($por_mail) {
+                    // La cuenta existe pero la contraseña no casó.
+                    if (isset($por_mail['login_method']) && $por_mail['login_method'] === 'google') {
+                        echo json_encode(['success' => false, 'error' => 'Esta cuenta se creó con Google. Entra pulsando el botón "Continuar con Google" en lugar de email y contraseña.']);
+                        return;
+                    }
+                    echo json_encode(['success' => false, 'error' => 'La contraseña no es correcta. Si la has olvidado, usa "¿Has olvidado tu contraseña?" para restablecerla.']);
+                    return;
+                }
+                // No hay cuenta con ese email: ¿tecleó su nombre de usuario en vez del email?
+                $por_username = $collection_usuarios->findOne(['username' => $mail]);
+                if ($por_username) {
+                    echo json_encode(['success' => false, 'error' => 'Para entrar debes usar tu correo electrónico (no el nombre de usuario) junto con tu contraseña.']);
+                    return;
+                }
+            } catch (Throwable $e) {
+                debug_log("login_user (diagnóstico de fallo): " . $e->getMessage());
+            }
 
             echo json_encode(['success' => false, 'error' => 'no_trobat']);
 
@@ -1424,8 +1457,10 @@ function google_login($datos) {
                             $beneficio_email = (int)$contexto['beneficio'];
                         }
                         
-                        // Construir textos personalizados — enfoque suave, sin mencionar VIP
-                        $texto_sobre_codigo = !empty($nombre_marca_email) 
+                        // Construir textos personalizados. Antes "enfoque suave, sin mencionar
+                        // VIP": el usuario hace clic, llega al chat, y ahí choca con el paywall
+                        // de lectura sin haberlo visto venir. Mejor ser explícitos aquí mismo.
+                        $texto_sobre_codigo = !empty($nombre_marca_email)
                             ? 'quiere usar tu código de <strong>' . htmlspecialchars($nombre_marca_email) . '</strong> y necesita tu ayuda'
                             : 'quiere usar uno de tus códigos y necesita tu ayuda';
                         
@@ -1456,14 +1491,19 @@ function google_login($datos) {
                                     </div>
                                     
                                     <p style="margin-top: 25px; font-size: 14px; color: #666; text-align: center;">Abre el mensaje, ayúdale con el proceso y gana dinero con tus códigos.</p>
+
+                                    <div style="background-color:#fdf3f4;border:1px solid #f8d7da;border-radius:10px;padding:18px 20px;margin-top:25px;">
+                                        <p style="margin:0 0 8px;color:#c7254e;font-weight:700;font-size:15px;">&#128274; Nota: como no eres VIP, el chat solo te dejará leer/responder mensajes si te haces VIP.</p>
+                                        <p style="margin:0;color:#555;font-size:14px;line-height:1.5;">Con <a href="' . $link_vip . '" style="color:#E30613;font-weight:bold;text-decoration:none;">VIP (9,99€/mes, primer mes a mitad de precio)</a> lees y respondes sin límite, badge verificado, y 10€ de saldo gratis cada mes para tus destacados.</p>
+                                    </div>
                                 </div>
                                 <div style="text-align: center; font-size: 12px; color: #999; margin-top: 20px;">
                                     © ' . date('Y') . ' Código Amigo. Todos los derechos reservados.
                                 </div>
                             </div>
                         ';
-                        
-                        $text_content = "Hola $nombre_destino, $nombre_origen quiere usar tu código y te ha enviado un mensaje. Ábrelo y ayúdale con el proceso: $link_chat";
+
+                        $text_content = "Hola $nombre_destino, $nombre_origen quiere usar tu código y te ha enviado un mensaje. Como no eres VIP, necesitas hacerte VIP (9,99€/mes, primer mes a mitad de precio) para leer y responder mensajes: $link_vip";
                     }
 
                     // Enviar email (envolvemos en try/catch independiente para no bloquear el retorno)
@@ -2152,24 +2192,29 @@ function google_login($datos) {
                 return false;
             }
             
-            // Verificar fecha de expiración
-            if (isset($usuario['vip_expires_at'])) {
-                $expires_at = $usuario['vip_expires_at'];
-                $now = new DateTime();
-                
-                if ($expires_at instanceof MongoDB\BSON\UTCDateTime) {
-                    $expires_datetime = $expires_at->toDateTime();
-                } else {
-                    $expires_datetime = new DateTime($expires_at);
-                }
-                
-                if ($expires_datetime < $now) {
-                    // VIP expirado, desactivar
-                    desactivar_vip($user_id);
-                    return false;
-                }
+            // Sin fecha de expiración = anómalo: activar_vip SIEMPRE la setea.
+            // No conceder VIP permanente sin fecha (cierra el agujero de VIP eterno).
+            if (!isset($usuario['vip_expires_at'])) {
+                debug_log("es_usuario_vip: is_vip=true SIN vip_expires_at (anómalo), denegando: $user_id");
+                return false;
             }
-            
+
+            // Verificar fecha de expiración
+            $expires_at = $usuario['vip_expires_at'];
+            $now = new DateTime();
+
+            if ($expires_at instanceof MongoDB\BSON\UTCDateTime) {
+                $expires_datetime = $expires_at->toDateTime();
+            } else {
+                $expires_datetime = new DateTime($expires_at);
+            }
+
+            if ($expires_datetime < $now) {
+                // VIP expirado, desactivar
+                desactivar_vip($user_id);
+                return false;
+            }
+
             return true;
         } catch (Throwable $e) {
             debug_log("Error en es_usuario_vip: " . $e->getMessage());
@@ -2288,6 +2333,39 @@ function google_login($datos) {
         }
     }
     
+    /**
+     * Registra un evento de bloqueo VIP (ej. modal "Completar con IA" mostrado a no-VIP)
+     * para poder mandar un follow-up de conversión. Dedup: 1 registro por usuario+tipo+día,
+     * así el follow-up no cuenta un usuario que hizo clic 10 veces como 10 intentos.
+     * @param string $user_id ID del usuario
+     * @param string $tipo Identificador del evento, ej. 'modal_ia_bloqueada'
+     */
+    function registrar_evento_vip_bloqueo($user_id, $tipo) {
+        if (empty($user_id) || empty($tipo)) {
+            return false;
+        }
+
+        try {
+            $collection = getCollectionEventosVipBloqueo();
+            $hoy = (new DateTime('today'))->format('Y-m-d');
+
+            $collection->updateOne(
+                ['user_id' => (string)$user_id, 'tipo' => $tipo, 'dia' => $hoy],
+                ['$setOnInsert' => [
+                    'user_id' => (string)$user_id,
+                    'tipo' => $tipo,
+                    'dia' => $hoy,
+                    'fecha' => new MongoDB\BSON\UTCDateTime(),
+                ]],
+                ['upsert' => true]
+            );
+            return true;
+        } catch (Throwable $e) {
+            debug_log("Error en registrar_evento_vip_bloqueo: " . $e->getMessage());
+            return false;
+        }
+    }
+
     /**
      * Renueva el saldo mensual de un usuario VIP (+10€)
      * Incluye protección contra duplicados: no permite renovar si ya se renovó en las últimas 24 horas

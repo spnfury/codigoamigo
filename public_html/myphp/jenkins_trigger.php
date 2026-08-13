@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 /**
  * Jenkins Job Trigger
  * Script para disparar la regeneración de sitemaps desde Jenkins
@@ -40,13 +41,13 @@ if (php_sapi_name() === 'cli' || (isset($_GET['trigger']) && $_GET['trigger'] ==
     
     if ($result['success']) {
         $message = "✓ Job de Jenkins '{$job_name}' disparado exitosamente.";
-        error_log($message);
+        log_info($message);
         if (php_sapi_name() === 'cli') {
             echo $message . "\n";
         }
     } else {
         $message = "✗ Error al disparar job de Jenkins. HTTP Code: {$result['http_code']}";
-        error_log($message);
+        log_error($message);
         if (php_sapi_name() === 'cli') {
             echo $message . "\n";
         }

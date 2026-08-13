@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 // Verificar que la sesión esté iniciada y que el usuario esté logueado
 if (!isset($_SESSION["user_id"]) || empty($_SESSION["user_id"]) || $_SESSION["user_id"] == "") {
     header("Location: https://www.codigoamigo.com/login");
@@ -91,7 +92,428 @@ try {
 <!-- Incluir archivos CSS y JavaScript externos -->
 <link rel="stylesheet" href="/assets/css/mis-anuncios.css?v=<?php echo time(); ?>">
 <script src="/assets/js/mis-anuncios.js?<?php echo time(); ?>" defer></script>
+<script src="/assets/js/mis-anuncios-infinite.js?<?php echo time(); ?>" defer></script>
 <script src="/js/mass-message.js?v=<?php echo time(); ?>" defer></script>
+<!-- Define toggleAutoRenovar(): el interruptor de auto-renovación de cada
+     tarjeta lo invoca, pero esta página no cargaba el JS que lo define. -->
+<script src="/js/auto-renovar.js?v=<?php echo time(); ?>" defer></script>
+
+<style>
+/* ===========================================================================
+   ma-row · diseño limpio mobile-first
+   =========================================================================== */
+.codes-grid {
+    display:grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+    gap:12px;
+    max-width:1120px;
+    margin:0 auto;
+    align-items:start;
+}
+.codes-grid .ma-row { margin-bottom:0; }
+@media (max-width: 720px) {
+    .codes-grid { grid-template-columns: 1fr; max-width:760px; }
+}
+
+/* ===========================================================================
+   ma-search-sticky · barra búsqueda fija al scroll
+   =========================================================================== */
+.ma-search-sticky {
+    padding: 14px 16px;
+    background: #fff;
+    margin-bottom: 16px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transition: box-shadow 0.2s ease;
+}
+.ma-search-sticky.is-fixed {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9998;
+    margin: 0;
+    border-radius: 0;
+    padding: 12px 16px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.10);
+}
+.ma-search-placeholder { display: none; }
+.ma-search-placeholder.is-active { display: block; }
+
+.ma-row {
+    background:#fff;
+    border-radius:14px;
+    padding:14px 16px;
+    box-shadow:0 1px 2px rgba(0,0,0,0.05);
+    border:1px solid #eef0f3;
+    margin-bottom:10px;
+    transition:border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.ma-row:hover { border-color:#dfe3e8; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+
+/* Header: logo + título + kebab */
+.ma-row-head {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:10px;
+}
+.ma-row-logo {
+    flex-shrink:0;
+    width:38px;
+    height:38px;
+    border-radius:10px;
+    background:#f8f9fa;
+    overflow:hidden;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border:1px solid #eef0f3;
+}
+.ma-row-logo img { width:100%; height:100%; object-fit:contain; padding:4px; box-sizing:border-box; }
+.ma-row-logo-fallback {
+    width:100%; height:100%;
+    display:flex; align-items:center; justify-content:center;
+    background:#E30613;
+    color:#fff; font-weight:800; font-size:1rem;
+}
+.ma-row-title { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+.ma-row-name {
+    font-weight:800;
+    color:#1a1a2e;
+    text-decoration:none;
+    font-size:0.98rem;
+    line-height:1.2;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+.ma-row-badges {
+    display:flex;
+    align-items:center;
+    gap:5px;
+    flex-wrap:wrap;
+}
+
+/* Pills */
+.ma-pill {
+    padding:2px 7px;
+    border-radius:6px;
+    font-size:0.68rem;
+    font-weight:700;
+    line-height:1.4;
+    white-space:nowrap;
+    background:#f3f4f6;
+    color:#6b7280;
+}
+/* Posición: sutil, el valor es el número no el color */
+.ma-pill-pos { background:#f3f4f6; color:#4b5563; }
+/* Estado problema (caducado/desactivado/inactivo): ámbar discreto */
+.ma-pill-estado { background:#fdf6ec; color:#b45309; }
+.ma-pill-date { font-size:0.7rem; color:#9ca3af; }
+
+/* Kebab */
+.ma-kebab { position:relative; flex-shrink:0; }
+.ma-kebab-btn {
+    background:transparent;
+    border:none;
+    width:32px; height:32px;
+    border-radius:8px;
+    color:#6b7280;
+    cursor:pointer;
+    font-size:1rem;
+    display:flex; align-items:center; justify-content:center;
+    transition:background 0.15s ease;
+}
+.ma-kebab-btn:hover { background:#f3f4f6; color:#1a1a2e; }
+.ma-kebab-menu {
+    position:absolute;
+    top:calc(100% + 4px);
+    right:0;
+    background:#fff;
+    border-radius:10px;
+    box-shadow:0 10px 25px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.06);
+    border:1px solid #f0f0f0;
+    min-width:170px;
+    padding:6px;
+    z-index:50;
+    display:none;
+    flex-direction:column;
+    gap:1px;
+}
+.ma-kebab.is-open .ma-kebab-menu { display:flex; }
+.ma-kebab-menu a,
+.ma-kebab-menu button {
+    background:transparent;
+    border:none;
+    text-align:left;
+    padding:9px 12px;
+    border-radius:7px;
+    color:#374151;
+    font-size:0.88rem;
+    font-weight:600;
+    text-decoration:none;
+    cursor:pointer;
+    display:flex; align-items:center; gap:9px;
+    transition:background 0.12s ease;
+}
+.ma-kebab-menu a:hover,
+.ma-kebab-menu button:hover { background:#f3f4f6; }
+.ma-kebab-menu button.danger { color:#dc2626; }
+.ma-kebab-menu button.danger:hover { background:#fef2f2; }
+.ma-kebab-menu i { width:14px; text-align:center; opacity:0.7; }
+
+/* Descripción */
+.ma-row-desc {
+    margin:0 0 10px 0;
+    color:#4b5563;
+    font-size:0.86rem;
+    line-height:1.45;
+}
+.ma-row-desc a { color:#E30613; font-weight:700; text-decoration:none; }
+
+/* Stats chips */
+.ma-row-stats {
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-bottom:10px;
+}
+.ma-chip {
+    padding:3px 9px;
+    border-radius:8px;
+    font-size:0.74rem;
+    font-weight:700;
+    background:#f3f4f6;
+    color:#4b5563;
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    text-decoration:none;
+    border:1px solid transparent;
+}
+/* Beneficio €: valor destacado pero plano (texto fuerte, sin fondo chillón) */
+.ma-chip-benef { background:#f3f4f6; color:#1a1a2e; }
+/* Potencial: ÚNICO acento de la card — dinero esperando, además es accionable */
+.ma-chip-potencial { background:#fef2f2; color:#E30613; border-color:#fecaca; }
+.ma-chip-potencial:hover { background:#fee2e2; }
+
+/* CTA */
+.ma-row-cta { display:flex; gap:8px; margin-bottom:8px; }
+.ma-btn {
+    flex:1;
+    padding:9px 14px;
+    border-radius:9px;
+    font-weight:700;
+    font-size:0.86rem;
+    text-decoration:none;
+    text-align:center;
+    border:1px solid transparent;
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    transition:background 0.15s ease, border-color 0.15s ease;
+}
+/* Ver detalle = secundario neutro (plano, sin color) */
+.ma-btn-detalle {
+    background:#fff;
+    color:#374151 !important;
+    border-color:#e5e7eb;
+}
+.ma-btn-detalle:hover { background:#f8f9fa; color:#1a1a2e !important; border-color:#d1d5db; }
+/* Reactivar = acción única en códigos inactivos */
+.ma-btn-reactivar { background:#1a1a2e; color:#fff; border-color:#1a1a2e; }
+.ma-btn-reactivar:hover { background:#2d2d4a; }
+
+/* Control segmentado de destacado: Normal | Super */
+.ma-dest-control {
+    display:flex;
+    border:1px solid #e5e7eb;
+    border-radius:9px;
+    overflow:hidden;
+    margin-bottom:8px;
+}
+.ma-dest-seg {
+    flex:1;
+    padding:9px 10px;
+    font-size:0.82rem;
+    font-weight:700;
+    text-align:center;
+    color:#6b7280;
+    text-decoration:none;
+    background:#fff;
+    border:none;
+    cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    transition:background 0.15s ease, color 0.15s ease;
+}
+.ma-dest-seg:hover { background:#f8f9fa; color:#1a1a2e; }
+.ma-dest-seg + .ma-dest-seg { border-left:1px solid #e5e7eb; }
+.ma-dest-seg i { opacity:0.85; }
+/* Estado activo: Normal = acento rojo de marca; Super = oscuro premium */
+.ma-dest-seg.is-active { color:#fff; }
+.ma-dest-seg.is-active:hover { color:#fff; }
+.ma-dest-normal.is-active { background:#E30613; }
+.ma-dest-normal.is-active:hover { background:#c70511; }
+.ma-dest-super.is-active { background:#1a1a2e; }
+.ma-dest-super.is-active:hover { background:#2d2d4a; }
+.ma-dest-label { font-size:0.7rem; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:0.4px; padding:0 2px 4px; }
+
+/* ===========================================================================
+   Métricas de rendimiento · tabla plana
+   =========================================================================== */
+.ma-metricas-toggle {
+    width:100%;
+    display:flex; align-items:center; justify-content:space-between;
+    background:#fff; border:none; cursor:pointer;
+    padding:16px 20px;
+    font-size:0.98rem; font-weight:800; color:#1a1a2e;
+    transition:background 0.15s ease;
+}
+.ma-metricas-toggle:hover { background:#f8f9fa; }
+.ma-metricas-toggle i.fa-chart-line { color:#E30613; margin-right:8px; }
+.ma-metricas-chevron { color:#9ca3af; transition:transform 0.2s ease; }
+.ma-metricas-toggle.is-open .ma-metricas-chevron { transform:rotate(180deg); }
+
+.ma-metricas-wrap { border-top:1px solid #eef0f3; }
+
+/* KPIs resumen */
+.ma-metricas-summary {
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
+    gap:1px; background:#eef0f3;
+    border-bottom:1px solid #eef0f3;
+}
+.ma-metricas-kpi { background:#fff; padding:14px 18px; display:flex; flex-direction:column; gap:3px; }
+.ma-metricas-kpi-label { font-size:0.72rem; color:#9ca3af; font-weight:700; text-transform:uppercase; letter-spacing:0.4px; }
+.ma-metricas-kpi-val { font-size:1.4rem; font-weight:800; color:#1a1a2e; line-height:1; }
+
+/* Tabla */
+.ma-metricas-scroll { max-height:520px; overflow-y:auto; }
+.ma-metricas-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+.ma-metricas-table thead th {
+    position:sticky; top:0; z-index:1;
+    background:#f8f9fa; color:#6b7280;
+    font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.3px;
+    text-align:right; padding:10px 14px; white-space:nowrap;
+    border-bottom:1px solid #eef0f3;
+}
+.ma-metricas-table thead th.col-prod { text-align:left; }
+.ma-metricas-table thead th.col-trend, .ma-metricas-table thead th.col-spark { text-align:center; }
+.ma-metricas-table tbody td { padding:10px 14px; text-align:right; border-bottom:1px solid #f3f4f6; color:#374151; white-space:nowrap; }
+.ma-metricas-table tbody tr:hover { background:#fafbfc; }
+.ma-metricas-table tbody td.col-prod { text-align:left; }
+.ma-metricas-total { color:#9ca3af; }
+.ma-row-inactiva { opacity:0.55; }
+
+/* Producto (logo + texto) */
+.ma-metricas-prod { display:flex; align-items:center; gap:10px; text-decoration:none; max-width:280px; }
+.ma-metricas-logo {
+    flex-shrink:0; width:34px; height:34px; border-radius:8px;
+    background:#f3f4f6; border:1px solid #eef0f3;
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
+    font-weight:800; color:#6b7280; font-size:0.85rem;
+}
+.ma-metricas-logo img { width:100%; height:100%; object-fit:contain; padding:3px; box-sizing:border-box; }
+.ma-metricas-prod-txt { min-width:0; display:flex; flex-direction:column; gap:1px; }
+.ma-metricas-marca { font-weight:800; color:#1a1a2e; font-size:0.86rem; display:flex; align-items:center; gap:5px; }
+.ma-metricas-desc { font-size:0.76rem; color:#9ca3af; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:230px; }
+
+/* Tendencia (único uso de verde/rojo: señal de rendimiento) */
+.ma-trend { font-weight:700; font-size:0.8rem; display:inline-flex; align-items:center; gap:3px; }
+.ma-trend-up { color:#16a34a; }
+.ma-trend-down { color:#dc2626; }
+.ma-trend-flat { color:#9ca3af; }
+.col-trend { text-align:center !important; }
+
+/* Sparkline 7 días */
+.col-spark { text-align:center !important; }
+.ma-spark { display:inline-flex; align-items:flex-end; gap:2px; height:28px; }
+.ma-spark-bar { width:5px; background:#d1d5db; border-radius:2px; display:block; }
+.ma-spark-bar.is-last { background:#1a1a2e; }
+
+@media (max-width: 720px) {
+    .ma-metricas-table thead th.col-spark, .ma-metricas-table tbody td.col-spark,
+    .ma-metricas-table thead th:nth-child(4), .ma-metricas-table tbody td:nth-child(4) { display:none; }
+    .ma-metricas-desc { display:none; }
+}
+
+/* Auto-renovación destacado */
+.ma-row-autoren {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-top:10px;
+    padding:8px 10px;
+    background:#fafbfc;
+    border:1px solid #eef0f3;
+    border-radius:10px;
+}
+.ma-autoren-label { font-size:0.78rem; font-weight:700; color:#6b7280; display:flex; align-items:center; gap:6px; }
+/* Switch estilo iOS */
+.ma-autoren-switch {
+    position:relative;
+    width:46px; height:26px;
+    border-radius:13px;
+    border:none;
+    background:#e4e6eb;
+    cursor:pointer;
+    padding:0;
+    flex-shrink:0;
+    transition:background 0.25s ease;
+    -webkit-tap-highlight-color:transparent;
+}
+.ma-autoren-switch::after {
+    content:'';
+    position:absolute;
+    top:2px; left:2px;
+    width:22px; height:22px;
+    border-radius:50%;
+    background:#fff;
+    box-shadow:0 1px 3px rgba(0,0,0,0.3);
+    transition:transform 0.25s ease;
+}
+.ma-autoren-switch.is-on { background:#34c759; }
+.ma-autoren-switch.is-on::after { transform:translateX(20px); }
+.ma-autoren-switch.is-loading { opacity:0.55; pointer-events:none; }
+
+/* Mobile */
+@media (max-width: 600px) {
+    .ma-row { padding:12px 14px; border-radius:14px; }
+    .ma-row-logo { width:34px; height:34px; }
+    .ma-row-name { font-size:0.92rem; }
+    .ma-pill, .ma-pill-date { font-size:0.65rem; }
+    .ma-chip { font-size:0.7rem; }
+    .ma-btn { font-size:0.82rem; padding:9px 12px; }
+    .ma-tab { padding:8px 12px !important; font-size:0.8rem !important; }
+}
+</style>
+
+<script>
+// Kebab dropdown: cerrar al click fuera
+function maToggleKebab(btn) {
+    var k = btn.closest('.ma-kebab');
+    if (!k) return;
+    var open = k.classList.contains('is-open');
+    document.querySelectorAll('.ma-kebab.is-open').forEach(function (el) { el.classList.remove('is-open'); });
+    if (!open) k.classList.add('is-open');
+}
+document.addEventListener('click', function (e) {
+    if (!e.target.closest('.ma-kebab')) {
+        document.querySelectorAll('.ma-kebab.is-open').forEach(function (el) { el.classList.remove('is-open'); });
+    }
+});
+// Toggle tabla de métricas
+function maToggleMetricas(btn) {
+    var wrap = document.getElementById('ma-metricas-wrap');
+    if (!wrap) return;
+    var open = wrap.style.display !== 'none';
+    wrap.style.display = open ? 'none' : 'block';
+    btn.classList.toggle('is-open', !open);
+}
+</script>
 <script>
 window.userIsVip = <?php echo $is_vip_user ? 'true' : 'false'; ?>;
 window.jsConfig = {
@@ -292,10 +714,33 @@ function filterByVisibility(visibility){
                         </div>
                     </a>
 
+                    <!-- Invitar amigos -->
+                    <a href="/invitar-amigos" style="display: flex; align-items: center; gap: 12px; padding: 14px; background: #f8f9fa; border-radius: 10px; text-decoration: none; cursor: pointer; transition: all 0.2s ease; border: 1px solid #eee;">
+                        <div style="background: #FFEBEE; color: #E30613; padding: 8px; border-radius: 8px;">
+                            <i class="fas fa-gift" style="font-size: 1rem;"></i>
+                        </div>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; font-size: 0.85rem; color: #333;">Invita amigos</div>
+                            <div style="font-size: 0.75rem; color: #999;">Gana 5€ por cada uno</div>
+                        </div>
+                    </a>
+
                 </div>
             </div>
 
-            <?php if (isset($_GET['success']) && $_GET['success'] === 'destacado'): 
+            <!-- Métricas de rendimiento (tabla colapsable) -->
+            <div style="background:#fff; border-radius:12px; margin-bottom:24px; box-shadow:0 2px 8px rgba(0,0,0,0.06); overflow:hidden;">
+                <button type="button" class="ma-metricas-toggle" onclick="maToggleMetricas(this)">
+                    <span><i class="fas fa-chart-line"></i> Métricas de rendimiento</span>
+                    <span style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:0.78rem; color:#9ca3af; font-weight:600;">Qué códigos funcionan mejor</span>
+                        <i class="fas fa-chevron-down ma-metricas-chevron"></i>
+                    </span>
+                </button>
+                <?php include __DIR__ . '/_mis_anuncios_metricas.php'; ?>
+            </div>
+
+            <?php if (isset($_GET['success']) && $_GET['success'] === 'destacado'):
                 // Obtener información del código destacado
                 $codigo_id_modal = isset($_GET['codigo']) ? $_GET['codigo'] : '';
                 $tipo_modal = isset($_GET['tipo']) && in_array($_GET['tipo'], ['normal','super']) ? $_GET['tipo'] : 'normal';
@@ -337,7 +782,7 @@ function filterByVisibility(visibility){
                     }
                 } catch (Exception $e) {
                     // Si hay error, usar valores por defecto
-                    error_log("Error obteniendo información del código destacado: " . $e->getMessage());
+                    log_error("Error obteniendo información del código destacado: " . $e->getMessage());
                 }
                 
                 // Mensaje por defecto si no se encontró la marca
@@ -559,80 +1004,70 @@ function filterByVisibility(visibility){
                 <?php endif; ?>
             </div>
             
+            <!-- Placeholder evita layout shift cuando search pasa a fixed -->
+            <div class="ma-search-placeholder" id="ma-search-placeholder"></div>
+            <!-- Filtro de texto sticky (JS lo conmuta a position:fixed al hacer scroll) -->
+            <div class="ma-search-sticky" id="ma-search-sticky">
+                <div style="position: relative; max-width: 480px; margin: 0 auto;">
+                    <input type="text" id="textFilter" placeholder="Buscar por marca, descripción o código..."
+                           style="color: #555; width: 100%; padding: 12px 16px 12px 44px; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 0.9rem; background: #f8f9fa; transition: all 0.2s ease; box-sizing: border-box;"
+                           onkeyup="filterByText(this.value)">
+                    <i class="fas fa-search" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: #aaa; font-size: 0.95rem;"></i>
+                    <button id="clearTextFilter" onclick="clearTextFilter()" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #aaa; cursor: pointer; font-size: 1rem; display: none;" title="Limpiar búsqueda">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
             <!-- Filtros de códigos -->
             <div style="background: #fff; padding: 20px 24px; border-radius: 12px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
 
-                <!-- Filtro de texto -->
-                <div style="margin-bottom: 20px;">
-                    <div style="position: relative; max-width: 480px; margin: 0 auto;">
-                        <input type="text" id="textFilter" placeholder="Buscar por marca, descripción o código..." 
-                               style="color: #555; width: 100%; padding: 12px 16px 12px 44px; border: 1px solid #e0e0e0; border-radius: 8px; font-size: 0.9rem; background: #f8f9fa; transition: all 0.2s ease; box-sizing: border-box;"
-                               onkeyup="filterByText(this.value)">
-                        <i class="fas fa-search" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: #aaa; font-size: 0.95rem;"></i>
-                        <button id="clearTextFilter" onclick="clearTextFilter()" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #aaa; cursor: pointer; font-size: 1rem; display: none;" title="Limpiar búsqueda">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Filtros por ESTADO -->
-                <div style="margin-bottom: 14px;">
-                    <div style="font-size: 0.75rem; color: #aaa; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Estado</div>
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                        <button class="filter-button active" data-visibility="all" onclick="filterByVisibility('all')" style="background: #f0f0f0; color: #555; padding: 8px 16px; border: 1px solid #ddd; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease;">
-                            <i class="fas fa-list" style="margin-right: 5px;"></i>
-                            Todos (<?php echo count($listado_codigos); ?>)
-                        </button>
-
-                        <button class="filter-button" data-visibility="activos" onclick="filterByVisibility('activos')" style="background: #f0f0f0; color: #555; padding: 8px 16px; border: 1px solid #ddd; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease;">
-                            <i class="fas fa-check-circle" style="margin-right: 5px;"></i>
-                            ✅ Activos (<?php echo $num_activos; ?>)
-                        </button>
-
-                        <?php if ($num_caducados > 0): ?>
-                        <button class="filter-button" data-visibility="caducados" onclick="filterByVisibility('caducados')" style="background: #f0f0f0; color: #555; padding: 8px 16px; border: 1px solid #ddd; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease;">
-                            <i class="fas fa-clock" style="margin-right: 5px;"></i>
-                            ⏰ Caducados (<?php echo $num_caducados; ?>)
-                        </button>
-                        <?php endif; ?>
-
-                        <?php if ($num_desactivados > 0): ?>
-                        <button class="filter-button" data-visibility="desactivados" onclick="filterByVisibility('desactivados')" style="background: #f0f0f0; color: #555; padding: 8px 16px; border: 1px solid #ddd; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease;">
-                            <i class="fas fa-ban" style="margin-right: 5px;"></i>
-                            🚫 Desactivados (<?php echo $num_desactivados; ?>)
-                        </button>
-                        <?php endif; ?>
-
-                        <?php if ($num_inactivos > 0): ?>
-                        <button class="filter-button" data-visibility="inactivos" onclick="filterByVisibility('inactivos')" style="background: #f0f0f0; color: #555; padding: 8px 16px; border: 1px solid #ddd; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease;">
-                            <i class="fas fa-pause-circle" style="margin-right: 5px;"></i>
-                            ⏸️ Inactivos (<?php echo $num_inactivos; ?>)
-                        </button>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
-                <!-- Filtros por VISIBILIDAD -->
+                <!-- Tabs por ESTADO (server-side, paginadas) -->
+                <?php
+                $estado_tab_actual = isset($estado_tab) ? $estado_tab : 'todos';
+                $tabs_estado = [
+                    ['key' => 'todos',        'label' => 'Todos',        'icon' => 'fa-list',          'count' => $total_codigos_usuario, 'siempre' => true],
+                    ['key' => 'activos',      'label' => '✅ Activos',     'icon' => 'fa-check-circle',  'count' => $num_activos,           'siempre' => true],
+                    ['key' => 'destacados',   'label' => '🌟 Destacados',  'icon' => 'fa-star',          'count' => $num_destacados,        'siempre' => $num_destacados > 0],
+                    ['key' => 'caducados',    'label' => '⏰ Caducados',   'icon' => 'fa-clock',         'count' => $num_caducados,         'siempre' => $num_caducados > 0],
+                    ['key' => 'desactivados', 'label' => '🚫 Desactivados','icon' => 'fa-ban',           'count' => $num_desactivados,      'siempre' => $num_desactivados > 0],
+                    ['key' => 'inactivos',    'label' => '⏸️ Inactivos',   'icon' => 'fa-pause-circle',  'count' => $num_inactivos,         'siempre' => $num_inactivos > 0],
+                ];
+                ?>
                 <div style="margin-bottom: 8px;">
-                    <div style="font-size: 0.75rem; color: #aaa; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Visibilidad (activos)</div>
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                        <button class="filter-button" data-visibility="alta" onclick="filterByVisibility('alta')" style="background: #f0f0f0; color: #555; padding: 8px 16px; border: 1px solid #ddd; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease;">
-                            ⭐ Más visibles (<?php echo $num_1_codes; ?>)
-                        </button>
-
-                        <button class="filter-button" data-visibility="media" onclick="filterByVisibility('media')" style="background: #f0f0f0; color: #555; padding: 8px 16px; border: 1px solid #ddd; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease;">
-                            👁️ Visibles (<?php echo $num_2_codes; ?>)
-                        </button>
-
-                        <button class="filter-button" data-visibility="baja" onclick="filterByVisibility('baja')" style="background: #f0f0f0; color: #555; padding: 8px 16px; border: 1px solid #ddd; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease;">
-                            😴 Poco visibles (<?php echo $num_3_codes; ?>)
-                        </button>
-
-                        <button class="filter-button" data-visibility="destacados" onclick="filterByVisibility('destacados')" style="background: #f0f0f0; color: #555; padding: 8px 16px; border: 1px solid #ddd; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s ease;">
-                            🌟 Destacados (<?php echo count(array_filter($listado_codigos, function($c) { return isset($c['destacado']) && $c['destacado'] > 0 && (!isset($c['estado']) || (int)$c['estado'] === 0); })); ?>)
-                        </button>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 2px solid #f0f0f0; padding-bottom: 12px;">
+                        <?php foreach ($tabs_estado as $tab): if (!$tab['siempre']) continue; ?>
+                            <?php $activo = $tab['key'] === $estado_tab_actual; ?>
+                            <a href="?estado=<?php echo $tab['key']; ?>"
+                               class="ma-tab <?php echo $activo ? 'active' : ''; ?>"
+                               style="<?php echo $activo
+                                   ? 'background:#E30613;color:white;border:1px solid #E30613;'
+                                   : 'background:#f8f9fa;color:#555;border:1px solid #e0e0e0;'; ?>
+                                   padding:10px 18px;border-radius:10px;font-weight:600;font-size:0.9rem;
+                                   text-decoration:none;display:inline-flex;align-items:center;gap:6px;
+                                   transition:all 0.2s ease;">
+                                <i class="fas <?php echo $tab['icon']; ?>"></i>
+                                <?php echo $tab['label']; ?>
+                                <span style="<?php echo $activo
+                                    ? 'background:rgba(255,255,255,0.25);'
+                                    : 'background:#eee;'; ?>
+                                    padding:2px 8px;border-radius:10px;font-size:0.75rem;font-weight:700;">
+                                    <?php echo number_format($tab['count'], 0, ',', '.'); ?>
+                                </span>
+                            </a>
+                        <?php endforeach; ?>
                     </div>
                 </div>
+
+                <!-- Sub-filtros por visibilidad (sólo informativo, client-side dentro de la página actual) -->
+                <?php if ($estado_tab_actual === 'activos' || $estado_tab_actual === 'todos'): ?>
+                <div style="margin-top: 12px; display:flex; flex-wrap:wrap; gap:10px; font-size:0.8rem; color:#777;">
+                    <span><i class="fas fa-star" style="color:#FFC107;"></i> Posición 1: <strong><?php echo $num_1_codes; ?></strong></span>
+                    <span><i class="fas fa-eye" style="color:#2196F3;"></i> Posición 2: <strong><?php echo $num_2_codes; ?></strong></span>
+                    <span><i class="fas fa-moon" style="color:#9E9E9E;"></i> Posición 3+: <strong><?php echo $num_3_codes; ?></strong></span>
+                    <span style="opacity:0.6;">(en esta página)</span>
+                </div>
+                <?php endif; ?>
 
                 <?php 
                 // Calcular destacados caducados
@@ -724,347 +1159,23 @@ function filterByVisibility(visibility){
                             <option value="beneficio_asc">Menor beneficio</option>
                         </select>
                     </div>
-            <div class="codes-grid">
-            <?php foreach($listado_codigos as $codigo): ?>
-                <?php
-                // Verificar que $codigo['marca'] existe y no es null
-                if (!isset($codigo['marca']) || $codigo['marca'] === null) {
-                    continue;
-                }
-                
-                $marca = getObjectMarca('nombre_clave', $codigo['marca']);
-                if (!$marca) {
-                    continue;
-                }
-                
-                $posicion = get_posicion_codigo_en_marca($codigo['_id'], $codigo['marca']);
-                // Verificar si está destacado: puede ser timestamp (número) o boolean
-                $is_destacado = false;
-                if (isset($codigo['destacado'])) {
-                    // Convertir a array si es un objeto MongoDB
-                    if (is_object($codigo['destacado'])) {
-                        $codigo['destacado'] = (string)$codigo['destacado'];
-                    }
-                    
-                    if (is_numeric($codigo['destacado'])) {
-                        $is_destacado = (float)$codigo['destacado'] > 0;
-                    } elseif (is_bool($codigo['destacado'])) {
-                        $is_destacado = $codigo['destacado'];
-                    } elseif (is_string($codigo['destacado']) && $codigo['destacado'] !== '' && $codigo['destacado'] !== '0') {
-                        $is_destacado = true;
-                    }
-                }
-                
-                // Determinar clase de visibilidad
-                $visibilidad_class = '';
-                $visibilidad_text = '';
-                if($posicion == 1) {
-                    $visibilidad_class = 'alta';
-                    $visibilidad_text = 'Alta Visibilidad';
-                } elseif($posicion == 2) {
-                    $visibilidad_class = 'media';
-                    $visibilidad_text = 'Media Visibilidad';
-                } else {
-                    $visibilidad_class = 'baja';
-                    $visibilidad_text = 'Baja Visibilidad';
-                }
-                
-                // Obtener categoría para filtros
-                $categoria_nombre = '';
-                if(isset($codigo['categoria']) && !empty($codigo['categoria'])) {
-                    $categoria_obj = getObjectCategoria($codigo['categoria']);
-                    if($categoria_obj) {
-                        $categoria_nombre = $categoria_obj['nombre'];
-                    }
-                }
-                
-                // Formatear fecha para filtros
-                $fecha_publicacion = '';
-                if(isset($codigo['fecha_publicacion']) && !empty($codigo['fecha_publicacion'])) {
-                    $fecha_publicacion = date('Y-m-d', strtotime($codigo['fecha_publicacion']));
-                }
-                ?>
-                
-                <?php 
-                // Sistema mejorado de búsqueda de imágenes
-                $imagen_url = '';
-                $marca_nombre_clave = strtolower($codigo['marca']);
-                
-                // 1. Buscar en los campos de la marca
-                if (isset($marca['url_imagen']) && !empty($marca['url_imagen'])) {
-                    $imagen_url = $marca['url_imagen'];
-                } elseif (isset($marca['imagen']) && !empty($marca['imagen'])) {
-                    $imagen_url = $marca['imagen'];
-                } elseif (isset($marca['logo']) && !empty($marca['logo'])) {
-                    $imagen_url = $marca['logo'];
-                }
-                
-                // 2. Si no hay imagen específica, buscar en el directorio de marcas
-                if (empty($imagen_url)) {
-                    $formatos = ['png', 'jpg', 'jpeg', 'gif', 'svg'];
-                    $imagen_encontrada = false;
-                    
-                    foreach ($formatos as $formato) {
-                        $ruta_imagen = "/img/marcas/{$marca_nombre_clave}.{$formato}";
-                        $ruta_fisica = $_SERVER['DOCUMENT_ROOT'] . $ruta_imagen;
-                        
-                        if (file_exists($ruta_fisica)) {
-                            $imagen_url = $ruta_imagen;
-                            $imagen_encontrada = true;
-                            break;
-                        }
-                    }
-                    
-                    // 3. Si no se encuentra, usar imagen por defecto
-                    if (!$imagen_encontrada) {
-                        $imagen_url = '/img/no_image.png';
-                    }
-                }
-                
-                // Procesar URL de imagen
-                if (!empty($imagen_url)) {
-                    // Convertir URLs de cdn.codigoamigo.com a URLs directas del servidor
-                    if (strpos($imagen_url, 'cdn.codigoamigo.com') !== false) {
-                        // Extraer el path de la URL del CDN
-                        $path = parse_url($imagen_url, PHP_URL_PATH);
-                        if ($path) {
-                            // Convertir a URL directa del servidor
-                            // Si es panel_marcas, necesita /img/ antes
-                            if (strpos($path, '/panel_marcas/') !== false) {
-                                $imagen_url = 'https://www.codigoamigo.com/img' . $path;
-                            } else {
-                                $imagen_url = 'https://www.codigoamigo.com' . $path;
-                            }
-                        }
-                    }
-                    // Si no empieza con http/https/data:, convertir a URL relativa y luego absoluta
-                    elseif (!str_starts_with($imagen_url, 'http') && !str_starts_with($imagen_url, 'data:')) {
-                        if (!str_starts_with($imagen_url, '/')) {
-                            $imagen_url = '/' . $imagen_url;
-                        }
-                        $imagen_url = 'https://www.codigoamigo.com' . $imagen_url;
-                    }
-                    // Convertir http a https si es necesario
-                    if (strpos($imagen_url, 'http://') !== false) {
-                        $imagen_url = str_replace('http://', 'https://', $imagen_url);
-                    }
-                }
-                
-                $marca_url = '/de-' . strtolower($codigo['marca']);
-                
-                // Formatear fecha
-                $fecha_formateada = '';
-                if(isset($codigo['fecha_publicacion']) && !empty($codigo['fecha_publicacion'])) {
-                    $timestamp = strtotime($codigo['fecha_publicacion']);
-                    $diferencia = time() - $timestamp;
-                    if($diferencia < 86400) { // Menos de un día
-                        $fecha_formateada = 'Hoy';
-                    } elseif($diferencia < 172800) { // Menos de 2 días
-                        $fecha_formateada = 'Ayer';
-                    } elseif($diferencia < 604800) { // Menos de una semana
-                        $fecha_formateada = 'Hace ' . floor($diferencia / 86400) . ' días';
-                    } else {
-                        $fecha_formateada = date('d/m/Y', $timestamp);
-                    }
-                }
-                
-                $descripcion = $codigo['descripcion'] ?? 'Código de descuento válido';
-                ?>
-                
-                <?php
-                // Determinar estado del código para filtros y estilos
-                $estado_codigo_val = isset($codigo['estado']) ? (int)$codigo['estado'] : 0;
-                $estado_class = '';
-                $estado_label = '';
-                if ($estado_codigo_val === -3) {
-                    $estado_class = 'estado-caducado';
-                    $estado_label = 'Caducado';
-                } elseif ($estado_codigo_val === -2) {
-                    $estado_class = 'estado-desactivado';
-                    $estado_label = 'Desactivado';
-                } elseif ($estado_codigo_val === -1) {
-                    $estado_class = 'estado-inactivo';
-                    $estado_label = 'Inactivo';
-                }
-                ?>
-                <div class="code-card code-item mis-anuncios-card <?php echo $estado_class; ?>" data-visibilidad="<?php echo $visibilidad_class; ?>" data-categoria="<?php echo htmlspecialchars($categoria_nombre); ?>" data-fecha="<?php echo $fecha_publicacion; ?>" data-marca="<?php echo htmlspecialchars($marca['nombre'] ?? $codigo['marca']); ?>" data-clicks="<?php echo $codigo['totalclicks'] ?? 0; ?>" data-beneficio="<?php echo $codigo['num_beneficio'] ?? 10; ?>" data-destacado="<?php echo $is_destacado ? 'si' : 'no'; ?>" data-estado="<?php echo $estado_codigo_val; ?>" data-codigo-id="<?php echo $codigo['_id']; ?>">
-
-                    <!-- Badge de estado (caducado/desactivado/inactivo) -->
-                    <?php if($estado_label): ?>
-                        <div class="estado-badge estado-badge-<?php echo $estado_class; ?>">
-                            <i class="fas fa-<?php echo $estado_codigo_val === -3 ? 'clock' : ($estado_codigo_val === -2 ? 'ban' : 'pause-circle'); ?>"></i>
-                            <?php echo $estado_label; ?>
-                        </div>
-                    <?php endif; ?>
-
-                    <!-- Badge de destacado -->
-                    <?php if($is_destacado && $estado_codigo_val === 0): ?>
-                        <div class="featured-badge"><i class="fas fa-star"></i> Destacado</div>
-                    <?php endif; ?>
-
-                    <!-- Imagen de la marca (clickeable) - Estilo moderno -->
-                    <?php if($estado_codigo_val >= 0): // Solo mostrar imagen grande si está activo ?>
-                    <div class="code-brand-image">
-                        <a href="/de-<?php echo $codigo['marca']; ?>?codigo=<?php echo $codigo['_id']; ?>" class="brand-link">
-                            <?php if(!empty($imagen_url)): ?>
-                                <img loading="lazy" src="<?php echo htmlspecialchars($imagen_url); ?>" alt="<?php echo htmlspecialchars($marca['nombre'] ?? $codigo['marca']); ?>" class="brand-image">
-                            <?php else: ?>
-                                <div class="brand-placeholder"><i class="fas fa-tag"></i></div>
-                            <?php endif; ?>
-                        </a>
-                        <!-- Badge flotante con nombre de marca -->
-                        <div class="brand-name-badge">
-                            <?php echo htmlspecialchars($marca['nombre'] ?? $codigo['marca']); ?>
-                        </div>
-
-                        <!-- Badge flotante con visitas (izquierda, abajo) -->
-                        <div class="visits-badge">
-                            <i class="far fa-eye"></i>
-                            <span>Visitas <?php echo number_format($codigo['totalclicks'] ?? 0); ?></span>
-                        </div>
-                        
-                        <!-- Badge de Potencial -->
-                        <?php 
-                        $codigo_id_str = (string)$codigo['_id'];
-                        $item_potencial = $potencial_data['per_code'][$codigo_id_str] ?? null;
-                        if ($item_potencial && $item_potencial['count'] > 0): ?>
-                            <div class="potential-badge-card" 
-                                 onclick='initMassMessageModal(<?php echo json_encode($item_potencial['viewer_ids']); ?>, <?php echo $codigo['num_beneficio'] ?? 5; ?>, <?php echo $item_potencial['potential']; ?>)' 
-                                 title="¡Haz clic para enviar mensaje masivo a los interesados!"
-                                 style="position: absolute; bottom: 10px; right: 10px; background: rgba(255, 255, 255, 0.95); color: #E30613; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 800; display: flex; align-items: center; gap: 6px; cursor: pointer; border: 2px solid #E30613; box-shadow: 0 4px 10px rgba(227, 6, 19, 0.15); transition: all 0.3s ease; z-index: 5;">
-                                <i class="fas fa-bolt" style="font-size: 0.9rem;"></i>
-                                <span>Potencial: <?php echo number_format($item_potencial['potential'], 2, ',', '.'); ?>€</span>
-                                <i class="fas fa-chevron-right" style="font-size: 0.7rem; opacity: 0.7;"></i>
-                            </div>
-                            <style>
-                                .potential-badge-card:hover { transform: scale(1.05); background: #E30613; color: white; }
-                            </style>
-                        <?php endif; ?>
-                    </div>
-                    <?php else: // Si está inactivo, mostrar solo un header simplificado ?>
-                    <div style="padding: 15px 15px 5px 15px; font-weight: bold; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; color: #fff;">
-                        <?php if(!empty($imagen_url)): ?>
-                            <img src="<?php echo htmlspecialchars($imagen_url); ?>" style="width: 30px; height: 30px; border-radius: 5px; object-fit: cover;" alt="<?php echo htmlspecialchars($marca['nombre'] ?? $codigo['marca']); ?>">
-                        <?php endif; ?>
-                        <span><?php echo htmlspecialchars($marca['nombre'] ?? $codigo['marca']); ?></span>
-                    </div>
-                    <?php endif; ?>
-
-
-                    
-                    <!-- Badge de visibilidad con posición (fuera del contenedor de imagen para evitar z-index) -->
-                    <?php if($estado_codigo_val >= 0): // Solo si está activo ?>
-                    <div class="top-left-badges">
-                        <div class="visibility-badge visibility-<?php echo $visibilidad_class; ?>">
-                            <span class="position-in-badge">Posición #<?php echo $posicion; ?></span>
-                            <?php echo $visibilidad_text; ?>
-                        </div>
-                    </div>
-                    <?php endif; ?>
-
-                    <!-- Descripción -->
-                    <?php if($estado_codigo_val >= 0): // Solo si está activo ?>
-                    <div class="code-description">
-                        <div class="code-description-text">
-                            <?php 
-                            $descripcion_corta = mb_strlen($descripcion) > 120 ? mb_substr($descripcion, 0, 120) . '...' : $descripcion;
-                            echo htmlspecialchars($descripcion_corta); 
-                            if(mb_strlen($descripcion) > 120): ?>
-                                <span class="read-more-link" onclick="toggleDescripcion('<?php echo $codigo['_id']; ?>')">ver más</span>
-                            <?php endif; ?>
-                            <p id="desc-full-<?php echo $codigo['_id']; ?>" style="display: none; margin-top: 0.5rem;">
-                                <?php echo htmlspecialchars($descripcion); ?>
-                            </p>
-                        </div>
-                    </div>
-                    <?php endif; ?>
-
-                    <!-- Beneficio -->
-                    <?php if($estado_codigo_val >= 0 && isset($codigo['num_beneficio']) && $codigo['num_beneficio'] > 0): ?>
-                        <div class="code-meta-info">
-                            <div class="beneficio-destacado">
-                                <div class="beneficio-icono">💰</div>
-                                <div class="beneficio-contenido">
-                                    <div class="beneficio-cantidad"><?php echo $codigo['num_beneficio']; ?>€</div>
-                                    <div class="beneficio-tipo">BENEFICIO</div>
-                                </div>
-                            </div>
-                        </div>
-                    <?php elseif($estado_codigo_val < 0 && isset($codigo['num_beneficio']) && $codigo['num_beneficio'] > 0): // Compacto para inactivos ?>
-                        <div style="padding: 0 15px 10px 15px; color: #10b981; font-weight: bold;">
-                            Beneficio asociado: <?php echo $codigo['num_beneficio']; ?>€
-                        </div>
-                    <?php endif; ?>
-
-                    <!-- Código de descuento -->
-                    <div class="code-code-display">
-                        <span class="code-label">Código:</span>
-                        <span class="code-value"><?php echo htmlspecialchars($codigo['codigo'] ?? 'N/A'); ?></span>
-                    </div>
-
-                    <!-- Botones de acción -->
-                    <div class="code-actions">
-                        <?php if($estado_codigo_val >= 0): // Solo mostrar botones Destacar/Super si está activo ?>
-                            <a href="/destacar_codigo?codigo=<?php echo $codigo['_id']; ?>" class="btn-action btn-destacar">
-                                <i class="fas fa-star"></i> Destacar
-                            </a>
-                            <?php 
-                            // Check if brand has Super Landing
-                            $has_super_landing = false;
-                            if (!function_exists('get_active_super_landings')) {
-                                require_once __DIR__ . '/../myphp/funciones.php';
-                                include_once __DIR__ . '/../myphp/_super_landing_functions.php';
-                            }
-                            if (function_exists('get_active_super_landings')) {
-                                $all_sl = get_active_super_landings(50);
-                                foreach ($all_sl as $sl) {
-                                    $linked_slugs = isset($sl['linked_brand_slugs']) ? 
-                                        (is_array($sl['linked_brand_slugs']) ? $sl['linked_brand_slugs'] : iterator_to_array($sl['linked_brand_slugs'])) : [];
-                                    if (in_array($codigo['marca'], $linked_slugs)) {
-                                        $has_super_landing = true;
-                                        break;
-                                    }
-                                }
-                            }
-                            
-                            if ($has_super_landing): 
-                                $is_super = isset($codigo['tipo_destacado']) && $codigo['tipo_destacado'] === 'super';
-                            ?>
-                                <a href="/destacar_super.php?codigo_id=<?php echo $codigo['_id']; ?>" 
-                                   class="btn-action btn-super <?php echo $is_super ? 'super-active' : ''; ?>" 
-                                   title="Destacar en la Guía Oficial">
-                                    <i class="fas fa-trophy"></i> Super
-                                    <?php if ($is_super): ?><i class="fas fa-check-circle" style="margin-left: 4px;"></i><?php endif; ?>
-                                </a>
-                            <?php endif; // has_super_landing ?>
-                        <?php else: // Si está inactivo/caducado, mostrar botón Reactivar grande ?>
-                            <button onclick="reactivarCodigo('<?php echo $codigo['_id']; ?>', '<?php echo addslashes($marca['nombre'] ?? $codigo['marca']); ?>')" class="btn-action btn-reactivar">
-                                <i class="fas fa-redo"></i> Reactivar
-                            </button>
-                        <?php endif; // active code condition ?>
-                        
-                        <!-- Botones de Gestión (Edit, Stats, Delete) compactos y neutros -->
-                        <div style="display: flex; gap: 8px; margin-top: 4px; align-items: center;">
-                            <a href="/modificar_codigo/<?php echo $codigo['_id']; ?>" class="btn-action btn-modificar-neutral" style="flex: 2;">
-                                <i class="fas fa-edit"></i> Editar
-                            </a>
-                            <button onclick="mostrarEstadisticas('<?php echo $codigo['_id']; ?>', '<?php echo addslashes($codigo['marca'] ?? ''); ?>')" class="btn-action btn-stats-neutral" style="flex: 1;" title="Ver Estadísticas">
-                                <i class="fas fa-chart-bar"></i>
-                            </button>
-                            <button onclick="confirmarEliminarCodigo('<?php echo $codigo['_id']; ?>', '<?php echo addslashes($marca['nombre'] ?? $codigo['marca']); ?>')" class="btn-action btn-eliminar-neutral" style="flex: 1;" title="Borrar Código">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                            <?php if(!empty($fecha_formateada)): ?>
-                                <div class="brand-date-badge">
-                                    <i class="far fa-clock"></i>
-                                    <span><?php echo htmlspecialchars($fecha_formateada); ?></span>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-            <?php endforeach; ?>
+            <div class="codes-grid" id="ma-codes-grid" data-estado="<?php echo htmlspecialchars($estado_tab); ?>" data-pagina="1" data-total="<?php echo (int)$total_filtrado; ?>">
+            <?php foreach($listado_codigos as $codigo): include __DIR__ . '/_mis_anuncios_card.php'; endforeach; ?>
             </div>
+
+            <!-- Sentinel infinite scroll -->
+            <div id="ma-sentinel" style="height:1px;"></div>
+            <div id="ma-loader" style="text-align:center; padding:24px; color:#999; display:none;">
+                <i class="fas fa-spinner fa-spin"></i> Cargando más códigos…
+            </div>
+            <div id="ma-end" style="text-align:center; color:#999; font-size:0.85rem; margin:20px 0 30px; display:none;">
+                <span id="ma-end-text">No hay más códigos</span>
+            </div>
+            <div id="ma-counter" style="text-align:center; color:#999; font-size:0.85rem; margin:8px 0 24px;">
+                <span id="ma-counter-text"><?php echo number_format($total_filtrado, 0, ',', '.'); ?> códigos en total</span>
+            </div>
+
+            <?php /* Bloque original eliminado por infinite scroll */ ?>
         <?php else: ?>
             <div style="background: white; border-radius: 20px; padding: 50px; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,0.1); margin: 40px 0;">
                 <div style="font-size: 5rem; margin-bottom: 20px;">🎯</div>
@@ -1632,9 +1743,9 @@ window.filterByVisibility = function(visibility) {
         
         <div class="footer-links" style="display: flex; justify-content: center; gap: 30px; margin-bottom: 20px; flex-wrap: wrap;">
             <a href="/" style="color: #cccccc; text-decoration: none; font-size: 1rem; transition: color 0.3s ease;">Inicio</a>
-            <a href="/todos-los-codigos" style="color: #cccccc; text-decoration: none; font-size: 1rem; transition: color 0.3s ease;">Todos los Códigos</a>
-            <a href="/marcas" style="color: #cccccc; text-decoration: none; font-size: 1rem; transition: color 0.3s ease;">Marcas</a>
-            <a href="/categorias" style="color: #cccccc; text-decoration: none; font-size: 1rem; transition: color 0.3s ease;">Categorías</a>
+            <a href="/ultimos-codigos" style="color: #cccccc; text-decoration: none; font-size: 1rem; transition: color 0.3s ease;">Todos los Códigos</a>
+            <a href="/listado-marcas" style="color: #cccccc; text-decoration: none; font-size: 1rem; transition: color 0.3s ease;">Marcas</a>
+            <a href="/listado-categorias" style="color: #cccccc; text-decoration: none; font-size: 1rem; transition: color 0.3s ease;">Categorías</a>
         </div>
         
         <div class="footer-bottom" style="border-top: 1px solid #404040; padding-top: 20px; color: #888888; font-size: 0.9rem;">

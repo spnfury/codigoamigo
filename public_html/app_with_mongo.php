@@ -410,9 +410,20 @@ $app->get('/', function ($request, $response) {
                     <p style="color: rgba(255,255,255,0.8); margin: 0; font-size: 0.85rem; line-height: 1.4;">Badge dorado • Chat con viewers • 10€ de saldo gratis cada mes</p>
                 </div>
             </div>
-            <a href="/public/mis_viewers.php" style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #ffd700, #E30613); color: white; padding: 12px 24px; border-radius: 25px; font-weight: 700; text-decoration: none; font-size: 0.9rem; white-space: nowrap; transition: transform 0.2s ease, box-shadow 0.2s ease;" onmouseover="this.style.transform='scale(1.03)'; this.style.boxShadow='0 8px 25px rgba(255,215,0,0.3)'" onmouseout="this.style.transform=''; this.style.boxShadow=''">
-                <i class="fas fa-crown"></i> Solo 9,99€/mes →
-            </a>
+            <!-- El botón lleva directo a la pasarela, no al panel de leads.
+                 Antes enlazaba a /public/mis_viewers.php: quien pulsaba un CTA
+                 con un precio escrito aterrizaba en un cuadro de mando con sus
+                 métricas ("55 leads totales", "2.827€ potencial") y sin nada que
+                 pagar a la vista. El precio también estaba mal: anunciaba
+                 9,99€/mes cuando la entrada real son 4,99€ el primer mes, que
+                 además es mejor gancho. -->
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                <button type="button" id="btnVipHomeBanner" style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #ffd700, #E30613); color: white; padding: 12px 24px; border: none; border-radius: 25px; font-weight: 700; font-size: 0.9rem; white-space: nowrap; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease;" onmouseover="this.style.transform='scale(1.03)'; this.style.boxShadow='0 8px 25px rgba(255,215,0,0.3)'" onmouseout="this.style.transform=''; this.style.boxShadow=''">
+                    <span class="vip-banner-text"><i class="fas fa-crown"></i> Empieza por 4,99€ →</span>
+                    <span class="vip-banner-spinner" style="display: none;"><i class="fas fa-spinner fa-spin"></i></span>
+                </button>
+                <small style="color: rgba(255,255,255,0.45); font-size: 0.72rem;">Luego 9,99€/mes. Cancelas cuando quieras.</small>
+            </div>
         </div>
     </div>
     <script>
@@ -422,6 +433,52 @@ $app->get('/', function ($request, $response) {
         if (!dismissed || (Date.now() - parseInt(dismissed)) > 7 * 24 * 60 * 60 * 1000) {
             document.getElementById('vip-home-banner').style.display = 'block';
         }
+
+        // Del banner a la pasarela en un clic, sin pantallas intermedias.
+        var btn = document.getElementById('btnVipHomeBanner');
+        if (!btn) return;
+
+        btn.addEventListener('click', async function() {
+            var texto = btn.querySelector('.vip-banner-text');
+            var spinner = btn.querySelector('.vip-banner-spinner');
+            btn.disabled = true;
+            btn.style.opacity = '0.8';
+            if (texto) texto.style.display = 'none';
+            if (spinner) spinner.style.display = 'inline-block';
+
+            function restaurar() {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                if (texto) texto.style.display = 'inline-flex';
+                if (spinner) spinner.style.display = 'none';
+            }
+
+            try {
+                if (typeof gtag === 'function') {
+                    gtag('event', 'begin_checkout', {
+                        currency: 'EUR', value: 4.99, source: 'banner_home',
+                        items: [{ item_id: 'vip_subscription', item_name: 'Suscripción VIP', price: 4.99, quantity: 1 }]
+                    });
+                }
+                var res = await fetch('/crear_sesion_suscripcion_vip.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source: 'banner_home' })
+                });
+                var data = await res.json();
+                if (data.success && data.checkout_url) {
+                    window.location.href = data.checkout_url;
+                    return;
+                }
+                // Si la pasarela falla, al menos que no se quede en nada: al
+                // embudo VIP, donde puede reintentar el alta.
+                window.location.href = '/public/mis_viewers.php';
+            } catch (e) {
+                console.error('VIP banner checkout:', e);
+                restaurar();
+                window.location.href = '/public/mis_viewers.php';
+            }
+        });
     })();
     </script>
     <?php endif; ?>
@@ -462,6 +519,14 @@ $app->get('/', function ($request, $response) {
 
         // Mostrar marcas populares (solo en la primera página)
         echo generate_popular_brands_section(9);
+
+        // Bloque de enlace interno hacia marcas cercanas a página 1 (SEO)
+        echo render_marcas_oportunidad();
+
+        // Banner de invitar amigos (solo logueados)
+        if (function_exists('generate_referral_home_banner')) {
+            echo generate_referral_home_banner();
+        }
 
         // Mostrar categorías populares (solo en la primera página)
         echo generate_popular_categories_section();
@@ -1154,14 +1219,14 @@ $app->get('/ofertas/{termino}', function ($request, $response, $args) {
         try {
             $record_result = record_search_term($termino);
             if (!$record_result) {
-                error_log("Error registrando búsqueda (record_search_term devolvió false): " . $termino);
+                log_error("Error registrando búsqueda (record_search_term devolvió false): " . $termino);
             }
         } catch (Throwable $e) {
-            error_log("Error registrando búsqueda simplificada: " . $e->getMessage());
+            log_error("Error registrando búsqueda simplificada: " . $e->getMessage());
         }
     } else {
         if (!$fromTrends && !function_exists('record_search_term')) {
-            error_log("Error: record_search_term no existe al intentar registrar: " . $termino);
+            log_error("Error: record_search_term no existe al intentar registrar: " . $termino);
         }
     }
 
@@ -1248,10 +1313,34 @@ $app->get('/ofertas/{termino}', function ($request, $response, $args) {
         'sort' => array('fecha_publicacion' => -1, '_id' => -1)
     );
 
-    $lista_codigos_generales = get_all_listado_codigos_array($general_filter, $general_options);
-    $codigos_generales = isset($lista_codigos_generales["results"]) && is_array($lista_codigos_generales["results"])
-        ? $lista_codigos_generales["results"]
-        : array();
+    // Relevancia: primero los códigos cuya MARCA coincide con el término;
+    // después los que solo lo mencionan en la descripción. Antes iban mezclados
+    // por fecha y buscar "netflix" mostraba primero marcas sin relación aparente.
+    $codigos_generales = array();
+    if (!empty($termino) && isset($regex)) {
+        $filtro_marca = $general_filter;
+        $filtro_marca['$or'] = array(array('marca' => $regex));
+        $res_marca = get_all_listado_codigos_array($filtro_marca, $general_options);
+        $codigos_generales = isset($res_marca["results"]) && is_array($res_marca["results"]) ? $res_marca["results"] : array();
+
+        $restante = 50 - count($codigos_generales);
+        if ($restante > 0) {
+            $filtro_desc = $general_filter;
+            $filtro_desc['$or'] = array(array('descripcion' => $regex));
+            $filtro_desc['marca'] = array('$not' => $regex);
+            $opciones_desc = $general_options;
+            $opciones_desc['limit'] = $restante;
+            $res_desc = get_all_listado_codigos_array($filtro_desc, $opciones_desc);
+            if (isset($res_desc["results"]) && is_array($res_desc["results"])) {
+                $codigos_generales = array_merge($codigos_generales, $res_desc["results"]);
+            }
+        }
+    } else {
+        $lista_codigos_generales = get_all_listado_codigos_array($general_filter, $general_options);
+        $codigos_generales = isset($lista_codigos_generales["results"]) && is_array($lista_codigos_generales["results"])
+            ? $lista_codigos_generales["results"]
+            : array();
+    }
 
 
 
@@ -1648,9 +1737,29 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
     $GLOBALS['actual_url'] = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     $GLOBALS['actual_url_limpia'] = 'https://www.codigoamigo.com/de-' . $marca;
 
-    // Incluir archivos necesarios
+    // Incluir archivos necesarios.
+    // funciones.php va primero y aparte: la comprobación de marca de más abajo
+    // solo necesita ese, y los siguientes (modern/adsense) emiten output al
+    // cargarse — si se incluyeran antes del 404, el body saldría con restos.
     include_once __DIR__ . '/inc/includes.php';
     include_once __DIR__ . '/myphp/funciones.php';
+
+    // Marca inexistente -> 404 real.
+    //
+    // Hasta 2026-07-28 CUALQUIER /de-loquesea respondía 200 con título
+    // generado ("Cupones descuento Asdfghjkl"), canonical auto-referente y
+    // sin noindex: un generador infinito de soft-404. Google penaliza ese
+    // patrón y gasta crawl budget en páginas vacías.
+    //
+    // Comprobado contra GSC antes de activarlo: de 601 URLs /de-* con datos
+    // en 90 días, 599 tienen marca en BD; las 2 huérfanas se resolvieron
+    // ('iqos iluma i' con un 301 a /de-iqos, 'nuevamarcatribbu' se deja caer).
+    // Las redirecciones de marca se comprueban antes, así que siguen vivas.
+    if (!getObjectMarca('nombre_clave', $marca)) {
+        log_info('404 marca inexistente', ['marca' => $marca, 'ref' => $_SERVER['HTTP_REFERER'] ?? '']);
+        return $response->withStatus(404)->withHeader('X-Robots-Tag', 'noindex');
+    }
+
     include_once __DIR__ . '/myphp/funciones_utilidades.php';
     include_once __DIR__ . '/myphp/funciones_modern.php';
     include_once __DIR__ . '/myphp/funciones_adsense.php';
@@ -1728,11 +1837,21 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
 
             // Incluir el header moderno
 
+            // Mes/año actual para frescura en título (mismo patrón que
+            // generate_titulo_marca_mejorado en funciones_titulo_marca.php)
+            $meses_es_detalle = [
+                1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril',
+                5 => 'Mayo', 6 => 'Junio', 7 => 'Julio', 8 => 'Agosto',
+                9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre'
+            ];
+            $fecha_detalle_actual = new DateTime();
+            $string_fecha_detalle = $meses_es_detalle[(int)$fecha_detalle_actual->format('n')] . ' ' . $fecha_detalle_actual->format('Y');
+
             // Llamar a la función del header moderno
             get_header_modern(
-                "Código amigo " . ucfirst($marca) . " (verificado) - CodigoAmigo.com",
-                "Usa este código amigo de " . ucfirst($marca) . " verificado por la comunidad. Ahorra hasta " . ($codigo_arr['num_beneficio'] ?? '') . "€ en tu Registro.",
-                "Código amigo " . ucfirst($marca) . " Verificado",
+                "Código amigo " . ucfirst($marca) . " (verificado) " . $string_fecha_detalle . " - CodigoAmigo.com",
+                "Usa este código amigo de " . ucfirst($marca) . " verificado por la comunidad. Ahorra hasta " . ($codigo_arr['num_beneficio'] ?? '') . "€ en tu Registro. Válido " . $string_fecha_detalle . ".",
+                "Código amigo " . ucfirst($marca) . " Verificado " . $string_fecha_detalle,
                 "Código amigo " . ucfirst($marca) . " (verificado) - ¡Ahorra ahora!",
                 "https://www.codigoamigo.com/img/logo_codigoamigo_real4.png"
             );
@@ -1845,11 +1964,11 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
         
         // Debug: Verificar ordenamiento de códigos destacados
         if (!empty($codigos_destacados) && isset($_GET['debug_destacados'])) {
-            error_log("DEBUG DESTACADOS - Total: " . count($codigos_destacados));
+            log_info("DEBUG DESTACADOS - Total: " . count($codigos_destacados));
             foreach ($codigos_destacados as $idx => $cod) {
                 $destacado_val = isset($cod['destacado']) ? $cod['destacado'] : 'NO';
                 $destacado_social_val = isset($cod['destacado_social']) ? $cod['destacado_social'] : 'NO';
-                error_log("  [$idx] ID: " . (string)$cod['_id'] . " | destacado: $destacado_val | destacado_social: $destacado_social_val");
+                log_info("  [$idx] ID: " . (string)$cod['_id'] . " | destacado: $destacado_val | destacado_social: $destacado_social_val");
             }
         }
         
@@ -1929,7 +2048,25 @@ $app->get('/de-{marca}', function ($request, $response, $args) {
         }
         
         $numero_codigos = $total_codigos; // Total para la paginación
-        
+
+        // Ficha sin códigos activos -> noindex,follow.
+        //
+        // El 404 de arriba solo cubre marcas que no existen en BD. Una marca que
+        // SÍ existe pero se ha quedado sin códigos vigentes seguía devolviendo 200
+        // indexable, con description "0 códigos verificados válidos para <mes>":
+        // el mismo soft-404 por otra puerta (38 fichas así a 2026-08-07).
+        //
+        // Es reversible solo: en cuanto alguien publica un código para la marca,
+        // $total_codigos deja de ser 0 y la ficha vuelve al índice sin tocar nada.
+        // Se deja follow para no cortar el flujo de enlaces del silo de marcas.
+        //
+        // Solo meta robots, no X-Robots-Tag: a esta altura de la ruta los includes
+        // de _header_modern/adsense ya han emitido output, así que un withHeader()
+        // aquí llegaría tarde y provocaría "headers already sent".
+        if ($total_codigos === 0) {
+            $GLOBALS['noindex'] = 1;
+        }
+
         // Generar título y descripción mejorados
         $titulo_mejorado = generate_titulo_marca_mejorado($marca_info, $codigos);
         $descripcion_mejorada = generate_descripcion_marca_mejorada($marca_info, $codigos, $numero_codigos);
@@ -2006,7 +2143,7 @@ $app->get('/login', function ($request, $response, $args) {
                 );
             }
         } catch (Throwable $e) {
-            error_log("Error in autologin: " . $e->getMessage());
+            log_error("Error in autologin: " . $e->getMessage());
         }
     }
     
@@ -2522,16 +2659,16 @@ $app->get('/mis-anuncios', function ($request, $response, $args) {
                 if (function_exists('destacar_codigo_moderno')) {
                     $resultado = destacar_codigo_moderno($codigo_id_qs, $tipo_qs);
                     if ($resultado) {
-                        error_log("Código destacado exitosamente: $codigo_id_qs, tipo: $tipo_qs");
+                        log_info("Código destacado exitosamente: $codigo_id_qs, tipo: $tipo_qs");
                     } else {
-                        error_log("Error al destacar código: $codigo_id_qs");
+                        log_error("Error al destacar código: $codigo_id_qs");
                     }
                 }
                 $_SESSION['last_destacado_notify'] = $codigo_id_qs;
             }
         }
     } catch (Exception $e) {
-        error_log("Error procesando destacado en app_with_mongo: " . $e->getMessage());
+        log_error("Error procesando destacado en app_with_mongo: " . $e->getMessage());
     }
     
     // ========================================================================
@@ -2852,6 +2989,70 @@ $app->get('/blog', function ($request, $response, $args) {
     return $response;
 });
 
+// ─── Baja de correo en un clic (sin login) ───
+//
+// GET  = la persona pincha el enlace del pie del correo.
+// POST = el proveedor (Gmail, Yahoo...) ejecuta la baja por su cuenta cuando el
+//        usuario pulsa "Cancelar suscripción" en su bandeja: es el one-click de
+//        la RFC 8058, y sin él los correos de volumen se filtran a spam.
+//
+// El enlace va firmado con HMAC, así que no hace falta sesión y nadie puede dar
+// de baja a otra persona cambiando el parámetro de la URL.
+$baja_email_handler = function ($request, $response, $args) {
+    global $noindex;
+    $noindex = 1;
+
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/funciones_baja_email.php';
+
+    $email = (string)($request->getQueryParam('e') ?? ($request->getParsedBody()['e'] ?? ''));
+    $token = (string)($request->getQueryParam('t') ?? ($request->getParsedBody()['t'] ?? ''));
+
+    $ok = $email !== '' && baja_email_token_valido($email, $token);
+    if ($ok) {
+        registrar_baja_email($email, $request->getMethod() === 'POST' ? 'one-click' : 'enlace');
+    } else {
+        log_info('[baja_email] intento con firma inválida', ['email' => $email]);
+    }
+
+    // El one-click del proveedor no enseña nada a nadie: solo espera un 200.
+    if ($request->getMethod() === 'POST') {
+        return $response->withStatus($ok ? 200 : 400)->withHeader('Content-Type', 'text/plain');
+    }
+
+    $titulo = $ok ? 'Baja confirmada' : 'Enlace no válido';
+    $mensaje = $ok
+        ? 'Hemos dado de baja a <strong>' . htmlspecialchars($email, ENT_QUOTES, 'UTF-8') . '</strong>. No volverás a recibir nuestros correos.'
+        : 'Este enlace de baja no es válido o ha caducado. Escríbenos y lo hacemos a mano.';
+
+    $response->getBody()->write(
+        '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">'
+        . '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        . '<meta name="robots" content="noindex"><title>' . $titulo . ' - Código Amigo</title></head>'
+        . '<body style="margin:0;background:#f4f7fa;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,Arial,sans-serif;">'
+        . '<div style="max-width:520px;margin:60px auto;background:#fff;border-radius:12px;padding:40px 32px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.05);">'
+        . '<img src="https://www.codigoamigo.com/img/logo_codigoamigo.png" alt="Código Amigo" style="max-width:160px;margin-bottom:24px;">'
+        . '<h1 style="font-size:22px;color:#222;margin:0 0 16px;">' . $titulo . '</h1>'
+        . '<p style="color:#555;line-height:1.6;margin:0 0 28px;">' . $mensaje . '</p>'
+        . '<a href="https://www.codigoamigo.com" style="background:#E30613;color:#fff;padding:14px 30px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;">Volver a Código Amigo</a>'
+        . '</div></body></html>'
+    );
+
+    return $response->withStatus($ok ? 200 : 400)->withHeader('Content-Type', 'text/html; charset=UTF-8');
+};
+$app->get('/baja', $baja_email_handler);
+$app->post('/baja', $baja_email_handler);
+
+// URL antigua del embudo VIP. No existía como ruta, así que caía en el catch-all
+// y terminaba en la home: quien pulsaba "hazte VIP" desde el chat o desde la
+// ficha de marca acababa en la portada sin entender qué había pasado. Los
+// enlaces del código ya apuntan a /public/mis_viewers.php; esto cubre los que
+// puedan seguir vivos en correos enviados o enlaces externos.
+$app->get('/suscripciones_y_creditos', function ($request, $response, $args) {
+    return $response->withRedirect('/public/mis_viewers.php', 301);
+});
+
 // Rutas de páginas legales
 $app->get('/politica-de-privacidad', function ($request, $response, $args) {
     global $noindex;
@@ -3019,8 +3220,8 @@ $app->get('/listado-categorias', function ($request, $response, $args) {
     // Incluir archivos necesarios
     include_once __DIR__ . '/inc/includes.php';
     
-    $title = "Nuestras categorías";
-    $description = "Lista de nuestras categorías - " . (isset($GLOBALS["author"]) ? $GLOBALS["author"] : "Código Amigo");
+    $title = "Categorías de códigos de descuento y cupones | CodigoAmigo";
+    $description = "Todas las categorías de códigos de descuento: alimentación, viajes, banca, telefonía, cursos y más. Encuentra cupones y códigos amigo verificados para ahorrar.";
     $title_social = $title;
     $description_social = $description;
     $imagen_social = "https://www.codigoamigo.com/img/logo_codigoamigo_real4.png";
@@ -3126,7 +3327,11 @@ $app->get('/{categoria}-comparte-y-gana', function ($request, $response, $args) 
 
     // Generar contenido de la página de categoría
     echo generate_category_page_layout($categoria_url . '-comparte-y-gana', $nombre_categoria, $descripcion_categoria, $marcas_categoria);
-    
+
+    // Contenido SEO (intro rico + FAQs + schema FAQPage) — convierte la página
+    // de categoría de thin content a cuerpo real para competir por head terms.
+    echo render_categoria_seo($categoria_url);
+
     // CSS adicional
     echo get_modern_additional_css();
     
@@ -3380,6 +3585,12 @@ $app->get('/listado_marcas', function ($request, $response, $args) {
     return $response->withRedirect("https://www.codigoamigo.com/listado-marcas", 301);
 });
 
+// El menú (header_base, header_chollos, _header_mobile_new, funciones_modern)
+// enlaza a /marcas, que no tenía ruta y caía en la home (soft-404)
+$app->get('/marcas', function ($request, $response, $args) {
+    return $response->withRedirect("https://www.codigoamigo.com/listado-marcas", 301);
+});
+
 $app->get('/listado-marcas', function ($request, $response, $args) {
     global $author_web, $show_adsense, $name_page, $detect;
     include_once $_SERVER['DOCUMENT_ROOT'] . '/inc/includes.php';
@@ -3393,8 +3604,8 @@ $app->get('/listado-marcas', function ($request, $response, $args) {
     include_once $_SERVER['DOCUMENT_ROOT'] . '/myphp/_header_modern.php';
     $GLOBALS['header_modern_used'] = true; // Marcar que se usó el header moderno
     
-    $title = "Listado de marcas";
-    $description = "Todas las marcas disponibles en " . (isset($GLOBALS["author"]) ? $GLOBALS["author"] : "Código Amigo");
+    $title = "Todas las marcas con códigos de descuento y referido | CodigoAmigo";
+    $description = "Explora todas las marcas con códigos de descuento, cupones y códigos amigo verificados por la comunidad. Encuentra tu marca y ahorra en tu próxima compra.";
     include __DIR__ . '/public/listado_marcas.php';
     
     return $response;
@@ -3547,7 +3758,12 @@ $app->get('/felicidades_destacar', function ($request, $response, $args) {
     
     $title = "¡Código destacado exitosamente!";
     $description = "Tu código ha sido destacado correctamente en " . $author_web;
-    
+
+    // Incluir archivos necesarios (getCodeByID, getObjectMarca, get_header_new, get_footer)
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/funciones_modern.php';
+
     include_once $_SERVER['DOCUMENT_ROOT'] . '/public/felicidades_destacar.php';
     
     return $response;
@@ -3555,10 +3771,15 @@ $app->get('/felicidades_destacar', function ($request, $response, $args) {
 
 $app->get('/destaca', function ($request, $response, $args) {
     global $author_web;
-    
+
     $title = "Destaca tu código";
     $description = "Haz que tu código destaque en " . $author_web;
-    
+
+    // Incluir archivos necesarios (getCodeByID, getObjectMarca, get_header_new, get_footer)
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/funciones_modern.php';
+
     include_once $_SERVER['DOCUMENT_ROOT'] . '/public/destaca.php';
     
     return $response;
@@ -3679,7 +3900,7 @@ $app->post('/ajax_actions', function ($request, $response, $args) {
             
             return $response->write(json_encode($result));
         } catch (Exception $e) {
-            error_log('Error en favoritos: ' . $e->getMessage());
+            log_error('Error en favoritos: ' . $e->getMessage());
             return $response->write(json_encode(['success' => false, 'message' => 'Error al procesar la solicitud']));
         }
     }
@@ -3746,7 +3967,7 @@ $app->post('/ajax', function ($request, $response, $args) {
             
             return $response->write(json_encode($result));
         } catch (Exception $e) {
-            error_log('Error en favoritos: ' . $e->getMessage());
+            log_error('Error en favoritos: ' . $e->getMessage());
             return $response->write(json_encode(['success' => false, 'message' => 'Error al procesar la solicitud']));
         }
     }
@@ -3806,7 +4027,7 @@ $app->post('/ajax/', function ($request, $response, $args) {
             
             return $response->write(json_encode($result));
         } catch (Exception $e) {
-            error_log('Error en favoritos: ' . $e->getMessage());
+            log_error('Error en favoritos: ' . $e->getMessage());
             return $response->write(json_encode(['success' => false, 'message' => 'Error al procesar la solicitud']));
         }
     }
@@ -4097,7 +4318,7 @@ $app->post('/procesar_destacado_saldo', function ($request, $response, $args) {
         
         // Actualizar el código para destacarlo con duración fija
         $duracion_dias = ($tipo === 'super' || $tipo === 'super_landing') ? DESTACADO_DURACION_SUPER : DESTACADO_DURACION_NORMAL;
-        $auto_renovar = isset($params['auto_renovar']) && $params['auto_renovar'] === '1';
+        $auto_renovar = isset($_POST['auto_renovar']) && $_POST['auto_renovar'] === '1';
         $update_data_codigo = [
             'destacado' => time(),
             'tipo_destacado' => $tipo,
@@ -4228,7 +4449,7 @@ $app->post('/procesar_destacado_saldo', function ($request, $response, $args) {
                                 $bg_notify_data['user_id'],
                                 $codigo_actualizado
                             );
-                            error_log("Notificaciones de competencia home enviadas (background): $emails_enviados");
+                            log_info("Notificaciones de competencia home enviadas (background): $emails_enviados");
                         }
                     }
                     
@@ -4238,10 +4459,10 @@ $app->post('/procesar_destacado_saldo', function ($request, $response, $args) {
                             require_once __DIR__ . '/myphp/funciones_destacados_email.php';
                         }
                         $notifs = notificarCompetenciaDestacado($bg_notify_data['marca_clave'], $bg_notify_data['user_id'], $bg_notify_data['tipo']);
-                        error_log("Notificaciones competencia marca (background) ({$bg_notify_data['marca_clave']}): $notifs enviadas");
+                        log_info("Notificaciones competencia marca (background) ({$bg_notify_data['marca_clave']}): $notifs enviadas");
                     }
                 } catch (\Exception $e) {
-                    error_log("Error enviando notificaciones en background: " . $e->getMessage());
+                    log_error("Error enviando notificaciones en background: " . $e->getMessage());
                 }
             });
             
@@ -4303,6 +4524,21 @@ $app->get('/bienvenida-login', function ($request, $response, $args) {
         return $response->withRedirect('/', 302);
     }
 
+    // La plantilla llama a get_header_modern() y esta ruta no cargaba nada, así
+    // que la página reventaba con "Call to undefined function get_header_modern()"
+    // y devolvía un 500 con la traza de Slim a la vista. Es la pantalla que se
+    // enseña justo después de iniciar sesión.
+    include_once __DIR__ . '/inc/includes.php';
+    include_once __DIR__ . '/myphp/funciones.php';
+    include_once __DIR__ . '/myphp/funciones_modern.php';
+    include_once __DIR__ . '/myphp/_header_modern.php';
+    $GLOBALS['header_modern_used'] = true;
+
+    if (!isset($detect)) {
+        $detect = new Mobile_Detect();
+    }
+    $GLOBALS['detect'] = $detect;
+
     $title = '¡Bienvenido a Código Amigo!';
     $description = 'Descubre las mejores oportunidades para compartir y ahorrar en nuestra comunidad - ' . $author_web;
 
@@ -4327,9 +4563,9 @@ $app->post('/google_sign', function ($request, $response, $args) {
             'success' => false,
             'error' => 'Respuesta vacía del servicio de autenticación'
         ]);
-        error_log('[google_sign route] Respuesta vacía después de incluir google-sign-in.php');
+        log_error('[google_sign route] Respuesta vacía después de incluir google-sign-in.php');
     } elseif ($trimmedPayload[0] !== '{' && $trimmedPayload[0] !== '[') {
-        error_log('[google_sign route] Respuesta inesperada: ' . substr($trimmedPayload, 0, 400));
+        log_error('[google_sign route] Respuesta inesperada: ' . substr($trimmedPayload, 0, 400));
     }
 
     $response->getBody()->write($trimmedPayload);

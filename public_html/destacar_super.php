@@ -75,6 +75,12 @@ if (function_exists('get_active_super_landings')) {
     }
 }
 
+// Super disponible para todos los códigos. Si la marca aún no tiene Guía Oficial,
+// usamos un título genérico para los textos de beneficios.
+if (empty($super_landing_title)) {
+    $super_landing_title = 'Las Mejores Ofertas y Códigos';
+}
+
 // Get header
 include_once __DIR__ . '/myphp/_header_modern.php';
 get_header_modern('Destacar Código Super - Código Amigo', 'Destaca tu código en la posición premium de las Guías');
@@ -94,23 +100,14 @@ get_header_modern('Destacar Código Super - Código Amigo', 'Destaca tu código 
                 </div>
             <?php endif; ?>
             <i class="fas fa-trophy" style="font-size: 4rem; color: #E30613; margin-bottom: 20px;"></i>
-            <h1 style="font-size: 2.5rem; font-weight: 800; color: white; margin-bottom: 10px;">
+            <h1 style="font-size: 2.5rem; font-weight: 800; color: #1a1a2e; margin-bottom: 10px;">
                 Destaca tu Código como SUPER
             </h1>
-            <p style="font-size: 1.2rem; color: #e0e0e0;">
+            <p style="font-size: 1.2rem; color: #666;">
                 La posición más privilegiada en las Guías Oficiales
             </p>
         </div>
 
-        <?php if (!$has_super_landing): ?>
-            <div class="alert alert-warning text-center">
-                <i class="fas fa-info-circle"></i> Esta marca aún no tiene una Guía Oficial activa.
-                <br>El destacado Super solo está disponible para marcas con Guías Oficiales.
-            </div>
-            <div class="text-center mt-4">
-                <a href="/mis-anuncios" class="btn btn-default">Volver a Mis Códigos</a>
-            </div>
-        <?php else: ?>
             <div class="current-code-info" style="background: #f8f9fa; padding: 20px; border-radius: 12px; margin-bottom: 30px;">
                 <h3 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 15px;">Tu Código:</h3>
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
@@ -203,7 +200,6 @@ get_header_modern('Destacar Código Super - Código Amigo', 'Destaca tu código 
                     <i class="fas fa-arrow-left"></i> Volver a Mis Códigos
                 </a>
             </div>
-        <?php endif; ?>
     </div>
 </div>
 

@@ -1,0 +1,113 @@
+/* Flash Promotions Styles */
+:root {
+    --flash-promo-bg: #E8F5E9;
+    --flash-promo-border: #28a745;
+    --success-green: #28a745;
+}
+
+.code-card.flash-promo {
+    border: 2px solid var(--flash-promo-border);
+    background: linear-gradient(135deg, var(--flash-promo-bg) 0%, #ffffff 100%);
+    box-shadow: 0 8px 25px rgba(40, 167, 69, 0.15);
+    position: relative;
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 25px;
+    transition: all 0.3s ease;
+}
+
+.code-card.flash-promo:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 30px rgba(40, 167, 69, 0.25);
+}
+
+.flash-promo-badge {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: linear-gradient(135deg, var(--success-green), #20c997);
+    color: white !important;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+    z-index: 10;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.code-card.flash-promo .code-title {
+    color: #1b5e20 !important;
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.code-card.flash-promo .code-description {
+    color: #444;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 20px;
+}
+
+.code-card.flash-promo .btn-primary {
+    background: linear-gradient(135deg, var(--success-green), #218838);
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+    border: none;
+    color: white !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 25px;
+    border-radius: 25px;
+    text-decoration: none;
+    font-weight: 600;
+    width: 100%;
+    justify-content: center;
+}
+
+.code-card.flash-promo .btn-primary:hover {
+    box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+    transform: translateY(-2px);
+}
+
+.verified-brand-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--success-green);
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.code-card.flash-promo .benefit-display {
+    background: linear-gradient(135deg, var(--success-green), #20c997);
+    color: white;
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+    margin: 15px 0;
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.2);
+}
+
+.code-card.flash-promo .benefit-amount {
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+
+.code-card.flash-promo .flash-promo-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.code-card.flash-promo .brand-logo-small {
+    width: 45px;
+    height: 45px;
+    border-radius: 8px;
+    object-fit: cover;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}

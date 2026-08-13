@@ -1,0 +1,198 @@
+{
+    "generado": "2026-08-06T12:10:01+00:00",
+    "generado_human": "2026-08-06 12:10",
+    "apps": [
+        {
+            "id": "codigoamigo",
+            "nombre": "Código Amigo",
+            "tipo": "expo",
+            "ruta": "/home/admin/web/codigoamigo.com/mobile-app",
+            "web": "https://www.codigoamigo.com",
+            "estado_objetivo": "publicar",
+            "notas": "Primera publicación pendiente.",
+            "existe": true,
+            "version": "1.0.0",
+            "android_package": "com.codigoamigo.app",
+            "ios_bundle": "com.codigoamigo.app",
+            "git": {
+                "ultimo_commit": "d4b80b2",
+                "fecha": "2026-07-28",
+                "sin_commitear": 0,
+                "remote": null
+            },
+            "checklist": [
+                {
+                    "ok": true,
+                    "texto": "Nombre de app definido"
+                },
+                {
+                    "ok": true,
+                    "texto": "android.package definido"
+                },
+                {
+                    "ok": true,
+                    "texto": "ios.bundleIdentifier definido"
+                },
+                {
+                    "ok": false,
+                    "texto": "Proyecto vinculado a EAS (eas init)"
+                },
+                {
+                    "ok": true,
+                    "texto": "Perfil de build \"production\" en eas.json"
+                },
+                {
+                    "ok": true,
+                    "texto": "expo-updates instalado (necesario por \"channel\", da OTA)"
+                },
+                {
+                    "ok": true,
+                    "texto": "expo-constants instalado (lo exige expo-router)"
+                },
+                {
+                    "ok": true,
+                    "texto": "Dependencias instaladas"
+                },
+                {
+                    "ok": true,
+                    "texto": "Icono 1024x1024"
+                },
+                {
+                    "ok": false,
+                    "texto": "Service account de Google Play (para eas submit)"
+                },
+                {
+                    "ok": false,
+                    "texto": "ascAppId de App Store Connect"
+                },
+                {
+                    "ok": false,
+                    "texto": "Recursos de ficha de tienda (capturas y gráfico destacado)"
+                },
+                {
+                    "ok": false,
+                    "texto": "Repositorio con remoto (copia fuera del servidor)"
+                }
+            ],
+            "sdk": "~54.0.36",
+            "eas_project_id": "",
+            "listos": 8,
+            "total": 13,
+            "pct": 62
+        },
+        {
+            "id": "planazosbcn",
+            "nombre": "PlanazosBCN",
+            "tipo": "expo",
+            "ruta": "/home/planazosbcn/mobile",
+            "web": "https://planazosbcn.com",
+            "estado_objetivo": "prototipo",
+            "notas": "Scaffold de Expo sin configurar: sin package/bundleId ni eas.json.",
+            "existe": true,
+            "version": "1.0.0",
+            "android_package": null,
+            "ios_bundle": null,
+            "git": {
+                "ultimo_commit": "95051d2",
+                "fecha": "2026-07-23",
+                "sin_commitear": 13,
+                "remote": "git@github.com:spnfury/planazosbcn.git"
+            },
+            "checklist": [
+                {
+                    "ok": true,
+                    "texto": "Nombre de app definido"
+                },
+                {
+                    "ok": false,
+                    "texto": "android.package definido"
+                },
+                {
+                    "ok": false,
+                    "texto": "ios.bundleIdentifier definido"
+                },
+                {
+                    "ok": false,
+                    "texto": "Proyecto vinculado a EAS (eas init)"
+                },
+                {
+                    "ok": false,
+                    "texto": "Perfil de build \"production\" en eas.json"
+                },
+                {
+                    "ok": false,
+                    "texto": "expo-updates instalado (necesario por \"channel\", da OTA)"
+                },
+                {
+                    "ok": true,
+                    "texto": "expo-constants instalado (lo exige expo-router)"
+                },
+                {
+                    "ok": false,
+                    "texto": "Dependencias instaladas"
+                },
+                {
+                    "ok": false,
+                    "texto": "Icono 1024x1024"
+                },
+                {
+                    "ok": false,
+                    "texto": "Service account de Google Play (para eas submit)"
+                },
+                {
+                    "ok": false,
+                    "texto": "ascAppId de App Store Connect"
+                },
+                {
+                    "ok": false,
+                    "texto": "Recursos de ficha de tienda (capturas y gráfico destacado)"
+                },
+                {
+                    "ok": true,
+                    "texto": "Repositorio con remoto (copia fuera del servidor)"
+                }
+            ],
+            "sdk": "~54.0.33",
+            "eas_project_id": "",
+            "listos": 3,
+            "total": 13,
+            "pct": 23
+        },
+        {
+            "id": "radargas",
+            "nombre": "RadarGas",
+            "tipo": "capacitor",
+            "ruta": "/var/www/radargas.com",
+            "web": "https://radargas.com",
+            "estado_objetivo": "publicada",
+            "notas": "Ya en App Store y Google Play. Se compila fuera de este servidor (Mac del desarrollador): aquí no existen las carpetas android/ e ios/.",
+            "existe": true,
+            "version": "1.0.7",
+            "android_package": "com.radargas.app",
+            "ios_bundle": "com.radargas.app",
+            "git": {
+                "ultimo_commit": "5ca657c",
+                "fecha": "2026-05-10",
+                "sin_commitear": 2,
+                "remote": "https://github.com/spnfury/Gasgas.git"
+            },
+            "checklist": [
+                {
+                    "ok": false,
+                    "texto": "Proyecto Android presente en el servidor"
+                },
+                {
+                    "ok": false,
+                    "texto": "Proyecto iOS presente en el servidor"
+                },
+                {
+                    "ok": true,
+                    "texto": "Repositorio con remoto"
+                }
+            ],
+            "listos": 1,
+            "total": 3,
+            "pct": 33
+        }
+    ]
+}

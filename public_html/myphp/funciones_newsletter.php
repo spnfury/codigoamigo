@@ -614,10 +614,24 @@ function procesarColaNewsletter($limite_diario = 300) {
             return $resultado;
         }
         
+        include_once __DIR__ . '/funciones_baja_email.php';
+
         // Procesar cada email
         foreach ($pendientes as $item) {
             $resultado['procesados']++;
-            
+
+            // La cola se construye al crear la newsletter, así que puede llevar
+            // días parada mientras alguien se da de baja. Se comprueba aquí, en
+            // el momento del envío, y no cuando se encoló.
+            if (email_tiene_baja($item['usuario_email'])) {
+                $collection_queue->updateOne(
+                    ['_id' => $item['_id']],
+                    ['$set' => ['estado' => 'baja', 'fecha_envio' => new MongoDB\BSON\UTCDateTime()]]
+                );
+                $resultado['bajas'] = ($resultado['bajas'] ?? 0) + 1;
+                continue;
+            }
+
             // Obtener datos de la newsletter
             $newsletter = $collection_newsletters->findOne(['_id' => new MongoDB\BSON\ObjectId($item['newsletter_id'])]);
             

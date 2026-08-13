@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../inc/logger.php';
 /**
  * API endpoint para sincronización de mensajes de Telegram
  * Recibe datos del script Python y procesa los mensajes para crear chollos
@@ -97,13 +98,13 @@ if ($eliminar_anteriores) {
                 $fuenteObjectId = new MongoDB\BSON\ObjectId($fuente_id);
                 $resultado_eliminacion = $collection_chollos->deleteMany(['fuente_id' => $fuenteObjectId]);
                 $eliminados = $resultado_eliminacion->getDeletedCount();
-                error_log("Eliminados {$eliminados} chollos anteriores de la fuente {$fuente_id}");
+                log_info("Eliminados {$eliminados} chollos anteriores de la fuente {$fuente_id}");
             } catch (Exception $e) {
-                error_log("Error al eliminar chollos anteriores: " . $e->getMessage());
+                log_error("Error al eliminar chollos anteriores: " . $e->getMessage());
             }
         }
     } catch (Throwable $e) {
-        error_log("Error al eliminar chollos anteriores: " . $e->getMessage());
+        log_error("Error al eliminar chollos anteriores: " . $e->getMessage());
     }
 }
 
@@ -152,18 +153,18 @@ foreach ($mensajes as $mensaje_data) {
                 $asin_detectado = extraerASIN($enlace_expandido);
                 if ($asin_detectado) {
                     $info['asin'] = $asin_detectado;
-                    error_log("Telegram sync - ASIN extraído: $asin_detectado para: " . substr($info['titulo'] ?? '', 0, 50));
+                    log_info("Telegram sync - ASIN extraído: $asin_detectado para: " . substr($info['titulo'] ?? '', 0, 50));
                 } else {
-                    error_log("Telegram sync - No se pudo extraer ASIN de enlace expandido: $enlace_expandido");
+                    log_warning("Telegram sync - No se pudo extraer ASIN de enlace expandido: $enlace_expandido");
                 }
             } else {
                 // No se pudo expandir - intentar extraer ASIN del enlace original
                 $asin_detectado = extraerASIN($info['enlace']);
                 if ($asin_detectado) {
                     $info['asin'] = $asin_detectado;
-                    error_log("Telegram sync - ASIN extraído directamente: $asin_detectado");
+                    log_info("Telegram sync - ASIN extraído directamente: $asin_detectado");
                 } else {
-                    error_log("Telegram sync - ADVERTENCIA: No se pudo expandir ni extraer ASIN de: " . $info['enlace']);
+                    log_warning("Telegram sync - ADVERTENCIA: No se pudo expandir ni extraer ASIN de: " . $info['enlace']);
                 }
             }
             
@@ -185,7 +186,7 @@ foreach ($mensajes as $mensaje_data) {
         
         $chollos_preparados[] = $info;
     } catch (Throwable $e) {
-        error_log("Error preparando mensaje: " . $e->getMessage());
+        log_error("Error preparando mensaje: " . $e->getMessage());
     }
 }
 
@@ -250,7 +251,7 @@ foreach ($chollos_preparados as $info) {
         }
     } catch (Throwable $e) {
         $resultados['errores']++;
-        error_log("Error guardando chollo: " . $e->getMessage());
+        log_error("Error guardando chollo: " . $e->getMessage());
     }
 }
 

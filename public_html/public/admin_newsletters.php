@@ -218,7 +218,7 @@ if ($collection_newsletters) {
         ]);
         $newsletters = iterator_to_array($newsletters_cursor);
     } catch (Throwable $e) {
-        error_log("Error al obtener newsletters: " . $e->getMessage());
+        log_error("Error al obtener newsletters: " . $e->getMessage());
     }
 }
 
@@ -230,7 +230,7 @@ if ($collection_queue) {
     try {
         $pendientes_total = $collection_queue->countDocuments(['estado' => 'pendiente']);
     } catch (Throwable $e) {
-        error_log("Error al contar pendientes: " . $e->getMessage());
+        log_error("Error al contar pendientes: " . $e->getMessage());
     }
 }
 

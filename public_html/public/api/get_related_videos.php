@@ -1,4 +1,5 @@
 <?php
+include_once __DIR__ . '/../../inc/logger.php';
 // API Endpoint para obtener videos relacionados
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -33,7 +34,7 @@ try {
     $product_name = extractProductNameGroq($chollo['titulo'], $chollo['descripcion'] ?? '');
     
     if ($debug) {
-        error_log("Producto detectado: " . $product_name);
+        log_info("Producto detectado: " . $product_name);
     }
 
     // 2. Buscar videos (Shorts y Normales)

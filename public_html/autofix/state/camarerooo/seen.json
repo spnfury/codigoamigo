@@ -1,0 +1,9 @@
+{
+    "4400c030636196e7": {
+        "estado": "manual",
+        "archivo": "/home/admin/web/camarerooo.cladoo.com/laravel/public/index.php",
+        "linea": 8,
+        "tipo": "Warning: file_exists(): open_basedir restriction in effect. File(/home/admin/web/camarerooo.cladoo.com/laravel/public/../storage/framework/maintenance.php) is not within the allowed path(s): (/home/admin/.composer:/home/admin/web/camarerooo.cladoo.com/public_html:/home/admin/web/camarerooo.cladoo.com/private:/home/admin/web/camarerooo.cladoo.com/public_shtml:/home/admin/tmp:/tmp:/bin:/usr/bin:/usr/local/bin:/usr/share:/opt)",
+        "ts_ultimo": "2026-07-18 07:05:01"
+    }
+}

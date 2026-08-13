@@ -232,29 +232,28 @@ function googleLoginEndpoint(googleUser) {
 // Toggle auto-renovar destacado
 function toggleAutoRenovar(el) {
     var codigoId = el.getAttribute('data-codigo-id');
-    el.style.opacity = '0.5';
+    if (el.classList.contains('is-loading')) return;
+    el.classList.add('is-loading');
     $.ajax({
         url: '/myphp/ajax_actions.php',
         method: 'POST',
         data: { metodo: 'toggle_auto_renovar', codigo_id: codigoId },
         success: function(resp) {
-            el.style.opacity = '1';
+            el.classList.remove('is-loading');
             let jsonResp = typeof resp === 'string' ? JSON.parse(resp) : resp;
             if (jsonResp.success) {
                 if (jsonResp.auto_renovar) {
-                    el.style.background = 'linear-gradient(135deg,#28a745,#20c997)';
-                    el.style.color = 'white';
-                    el.innerHTML = '🔄 Auto ON';
-                    el.title = 'Auto-renovación activada: se renovará desde tu saldo al expirar';
+                    el.classList.add('is-on');
+                    el.setAttribute('aria-checked', 'true');
+                    el.title = 'Auto-renovación activada: se renovará desde tu saldo al expirar el destacado';
                 } else {
-                    el.style.background = '#e9ecef';
-                    el.style.color = '#666';
-                    el.innerHTML = '🔄 Auto OFF';
-                    el.title = 'Activa la auto-renovación para renovar automáticamente desde tu saldo';
+                    el.classList.remove('is-on');
+                    el.setAttribute('aria-checked', 'false');
+                    el.title = 'Activa la auto-renovación para renovar el destacado automáticamente desde tu saldo';
                 }
             }
         },
-        error: function() { el.style.opacity = '1'; }
+        error: function() { el.classList.remove('is-loading'); }
     });
 }
 
@@ -437,46 +436,6 @@ $(document).ready(function () {
 
 
 
-	$(document).on('click', '.envia_buzz', function (event) {
-
-
-		//$(".block_menu_mobile").addClass("hide");
-
-		//$("#modal_statistics").html('');
-
-		var boton = $(this);
-
-		$.ajax({
-			type: "POST",
-			url: "/myphp/ajax_actions.php",
-			data: {
-				metodo: "enviar_buzz_codigo",
-				marca: $(this).attr("data-marca"),
-				descuento: $(this).attr("data-descuento"),
-				id_user: $(this).attr("data-codigo-id-user"),
-				data_codigo_id: $(this).attr("data-codigo-id"),
-				data_codigo_url: $(this).attr("data-codigo-url"),
-			},
-			cache: false,
-			success: function (data) {
-
-				if (data >= 0) {
-
-					showToast('Zumbido enviado al usuario. Te quedan ' + data + ' zumbidos disponibles');
-					boton.hide();
-
-				} else {
-					showToast('Zumbido no enviado. No te queda saldo de zumbidos. Puedes generar saldo haciendo login cada día.', 'warning');
-
-				}
-				//$("#modal_statistics").html(data);
-			}
-		});
-
-		//$("#modal_statistics").modal();
-
-
-	});
 
 
 

@@ -27,19 +27,29 @@ require_once __DIR__ . '/../myphp/email_helper.php';
 
 $apply = in_array('--apply', $argv ?? [], true);
 $limit = 200;
+$max_dias = 730; // ver nota sobre la ventana más abajo
 foreach ($argv ?? [] as $arg) {
     if (preg_match('/^--limit=(\d+)$/', $arg, $m)) {
         $limit = (int)$m[1];
     }
+    if (preg_match('/^--max-dias=(\d+)$/', $arg, $m)) {
+        $max_dias = (int)$m[1];
+    }
 }
 
-echo "Modo: " . ($apply ? "APPLY" : "DRY-RUN") . " | Cap: $limit envíos\n\n";
+echo "Modo: " . ($apply ? "APPLY" : "DRY-RUN") . " | Cap: $limit envíos | Ventana: 90-{$max_dias}d\n\n";
 
 $collection_codigos = getCollectionCodigos();
 $collection_usuarios = getCollectionUsuarios();
 
-$umbral_inactividad_max = strtotime('-90 days');  // al menos 90d sin publicar
-$umbral_inactividad_min = strtotime('-365 days'); // pero menos de 365d (cuentas más viejas suelen ser zombi)
+$umbral_inactividad_max = strtotime('-90 days');   // al menos 90d sin publicar
+// Suelo de la ventana. Era 365d fijo, lo que dejaba fuera a 12.300 de los
+// 12.599 publicadores únicos (auditoría 2026-07-27) — el grueso de la base
+// se registró en 2019-2021. Se sube a 730d y se hace configurable para poder
+// escalar por fases: esos emails llevan años sin tocarse y un envío masivo de
+// golpe dispararía rebotes y quejas de spam (dominio quemado). Ampliar
+// gradualmente vigilando la tasa de rebote en Brevo antes de subir más.
+$umbral_inactividad_min = strtotime("-{$max_dias} days");
 $umbral_email_cooldown = strtotime('-30 days');
 
 // 1. Encontrar fecha del último código por usuario (cualquier estado activo)
@@ -111,10 +121,13 @@ foreach ($inactivos as $row) {
 
     echo "  - $to_email | $total_codigos códigos | ${dias_inactivo}d inactivo | potencial: " . number_format($total_potential, 2) . "€ ($total_viewers viewers)\n";
 
-    // Skip si potencial = 0: subject "0€ esperándote" mata la apertura
+    // Antes se saltaba a todo el que tuviera potencial 0 porque el asunto
+    // rezaba "0€ esperándote". El asunto ya no menciona la cifra, y con las
+    // vistas actuales de la plataforma (38 en 7 días, auditoría 2026-07-27)
+    // el potencial sale 0 para casi todos: el filtro descartaba 143 de 213
+    // destinatarios (67%). Se mantiene el contador solo como métrica.
     if ($total_potential <= 0) {
         $saltados_sin_potencial++;
-        continue;
     }
 
     if (!$apply) continue;
@@ -126,6 +139,15 @@ foreach ($inactivos as $row) {
                        . '<p style="margin:0 0 6px;font-weight:700;color:#1a5f8a;">Tu potencial de ganancias actual</p>'
                        . '<p style="margin:0;font-size:28px;font-weight:700;color:#27ae60;">' . number_format($total_potential, 2) . '€</p>'
                        . '<p style="margin:6px 0 0;font-size:13px;color:#555;">' . $total_viewers . ' personas han visto tus códigos. Cada uno puede usarlos y generarte comisiones.</p>'
+                       . '</div>';
+    } else {
+        // Sin viewers todavía: no inventamos una cifra. Se explica el motivo
+        // real (los códigos antiguos caen en el ranking de su marca) y qué
+        // hacer al respecto.
+        $potencial_html = '<div style="background:#fff8e1;border-left:4px solid #f0ad4e;border-radius:6px;padding:18px 20px;margin:20px 0;">'
+                       . '<p style="margin:0 0 6px;font-weight:700;color:#8a6d1a;">Tus códigos han perdido visibilidad</p>'
+                       . '<p style="margin:0;font-size:13px;color:#555;">Los códigos más recientes aparecen por delante en cada marca. '
+                       . 'Publicar uno nuevo vuelve a situarte arriba y es lo que hace que otros usuarios lo vean y lo usen.</p>'
                        . '</div>';
     }
 

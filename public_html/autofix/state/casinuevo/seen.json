@@ -1,0 +1,9 @@
+{
+    "a8653d1d565f2536": {
+        "estado": "manual",
+        "archivo": "/home/casinuevo_user/web/casinovios.com/public_html/src/Helpers/SessionHelper.php",
+        "linea": 117,
+        "tipo": "Warning: session_start(): Session ID is too long or contains illegal characters. Only the A-Z, a-z, 0-9, &quot;-&quot;, and &quot;,&quot; characters are allowed",
+        "ts_ultimo": "2026-08-05 04:10:01"
+    }
+}

@@ -19,9 +19,20 @@ if (!$release) {
     $release = 'codigoamigo@unknown';
 }
 
+// DSN y token viven en env / private/api_secrets.php (fuera de git)
+$sentry_secrets_path = dirname(__DIR__, 2) . '/private/api_secrets.php';
+if (is_readable($sentry_secrets_path)) {
+    require_once $sentry_secrets_path;
+}
+$sentry_env = function ($key) {
+    if (!empty($_ENV[$key])) return $_ENV[$key];
+    $v = getenv($key);
+    return ($v !== false && $v !== '') ? $v : '';
+};
+
 return [
-    'dsn' => 'https://5d64a3afc75a3b86dc15bd6ad35ac508@o231422.ingest.us.sentry.io/4510326275964928',
-    'auth_token' => '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',
+    'dsn' => $sentry_env('SENTRY_DSN'),
+    'auth_token' => $sentry_env('SENTRY_AUTH_TOKEN'),
     'org_slug' => 'sergi-rodriguez',
     'options' => [
         'environment' => $environment,

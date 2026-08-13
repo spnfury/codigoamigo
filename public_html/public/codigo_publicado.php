@@ -155,6 +155,20 @@ get_header_new(
                         </div>
                     </div>
 
+                    <!-- Sección para invitar amigos (momento de máxima intención: acaba de publicar) -->
+                    <div class="invita-amigos-section">
+                        <div class="invita-header-promo">
+                            <h3>🎁 Invita a un amigo y gana 5€</h3>
+                            <p class="invita-subtitle">Tu amigo recibe 5€ al registrarse y tú ganas otros 5€ cuando publique su primer código</p>
+                        </div>
+                        <div class="invita-cta">
+                            <a href="/invitar-amigos" class="btn-invita-now">
+                                <i class="fas fa-gift"></i>
+                                Invitar amigos ahora
+                            </a>
+                        </div>
+                    </div>
+
                     <!-- Sección de URL de afiliado (menos relevante) -->
                     <div class="asignar-url-section-minimal" style="display: none;">
                         <p class="text-muted" style="font-size: 0.9rem; margin: 20px 0;">
@@ -179,11 +193,11 @@ get_header_new(
                                 <strong>Comparte tu código</strong>
                                 <p>Cuantas más personas lo usen, más ganarás</p>
                             </div>
-                            <div class="tip-item">
+                            <a href="/invitar-amigos" class="tip-item" style="text-decoration: none; display: block;">
                                 <i class="fas fa-users"></i>
                                 <strong>Invita a amigos</strong>
-                                <p>Cuéntales sobre tu código descuento</p>
-                            </div>
+                                <p>Gana 5€ por cada amigo que se una</p>
+                            </a>
                             <div class="tip-item">
                                 <i class="fas fa-star"></i>
                                 <strong>Calidad importa</strong>
@@ -686,6 +700,67 @@ get_header_new(
 
 .btn-link-secondary:hover {
     color: white;
+}
+
+/* Estilos para la sección de invitar amigos */
+.invita-amigos-section {
+    background: linear-gradient(135deg, #00c853 0%, #00a844 100%);
+    border-radius: 20px;
+    padding: 35px 30px;
+    margin: 40px auto;
+    max-width: 800px;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0, 200, 83, 0.3);
+}
+
+.invita-header-promo h3 {
+    color: white;
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+
+.invita-subtitle {
+    color: rgba(255,255,255,0.95);
+    font-size: 1.05rem;
+    margin: 0 0 25px 0;
+}
+
+.btn-invita-now {
+    background: white;
+    color: #00a844;
+    padding: 16px 36px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    border-radius: 12px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+}
+
+.btn-invita-now:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+    color: #00a844;
+}
+
+@media (max-width: 768px) {
+    .invita-amigos-section {
+        padding: 25px 20px;
+        margin: 30px auto;
+    }
+    .invita-header-promo h3 {
+        font-size: 1.4rem;
+    }
+    .btn-invita-now {
+        width: 100%;
+        max-width: 300px;
+        justify-content: center;
+    }
 }
 
 /* Estilos para la sección de asignación de URL (minimal) */

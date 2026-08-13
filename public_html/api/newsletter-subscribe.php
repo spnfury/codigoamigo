@@ -145,7 +145,7 @@ try {
     }
     
 } catch (Exception $e) {
-    error_log("Error en newsletter-subscribe: " . $e->getMessage());
+    log_error("Error en newsletter-subscribe: " . $e->getMessage());
     echo json_encode([
         'success' => false, 
         'message' => 'Error interno del servidor. Inténtalo más tarde.'

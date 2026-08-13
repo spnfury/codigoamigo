@@ -73,7 +73,7 @@ try {
         ]);
     }
 } catch (Throwable $e) {
-    error_log("Error en registrar_vista_codigo.php: " . $e->getMessage());
+    log_error("Error en registrar_vista_codigo.php: " . $e->getMessage());
     echo json_encode([
         'success' => false,
         'error' => 'Error interno del servidor'

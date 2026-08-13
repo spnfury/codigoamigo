@@ -1,0 +1,23 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Inflate Stats') {
+            steps {
+                script {
+                    echo 'Starting Stats Inflation...'
+                    sh 'php /home/admin/web/codigoamigo.com/public_html/scripts/inflate_stats.php'
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo 'Stats inflated successfully!'
+        }
+        failure {
+            echo 'Failed to inflate stats.'
+        }
+    }
+}
